@@ -20,6 +20,8 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import org.lwjgl.glfw.GLFW;
+import com.gtceu.calcboard.client.gui.dialog.modal.IBoardModal;
+import com.gtceu.calcboard.client.gui.dialog.modal.ModalRenderContext;
 
 import java.util.*;
 
@@ -28,7 +30,7 @@ import java.util.*;
  * Provides multi-page process net balance aggregation, total generation vs consumption power balance,
  * and per-item drill-down source/sink contribution analysis.
  */
-public class GlobalBalanceDashboardDialog {
+public class GlobalBalanceDashboardDialog implements IBoardModal {
     private final BoardScreen parent;
     private boolean visible = false;
 
@@ -68,14 +70,19 @@ public class GlobalBalanceDashboardDialog {
         return visible;
     }
 
+    private List<BoardPage> getDisplayPages() {
+        return BoardManager.getInstance().getPages().stream()
+                .filter(p -> !p.isModuleSubPage())
+                .toList();
+    }
+
     public void open() {
         this.visible = true;
         this.pageScrollY = 0;
         this.itemScrollY = 0;
         this.contributionPopup.close();
 
-        // Default: select all pages if nothing selected
-        List<BoardPage> pages = BoardManager.getInstance().getPages();
+        List<BoardPage> pages = getDisplayPages();
         if (selectedPageIds.isEmpty()) {
             for (BoardPage page : pages) {
                 selectedPageIds.add(page.getId());
@@ -110,7 +117,7 @@ public class GlobalBalanceDashboardDialog {
 
     private void updateSummaryIfNeeded() {
         if (dirty || cachedSummary == null) {
-            List<BoardPage> allPages = BoardManager.getInstance().getPages();
+            List<BoardPage> allPages = getDisplayPages();
             List<BoardPage> selectedPages = new ArrayList<>();
             for (BoardPage p : allPages) {
                 if (selectedPageIds.contains(p.getId())) {
@@ -120,6 +127,11 @@ public class GlobalBalanceDashboardDialog {
             this.cachedSummary = GlobalBalanceAggregator.compute(selectedPages);
             this.dirty = false;
         }
+    }
+
+    @Override
+    public void renderModal(ModalRenderContext context) {
+        render(context.graphics(), context.screenWidth(), context.screenHeight(), context.mouseX(), context.mouseY());
     }
 
     public void render(GuiGraphics graphics, int screenWidth, int screenHeight, int mouseX, int mouseY) {
@@ -140,16 +152,13 @@ public class GlobalBalanceDashboardDialog {
         graphics.pose().pushPose();
         graphics.pose().translate(0, 0, 600.0f);
 
-        // 1. Semi-transparent Black Dim Overlay
         graphics.fill(0, 0, screenWidth, screenHeight, 0x88000000);
 
-        // 2. Dialog Main Container Background & Border
         graphics.fill(dialogX, dialogY, dialogX + dialogW, dialogY + dialogH, 0xF2121722);
         graphics.renderOutline(dialogX, dialogY, dialogW, dialogH, 0xFF3D4B66);
 
-        // 3. Header Bar
         graphics.fill(dialogX, dialogY, dialogX + dialogW, dialogY + 24, 0xFF1C2433);
-        graphics.drawString(font, "§6📊 " + Component.translatable("gui.gtcalcboard.global_balance.modal_title").getString(), dialogX + 10, dialogY + 8, 0xFFFFFFFF, false);
+        graphics.drawString(font, "§6∑ " + Component.translatable("gui.gtcalcboard.global_balance.modal_title").getString(), dialogX + 10, dialogY + 8, 0xFFFFFFFF, false);
 
         // Close Button [✕]
         int closeX = dialogX + dialogW - 20;
@@ -159,7 +168,6 @@ public class GlobalBalanceDashboardDialog {
         graphics.renderOutline(closeX, closeY, 16, 16, closeHover ? 0xFFFF4444 : 0xFF4A5A78);
         graphics.drawCenteredString(font, "✕", closeX + 8, closeY + 4, closeHover ? 0xFFFFFFFF : 0xFFAAAAAA);
 
-        // 4. Top Summary Banner (Power Balance + Machine Stats)
         int bannerY = dialogY + 26;
         int bannerH = 26;
         graphics.fill(dialogX + 6, bannerY, dialogX + dialogW - 6, bannerY + bannerH, 0xDD18202E);
@@ -178,10 +186,10 @@ public class GlobalBalanceDashboardDialog {
             powerText = "§e⚡ " + Component.translatable("gui.gtcalcboard.global_balance.power_balanced").getString();
             powerColor = 0xFFFFAA00;
         } else if (netEUt > 0) {
-            powerText = "§a⚡ +" + FormatUtil.formatEUt(netEUt) + " (" + Component.translatable("gui.gtcalcboard.global_balance.power_surplus").getString() + " 🟢)";
+            powerText = "§a⚡ +" + FormatUtil.formatEUt(netEUt) + " (" + Component.translatable("gui.gtcalcboard.global_balance.power_surplus").getString() + " ●)";
             powerColor = 0xFF55FF55;
         } else {
-            powerText = "§c⚡ -" + FormatUtil.formatEUt(-netEUt) + " (" + Component.translatable("gui.gtcalcboard.global_balance.power_deficit").getString() + " 🔴)";
+            powerText = "§c⚡ -" + FormatUtil.formatEUt(-netEUt) + " (" + Component.translatable("gui.gtcalcboard.global_balance.power_deficit").getString() + " ●)";
             powerColor = 0xFFFF5555;
         }
 
@@ -197,7 +205,7 @@ public class GlobalBalanceDashboardDialog {
         String countFormatted = cachedSummary.totalMachineCount() >= 100_000
             ? FormatUtil.formatCompactNumber(cachedSummary.totalMachineCount())
             : String.format(Locale.ROOT, "%,d", cachedSummary.totalMachineCount());
-        String machStr = "§6🏭 " + countFormatted + Component.translatable("gui.gtcalcboard.machine_unit").getString();
+        String machStr = "§6▦ " + countFormatted + Component.translatable("gui.gtcalcboard.machine_unit").getString();
         int machW = font.width(machStr);
         int machX = dialogX + dialogW - 18 - machW;
         graphics.drawString(font, machStr, machX, pY, 0xFFFFFFFF, false);
@@ -207,17 +215,14 @@ public class GlobalBalanceDashboardDialog {
         int pageCountW = font.width(pageCountStr);
         graphics.drawString(font, pageCountStr, machX - pageCountW - 8, pY, 0xFFAAAAAA, false);
 
-        // 5. Left Sidebar (Included Pages List & Selection Controls)
         int sidebarX = dialogX + 6;
         int sidebarY = bannerY + bannerH + 4;
         int sidebarH = dialogH - (sidebarY - dialogY) - 6;
 
         renderSidebar(graphics, font, sidebarX, sidebarY, SIDEBAR_WIDTH, sidebarH, mouseX, mouseY);
 
-        // Separator between sidebar and main content
         graphics.fill(dialogX + SIDEBAR_WIDTH + 8, sidebarY, dialogX + SIDEBAR_WIDTH + 9, sidebarY + sidebarH, 0xFF283448);
 
-        // 6. Right Main Content (Material Balance List & Filter Controls)
         int mainX = dialogX + SIDEBAR_WIDTH + 12;
         int mainY = sidebarY;
         int mainW = dialogW - SIDEBAR_WIDTH - 18;
@@ -227,7 +232,6 @@ public class GlobalBalanceDashboardDialog {
 
         graphics.pose().popPose();
 
-        // 7. Render Drill-Down Popup (Highest dialog layer)
         if (contributionPopup.isVisible()) {
             contributionPopup.render(graphics, screenWidth, screenHeight, mouseX, mouseY);
         } else {
@@ -243,7 +247,7 @@ public class GlobalBalanceDashboardDialog {
 
         // Header Title
         graphics.fill(x, y, x + w, y + 16, 0xCC1C2536);
-        graphics.drawString(font, "§6📑 " + Component.translatable("gui.gtcalcboard.global_balance.included_pages").getString(), x + 6, y + 4, 0xFFFFFFFF, false);
+        graphics.drawString(font, "§6▪ " + Component.translatable("gui.gtcalcboard.global_balance.included_pages").getString(), x + 6, y + 4, 0xFFFFFFFF, false);
 
         // Bottom Action Buttons ([Select All] / [Deselect All])
         int btnH = 15;
@@ -268,7 +272,7 @@ public class GlobalBalanceDashboardDialog {
         int listY = y + 18;
         int listH = btnY - listY - 2;
 
-        List<BoardPage> pages = BoardManager.getInstance().getPages();
+        List<BoardPage> pages = getDisplayPages();
         int rowH = 18;
         int totalH = pages.size() * rowH;
         maxPageScrollY = Math.max(0, totalH - listH);
@@ -381,7 +385,7 @@ public class GlobalBalanceDashboardDialog {
         final double netRate;
         final double producedRate;
         final double consumedRate;
-        final int statusType; // 0: Deficit (🔴), 1: Surplus (🟢), 2: Balanced (🟢/🔵)
+        final int statusType; // 0: Deficit (●), 1: Surplus (●), 2: Balanced (●/●)
 
         BalanceRowItem(IngredientStack stack, double netRate, double producedRate, double consumedRate, int statusType) {
             this.stack = stack;
@@ -448,34 +452,29 @@ public class GlobalBalanceDashboardDialog {
         graphics.fill(x, y, x + w, y + h, rowBg);
         graphics.renderOutline(x, y, w, h, rowBorder);
 
-        // 1. Icon
         IngredientRenderer.render(graphics, item.stack, x + 4, y + 1);
 
-        // 2. Rightmost Status Tag: [Deficit 🔴] / [Surplus 🟢] / [Balanced 🟢]
         String tagStr = switch (item.statusType) {
-            case 0 -> "§c[" + Component.translatable("gui.gtcalcboard.tooltip.deficit").getString() + " 🔴]";
-            case 1 -> "§a[" + Component.translatable("gui.gtcalcboard.tooltip.surplus").getString() + " 🟢]";
-            default -> "§b[" + Component.translatable("gui.gtcalcboard.global_balance.balanced_tag").getString() + " 🟢]";
+            case 0 -> "§c[" + Component.translatable("gui.gtcalcboard.tooltip.deficit").getString() + " ●]";
+            case 1 -> "§a[" + Component.translatable("gui.gtcalcboard.tooltip.surplus").getString() + " ●]";
+            default -> "§b[" + Component.translatable("gui.gtcalcboard.global_balance.balanced_tag").getString() + " ●]";
         };
         int tagW = font.width(tagStr);
         int tagX = x + w - 6 - tagW;
         graphics.drawString(font, tagStr, tagX, y + 5, 0xFFFFFFFF, false);
 
-        // 3. Net Rate: e.g. -1.08M B/s or +282.01/s
         String sign = item.netRate > 0.0001 ? "+" : "";
-        String rateFormatted = sign + NodeCardRenderer.formatRate(item.netRate, item.stack.isFluid());
+        String rateFormatted = sign + (item.stack.isStressUnit() ? FormatUtil.formatRate(item.netRate, item.stack) : NodeCardRenderer.formatRate(item.netRate, item.stack.isFluid()));
         int rateColor = item.statusType == 0 ? 0xFFFF5555 : (item.statusType == 1 ? 0xFF55FF55 : 0xFF55FFFF);
         int rateW = font.width(rateFormatted);
         int rateX = tagX - 6 - rateW;
         graphics.drawString(font, rateFormatted, rateX, y + 5, rateColor, false);
 
-        // 4. Flow Details: (+Prod -Cons) dynamically placed to the left of Net Rate
         String flowDetails = String.format("§7(+%s -%s)", FormatUtil.formatCompactNumber(item.producedRate), FormatUtil.formatCompactNumber(item.consumedRate));
         int flowW = font.width(flowDetails);
         int flowX = rateX - 6 - flowW;
         graphics.drawString(font, flowDetails, flowX, y + 5, 0xFF888888, false);
 
-        // 5. Name: dynamically sized to fit available width between Icon (x + 24) and Flow Details (flowX)
         int maxNameW = Math.max(20, (flowX - 6) - (x + 24));
         String name = item.stack.getDisplayName();
         if (font.width(name) > maxNameW) {
@@ -506,7 +505,7 @@ public class GlobalBalanceDashboardDialog {
 
         if (hoveredMachines && cachedSummary != null && !cachedSummary.machineBreakdown().isEmpty()) {
             List<Component> tooltip = new ArrayList<>();
-            tooltip.add(Component.literal("§6🏭 " + Component.translatable("gui.gtcalcboard.total_machines_breakdown").getString()));
+            tooltip.add(Component.literal("§6▦ " + Component.translatable("gui.gtcalcboard.total_machines_breakdown").getString()));
             for (Map.Entry<String, Integer> entry : cachedSummary.machineBreakdown().entrySet()) {
                 tooltip.add(Component.literal("§7• " + entry.getKey() + ": §f" + entry.getValue() + Component.translatable("gui.gtcalcboard.machine_unit").getString()));
             }
@@ -517,12 +516,58 @@ public class GlobalBalanceDashboardDialog {
         if (hoveredStack != null) {
             List<Component> tooltip = new ArrayList<>();
             tooltip.add(Component.literal(hoveredStack.getDisplayName()));
-            String exactRateStr = FormatUtil.formatExactRate(hoveredRate, hoveredStack.isFluid());
+            String exactRateStr = FormatUtil.formatExactRate(hoveredRate, hoveredStack);
             String ratePrefix = hoveredRate > 0 ? "+" : "";
             tooltip.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.global_balance.net_rate").getString() + ": §f" + ratePrefix + exactRateStr));
+            appendRecirculationBreakdown(tooltip, hoveredStack);
             tooltip.add(Component.literal("§8" + Component.translatable("gui.gtcalcboard.global_balance.click_drilldown_hint").getString()));
             com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer.renderComponentTooltip(graphics, font, tooltip, mouseX, mouseY, screenWidth, screenHeight);
         }
+    }
+
+    private void appendRecirculationBreakdown(List<Component> tooltip, IngredientStack stack) {
+        if (stack == null) return;
+        double[] totals = new double[2];
+        for (BoardPage page : getDisplayPages()) {
+            if (selectedPageIds.contains(page.getId())) {
+                accumulatePageRecirculation(page, stack, totals);
+            }
+        }
+        if (totals[0] > 0.0001) {
+            String recircStr = FormatUtil.formatExactRate(totals[0], stack);
+            String totalStr = FormatUtil.formatExactRate(totals[1], stack);
+            tooltip.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.internal_recirculation").getString() + ": §b" + recircStr));
+            tooltip.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.total_recirculation_throughput").getString() + ": §a" + totalStr));
+        }
+    }
+
+    private void accumulatePageRecirculation(BoardPage page, IngredientStack stack, double[] totals) {
+        if (page.getGraph() == null) return;
+        var metas = com.gtceu.calcboard.api.solver.FixedPointEfficiencySolver.precomputeDampedLoopMetas(page.getGraph(), null);
+        for (var meta : metas) {
+            accumulateMetaRecirculation(page.getGraph(), meta, stack, totals);
+        }
+    }
+
+    private void accumulateMetaRecirculation(
+            com.gtceu.calcboard.api.model.FlowGraph graph,
+            com.gtceu.calcboard.api.solver.FixedPointEfficiencySolver.PrecomputedDampedLoopMeta meta,
+            IngredientStack stack,
+            double[] totals
+    ) {
+        if (!meta.resource().matches(stack)) return;
+        double sExt = meta.computeExternalSupply(graph, null, null);
+        double sSteady = meta.computeSteadyStateSupply(graph, null, null);
+        double internalLoop = Math.max(0.0, sSteady - sExt);
+        totals[0] += internalLoop;
+        totals[1] += sSteady;
+    }
+
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        int screenW = parent != null && parent.width > 0 ? parent.width : Minecraft.getInstance().getWindow().getGuiScaledWidth();
+        int screenH = parent != null && parent.height > 0 ? parent.height : Minecraft.getInstance().getWindow().getGuiScaledHeight();
+        return mouseClicked(mouseX, mouseY, button, screenW, screenH);
     }
 
     public boolean mouseClicked(double mouseX, double mouseY, int button, int screenWidth, int screenHeight) {
@@ -546,7 +591,6 @@ public class GlobalBalanceDashboardDialog {
             return true;
         }
 
-        // 2. Sidebar selection buttons & checkboxes
         int sidebarX = dialogX + 6;
         int bannerH = 26;
         int sidebarY = dialogY + 26 + bannerH + 4;
@@ -560,7 +604,7 @@ public class GlobalBalanceDashboardDialog {
 
         // [Select All] clicked
         if (mouseX >= allBtnX && mouseX <= allBtnX + btnW && mouseY >= btnY && mouseY <= btnY + btnH && button == 0) {
-            for (BoardPage page : BoardManager.getInstance().getPages()) {
+            for (BoardPage page : getDisplayPages()) {
                 selectedPageIds.add(page.getId());
             }
             this.dirty = true;
@@ -576,11 +620,10 @@ public class GlobalBalanceDashboardDialog {
             return true;
         }
 
-        // Page Checkbox Rows clicked
         int pageListY = sidebarY + 18;
         int pageListH = btnY - pageListY - 2;
         if (mouseX >= sidebarX && mouseX <= sidebarX + SIDEBAR_WIDTH && mouseY >= pageListY && mouseY <= pageListY + pageListH && button == 0) {
-            List<BoardPage> pages = BoardManager.getInstance().getPages();
+            List<BoardPage> pages = getDisplayPages();
             int rowH = 18;
             int clickedIdx = (int) ((mouseY - pageListY + pageScrollY) / rowH);
             if (clickedIdx >= 0 && clickedIdx < pages.size()) {
@@ -596,7 +639,6 @@ public class GlobalBalanceDashboardDialog {
             }
         }
 
-        // 3. Filter Tabs
         int mainX = dialogX + SIDEBAR_WIDTH + 12;
         int tabY = sidebarY + 3;
         int tabH = 14;
@@ -625,7 +667,6 @@ public class GlobalBalanceDashboardDialog {
             return true;
         }
 
-        // 4. Material Row click -> Open Drilldown Popup
         int itemListY = sidebarY + 22;
         int mainW = dialogW - SIDEBAR_WIDTH - 18;
         int itemListH = sidebarH - 26;

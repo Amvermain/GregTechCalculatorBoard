@@ -158,8 +158,10 @@ public final class RecipeSearchCacheManager {
 
                 CACHING_PROGRESS = new RecipeLoadingProgress(2, 4, "gui.gtcalcboard.loading_recipe_phase.2", rawList.size() + " Recipes");
                 List<SearchableRecipe> tempList = new ArrayList<>(rawList);
-                if (ModCompatHelper.isCreateLoaded() || ModCompatHelper.isCreateNewAgeLoaded() || ModCompatHelper.isCreateAdditionsLoaded()) {
-                    tempList.addAll(com.gtceu.calcboard.compat.create.CreateModAdapter.getVirtualKineticSearchRecipes());
+                for (com.gtceu.calcboard.api.spi.IModAdapter modAdapter : com.gtceu.calcboard.api.spi.ModAdapterRegistry.getAllLoadedAdapters()) {
+                    try {
+                        modAdapter.collectNativeCatalogRecipes(tempList);
+                    } catch (Throwable ignored) {}
                 }
 
                 synchronized (GLOBAL_RECIPES) {

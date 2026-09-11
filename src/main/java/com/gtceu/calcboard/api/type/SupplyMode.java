@@ -7,7 +7,8 @@ public enum SupplyMode {
     NONE("gui.gtcalcboard.junction.supply_mode.none", false, false),
     INFINITE("gui.gtcalcboard.junction.supply_mode.infinite", true, false),
     FIXED_RATE("gui.gtcalcboard.junction.supply_mode.fixed_rate", true, false),
-    VOID_SINK("gui.gtcalcboard.junction.supply_mode.void_sink", false, true);
+    VOID_SINK("gui.gtcalcboard.junction.supply_mode.void_sink", false, true),
+    FIXED_DRAIN("gui.gtcalcboard.junction.supply_mode.fixed_drain", false, true);
 
     private final String translationKey;
     private final boolean isExternal;
@@ -33,5 +34,9 @@ public enum SupplyMode {
 
     public boolean isSink() {
         return isSink;
+    }
+
+    public boolean isFixedDrain() {
+        return this == FIXED_DRAIN;
     }
 }

@@ -176,7 +176,7 @@ public class BlueprintFileManager {
                 FolderBlueprintPackage folderPkg = loadFolderBlueprint(file);
                 if (folderPkg != null) {
                     BlueprintMetadata meta = new BlueprintMetadata();
-                    meta.setTitle("📁 " + folderPkg.getRootFolderName() + " (" + folderPkg.getPages().size() + " pages)");
+                    meta.setTitle("≡ " + folderPkg.getRootFolderName() + " (" + folderPkg.getPages().size() + " pages)");
                     meta.setDescription(folderPkg.getDescription());
                     meta.setAuthor(folderPkg.getAuthor());
                     int totalNodes = folderPkg.getPages().stream().mapToInt(p -> p.graph() != null ? p.graph().getNodes().size() : 0).sum();

@@ -470,7 +470,7 @@ public class CompoundNodeTest {
         Assertions.assertEquals(7, cluster.nodes().size(), "Must generate exactly 7 Layer nodes");
         Assertions.assertNotNull(cluster.frame(), "Must generate a compound frame");
         Assertions.assertTrue(cluster.frame().isCompoundFrame());
-        Assertions.assertEquals("🧩 Stargate Component Assembly (7-Layer)", cluster.frame().getTitle());
+        Assertions.assertEquals("▦ Stargate Component Assembly (7-Layer)", cluster.frame().getTitle());
 
         for (int i = 0; i < 7; i++) {
             RecipeNode node = cluster.nodes().get(i);

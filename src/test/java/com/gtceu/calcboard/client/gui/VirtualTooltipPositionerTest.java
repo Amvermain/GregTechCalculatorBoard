@@ -65,5 +65,13 @@ public class VirtualTooltipPositionerTest {
 
         String simpleShift = BoardTooltipRenderer.formatPortRate(5.0, false, true, hiddenRefSimple);
         Assertions.assertEquals(simpleNoShift, simpleShift, "When compact equals exact, shift must not add redundant parentheses");
+
+        boolean[] hiddenRefAutoBucket = new boolean[]{false};
+        String autoBucketNoShift = BoardTooltipRenderer.formatPortRate(1638.4, true, false, hiddenRefAutoBucket);
+        Assertions.assertTrue(hiddenRefAutoBucket[0], "hiddenRef must be true when fluid rate in Buckets is rounded");
+        Assertions.assertEquals("1.64 B/s", autoBucketNoShift);
+
+        String autoBucketShift = BoardTooltipRenderer.formatPortRate(1638.4, true, true, hiddenRefAutoBucket);
+        Assertions.assertEquals("1.64 B/s §8(1.6384 B/s)", autoBucketShift);
     }
 }

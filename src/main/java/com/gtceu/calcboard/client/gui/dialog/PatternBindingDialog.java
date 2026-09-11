@@ -12,12 +12,15 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import org.lwjgl.glfw.GLFW;
 
+import com.gtceu.calcboard.client.gui.dialog.modal.IBoardModal;
+import com.gtceu.calcboard.client.gui.dialog.modal.ModalRenderContext;
+
 import java.util.Optional;
 
 /**
  * Modal dialog for inspecting and managing the 1:1 binding between the active page and an AE2 autocrafting pattern.
  */
-public class PatternBindingDialog {
+public class PatternBindingDialog implements IBoardModal {
 
     private final BoardScreen parent;
     private boolean visible = false;
@@ -39,6 +42,11 @@ public class PatternBindingDialog {
 
     public boolean isVisible() {
         return visible;
+    }
+
+    @Override
+    public void renderModal(ModalRenderContext context) {
+        render(context.graphics(), context.screenWidth(), context.screenHeight(), context.mouseX(), context.mouseY());
     }
 
     public void render(GuiGraphics graphics, int screenW, int screenH, int mouseX, int mouseY) {

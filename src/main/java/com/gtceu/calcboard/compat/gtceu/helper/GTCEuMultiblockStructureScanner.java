@@ -66,51 +66,7 @@ public class GTCEuMultiblockStructureScanner {
             }
 
             if (variants.isEmpty()) return null;
-
-            variants.sort(Comparator.comparingInt(d -> d.parts().stream().mapToInt(MultiblockStructurePart::amount).sum()));
-
-            MultiblockStructureDef largest = variants.get(variants.size() - 1);
-            int maxCoil = variants.stream().mapToInt(MultiblockStructureDef::coilSlotCount).max().orElse(0);
-            int maxEnergy = variants.stream().mapToInt(MultiblockStructureDef::energyHatchSlotCount).max().orElse(0);
-            int maxInBus = variants.stream().mapToInt(MultiblockStructureDef::inputBusSlotCount).max().orElse(0);
-            int maxOutBus = variants.stream().mapToInt(MultiblockStructureDef::outputBusSlotCount).max().orElse(0);
-            int maxInHatch = variants.stream().mapToInt(MultiblockStructureDef::inputHatchSlotCount).max().orElse(0);
-            int maxOutHatch = variants.stream().mapToInt(MultiblockStructureDef::outputHatchSlotCount).max().orElse(0);
-            int maxMaint = variants.stream().mapToInt(MultiblockStructureDef::maintenanceSlotCount).max().orElse(0);
-
-            GTCEuPatternScanner.PatternScanResult patternRes = GTCEuPatternScanner.scanPattern(def);
-            Class<?> mCls = GTCEuReflectionBridge.getMachineClass(def);
-            boolean supportsCoilAbility = (mCls != null && GTCEuReflectionBridge.isCoilWorkableClass(mCls))
-                    || MultiblockDetector.isCoilMultiblock(controllerId)
-                    || (GTCEuCoilModifierHelper.getCoilMachineSpec(controllerId).kind() != GTCEuCoilModifierHelper.CoilMachineKind.GENERIC);
-            if (!supportsCoilAbility) {
-                maxCoil = 0;
-            }
-
-            Set<ResourceLocation> allCandidates = new HashSet<>(patternRes.candidateBlocks());
-            for (MultiblockStructurePart p : largest.parts()) {
-                if (p != null && p.itemId() != null) {
-                    allCandidates.add(p.itemId());
-                }
-            }
-
-            MultiblockStructureDef canonicalDef = new MultiblockStructureDef(
-                    largest.controllerId(),
-                    largest.controllerName(),
-                    largest.parts(),
-                    maxCoil,
-                    maxEnergy,
-                    maxInBus,
-                    maxOutBus,
-                    maxInHatch,
-                    maxOutHatch,
-                    maxMaint,
-                    patternRes.allowedAbilities(),
-                    Collections.unmodifiableSet(allCandidates)
-            );
-
-            MultiblockStructureCatalog.registerStructure(canonicalDef, variants);
-            return canonicalDef;
+            return finalizeAndRegisterStructure(controllerId, def, variants);
         } catch (Throwable ignored) {}
         return null;
     }
@@ -161,47 +117,7 @@ public class GTCEuMultiblockStructureScanner {
 
                     if (variants.isEmpty()) continue;
 
-                    variants.sort(Comparator.comparingInt(d -> d.parts().stream().mapToInt(MultiblockStructurePart::amount).sum()));
-
-                    MultiblockStructureDef largest = variants.get(variants.size() - 1);
-                    int maxCoil = variants.stream().mapToInt(MultiblockStructureDef::coilSlotCount).max().orElse(0);
-                    int maxEnergy = variants.stream().mapToInt(MultiblockStructureDef::energyHatchSlotCount).max().orElse(0);
-                    int maxInBus = variants.stream().mapToInt(MultiblockStructureDef::inputBusSlotCount).max().orElse(0);
-                    int maxOutBus = variants.stream().mapToInt(MultiblockStructureDef::outputBusSlotCount).max().orElse(0);
-                    int maxInHatch = variants.stream().mapToInt(MultiblockStructureDef::inputHatchSlotCount).max().orElse(0);
-                    int maxOutHatch = variants.stream().mapToInt(MultiblockStructureDef::outputHatchSlotCount).max().orElse(0);
-                    int maxMaint = variants.stream().mapToInt(MultiblockStructureDef::maintenanceSlotCount).max().orElse(0);
-
-                    GTCEuPatternScanner.PatternScanResult patternRes = GTCEuPatternScanner.scanPattern(def);
-                    Class<?> mCls = GTCEuReflectionBridge.getMachineClass(def);
-                    boolean supportsCoilAbility = mCls != null && GTCEuReflectionBridge.isCoilWorkableClass(mCls);
-                    if (!supportsCoilAbility) {
-                        maxCoil = 0;
-                    }
-
-                    Set<ResourceLocation> scanCandidates = new HashSet<>(patternRes.candidateBlocks());
-                    for (MultiblockStructurePart p : largest.parts()) {
-                        if (p != null && p.itemId() != null) {
-                            scanCandidates.add(p.itemId());
-                        }
-                    }
-
-                    MultiblockStructureDef canonicalDef = new MultiblockStructureDef(
-                            largest.controllerId(),
-                            largest.controllerName(),
-                            largest.parts(),
-                            maxCoil,
-                            maxEnergy,
-                            maxInBus,
-                            maxOutBus,
-                            maxInHatch,
-                            maxOutHatch,
-                            maxMaint,
-                            patternRes.allowedAbilities(),
-                            Collections.unmodifiableSet(scanCandidates)
-                    );
-
-                    MultiblockStructureCatalog.registerStructure(canonicalDef, variants);
+                    finalizeAndRegisterStructure(controllerId, def, variants);
 
                     // Yield CPU every 3 multiblocks to maintain silky smooth 60+ FPS on render thread
                     if ((++count % 3) == 0) {
@@ -312,11 +228,6 @@ public class GTCEuMultiblockStructureScanner {
             String controllerName = MultiblockStructureCatalog.formatMachineName(controllerId.getPath());
             parts.add(0, new MultiblockStructurePart(controllerId, controllerName, 1, PartCategory.CONTROLLER));
 
-            if (!MultiblockDetector.isCoilMultiblock(controllerId)
-                    && GTCEuCoilModifierHelper.getCoilMachineSpec(controllerId).kind() == GTCEuCoilModifierHelper.CoilMachineKind.GENERIC) {
-                coilSlots = 0;
-            }
-
             return new MultiblockStructureDef(
                     controllerId,
                     controllerName,
@@ -332,6 +243,11 @@ public class GTCEuMultiblockStructureScanner {
         } catch (Throwable ignored) {
             return null;
         }
+    }
+
+    public static void invalidateTextCaches() {
+        ITEM_NAME_CACHE.clear();
+        BLOCK_NAME_CACHE.clear();
     }
 
     private static String resolveStackDisplayName(ItemStack stack, ResourceLocation id) {
@@ -372,6 +288,109 @@ public class GTCEuMultiblockStructureScanner {
     private static boolean isValidDisplayName(String name) {
         if (name == null || name.isBlank()) return false;
         return !name.startsWith("block.") && !name.startsWith("item.") && !name.startsWith("tagprefix.") && !name.equals("tagprefix.frame");
+    }
+
+    private static MultiblockStructureDef finalizeAndRegisterStructure(
+            ResourceLocation controllerId,
+            Object def,
+            List<MultiblockStructureDef> rawVariants
+    ) {
+        if (rawVariants == null || rawVariants.isEmpty()) return null;
+
+        rawVariants.sort(Comparator.comparingInt(d -> d.parts().stream().mapToInt(MultiblockStructurePart::amount).sum()));
+        MultiblockStructureDef largest = rawVariants.get(rawVariants.size() - 1);
+
+        int maxCoil = rawVariants.stream().mapToInt(MultiblockStructureDef::coilSlotCount).max().orElse(0);
+        int maxEnergy = rawVariants.stream().mapToInt(MultiblockStructureDef::energyHatchSlotCount).max().orElse(0);
+        int maxInBus = rawVariants.stream().mapToInt(MultiblockStructureDef::inputBusSlotCount).max().orElse(0);
+        int maxOutBus = rawVariants.stream().mapToInt(MultiblockStructureDef::outputBusSlotCount).max().orElse(0);
+        int maxInHatch = rawVariants.stream().mapToInt(MultiblockStructureDef::inputHatchSlotCount).max().orElse(0);
+        int maxOutHatch = rawVariants.stream().mapToInt(MultiblockStructureDef::outputHatchSlotCount).max().orElse(0);
+        int maxMaint = rawVariants.stream().mapToInt(MultiblockStructureDef::maintenanceSlotCount).max().orElse(0);
+
+        GTCEuPatternScanner.PatternScanResult patternRes = GTCEuPatternScanner.scanPattern(def);
+        Class<?> mCls = GTCEuReflectionBridge.getMachineClass(def);
+        boolean supportsCoilAbility = patternRes.allowedAbilities().contains("HEATING_COILS")
+                || (mCls != null && GTCEuReflectionBridge.isCoilWorkableClass(mCls))
+                || (GTCEuCoilModifierHelper.getCoilMachineSpec(controllerId).kind() != GTCEuCoilModifierHelper.CoilMachineKind.GENERIC);
+
+        if (!supportsCoilAbility) {
+            maxCoil = 0;
+        }
+
+        Set<String> finalAbilities = new HashSet<>(patternRes.allowedAbilities());
+        if (supportsCoilAbility && maxCoil > 0) {
+            finalAbilities.add("HEATING_COILS");
+            MultiblockDetector.registerCoilMultiblock(controllerId, null);
+        } else {
+            finalAbilities.remove("HEATING_COILS");
+        }
+
+        List<MultiblockStructurePart> sanitizedParts = sanitizePartsCoilCategory(largest.parts(), supportsCoilAbility);
+        List<MultiblockStructureDef> sanitizedVariants = sanitizeVariantsCoilCategory(rawVariants, supportsCoilAbility);
+
+        Set<ResourceLocation> allCandidates = new HashSet<>(patternRes.candidateBlocks());
+        for (MultiblockStructurePart p : sanitizedParts) {
+            if (p != null && p.itemId() != null) {
+                allCandidates.add(p.itemId());
+            }
+        }
+
+        MultiblockStructureDef canonicalDef = new MultiblockStructureDef(
+                largest.controllerId(),
+                largest.controllerName(),
+                sanitizedParts,
+                maxCoil,
+                maxEnergy,
+                maxInBus,
+                maxOutBus,
+                maxInHatch,
+                maxOutHatch,
+                maxMaint,
+                Collections.unmodifiableSet(finalAbilities),
+                Collections.unmodifiableSet(allCandidates)
+        );
+
+        MultiblockStructureCatalog.registerStructure(canonicalDef, sanitizedVariants);
+        return canonicalDef;
+    }
+
+    private static List<MultiblockStructurePart> sanitizePartsCoilCategory(List<MultiblockStructurePart> parts, boolean supportsCoilAbility) {
+        if (supportsCoilAbility || parts == null) return parts;
+        List<MultiblockStructurePart> sanitized = new ArrayList<>(parts.size());
+        for (MultiblockStructurePart part : parts) {
+            if (part != null && part.category() == PartCategory.COIL) {
+                sanitized.add(new MultiblockStructurePart(part.itemId(), part.displayName(), part.amount(), PartCategory.CASING));
+            } else {
+                sanitized.add(part);
+            }
+        }
+        return sanitized;
+    }
+
+    private static List<MultiblockStructureDef> sanitizeVariantsCoilCategory(List<MultiblockStructureDef> variants, boolean supportsCoilAbility) {
+        if (supportsCoilAbility || variants == null) return variants;
+        List<MultiblockStructureDef> sanitized = new ArrayList<>(variants.size());
+        for (MultiblockStructureDef v : variants) {
+            if (v == null) continue;
+            Set<String> cleanAbilities = new HashSet<>(v.allowedAbilities());
+            cleanAbilities.remove("HEATING_COILS");
+            sanitized.add(new MultiblockStructureDef(
+                    v.controllerId(),
+                    v.controllerName(),
+                    sanitizePartsCoilCategory(v.parts(), false),
+                    0,
+                    v.energyHatchSlotCount(),
+                    v.inputBusSlotCount(),
+                    v.outputBusSlotCount(),
+                    v.inputHatchSlotCount(),
+                    v.outputHatchSlotCount(),
+                    v.maintenanceSlotCount(),
+                    Collections.unmodifiableSet(cleanAbilities),
+                    v.candidateBlocks()
+            ));
+        }
+        return sanitized;
     }
 }
 

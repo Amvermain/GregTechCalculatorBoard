@@ -17,8 +17,8 @@ import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer;
 import com.gtceu.calcboard.client.gui.util.BoardScissorHelper;
 import com.gtceu.calcboard.client.gui.widget.BoardToast;
-import com.gtceu.calcboard.compat.IModAdapter;
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.IModAdapter;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -29,7 +29,10 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.item.ItemStack;
 import org.lwjgl.glfw.GLFW;
+import com.gtceu.calcboard.client.gui.dialog.modal.IBoardModal;
+import com.gtceu.calcboard.client.gui.dialog.modal.ModalRenderContext;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -41,7 +44,7 @@ import java.util.List;
  * 4. Custom Addon multiplier tuner (CustomAddonBuilderView)
  * 5. Star Technology Helix/Threading configurator (ThreadingHelixView)
  */
-public class MachineConfigDialog {
+public class MachineConfigDialog implements IBoardModal {
 
     private final BoardScreen parent;
     private RecipeNode node;
@@ -56,6 +59,7 @@ public class MachineConfigDialog {
     private final AddonCatalogView addonCatalogView;
     private final CustomAddonBuilderView customAddonBuilderView;
     private final ThreadingHelixView threadingHelixView;
+    private final com.gtceu.calcboard.client.gui.compat.create.CreateBoilerConfigView createBoilerConfigView;
 
     // Top Base Parallel EditBox
     private EditBox parallelBox;
@@ -82,6 +86,7 @@ public class MachineConfigDialog {
         this.addonCatalogView = new AddonCatalogView(this);
         this.customAddonBuilderView = new CustomAddonBuilderView(this);
         this.threadingHelixView = new ThreadingHelixView(this);
+        this.createBoilerConfigView = new com.gtceu.calcboard.client.gui.compat.create.CreateBoilerConfigView(this);
     }
 
     public BoardScreen getParent() {
@@ -94,6 +99,10 @@ public class MachineConfigDialog {
 
     public AddonCatalogView getAddonCatalogView() {
         return addonCatalogView;
+    }
+
+    public com.gtceu.calcboard.client.gui.compat.create.CreateBoilerConfigView getCreateBoilerConfigView() {
+        return createBoilerConfigView;
     }
 
     public CustomAddonBuilderView getCustomAddonBuilderView() {
@@ -143,8 +152,14 @@ public class MachineConfigDialog {
         this.visible = true;
         if (initialCategory != null) {
             this.selectedCategory = initialCategory;
+        } else if (com.gtceu.calcboard.compat.create.CreateProperties.isCreateBoiler(node)) {
+            this.selectedCategory = AddonCategory.HEATER;
+        } else if (MachineAddon.isTurbineMachine(node) && node.isMultiblock()) {
+            this.selectedCategory = MachineAddon.Category.ROTOR;
+        } else if (MachineAddon.isCombustionMachine(node) && node.isMultiblock()) {
+            this.selectedCategory = AddonCategory.MULTIBLOCK_TRAIT;
         } else {
-            this.selectedCategory = (MachineAddon.isTurbineMachine(node) && node.isMultiblock()) ? MachineAddon.Category.ROTOR : null;
+            this.selectedCategory = null;
         }
         this.isCustomBuilderActive = (this.selectedCategory == AddonCategory.CUSTOM);
         this.activeAddonsView.resetScroll();
@@ -161,8 +176,17 @@ public class MachineConfigDialog {
         if (mc != null && mc.font != null) {
             this.parallelBox = new EditBox(mc.font, 0, 0, 48, 16, Component.translatable("gui.gtcalcboard.config.parallel"));
             this.parallelBox.setMaxLength(6);
-            this.parallelBox.setValue(String.valueOf(node.getTotalParallel()));
+            boolean isCombustion = com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isCombustionEngine(node);
+            if (isCombustion) {
+                node.setParallel(1);
+                node.setCustomParallel(0);
+            }
+            int initParallel = isCombustion ? 1 : Math.max(1, node.getParallel());
+            this.parallelBox.setValue(String.valueOf(initParallel));
             this.parallelBox.setResponder(text -> {
+                if (isCombustion) {
+                    return;
+                }
                 try {
                     int p = Integer.parseInt(text.trim());
                     if (p >= 1 && p <= 100000) {
@@ -172,6 +196,9 @@ public class MachineConfigDialog {
                     }
                 } catch (NumberFormatException ignored) {}
             });
+            if (isCombustion) {
+                this.parallelBox.setEditable(false);
+            }
         }
 
         syncThreadingAddons(node);
@@ -191,6 +218,7 @@ public class MachineConfigDialog {
         }
         if (parent != null) {
             parent.markSummaryDirty();
+            parent.rebuildBoardWidgets();
         }
     }
 
@@ -254,6 +282,11 @@ public class MachineConfigDialog {
 
     public static void cycleFontScalePrevious() {
         currentFontScale = currentFontScale.previous();
+    }
+
+    @Override
+    public void renderModal(ModalRenderContext context) {
+        render(context.graphics(), context.mouseX(), context.mouseY(), context.partialTicks(), context.screenWidth(), context.screenHeight());
     }
 
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks, int screenWidth, int screenHeight) {
@@ -345,7 +378,7 @@ public class MachineConfigDialog {
             graphics.drawCenteredString(font, font.plainSubstrByWidth(toggleText, toggleW - 4), toggleX + toggleW / 2, y + 7, 0xFFFFFFFF);
             if (toggleHover) {
                 this.deferredTooltip = List.of(
-                        Component.literal(isMb ? "§a🏛 " : "§7🏭 ").append(Component.translatable(isMb ? "gui.gtcalcboard.config.multiblock_mode" : "gui.gtcalcboard.config.singleblock_mode")),
+                        Component.literal(isMb ? "§a▦ " : "§7▦ ").append(Component.translatable(isMb ? "gui.gtcalcboard.config.multiblock_mode" : "gui.gtcalcboard.config.singleblock_mode")),
                         Component.literal("§7[Click]: §f" + Component.translatable(isMb ? "gui.gtcalcboard.tooltip.switch_to_singleblock" : "gui.gtcalcboard.tooltip.switch_to_multiblock").getString()),
                         Component.literal("§e[Right-Click]: §f" + Component.translatable("gui.gtcalcboard.tooltip.switch_machine_hint").getString())
                 );
@@ -359,7 +392,7 @@ public class MachineConfigDialog {
         boolean switchHover = virtualMouseX >= switchBtnX && virtualMouseX <= switchBtnX + switchBtnW && virtualMouseY >= y + 3 && virtualMouseY <= y + 3 + switchBtnH;
         graphics.fill(switchBtnX, y + 3, switchBtnX + switchBtnW, y + 3 + switchBtnH, switchHover ? 0xFF234B6E : 0xFF19344D);
         graphics.renderOutline(switchBtnX, y + 3, switchBtnW, switchBtnH, switchHover ? 0xFF5B9BD5 : 0xFF35587A);
-        String switchText = "§b🔄 " + Component.translatable("gui.gtcalcboard.switch_recipe.short_btn").getString();
+        String switchText = "§b⟲ " + Component.translatable("gui.gtcalcboard.switch_recipe.short_btn").getString();
         graphics.drawCenteredString(font, font.plainSubstrByWidth(switchText, switchBtnW - 4), switchBtnX + switchBtnW / 2, y + 7, 0xFFFFFFFF);
 
         // Category Machine Default Preset Button
@@ -388,11 +421,11 @@ public class MachineConfigDialog {
         } else {
             graphics.fill(presetBtnX, y + 3, presetBtnX + presetBtnW, y + 3 + presetBtnH, presetHover ? 0xFF2F3746 : 0xFF202632);
             graphics.renderOutline(presetBtnX, y + 3, presetBtnW, presetBtnH, presetHover ? 0xFF6B7F9E : 0xFF3D4A5E);
-            String presetText = "§7📌 " + Component.translatable("gui.gtcalcboard.config.preset.set").getString();
+            String presetText = "§7★ " + Component.translatable("gui.gtcalcboard.config.preset.set").getString();
             graphics.drawCenteredString(font, font.plainSubstrByWidth(presetText, presetBtnW - 4), presetBtnX + presetBtnW / 2, y + 7, 0xFFB0C0D8);
             if (presetHover) {
                 this.deferredTooltip = List.of(
-                        Component.literal("§f📌 ").append(Component.translatable("gui.gtcalcboard.config.preset.tooltip_set_title")),
+                        Component.literal("§f★ ").append(Component.translatable("gui.gtcalcboard.config.preset.tooltip_set_title")),
                         Component.translatable("gui.gtcalcboard.config.preset.category", "§b" + (catId != null ? catId.toString() : "Unknown")),
                         Component.literal("§8§m------------------------"),
                         Component.translatable("gui.gtcalcboard.config.preset.tooltip_set_desc"),
@@ -409,9 +442,17 @@ public class MachineConfigDialog {
         }
         graphics.drawString(font, title, x + 8, y + 7, 0xFFE0E6F0, false);
         if (titleHover) {
-            this.deferredTooltip = List.of(
-                    Component.literal("⚙ ").append(Component.translatable("gui.gtcalcboard.config_dialog_title", node.getName()))
-            );
+            List<Component> tt = new ArrayList<>();
+            tt.add(Component.literal("⚙ ").append(Component.translatable("gui.gtcalcboard.config_dialog_title", node.getName())));
+            com.gtceu.calcboard.api.model.FlowGraph graph = parent != null ? parent.getGraph() : null;
+            if (!node.isOperational(graph)) {
+                tt.add(Component.literal("§c⚠ " + Component.translatable("gui.gtcalcboard.node_warning.inactive").getString()));
+                List<Component> warnings = node.getOperationalWarnings(graph);
+                for (Component w : warnings) {
+                    tt.add(Component.literal("§c❌ ").append(w));
+                }
+            }
+            this.deferredTooltip = tt;
         }
 
         // SECTION 1: Base Parallel Header Area
@@ -441,6 +482,8 @@ public class MachineConfigDialog {
             customAddonBuilderView.render(graphics, font, catalogStartX + 4, catalogStartY + 4, catalogW - 8, catalogH - 8, virtualMouseX, virtualMouseY);
         } else if (selectedCategory == AddonCategory.THREADING) {
             threadingHelixView.render(graphics, font, node, catalogStartX + 4, catalogStartY + 4, catalogW - 8, catalogH - 8, virtualMouseX, virtualMouseY);
+        } else if (selectedCategory == AddonCategory.HEATER && com.gtceu.calcboard.compat.create.CreateProperties.isCreateBoiler(node)) {
+            createBoilerConfigView.render(graphics, font, node, catalogStartX + 4, catalogStartY + 4, catalogW - 8, catalogH - 8, virtualMouseX, virtualMouseY);
         } else {
             addonCatalogView.renderCatalogGrid(graphics, font, node, catalogStartX + 4, catalogStartY + 4, catalogW - 8, catalogH - 8, virtualMouseX, virtualMouseY);
         }
@@ -719,6 +762,8 @@ public class MachineConfigDialog {
                 if (parent != null) parent.markSummaryDirty();
                 return true;
             }
+        } else if (selectedCategory == AddonCategory.HEATER && com.gtceu.calcboard.compat.create.CreateProperties.isCreateBoiler(node)) {
+            return createBoilerConfigView.mouseClicked(node, catalogStartX + 4, catalogStartY + 4, catalogW - 8, catalogH - 8, mX, mY, button, parent);
         } else {
             return addonCatalogView.mouseClicked(mX, mY, button, node, catalogStartX + 4, catalogStartY + 4, catalogW - 8, catalogH - 8, parent);
         }

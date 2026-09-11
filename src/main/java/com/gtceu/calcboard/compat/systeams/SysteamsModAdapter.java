@@ -10,21 +10,36 @@ import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.type.OverclockMode;
 import com.gtceu.calcboard.api.type.PowerDisplayMode;
 
-import com.gtceu.calcboard.compat.IModAdapter;
+import com.gtceu.calcboard.api.spi.IModAdapter;
+import com.gtceu.calcboard.api.spi.extension.ICompoundRecipeProvider;
+import com.gtceu.calcboard.api.spi.extension.IEnergySimulationProvider;
+import com.gtceu.calcboard.api.spi.extension.IHardwareAddonProvider;
+import com.gtceu.calcboard.api.spi.extension.IModExtension;
 import com.gtceu.calcboard.compat.thermal.helper.ThermalAugmentHelper;
-import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
+import com.gtceu.calcboard.api.model.RecipeDetails;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.fml.ModList;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * Mod Adapter facade for Thermal Systeams (boilers, steam generation, steam dynamos).
  * Manages boiler recipe parsing, water-to-steam scaling, and steam dynamo conversions.
  */
 public class SysteamsModAdapter implements IModAdapter {
+
+    private static final Set<Class<? extends IModExtension>> SUPPORTED_EXTENSIONS = Set.of(
+            IEnergySimulationProvider.class,
+            ICompoundRecipeProvider.class
+    );
+
+    @Override
+    public Set<Class<? extends IModExtension>> getSupportedExtensions() {
+        return SUPPORTED_EXTENSIONS;
+    }
 
     @Override
     public String getModId() {
@@ -125,7 +140,7 @@ public class SysteamsModAdapter implements IModAdapter {
     }
 
     @Override
-    public boolean adaptRecipeDetails(Object emiRecipeObj, Object backing, EmiRecipeConverter.RecipeDetails details) {
+    public boolean adaptRecipeDetails(Object emiRecipeObj, Object backing, RecipeDetails details) {
         return SysteamsRecipeHandler.adaptRecipeDetails(emiRecipeObj, backing, details, this);
     }
 
@@ -133,11 +148,11 @@ public class SysteamsModAdapter implements IModAdapter {
         return SysteamsRecipeHandler.isSteamDynamo(backing, catId);
     }
 
-    public static boolean adaptSteamDynamoRecipe(Object backing, EmiRecipeConverter.RecipeDetails details, ResourceLocation catId) {
+    public static boolean adaptSteamDynamoRecipe(Object backing, RecipeDetails details, ResourceLocation catId) {
         return SysteamsRecipeHandler.adaptSteamDynamoRecipe(backing, details, catId);
     }
 
-    public static boolean adaptBoilerRecipe(Object backing, EmiRecipeConverter.RecipeDetails details, ResourceLocation catId) {
+    public static boolean adaptBoilerRecipe(Object backing, RecipeDetails details, ResourceLocation catId) {
         return SysteamsRecipeHandler.adaptBoilerRecipe(backing, details, catId);
     }
 
@@ -184,8 +199,38 @@ public class SysteamsModAdapter implements IModAdapter {
     }
 
     @Override
+    public String formatAddonSubtitle(RecipeNode node, MachineAddon addon) {
+        return "";
+    }
+
+    @Override
+    public String formatAddonBadge(RecipeNode node, MachineAddon addon) {
+        if (addon == null) return "";
+        boolean isKit = (addon instanceof com.gtceu.calcboard.compat.thermal.addon.ThermalAugmentAddon ta && ta.isUpgradeKit()) || addon.getParallelMultiplier() > 1;
+        if (isKit) {
+            return String.format("§d⚡%dx", addon.getParallelMultiplier());
+        }
+        if (addon.getDurationMultiplier() != 1.0 && addon.getEutMultiplier() != 1.0) {
+            return String.format("§e⚡%.1fx ⏱%.1fx", addon.getEutMultiplier(), addon.getDurationMultiplier());
+        }
+        if (addon.getEutMultiplier() != 1.0) {
+            return String.format("§e⚡%.1fx", addon.getEutMultiplier());
+        }
+        if (addon.getDurationMultiplier() != 1.0) {
+            return String.format("§a⏱%.1fx", addon.getDurationMultiplier());
+        }
+        return "";
+    }
+
+    @Override
     public int computeEffectiveParallel(RecipeNode node) {
         return Math.max(1, node.getParallel());
+    }
+
+    @Override
+    public double computeSingleMachinePower(RecipeNode node) {
+        if (node == null) return 0.0;
+        return node.getOverclockResult().eut();
     }
 
     @Override
@@ -206,7 +251,7 @@ public class SysteamsModAdapter implements IModAdapter {
         }
         double steamRate = 0.0;
         for (var entry : node.calculateEffectiveOutputRates().entrySet()) {
-            if (entry.getKey().isFluid() && entry.getKey().getId() != null && entry.getKey().getId().getPath().contains("steam")) {
+            if (entry.getKey().isFluid() && isSteamFluid(entry.getKey().getId())) {
                 steamRate += entry.getValue();
             }
         }
@@ -217,14 +262,10 @@ public class SysteamsModAdapter implements IModAdapter {
     }
 
     private String formatSteamRate(double steamRate) {
-        try {
-            return com.gtceu.calcboard.client.gui.util.FormatUtil.formatRate(steamRate, true);
-        } catch (Throwable t) {
-            if (steamRate >= 1000.0) {
-                return com.gtceu.calcboard.api.util.NumberFormatUtil.formatCompactNumber(steamRate / 1000.0) + " B/s";
-            } else {
-                return com.gtceu.calcboard.api.util.NumberFormatUtil.formatCompactNumber(steamRate) + " mB/s";
-            }
+        if (steamRate >= 1000.0) {
+            return com.gtceu.calcboard.api.util.NumberFormatUtil.formatCompactNumber(steamRate / 1000.0) + " B/s";
+        } else {
+            return com.gtceu.calcboard.api.util.NumberFormatUtil.formatCompactNumber(steamRate) + " mB/s";
         }
     }
 
@@ -242,7 +283,7 @@ public class SysteamsModAdapter implements IModAdapter {
         tooltipLines.add(Component.literal("§6♨ " + Component.translatable("gui.gtcalcboard.boiler_badge").getString()));
         double steamRate = 0.0;
         for (var entry : node.calculateEffectiveOutputRates().entrySet()) {
-            if (entry.getKey().isFluid() && entry.getKey().getId() != null && entry.getKey().getId().getPath().contains("steam")) {
+            if (entry.getKey().isFluid() && isSteamFluid(entry.getKey().getId())) {
                 steamRate += entry.getValue();
             }
         }

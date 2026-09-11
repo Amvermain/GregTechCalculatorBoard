@@ -2,8 +2,8 @@ package com.gtceu.calcboard.integration.emi;
 
 import com.gtceu.calcboard.api.catalog.CategoryCapability;
 import com.gtceu.calcboard.api.catalog.CategoryCapabilityMatrix;
-import com.gtceu.calcboard.compat.IModAdapter;
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.IModAdapter;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 
 import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
@@ -14,6 +14,7 @@ import com.gtceu.calcboard.api.model.RecipeNode;
 import dev.emi.emi.api.recipe.EmiRecipe;
 import dev.emi.emi.api.stack.EmiIngredient;
 import dev.emi.emi.api.stack.EmiStack;
+import com.gtceu.calcboard.integration.emi.EmiSlotChanceExtractor.SlotChance;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
@@ -28,17 +29,31 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 
 public class EmiRecipeConverter {
+
+    private static final Class<?> CREATE_BASIN_BLOCK_CLASS;
+    private static final Class<?> CREATE_BLAZE_BURNER_BLOCK_CLASS;
+
+    static {
+        Class<?> basinCls = null;
+        Class<?> burnerCls = null;
+        try {
+            basinCls = Class.forName("com.simibubi.create.content.processing.basin.BasinBlock");
+        } catch (Throwable ignored) {}
+        try {
+            burnerCls = Class.forName("com.simibubi.create.content.processing.burner.BlazeBurnerBlock");
+        } catch (Throwable ignored) {}
+        CREATE_BASIN_BLOCK_CLASS = basinCls;
+        CREATE_BLAZE_BURNER_BLOCK_CLASS = burnerCls;
+    }
 
     public static RecipeNode convert(EmiRecipe recipe) {
         return convert(recipe, null);
     }
 
     public static RecipeNode convert(EmiRecipe recipe, ResourceLocation preferredWorkstation) {
-        if (recipe instanceof KineticGenerationEmiRecipe kg) {
-            return kg.toRecipeNode();
-        }
         String catName = null;
         if (recipe.getCategory() != null && recipe.getCategory().getId() != null) {
             String catPath = recipe.getCategory().getId().getPath();
@@ -96,12 +111,25 @@ public class EmiRecipeConverter {
         List<ResourceLocation> allWs = findAllWorkstations(recipe);
         node.getAvailableWorkstations().clear();
         for (ResourceLocation ws : allWs) {
-            if (ws != null && !isDummyConditionMarker(ws)) {
+            if (ws != null && !isIgnoredWorkstation(ws)) {
                 node.getAvailableWorkstations().add(ws);
             }
         }
-        ResourceLocation icon = preferredWorkstation != null ? preferredWorkstation : findMachineIcon(recipe);
-        if (icon != null) {
+        ResourceLocation icon = preferredWorkstation;
+        if (icon == null) {
+            var adapter = ModAdapterRegistry.getAdapterForNode(node);
+            GTVoltageTier initialTier = details.tier != null ? details.tier : GTVoltageTier.LV;
+            if (adapter != null) {
+                initialTier = adapter.sanitizeTargetTier(node, initialTier);
+            }
+            ResourceLocation tieredWs = node.getWorkstationForTier(initialTier);
+            if (tieredWs != null && (node.getAvailableWorkstations().contains(tieredWs) || ForgeRegistries.ITEMS.containsKey(tieredWs))) {
+                icon = tieredWs;
+            } else {
+                icon = findMachineIcon(recipe);
+            }
+        }
+        if (icon != null && !isIgnoredWorkstation(icon)) {
             node.setMachineIcon(icon);
             if (!node.getAvailableWorkstations().contains(icon)) {
                 node.getAvailableWorkstations().add(0, icon);
@@ -115,10 +143,10 @@ public class EmiRecipeConverter {
         CompoundTag recipeDataTag = com.gtceu.calcboard.compat.gtceu.GTCEuRecipeHandler.extractRecipeDataTag(backing);
         com.gtceu.calcboard.api.property.RecipePropertyExtractorPipeline.extractAll(backing, recipeDataTag, catId, node.getProperties());
 
-        boolean isSupported = com.gtceu.calcboard.compat.ModAdapterRegistry.isCategorySupported(catId);
+        boolean isSupported = ModAdapterRegistry.isCategorySupported(catId);
         String rModId = (recipe.getId() != null) ? recipe.getId().getNamespace() : null;
         if (!isSupported && rModId != null) {
-            isSupported = com.gtceu.calcboard.compat.ModAdapterRegistry.isRecipeSupported(rModId, catId);
+            isSupported = ModAdapterRegistry.isRecipeSupported(rModId, catId);
         }
         if (!isSupported) {
             node.getProperties().set(com.gtceu.calcboard.api.property.NodeProperties.IS_GENERIC_UNSUPPORTED, true);
@@ -137,7 +165,35 @@ public class EmiRecipeConverter {
             }
         }
 
-        for (EmiIngredient input : recipe.getInputs()) {
+        boolean isGreate = (catId != null && catId.getNamespace().equals("greate"))
+                || (recipe.getId() != null && recipe.getId().getNamespace().equals("greate"))
+                || details.circuitNumber >= 0
+                || !"NONE".equalsIgnoreCase(details.heatCondition);
+
+        if (isGreate) {
+            int initTier = details.tier != null ? details.tier.ordinal() : 0;
+            node.getProperties().set(com.gtceu.calcboard.compat.greate.GreateProperties.IS_GREATE, true);
+            node.getProperties().set(com.gtceu.calcboard.compat.greate.GreateProperties.MACHINE_TIER, initTier);
+            node.getProperties().set(com.gtceu.calcboard.compat.greate.GreateProperties.REQUIRED_RECIPE_TIER, initTier);
+            node.getProperties().set(com.gtceu.calcboard.compat.greate.GreateProperties.CIRCUIT_NUMBER, details.circuitNumber);
+            node.getProperties().set(com.gtceu.calcboard.compat.greate.GreateProperties.HEAT_CONDITION, details.heatCondition);
+            node.setTargetTier(GTVoltageTier.getByIndex(initTier));
+            node.setRpm(256);
+            com.gtceu.calcboard.compat.greate.GreateMachineHelper.syncMachineIconToTier(node, initTier);
+        }
+
+        List<IngredientStack> gtTickInputs = null;
+        List<IngredientStack> gtTickOutputs = null;
+        if (backing != null && com.gtceu.calcboard.compat.gtceu.GTCEuRecipeHandler.isGTRecipe(backing)) {
+            gtTickInputs = com.gtceu.calcboard.compat.gtceu.GTCEuRecipeHandler.extractTickIngredients(backing, "tickInputs", details.durationTicks);
+            gtTickOutputs = com.gtceu.calcboard.compat.gtceu.GTCEuRecipeHandler.extractTickIngredients(backing, "tickOutputs", details.durationTicks);
+        }
+
+        List<SlotChance> extractedInputChances = extractSlotChances(recipe, true);
+        boolean[] usedInputChances = new boolean[extractedInputChances.size()];
+
+        for (int inIdx = 0; inIdx < recipe.getInputs().size(); inIdx++) {
+            EmiIngredient input = recipe.getInputs().get(inIdx);
             long reqAmount = input.getAmount();
             float reqChance = input.getChance();
             IngredientStack primaryStack = null;
@@ -176,47 +232,42 @@ public class EmiRecipeConverter {
                     }
                 } catch (Throwable ignored) {}
 
+                primaryStack = applyTickIngredientScaling(primaryStack, gtTickInputs);
+                applySlotChance(primaryStack, inIdx, extractedInputChances, usedInputChances);
                 primaryStack.setAlternatives(altIds);
                 node.addInput(primaryStack);
             }
         }
 
-        List<OutputSlotChance> extractedChances = extractOutputSlotChances(recipe);
+        if (gtTickInputs != null) {
+            for (IngredientStack tickIn : gtTickInputs) {
+                if (tickIn != null && tickIn.getId() != null && !containsIngredient(node.getInputs(), tickIn)) {
+                    node.addInput(tickIn.copy());
+                }
+            }
+        }
+
+        List<SlotChance> extractedChances = extractSlotChances(recipe, false);
         boolean[] usedChances = new boolean[extractedChances.size()];
 
-        // Convert Outputs
         for (int i = 0; i < recipe.getOutputs().size(); i++) {
             EmiStack outStack = recipe.getOutputs().get(i);
             if (outStack == null || outStack.isEmpty()) continue;
             if (isDummyConditionMarker(outStack.getId())) continue;
 
-            float chance = outStack.getChance();
-            double tierBoost = 0.0;
-            ResourceLocation outId = outStack.getId();
-
-            // 1. Try exact index matching first
-            if (i < extractedChances.size() && !usedChances[i] && outId != null && outId.equals(extractedChances.get(i).id())) {
-                chance = (float) extractedChances.get(i).chance();
-                tierBoost = extractedChances.get(i).tierChanceBoost();
-                usedChances[i] = true;
-            } else if (outId != null) {
-                // 2. Consume first unused matching ID in order
-                for (int j = 0; j < extractedChances.size(); j++) {
-                    if (!usedChances[j] && outId.equals(extractedChances.get(j).id())) {
-                        chance = (float) extractedChances.get(j).chance();
-                        tierBoost = extractedChances.get(j).tierChanceBoost();
-                        usedChances[j] = true;
-                        break;
-                    }
-                }
-            }
-
-            IngredientStack os = convertEmiStack(outStack, outStack.getAmount(), chance);
+            IngredientStack os = convertEmiStack(outStack, outStack.getAmount(), outStack.getChance());
             if (os != null && !isDummyConditionMarker(os.getId())) {
-                if (os.getChance() < 1.0) {
-                    os.setTierChanceBoost(tierBoost);
-                }
+                os = applyTickIngredientScaling(os, gtTickOutputs);
+                applySlotChance(os, i, extractedChances, usedChances);
                 node.addOutput(os);
+            }
+        }
+
+        if (gtTickOutputs != null) {
+            for (IngredientStack tickOut : gtTickOutputs) {
+                if (tickOut != null && tickOut.getId() != null && !containsIngredient(node.getOutputs(), tickOut)) {
+                    node.addOutput(tickOut.copy());
+                }
             }
         }
 
@@ -260,7 +311,7 @@ public class EmiRecipeConverter {
         }
         if (hasAnyMulti && !hasAnySingle) {
             node.setMultiblock(true);
-            var adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+            var adapter = ModAdapterRegistry.getAdapterForNode(node);
             if (adapter != null) {
                 var preferredWs = adapter.getPreferredMultiblockWorkstation(node, node.getAvailableWorkstations());
                 if (preferredWs != null) {
@@ -273,7 +324,7 @@ public class EmiRecipeConverter {
             node.setMultiblock(true);
             GTVoltageTier minTier = node.getMinFusionVoltageTier();
             node.setTargetTier(minTier);
-            var adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+            var adapter = ModAdapterRegistry.getAdapterForNode(node);
             if (adapter != null) {
                 var preferredWs = adapter.getPreferredMultiblockWorkstation(node, node.getAvailableWorkstations());
                 if (preferredWs != null) {
@@ -302,6 +353,13 @@ public class EmiRecipeConverter {
         if (preferredWorkstation == null) {
             com.gtceu.calcboard.api.preset.CategoryMachinePresetManager.getInstance().applyPresetIfPresent(node);
         }
+        var adapter = ModAdapterRegistry.getAdapterForNode(node);
+        GTVoltageTier effectiveTier = node.getTargetTier() != null ? node.getTargetTier() : (node.getRecipeTier() != null ? node.getRecipeTier() : GTVoltageTier.LV);
+        if (adapter != null) {
+            effectiveTier = adapter.sanitizeTargetTier(node, effectiveTier);
+        }
+        node.setTargetTier(effectiveTier);
+        com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.ensureCombustionInputs(node);
         return node;
     }
 
@@ -309,7 +367,6 @@ public class EmiRecipeConverter {
         List<ResourceLocation> list = new ArrayList<>();
         if (recipe == null) return list;
 
-        // 1. Check recipe.getWorkstations()
         try {
             Method m = recipe.getClass().getMethod("getWorkstations");
             Object res = m.invoke(recipe);
@@ -320,7 +377,6 @@ public class EmiRecipeConverter {
             }
         } catch (Throwable ignored) {}
 
-        // 2. Check recipe.getCategory() workstations
         try {
             if (recipe.getCategory() != null) {
                 try {
@@ -384,22 +440,39 @@ public class EmiRecipeConverter {
 
         // Any dummy condition/dimension/planet marker across all mods (gtceu, start_core, kubejs, etc.)
         if (path.endsWith("_marker") || path.endsWith("_marker_item") || path.endsWith("_marker_block")
-                || path.contains("dimension_marker") || path.contains("biome_marker")
-                || path.contains("planet_marker") || path.contains("environmental_marker")
-                || path.contains("altitude_marker") || path.contains("temperature_marker")) {
+                || path.startsWith("dimension_marker") || path.startsWith("biome_marker")
+                || path.startsWith("planet_marker") || path.startsWith("environmental_marker")
+                || path.startsWith("altitude_marker") || path.startsWith("temperature_marker")) {
             return true;
         }
 
         return false;
     }
 
+    public static boolean isIgnoredWorkstation(ResourceLocation id) {
+        if (id == null) return true;
+        if (isDummyConditionMarker(id)) return true;
+        try {
+            net.minecraft.world.item.Item item = ForgeRegistries.ITEMS.getValue(id);
+            if (item instanceof net.minecraft.world.item.BlockItem bi) {
+                net.minecraft.world.level.block.Block block = bi.getBlock();
+                if (CREATE_BASIN_BLOCK_CLASS != null && CREATE_BASIN_BLOCK_CLASS.isInstance(block)) {
+                    return true;
+                }
+                if (CREATE_BLAZE_BURNER_BLOCK_CLASS != null && CREATE_BLAZE_BURNER_BLOCK_CLASS.isInstance(block)) {
+                    return true;
+                }
+            }
+        } catch (Throwable ignored) {}
+        return false;
+    }
+
     public static ResourceLocation findMachineIcon(EmiRecipe recipe) {
         if (recipe == null) return null;
 
-        // 1. Try all workstations from recipe and category
         List<ResourceLocation> allWs = findAllWorkstations(recipe);
         for (ResourceLocation ws : allWs) {
-            if (ws != null && !isDummyConditionMarker(ws)) {
+            if (ws != null && !isDummyConditionMarker(ws) && !isIgnoredWorkstation(ws)) {
                 return ws;
             }
         }
@@ -482,196 +555,12 @@ public class EmiRecipeConverter {
         }
     }
 
-    public record OutputSlotChance(ResourceLocation id, double chance, double tierChanceBoost) {}
- 
-    private static List<OutputSlotChance> extractOutputSlotChances(EmiRecipe recipe) {
-        List<OutputSlotChance> list = new ArrayList<>();
-        if (recipe == null) return list;
-        try {
-            Object backing = unwrapBackingRecipe(recipe);
-            if (backing == null) backing = recipe.getBackingRecipe();
-            if (backing == null) return list;
-
-            // 1. GTCEu GTRecipe
-            if (ModCompatHelper.isGTLoaded() && com.gtceu.calcboard.compat.gtceu.GTCEuRecipeHandler.isGTRecipe(backing)) {
-                List<IngredientStack> gtOuts = com.gtceu.calcboard.compat.gtceu.GTCEuRecipeHandler.extractGTRecipeContents(backing, "outputs");
-                if (gtOuts != null && !gtOuts.isEmpty()) {
-                    for (IngredientStack is : gtOuts) {
-                        if (is != null && is.getId() != null) {
-                            list.add(new OutputSlotChance(is.getId(), is.getChance(), is.getTierChanceBoost()));
-                        }
-                    }
-                    return list;
-                }
-            }
-
-            // 2. Create ProcessingRecipe (e.g. Fan Washing, Crushing, Milling, Cutting, etc.)
-            try {
-                Method m = backing.getClass().getMethod("getRollableResults");
-                Object res = m.invoke(backing);
-                if (res instanceof List<?> rollableList) {
-                    for (Object po : rollableList) {
-                        if (po == null) continue;
-                        Method getStackM = po.getClass().getMethod("getStack");
-                        Method getChanceM = po.getClass().getMethod("getChance");
-                        Object stackObj = getStackM.invoke(po);
-                        Object chanceObj = getChanceM.invoke(po);
-                        if (stackObj instanceof net.minecraft.world.item.ItemStack is && chanceObj instanceof Number n) {
-                            ResourceLocation id = ForgeRegistries.ITEMS.getKey(is.getItem());
-                            if (id != null) {
-                                double ch = Math.max(0.0, Math.min(1.0, n.doubleValue()));
-                                list.add(new OutputSlotChance(id, ch, 0.0));
-                            }
-                        }
-                    }
-                    if (!list.isEmpty()) {
-                        return list;
-                    }
-                }
-            } catch (Throwable ignored) {}
-
-            // 3. GTCEu GTRecipe reflection fallback
-            if (ModCompatHelper.isGTLoaded() && backing.getClass().getName().contains("GTRecipe")) {
-                Field outputsField = null;
-                try {
-                    outputsField = backing.getClass().getField("outputs");
-                } catch (Throwable ignored) {
-                    try {
-                        outputsField = backing.getClass().getDeclaredField("outputs");
-                        outputsField.setAccessible(true);
-                    } catch (Throwable ignored2) {}
-                }
-                if (outputsField != null) {
-                    Object outputsObj = outputsField.get(backing);
-                    if (outputsObj instanceof Map<?, ?> outMap) {
-                        for (Object listObj : outMap.values()) {
-                            if (listObj instanceof List<?> contentList) {
-                                for (Object contentObj : contentList) {
-                                    if (contentObj == null) continue;
-                                    double chance = 1.0;
-                                    try {
-                                        Field f = contentObj.getClass().getField("chance");
-                                        Object v = f.get(contentObj);
-                                        if (v instanceof Number n) chance = n.doubleValue();
-                                    } catch (Throwable ignored) {
-                                        try {
-                                            Method m = contentObj.getClass().getMethod("chance");
-                                            Object v = m.invoke(contentObj);
-                                            if (v instanceof Number n) chance = n.doubleValue();
-                                        } catch (Throwable ignored2) {
-                                            try {
-                                                Method m = contentObj.getClass().getMethod("getChance");
-                                                Object v = m.invoke(contentObj);
-                                                if (v instanceof Number n) chance = n.doubleValue();
-                                            } catch (Throwable ignored3) {}
-                                        }
-                                    }
-                                    if (chance > 1.0) {
-                                        chance = chance / 10000.0; // GTCEu uses 10000 = 100%
-                                    }
-                                    chance = Math.max(0.0, Math.min(1.0, chance));
-
-                                    double boost = 0.0;
-                                    try {
-                                        Field f = contentObj.getClass().getField("tierChanceBoost");
-                                        Object v = f.get(contentObj);
-                                        if (v instanceof Number n) boost = n.doubleValue();
-                                    } catch (Throwable ignored) {
-                                        try {
-                                            Method m = contentObj.getClass().getMethod("tierChanceBoost");
-                                            Object v = m.invoke(contentObj);
-                                            if (v instanceof Number n) boost = n.doubleValue();
-                                        } catch (Throwable ignored2) {
-                                            try {
-                                                Method m = contentObj.getClass().getMethod("getTierChanceBoost");
-                                                Object v = m.invoke(contentObj);
-                                                if (v instanceof Number n) boost = n.doubleValue();
-                                            } catch (Throwable ignored3) {}
-                                        }
-                                    }
-                                    if (boost > 1.0) {
-                                        boost = boost / 10000.0; // e.g. 500 = 5% = 0.05
-                                    }
-                                    boost = Math.max(0.0, boost);
-
-                                    ResourceLocation resId = extractContentResourceId(contentObj);
-                                    if (resId != null) {
-                                        list.add(new OutputSlotChance(resId, chance, boost));
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        } catch (Throwable ignored) {}
-        return list;
+    private static void applySlotChance(IngredientStack stack, int index, List<SlotChance> chances, boolean[] used) {
+        EmiSlotChanceExtractor.applySlotChance(stack, index, chances, used);
     }
 
-    private static ResourceLocation extractContentResourceId(Object contentObj) {
-        if (contentObj == null) return null;
-        try {
-            Object inner = contentObj;
-            for (int depth = 0; depth < 5 && inner != null; depth++) {
-                if (inner instanceof net.minecraft.world.item.ItemStack is) {
-                    return is.isEmpty() ? null : ForgeRegistries.ITEMS.getKey(is.getItem());
-                } else if (inner instanceof net.minecraft.world.item.Item it) {
-                    return ForgeRegistries.ITEMS.getKey(it);
-                } else if (inner instanceof net.minecraft.world.item.crafting.Ingredient ing) {
-                    net.minecraft.world.item.ItemStack[] items = ing.getItems();
-                    if (items != null && items.length > 0 && !items[0].isEmpty()) {
-                        return ForgeRegistries.ITEMS.getKey(items[0].getItem());
-                    }
-                } else if (inner instanceof Fluid fl) {
-                    return ForgeRegistries.FLUIDS.getKey(fl);
-                } else if (inner instanceof net.minecraft.world.item.ItemStack[] arr) {
-                    if (arr.length > 0 && !arr[0].isEmpty()) {
-                        return ForgeRegistries.ITEMS.getKey(arr[0].getItem());
-                    }
-                } else if (inner instanceof List<?> list && !list.isEmpty()) {
-                    inner = list.get(0);
-                    continue;
-                }
-
-                Object next = null;
-                String clName = inner.getClass().getName();
-                if (clName.contains("FluidStack")) {
-                    try {
-                        Method gm = inner.getClass().getMethod("getFluid");
-                        Object flObj = gm.invoke(inner);
-                        if (flObj instanceof Fluid fl) {
-                            return ForgeRegistries.FLUIDS.getKey(fl);
-                        }
-                    } catch (Throwable ignored) {}
-                }
-
-                for (String mName : new String[]{"content", "getContent", "getInner", "getStack", "getItems", "getMatchingStacks", "getItemStack", "getFluid", "getRawFluid", "getIngredient", "inner"}) {
-                    try {
-                        Method m = inner.getClass().getMethod(mName);
-                        next = m.invoke(inner);
-                        if (next != null && next != inner) break;
-                    } catch (Throwable ignored) {}
-                }
-                if (next == null) {
-                    for (String fName : new String[]{"content", "inner", "stack", "itemStack", "ingredient", "fluid"}) {
-                        try {
-                            Field f = null;
-                            try { f = inner.getClass().getField(fName); } catch (Throwable ignored) {
-                                f = inner.getClass().getDeclaredField(fName);
-                                f.setAccessible(true);
-                            }
-                            if (f != null) {
-                                next = f.get(inner);
-                                if (next != null && next != inner) break;
-                            }
-                        } catch (Throwable ignored) {}
-                    }
-                }
-                if (next == null || next == inner) break;
-                inner = next;
-            }
-        } catch (Throwable ignored) {}
-        return null;
+    private static List<SlotChance> extractSlotChances(EmiRecipe recipe, boolean isInput) {
+        return EmiSlotChanceExtractor.extractSlotChances(recipe, isInput);
     }
 
     public static String formatName(String raw) {
@@ -687,104 +576,41 @@ public class EmiRecipeConverter {
     }
 
     public static Object unwrapBackingRecipe(EmiRecipe recipe) {
-        if (recipe == null) return null;
-        Object backing = recipe.getBackingRecipe();
-        if (backing != null) return backing;
-
-        Class<?> cur = recipe.getClass();
-        while (cur != null && cur != Object.class) {
-            for (String mName : new String[]{"getRecipe", "recipe", "getGTRecipe", "gtRecipe", "getOriginalRecipe", "originalRecipe", "getValue", "value"}) {
-                try {
-                    Method m = cur.getDeclaredMethod(mName);
-                    m.setAccessible(true);
-                    Object res = m.invoke(recipe);
-                    if (res != null && res != recipe) return res;
-                } catch (Throwable ignored) {}
-            }
-            for (String fName : new String[]{"recipe", "gtRecipe", "backingRecipe", "originalRecipe", "target", "source", "value", "delegate"}) {
-                try {
-                    Field f = cur.getDeclaredField(fName);
-                    f.setAccessible(true);
-                    Object res = f.get(recipe);
-                    if (res != null && res != recipe) return res;
-                } catch (Throwable ignored) {}
-            }
-            cur = cur.getSuperclass();
-        }
-        return null;
+        return EmiRecipeDetailsExtractor.unwrapBackingRecipe(recipe);
     }
 
-    public static class RecipeDetails {
-        public double durationTicks = 20.0;
-        public double eut = 0.0;
-        public GTVoltageTier tier = GTVoltageTier.ULV;
-        public boolean isGenerator = false;
-        public com.gtceu.calcboard.api.type.EnergyType energyType = com.gtceu.calcboard.api.type.EnergyType.NONE;
-        public int backingRecipeTemp = 0;
-        public List<IngredientStack> extraInputs = new ArrayList<>();
-        public List<IngredientStack> extraOutputs = new ArrayList<>();
-        public boolean overrideOutputs = false;
-        public List<IngredientStack> customOutputs = new ArrayList<>();
+    public static class RecipeDetails extends com.gtceu.calcboard.api.model.RecipeDetails {
     }
 
     public static RecipeDetails extractRecipeDetails(EmiRecipe recipe, ResourceLocation preferredWorkstation) {
-        RecipeDetails details = new RecipeDetails();
-        try {
-            var backing = unwrapBackingRecipe(recipe);
-            ResourceLocation catId = recipe.getCategory() != null ? recipe.getCategory().getId() : null;
-
-            if (preferredWorkstation != null && preferredWorkstation.getNamespace().equals("gtceu")) {
-                com.gtceu.calcboard.compat.IModAdapter gtAdapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForModId("gtceu");
-                if (gtAdapter != null && gtAdapter.adaptRecipeDetails(recipe, backing, details)) {
-                    return details;
-                }
-            } else if (preferredWorkstation != null && preferredWorkstation.getNamespace().equals("systeams")) {
-                if (com.gtceu.calcboard.compat.systeams.SysteamsModAdapter.adaptBoilerRecipe(backing, details, catId)) {
-                    return details;
-                }
-            }
-
-            // Route through ModAdapterRegistry
-            com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForCategory(catId);
-            boolean handled = adapter.adaptRecipeDetails(recipe, backing, details);
-
-            if (!handled && backing != null) {
-                if (com.gtceu.calcboard.compat.gtceu.GTCEuRecipeHandler.isGTRecipe(backing)) {
-                    com.gtceu.calcboard.compat.gtceu.GTCEuRecipeHandler.extractGTRecipeDetails(backing, details);
-                    handled = true;
-                } else {
-                    for (com.gtceu.calcboard.compat.IModAdapter a : com.gtceu.calcboard.compat.ModAdapterRegistry.getAllLoadedAdapters()) {
-                        if (a != adapter && a.adaptRecipeDetails(recipe, backing, details)) {
-                            handled = true;
-                            break;
-                        }
-                    }
-                    if (!handled) {
-                        if (backing instanceof net.minecraft.world.item.crafting.AbstractCookingRecipe acr) {
-                            details.durationTicks = acr.getCookingTime();
-                        }
-                    }
-                }
-            }
-        } catch (Throwable ignored) {}
-
-        if (!details.isGenerator && recipe.getCategory() != null && recipe.getCategory().getId() != null) {
-            details.isGenerator = isGeneratorCategory(recipe.getCategory().getId());
-        }
-
-        return details;
+        return EmiRecipeDetailsExtractor.extractRecipeDetails(recipe, preferredWorkstation);
     }
 
-    private static boolean isGeneratorCategory(ResourceLocation catId) {
-        String catPath = catId.getPath().toLowerCase();
-        String catNs = catId.getNamespace().toLowerCase();
-        return catPath.contains("dynamo") || catPath.contains("turbine")
-                || catPath.equals("generator") || catPath.endsWith("_generator")
-                || catPath.equals("combustion_generator") || catPath.equals("semi_fluid_generator")
-                || catPath.equals("gas_turbine") || catPath.equals("steam_turbine") || catPath.equals("plasma_generator")
-                || ((catNs.equals("thermal") || catNs.equals("thermal_expansion") || catNs.equals("systeams")) && catPath.contains("fuel"));
+    private static IngredientStack applyTickIngredientScaling(IngredientStack stack, List<IngredientStack> tickList) {
+        if (stack == null || tickList == null || tickList.isEmpty()) {
+            return stack;
+        }
+        IngredientStack matchingTick = com.gtceu.calcboard.compat.gtceu.GTCEuRecipeHandler.findMatchingTickIngredient(tickList, stack);
+        if (matchingTick == null) {
+            return stack;
+        }
+        IngredientStack scaled = stack.withAmount(matchingTick.getAmount());
+        if (matchingTick.getChance() > 0) {
+            scaled.setChance(matchingTick.getChance());
+            scaled.setTierChanceBoost(matchingTick.getTierChanceBoost());
+        }
+        return scaled;
+    }
+
+    private static boolean containsIngredient(List<IngredientStack> list, IngredientStack target) {
+        if (list == null || target == null || target.getId() == null) {
+            return false;
+        }
+        for (IngredientStack s : list) {
+            if (s != null && Objects.equals(s.getId(), target.getId()) && s.isFluid() == target.isFluid()) {
+                return true;
+            }
+        }
+        return false;
     }
 }
-
-
-

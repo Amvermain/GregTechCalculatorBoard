@@ -70,6 +70,9 @@
   - [ ] `Ctrl + 좌우 방향키` 단어 단위 점프 및 `Ctrl + Backspace/Delete` 단어 단위 삭제 확인
   - [ ] `Ctrl + A` 전체 선택 및 `Ctrl + C / X / V` 클립보드 복사/잘라내기/붙여넣기 확인
   - [ ] 인라인 편집 중 입력하는 키가 캔버스 전역 단축키로 오작동하지 않는지 확인
+- [ ] **대안 입력(Alternative Input) 순환 및 슬림 카드 모드 포트 상호작용 격리**:
+  - [ ] 대안 재료가 있는 입력 포트에 마우스 오버 후 휠 스크롤 시, 전압 티어가 바뀌지 않고 대안 재료 목록이 정상 순환되는지 확인 (`SlimCardInteractionTest`)
+  - [ ] 슬림 카드 모드(`Slim Card Mode`) 활성화 시, 카드 상의 숨겨진 Row 2 컨트롤(티어/오버클록 등)이 포트 스크롤 및 마우스 클릭을 가로채지 않는지 확인
 - [ ] **ArchUnit 클린 아키텍처 자동 정적 검증**:
   - [ ] `ArchitectureTest` JUnit 테스트 스위트가 아키텍처 위반 없이 100% 통과하는지 확인
 
@@ -89,6 +92,12 @@
   - [ ] 초당 사이클 수 $\text{CPS} = 20.0 \times \text{BatchesPerTick} \times \text{Parallel} \times \text{MachineCount}$ 정밀 연산 검증
 - [ ] **확률 부산물 전압 티어 부스트 (Tier Chance Boost)**:
   - [ ] 분쇄기/원심분리기 등에서 전압 티어 상승 시 $\text{Effective Chance} = \min(1.0, \text{BaseChance} + (\Delta\text{Tier} \times \text{TierChanceBoost}))$ 적용 검증
+- [ ] **투입물 소모 확률 및 음수 티어 부스트 (Input Consumption Chance & Reduction Boost)**:
+  - [ ] 확률적 투입물 유량 정밀 연산 검증: $\text{Rate} = \text{Amount} \times \text{EffectiveChance} \times \text{CPS}$
+  - [ ] 부호 지원 티어 부스트 연산: $\text{Effective Chance} = \text{clamp}(0.0, 1.0, \text{BaseChance} + (\Delta\text{Tier} \times \text{TierChanceBoost}))$
+  - [ ] Star Technology Cyclonic Sifter Netherite Mesh 소모율 검증 (ZPM 기본 $3\% \rightarrow 0.0025\text{/s}$, UV 오버클럭 $2.8\% \rightarrow 0.00467\text{/s}$)
+  - [ ] 투입 포트 툴팁의 동적 소모 확률 및 부호 반영 티어 변동치($\%+.1f\%/\text{Tier}$) 표시 확인
+  - [ ] `InputConsumptionChanceTest` JUnit 자동화 헤드리스 회귀 테스트 100% 통과 확인
 
 ### 2.2 가우스-요르단 폐루프 질량 보존 솔버 (`MassBalanceSolver`)
 - [ ] **폐루프 선형 연립방정식 정식화 ($A\mathbf{x} = \mathbf{b}$)**:
@@ -98,6 +107,33 @@
   - [ ] 분기점(Reroute)을 통과하는 다중 루프에서도 순수 유효 기계 대수 벡터 $\mathbf{x}$가 완벽히 수렴하는지 확인
 - [ ] **10-Pass 고정점 병목 완화 (Bottleneck Relaxation)**:
   - [ ] 상류 공급 부족 발생 시 모든 하류 기계의 정상 상태 가동률($\eta_v \in [0.0, 1.0]$)이 10-Pass 이내에 수렴($\Delta\eta < 10^{-4}$)하는지 확인
+- [ ] **자동 비율 맞춤(Auto-Ratio) 병목 해소 및 폐순환 루프 가드 (`AutoRatioBottleneckTest`)**:
+  - [ ] 단일 슬롯 병목 원료 및 확률 생산품에 대해 상류 공급 설비를 정수/소수점 비율로 자동 스케일링하는지 확인
+  - [ ] 강결합 컴포넌트(SCC) 및 방향성 폐순환 루프를 병목 증폭 대상에서 제외하여, 수소 재순환 등 폐루프 공정에서 기계 대수가 무한 폭주하지 않고 현실적으로 수렴하는지 검증
+  - [ ] `AutoRatioBottleneckTest` JUnit 자동화 헤드리스 회귀 테스트 100% 통과 확인
+  - [ ] **다단계 재순환 루프 단일 패스 수렴 검증 (`testDrainJunctionWithUpstreamRecirculationConvergesInSinglePass`)**: 정션 앵커 또는 단말 설비 기준 자동 비율 맞춤 실행 시 상류에 재순환 루프가 포함되어 있어도 여러 번 클릭할 필요 없이 1회 실행만으로 완전한 균형 비율로 수렴하고 오진단 경고가 뜨지 않는지 확인
+- [ ] **자동 비율 맞춤 폐순환 발산 감지 및 인터랙티브 가이드 (`AutoRatioDivergenceTest`, ADR-032)**:
+  - [ ] 외부 원료 미공급 폐순환 루프에서 연쇄 증폭을 차단하고 `AutoRatioResult(hasDivergence = true)` 결과 반환 검증
+  - [ ] 발산 억제 노드에 `NodeProperties.DIVERGENCE_WARNING` 플래그 설정 및 노드 카드 헤더 `[⚠ 루프]` 앰버 경고 뱃지 표시 확인
+  - [ ] 뱃지 마우스 호버 시 원인 및 권장 조치 방안을 안내하는 5행 가상 툴팁 노출 확인
+  - [ ] 경고 뱃지 클릭 시 해당 노드를 기준 기계(Anchor)로 승격(`node.setBaseNode(true)`)하고 경고를 해제하는 액션 검증
+  - [ ] 외부 공급선 연결 시 다음 자동 맞춤 연산에서 경고가 자동 소멸(Self-Healing)하는 라이프사이클 검증
+  - [ ] 복수 부산물 앵커 머신에서 하류 소비 기계 대수 연산 시 최대 산출물이 아닌 병목 투입량 기준으로 결정론적 스케일링 수행 확인 (`FractionalAutoRatioTest`)
+  - [ ] `AutoRatioDivergenceTest` JUnit 자동화 헤드리스 회귀 테스트 100% 통과 확인
+- [ ] **포괄적 공정 발산 방어 매트릭스 및 상황별 진단 (`ComprehensiveDivergenceMatrixTest`, ADR-033)**:
+  - [ ] 잉여 배출선이 없는 양의 피드백 증식 루프($\rho > 1.0$) 감지, 1사이클 기준 기계 대수 클램핑 및 `[⚠ 증식]` 청록색 경고 뱃지 표시 확인
+  - [ ] 외부 보충선이 없는 촉매/용매 감쇠 루프($0.95 \le \rho < 1.0$) 감지 및 `[⚠ 촉매]` 앰버 경고 뱃지 표시 확인
+  - [ ] 수급 모순이 발생한 복수 앵커(Anchor) 충돌 감지, `[⚠ 충돌]` 적색 경고 뱃지 표시 및 원클릭 앵커 해제 액션 검증
+  - [ ] 극미세 수율 레시피($< 10^{-4}$)의 상한선 도달을 연쇄 발산과 구분하여 `[⚠ 극소]` 경고 뱃지 표시 확인
+  - [ ] `ComprehensiveDivergenceMatrixTest` JUnit 자동화 헤드리스 회귀 테스트 100% 통과 확인
+- [ ] **감쇠 순환 공정 해석적 솔버 및 시각화 (ADR-044, `DampedRecirculationLoopTest`)**:
+  - [ ] 무한 등비급수 $O(1)$ 해석적 수렴: $S_{\text{steady}} = \frac{S_{\text{ext}}}{1 - r}$ ($r = P/D < 1 - 10^{-4}$), 반복 감쇠 없이 기계 가동률을 직접 산출
+  - [ ] 포트 유량 통계에서 정상 상태 순환 투입 포트를 감지하여 결손 오경고(⚠)를 억제하고 청록색 `§b🔄` 기호 표시 확인
+  - [ ] 마우스 호버 시 외부 순공급량, 내부 순환량, 순환율, 총 유량 및 유효 기계 가동률을 안내하는 7행 상세 툴팁 노출 확인
+  - [ ] Shift + 우클릭 또는 컨텍스트 메뉴 액션 [🔄 정상 상태에 대수 맞춤]으로 루프 내 모든 기계 대수를 정상 상태 용량으로 원클릭 스케일링 검증
+  - [ ] 전역 유량 대시보드에서 순환 자원의 내부 재순환량 세부 내역 표기 확인
+  - [ ] 외부 원료가 투입되는 다단계 순환 공정에서 외부 공급선이 없는 내부 중간 부산물 포트를 미공급 감쇄 루프로 오인하지 않고 정상 내부 유량으로 처리함을 검증 (`testMultiStepBrineLoopWithExternalFeed`)
+  - [ ] `DampedRecirculationLoopTest` JUnit 자동화 헤드리스 회귀 테스트 100% 통과 확인
 - [ ] **목표 배치 생산 소요 시간(ETA) 및 총 소요 자원 연산 (`ProductionETACalculator`)**:
   - [ ] 단말 노드의 목표 생산량 $A_{\text{target}}$ 기준 소요 시간 $T_{\text{ET}} = \frac{A_{\text{target}}}{\text{Rate}_{\text{in}}}$ 산출 검증
   - [ ] 전체 상류 노드의 총 소비 전력량 $E_{\text{total}} = \sum (n.\text{getTotalEUt}() \times 20 \times T_{\text{ET}})\text{ [EU]}$ 및 순 원자재 소요량 집계 확인
@@ -114,6 +150,13 @@
   - [ ] **듀얼 해치 승급**: 동일 티어 에너지 해치 2개 장착 시 +1 전압 티어 승급(Dual Hatch Overclock) 적용 확인
   - [ ] **비대칭 해치**: 비대칭 해치(예: 16A EV + 1A IV) 장착 시 최대 수용 전력 기반 티어 산정 확인
 
+### 2.4 속성 기반 테스트 및 퍼즈 검증 (`FlowSolverPropertyBasedFuzzTest`)
+- [ ] **수치 안전성 불변식**: 무작위 생성된 DAG, 순환 피드백, 정션 및 복합 토폴로지 전반에서 기계 대수, 연결선 유량, 포트 속도 또는 가동률이 `NaN`, `Infinite` 또는 음수를 생성하지 않음을 검증
+- [ ] **질량 보존 불변식**: 폐쇄된 화학양론 네트워크 및 균형 정션에서 총 생산량과 총 소비량, 유입량과 유출량이 $10^{-4}$ 허용 오차 내에서 일치함을 검증
+- [ ] **유한 종료 및 수렴 불변식**: 병리적 토폴로지(자기 루프, 고밀도 피드백 클리크, 극단적 속도 격차) 환경에서도 교착 상태, 무한 재귀 또는 크래시 없이 즉각 종료됨을 검증
+- [ ] **결정론적 재현성**: 시드 기반 그래프 생성 및 솔버 실행이 반복 실행 전반에서 100% 비트 단위로 동일한 결과를 생성함을 검증
+- [ ] `FlowSolverPropertyBasedFuzzTest` JUnit 자동화 테스트 100% 통과 확인
+
 ---
 
 ## 3. 모드별 특화 물리 & 특수 계산 호환 레이어 (Mod Compatibility SPI Layer)
@@ -124,6 +167,10 @@
   - [ ] **열분해로 (Pyrolyse Oven)**: 코일 속도 보너스 기반 소요 시간 단축 ($\text{DurationMult} = \frac{100.0}{\text{PyrolyseSpeed}\%}$) 검증
   - [ ] **크래킹 유닛 (Cracking Unit)**: 코일 에너지 보너스 기반 전력 할인 ($\text{EUtMult} = \frac{\text{CrackingEnergy}\%}{100.0}$) 검증
   - [ ] **대형 제련로 (Multi Smelter)**: 코일 티어에 따른 고유 병렬 수($32\text{x}, 64\text{x}, 128\text{x}\dots$) 자동 연동 검증
+  - [ ] **구조적 고정 코일 보호 및 기계별 코일 게이팅**:
+    - [ ] 구조에 고정 코일 블록이 포함된 멀티블록 기계(예: Heat Chamber, Draco Infusion, Titan Forge 등)가 기능적 코일 멀티블록으로 오인되지 않도록 보호 (`isCoilMultiblock == false`, `coilSlotCount == 0`, BOM 부품 카테고리가 `PartCategory.CASING`으로 유지)
+    - [ ] 동일 레시피 카테고리에 고티어 코일 기계(예: Void Excavator)가 존재하더라도, 현재 노드의 기계 아이콘이 비-코일 기계(예: Void Extractor)인 경우 카드에 `♨` 코일 뱃지가 뜨지 않고 부품 설정창에도 코일 탭이 비활성화됨을 확인
+    - [ ] `StructuralCoilProtectionTest` 및 `CoilGatingRegressionTest` 자동 회귀 테스트 100% 통과 확인
 - [ ] **대형 증기/가스/플라즈마 터빈 & 로터 홀더 물리 (`GTTurbinePhysics`)**:
   - [ ] **로터 홀더 스루풋 캡**: 전압 티어(EV 4,096 EU/t base, 티어별 2배) 및 장착된 로터 파워($\text{RotorPower}\%$)에 따른 최대 발전 용량 $\lfloor \text{BaseCap} \times \frac{\text{RotorPower}}{100} \rfloor$ 연산 검증
   - [ ] **로터 효율 및 홀더 보너스**: 로터 재질 고유 효율($\text{Efficiency}\%$) + 대형 터빈 홀더 티어차 보너스($\Delta\text{Tier} \times 10\%$)를 통한 연료 소비 지속시간 스케일링 검증
@@ -204,6 +251,29 @@
   - [ ] **통합 전력/기계 대수 집계**: 모듈 카드 상단에 내부 기계들의 총 소비 전력 및 총 기계 대수 합산 표시 확인
 - [ ] **모듈 펼치기 (Expand)**:
   - [ ] 모듈 카드의 `⤢ 펼치기` 클릭 시 기존 내부 노드들의 위치와 와이어링 배선이 **100% 원본 그대로 복원**되는지 확인
+- [ ] **미연결 입출력 포트 보존 및 자가 순환 루프 격리 (`GroupCollapsePortBugTest`)**:
+  - [ ] 그룹을 복합 모듈로 접을 때, 동일한 자재/유체(예: 촉매, 핫브라인 등 순환 유체)를 소비하고 생산하는 미연결 포트들이 전역 수지 요약에 의해 오상쇄되어 증발하지 않고 모듈 외곽 포트로 온전하게 보존되는지 확인
+- [ ] **분기점(Junction) 노드 캡슐화 및 Net Worth(원자재/순생산 수지) 보존 (`JunctionModuleCompressRegressionTest`)**:
+  - [ ] 중간 분기점/버퍼 정션 노드가 포함된 공정 그룹을 복합 모듈로 압축할 때, 정션 노드가 물리 기계가 아닌 단순 배선 라우팅 요소로 정확히 인식되는지 확인
+  - [ ] 정션 슬롯의 허구 소비/생산량 산출이 차단되어, 내부에서 완전 순환 상쇄되는 자재(예: 핫브라인 등)가 유령 모듈 포트로 생성되거나 Process Summary의 순수지(Net Worth)를 왜곡하지 않는지 확인
+  - [ ] 외부 정션/공급 노드와 연결된 기계를 모듈로 압축할 때, 내부 자체 공급량을 차감한 순 잔여 요구량만 모듈 경계 입력 포트로 정확히 책정되어 가동률 왜곡 및 유령 잉여 포트 발생이 방지되는지 확인
+  - [ ] `JunctionModuleCompressRegressionTest` 자동 회귀 테스트 100% 통과 확인
+
+### 4.3 공유 기계 풀 비파괴 인플레이스 접기 (In-Place Folding, ADR-042)
+- [ ] **인플레이스 접기 및 펼치기 (`⤡` / `⤢`)**:
+  - [ ] 공유 기계 풀 프레임 접기 시 내부 노드가 삭제되지 않고 단일 가상 기계 카드로 깔끔하게 축소되는지 확인
+  - [ ] 카드 헤더에 공유 기계 아이콘, 기계 명칭, 전압 티어, 오버클럭 모드, 시뮬레이션 총 가동률 대수가 정확히 표시되는지 확인
+  - [ ] 기계 아이콘이 원시 텍스처 경로 대신 아이템/블록 레지스트리를 통해 안전하게 리졸브되어 누락 텍스처(체크무늬 깨짐) 없이 정상 렌더링되는지 확인 (`SharedPoolFoldedTest`)
+  - [ ] 기계 대수 조작 시 내부 레시피들의 상대 비율이 비례하여 보존되는지 확인
+  - [ ] 프레임 설정 다이얼로그에서 목표 기계 대수 입력창 포커스 및 Tab 키 전환, 라벨 겹침 방지 레이아웃 확인 (`FrameEditDialogTest`)
+### 4.4 전용 서브페이지 복합 공정 모듈 및 경계 I/O 핀 (ADR-043)
+- [ ] **1:1 전용 서브페이지 내비게이션**:
+  - [ ] 복합 모듈 카드를 더블클릭할 때 독립 서브페이지(`PageType.MODULE`)로 부드럽게 이동하는지 확인
+  - [ ] 상단 브레드크럼 툴바 및 Escape 키로 상위 보드 페이지로 상태 유실 없이 복귀하는지 확인
+  - [ ] 모듈 생성/삭제 시 실행 취소(Undo)/다시 실행(Redo) 사이클에서 모듈 서브페이지가 정상 복원 및 정리되는지 확인 (`SubPageModuleUndoRedoBugTest`)
+- [ ] **경계 I/O 핀 조작성**:
+  - [ ] 경계 핀 노드가 콤팩트한 32x32 원자재 카드로 렌더링되며, 실시간 유량·방향 배지·출처 메타데이터가 정상 표시되는지 확인 (`DedicatedSubPageModuleTest`)
+  - [ ] 마우스 호버 퀵 삭제(`[x]`), 인라인 이름 변경, 우클릭 컨텍스트 메뉴 및 핀 인스펙터 패널 조작이 상위 페이지 토폴로지 훼손 없이 동작하는지 확인
 
 ---
 
@@ -273,6 +343,11 @@
   - [ ] 다중 포트 연결 시 원하는 자원만 체크박스로 선택하여 연결되는지 확인
 - [ ] **블루프린트 메타데이터 패키징 및 가져오기 미리보기 (`[📥] / [📤]`)**:
   - [ ] 제목/설명/태그 작성 및 가져오기 전 노드 수, 주요 원자재 요약 미리보기 확인
+- [ ] **멀티플레이 팀 워크스페이스 & 실시간 협업 (`WorkspaceCollaborationSyncTest`, ADR-003)**:
+  - [ ] 자가 락 식별: 페이지 편집 락을 보유한 플레이어가 본인 잠금 뱃지에 의해 차단되거나 교착 상태에 빠지지 않고 연속 편집 가능함을 검증
+  - [ ] 페이지별 리비전 추적: 자동 커밋 및 내보내기 시 워크스페이스 전체 리비전 대신 대상 페이지 리비전을 전송하여 허위 409 충돌 오류 방지 검증
+  - [ ] 자동 충돌 복구: 409 리비전 충돌 발생 시 클라이언트가 최신 메타데이터를 질의하고 데이터 유실 없이 정상 동기화됨을 검증
+  - [ ] 난독화 안전 위젯 재구성: 탭 전환 및 워크스페이스 이동 시 `rebuildBoardWidgets()`를 사용하여 `IBoardScreenContext`의 런타임 `NoSuchMethodError` 방지 검증
 - [ ] **4대 언어 다국어 리소스 완전성 (i18n)**:
   - [ ] `en_us.json`, `ko_kr.json`, `zh_cn.json`, `ru_ru.json`의 번역 키 및 포맷 토큰(`%s`, `%d`)이 100% 동기화되어 누락된 키가 없는지 확인
   - [ ] `check_i18n.py` 검증 및 `testI18nCompletenessAndConsistency` 단위 테스트 통과 확인

@@ -79,7 +79,7 @@ public class ThermalModGuiHandler implements IModGuiHandler {
                 com.gtceu.calcboard.compat.systeams.SysteamsRecipeHandler.toggleDynamoBoilerMode(node);
                 widget.invalidateCache();
                 if (widget.getParent() != null) {
-                    widget.getParent().rebuildWidgets();
+                    widget.getParent().rebuildBoardWidgets();
                     widget.getParent().markSummaryDirty();
                 }
                 Minecraft.getInstance().getSoundManager().play(

@@ -8,7 +8,7 @@ import com.gtceu.calcboard.client.gui.compat.IModGuiHandler;
 import com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog;
 import com.gtceu.calcboard.client.gui.render.NodeCardRenderer;
 import com.gtceu.calcboard.client.gui.widget.NodeWidget;
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -52,9 +52,9 @@ public class CreateNewAgeModGuiHandler implements IModGuiHandler {
                 }
             }
 
-            String addonLabel = "🧲 0x";
+            String addonLabel = "⚡ 0x";
             if (magnetForce > 0) {
-                addonLabel = "🧲 " + magnetForce + "x";
+                addonLabel = "⚡ " + magnetForce + "x";
             }
             if (!node.getAddons().isEmpty()) {
                 addonLabel += " (+" + node.getAddons().size() + ")";
@@ -150,7 +150,7 @@ public class CreateNewAgeModGuiHandler implements IModGuiHandler {
         }
 
         if (node.isGenerator()) {
-            String magnetHeader = String.format(Locale.ROOT, "§6🧲 %s: §e%d/12 §7- Total Force: §e%d",
+            String magnetHeader = String.format(Locale.ROOT, "§6⚡ %s: §e%d/12 §7- Total Force: §e%d",
                     Component.translatable("gui.gtcalcboard.addon_cat.magnet").getString(), magnetCount, totalStrength);
             graphics.drawString(font, magnetHeader, x + 10, y + 30, 0xFFFFFFFF, false);
 

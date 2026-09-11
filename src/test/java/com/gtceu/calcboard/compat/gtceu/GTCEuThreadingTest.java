@@ -8,13 +8,14 @@ import com.gtceu.calcboard.api.catalog.CategoryCapability;
 import com.gtceu.calcboard.api.catalog.CategoryCapabilityMatrix;
 import com.gtceu.calcboard.api.catalog.MachineAddon;
 import com.gtceu.calcboard.api.catalog.MultiblockDetector;
-import com.gtceu.calcboard.compat.IModAdapter;
+import com.gtceu.calcboard.api.spi.IModAdapter;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 
 import com.gtceu.calcboard.api.type.GTThreadingHelix;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
-import com.gtceu.calcboard.api.type.NodeThreadingConfig;
+import com.gtceu.calcboard.compat.start.model.NodeThreadingConfig;
+import com.gtceu.calcboard.compat.start.helper.RecipeNodeThreadingHelper;
 import com.gtceu.calcboard.api.model.RecipeNode;
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import org.junit.jupiter.api.Assertions;
@@ -76,10 +77,11 @@ public class GTCEuThreadingTest {
     @Test
     public void testThreadingOverclockAndPowerScaling() {
         RecipeNode node = RecipeNode.create("Multithreaded Component Synthesis Forge", 100.0, 1000.0, GTVoltageTier.UIV);
+        node.addAddon(new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon("gtceu:uiv_energy_hatch", "UIV Energy Hatch", "", ResourceLocation.tryParse("gtceu:uiv_energy_hatch"), GTVoltageTier.UIV, 1, false, false, false));
         node.setMultiblock(true);
         node.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:multithreaded_component_synthesis_forge"));
 
-        NodeThreadingConfig cfg = node.getThreadingConfig();
+        NodeThreadingConfig cfg = RecipeNodeThreadingHelper.getOrCreateThreadingConfig(node);
         // Add 3x MAX Supreme (+180 Generalis)
         cfg.setHelixCount(GTThreadingHelix.MAX_SUPREME, 3);
 
@@ -117,7 +119,7 @@ public class GTCEuThreadingTest {
         RecipeNode original = RecipeNode.create("Multithreaded Component Synthesis Forge", 200.0, 5000.0, GTVoltageTier.UXV);
         original.setMultiblock(true);
 
-        NodeThreadingConfig cfg = original.getThreadingConfig();
+        NodeThreadingConfig cfg = RecipeNodeThreadingHelper.getOrCreateThreadingConfig(original);
         cfg.setHelixCount(GTThreadingHelix.UXV_SUPREME, 2); // +80 Gen
         cfg.setHelixCount(GTThreadingHelix.UIV_OVERDRIVE, 1); // +6 Gen, +18 Spd, +6 Eff
         cfg.setAssignedSpeed(30);
@@ -128,7 +130,7 @@ public class GTCEuThreadingTest {
         RecipeNode deserialized = RecipeNode.deserializeNBT(tag);
 
         Assertions.assertTrue(deserialized.hasThreading());
-        NodeThreadingConfig dCfg = deserialized.getThreadingConfig();
+        NodeThreadingConfig dCfg = RecipeNodeThreadingHelper.getThreadingConfig(deserialized);
 
         Assertions.assertEquals(2, dCfg.getHelixCount(GTThreadingHelix.UXV_SUPREME));
         Assertions.assertEquals(1, dCfg.getHelixCount(GTThreadingHelix.UIV_OVERDRIVE));
@@ -164,7 +166,7 @@ public class GTCEuThreadingTest {
     public void testSyncThreadingAddonsToActiveAddons() {
         RecipeNode node = RecipeNode.create("Quantum Force Transformer", 100.0, 1000000.0, GTVoltageTier.UEV);
         node.setMultiblock(true);
-        NodeThreadingConfig cfg = node.getThreadingConfig();
+        NodeThreadingConfig cfg = RecipeNodeThreadingHelper.getOrCreateThreadingConfig(node);
         cfg.addHelixCount(GTThreadingHelix.MAX_SUPREME, 4);
         cfg.addHelixCount(GTThreadingHelix.UHV_OVERDRIVE, 8);
 
@@ -177,7 +179,7 @@ public class GTCEuThreadingTest {
         Assertions.assertTrue(node.getAddons().stream().anyMatch(a -> a.getName().contains("8x UHV Overdrive")));
 
         // Test uninstall via adapter
-        com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+        com.gtceu.calcboard.api.spi.IModAdapter adapter = com.gtceu.calcboard.api.spi.ModAdapterRegistry.getAdapterForNode(node);
         com.gtceu.calcboard.api.catalog.MachineAddon maxHelixAddon = node.getAddons().stream()
                 .filter(a -> a.getName().contains("MAX Supreme"))
                 .findFirst().orElseThrow();
@@ -236,6 +238,7 @@ public class GTCEuThreadingTest {
     @Test
     public void testMultiblockControllerVariantAndParallelHatchAddonIntegration() {
         RecipeNode dtNode = RecipeNode.create("Distillation Tower", 100.0, 120.0, GTVoltageTier.MV);
+        dtNode.addAddon(new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon("gtceu:iv_energy_hatch", "IV Energy Hatch", "", ResourceLocation.tryParse("gtceu:iv_energy_hatch"), GTVoltageTier.IV, 1, false, false, false));
         dtNode.setMultiblock(true);
         dtNode.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:distillation_tower"));
 
@@ -248,7 +251,7 @@ public class GTCEuThreadingTest {
         Assertions.assertEquals(1, dtNode.getTotalParallel());
 
         // 2. Equip Elite Parallel Hatch (64x)
-        var adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(dtNode);
+        var adapter = ModAdapterRegistry.getAdapterForNode(dtNode);
         com.gtceu.calcboard.compat.gtceu.addon.GTParallelHatchAddon elitePar = new com.gtceu.calcboard.compat.gtceu.addon.GTParallelHatchAddon(
                 "gtceu:elite_parallel_hatch", "Elite Parallel Control Hatch", "", ResourceLocation.tryParse("gtceu:elite_parallel_control_hatch"), 64, false
         );
@@ -353,7 +356,7 @@ public class GTCEuThreadingTest {
         Assertions.assertTrue(farmNode.isExplicitThreadingMachine());
         Assertions.assertTrue(farmNode.hasThreading());
         Assertions.assertFalse(farmNode.canUseCoils());
-        Assertions.assertEquals(8, farmNode.getThreadingConfig().getMaxHelixCapacity());
+        Assertions.assertEquals(8, RecipeNodeThreadingHelper.getThreadingConfig(farmNode).getMaxHelixCapacity());
 
         var adapter = ModAdapterRegistry.getAdapterForNode(farmNode);
         var applicableCats = adapter.getApplicableAddonCategories(farmNode);

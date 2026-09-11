@@ -5,7 +5,7 @@ import com.gtceu.calcboard.api.util.ModCompatHelper;
 import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.compat.thermal.helper.ThermalAugmentHelper;
-import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
+import com.gtceu.calcboard.api.model.RecipeDetails;
 import net.minecraft.resources.ResourceLocation;
 
 import java.lang.reflect.Field;
@@ -16,7 +16,7 @@ import java.lang.reflect.Method;
  */
 public class ThermalRecipeHandler {
 
-    public static boolean adaptRecipeDetails(Object emiRecipeObj, Object backing, EmiRecipeConverter.RecipeDetails details) {
+    public static boolean adaptRecipeDetails(Object emiRecipeObj, Object backing, RecipeDetails details) {
         ResourceLocation catId = null;
         if (com.gtceu.calcboard.api.util.ModCompatHelper.isEmiLoaded()) {
             catId = EmiThermalHelper.getCategoryId(emiRecipeObj);

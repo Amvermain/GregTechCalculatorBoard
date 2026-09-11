@@ -8,6 +8,7 @@ version="${mod_version}"
 displayName="${mod_name}"
 displayURL="https://www.curseforge.com/minecraft/mc-mods/gregtech-calculator-board"
 issueTrackerURL="https://github.com/Amvermain/GregTechCalculatorBoard/issues"
+updateJSONURL="https://raw.githubusercontent.com/Amvermain/GregTechCalculatorBoard/main/update.json"
 authors="${mod_authors}"
 description='''${mod_description}'''
 

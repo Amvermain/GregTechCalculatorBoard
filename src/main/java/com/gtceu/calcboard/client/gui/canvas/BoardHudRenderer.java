@@ -14,6 +14,11 @@ import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.network.chat.Component;
 import org.joml.Matrix4f;
 
+import com.gtceu.calcboard.api.model.FlowGraph;
+import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.solver.FlowGraphSolver;
+import com.gtceu.calcboard.client.gui.interaction.CanvasQuickAddMarkerHandler;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -82,47 +87,149 @@ public class BoardHudRenderer {
         RenderSystem.disableBlend();
     }
 
+    public static void renderEmptyCanvasWatermark(GuiGraphics graphics, Font font, int width, int height, int nodeCount) {
+        if (nodeCount > 0) return;
+        String title = "GREGTECH CALCULATOR BOARD";
+        String hint = Component.translatable("gui.gtcalcboard.canvas.empty_watermark_hint").getString();
+
+        int cx = width / 2;
+        int cy = height / 2 - 10;
+
+        int titleW = font.width(title);
+        int hintW = font.width(hint);
+
+        graphics.drawString(font, title, cx - titleW / 2, cy - 8, 0x4494A3B8, false);
+        graphics.drawString(font, hint, cx - hintW / 2, cy + 6, 0x4464748B, false);
+    }
+
     public static void renderQuickAddMarker(GuiGraphics graphics, Font font, double qx, double qy, double canvasMouseX, double canvasMouseY) {
+        renderQuickAddMarker(graphics, font, qx, qy, canvasMouseX, canvasMouseY, null, null);
+    }
+
+    public static void renderQuickAddMarker(
+            GuiGraphics graphics,
+            Font font,
+            double qx,
+            double qy,
+            double canvasMouseX,
+            double canvasMouseY,
+            CanvasQuickAddMarkerHandler markerHandler,
+            FlowGraph graph
+    ) {
+        renderQuickAddBaseCapsule(graphics, font, qx, qy, canvasMouseX, canvasMouseY);
+        renderQuickAddFlyout(graphics, font, qx, qy, canvasMouseX, canvasMouseY, markerHandler, graph);
+    }
+
+    private static void renderQuickAddBaseCapsule(GuiGraphics graphics, Font font, double qx, double qy, double canvasMouseX, double canvasMouseY) {
         boolean searchHovered = canvasMouseX >= qx - 44 && canvasMouseX <= qx - 24 && canvasMouseY >= qy - 10 && canvasMouseY <= qy + 10;
         boolean junctionHovered = canvasMouseX >= qx - 21 && canvasMouseX <= qx - 1 && canvasMouseY >= qy - 10 && canvasMouseY <= qy + 10;
         boolean frameHovered = canvasMouseX >= qx + 2 && canvasMouseX <= qx + 22 && canvasMouseY >= qy - 10 && canvasMouseY <= qy + 10;
         boolean noteHovered = canvasMouseX >= qx + 25 && canvasMouseX <= qx + 45 && canvasMouseY >= qy - 10 && canvasMouseY <= qy + 10;
 
-        // Outer capsule background
         graphics.fill((int)(qx - 47), (int)(qy - 13), (int)(qx + 48), (int)(qy + 13), 0xDD0F172A);
         graphics.renderOutline((int)(qx - 47), (int)(qy - 13), 95, 26, 0x88334155);
 
-        // 1. [🔍] Search Recipe (Emerald)
-        int searchBg = searchHovered ? 0xEE10B981 : 0xBB059669;
-        int searchBorder = searchHovered ? 0xFF6EE7B7 : 0xCC10B981;
-        graphics.fill((int)(qx - 44), (int)(qy - 10), (int)(qx - 24), (int)(qy + 10), searchBg);
-        graphics.renderOutline((int)(qx - 44), (int)(qy - 10), 20, 20, searchBorder);
-        String searchIcon = "🔍";
-        graphics.drawString(font, searchIcon, (int)(qx - 34 - font.width(searchIcon) / 2.0f), (int)(qy - 4), 0xFFFFFFFF, false);
+        renderButton(graphics, font, (int)(qx - 44), (int)(qy - 10), searchHovered, "?", 0xEE10B981, 0xBB059669, 0xFF6EE7B7, 0xCC10B981);
+        renderButton(graphics, font, (int)(qx - 21), (int)(qy - 10), junctionHovered, "↔", 0xEE0284C7, 0xBB0369A1, 0xFF7DD3FC, 0xCC0284C7);
+        renderButton(graphics, font, (int)(qx + 2), (int)(qy - 10), frameHovered, "▦", 0xEE8B5CF6, 0xBB6D28D9, 0xFFC4B5FD, 0xCC7C3AED);
+        renderButton(graphics, font, (int)(qx + 25), (int)(qy - 10), noteHovered, "▪", 0xEEF59E0B, 0xBBB45309, 0xFFFDE68A, 0xCCD97706);
+    }
 
-        // 2. [🔀] Insert Junction (Sky/Cyan)
-        int juncBg = junctionHovered ? 0xEE0284C7 : 0xBB0369A1;
-        int juncBorder = junctionHovered ? 0xFF7DD3FC : 0xCC0284C7;
-        graphics.fill((int)(qx - 21), (int)(qy - 10), (int)(qx - 1), (int)(qy + 10), juncBg);
-        graphics.renderOutline((int)(qx - 21), (int)(qy - 10), 20, 20, juncBorder);
-        String juncIcon = "🔀";
-        graphics.drawString(font, juncIcon, (int)(qx - 11 - font.width(juncIcon) / 2.0f), (int)(qy - 4), 0xFFFFFFFF, false);
+    private static void renderButton(GuiGraphics graphics, Font font, int bx, int by, boolean hover, String icon, int hoverBg, int baseBg, int hoverBorder, int baseBorder) {
+        int bg = hover ? hoverBg : baseBg;
+        int border = hover ? hoverBorder : baseBorder;
+        graphics.fill(bx, by, bx + 20, by + 20, bg);
+        graphics.renderOutline(bx, by, 20, 20, border);
+        graphics.drawString(font, icon, (int)(bx + 10 - font.width(icon) / 2.0f), by + 6, 0xFFFFFFFF, false);
+    }
 
-        // 3. [🖼] Group Frame (Purple/Violet)
-        int frameBg = frameHovered ? 0xEE8B5CF6 : 0xBB6D28D9;
-        int frameBorder = frameHovered ? 0xFFC4B5FD : 0xCC7C3AED;
-        graphics.fill((int)(qx + 2), (int)(qy - 10), (int)(qx + 22), (int)(qy + 10), frameBg);
-        graphics.renderOutline((int)(qx + 2), (int)(qy - 10), 20, 20, frameBorder);
-        String frameIcon = "🖼";
-        graphics.drawString(font, frameIcon, (int)(qx + 12 - font.width(frameIcon) / 2.0f), (int)(qy - 4), 0xFFFFFFFF, false);
+    private static void renderQuickAddFlyout(
+            GuiGraphics graphics,
+            Font font,
+            double qx,
+            double qy,
+            double canvasMouseX,
+            double canvasMouseY,
+            CanvasQuickAddMarkerHandler markerHandler,
+            FlowGraph graph
+    ) {
+        if (markerHandler == null || !markerHandler.hasQuickAddWireContext()) return;
+        boolean isHoverArea = canvasMouseX >= qx - 23 && canvasMouseX <= qx + 1 && canvasMouseY >= qy - 62 && canvasMouseY <= qy + 12;
+        if (!isHoverArea) return;
 
-        // 4. [📝] Sticky Note / Memo (Amber/Gold)
-        int noteBg = noteHovered ? 0xEEF59E0B : 0xBBB45309;
-        int noteBorder = noteHovered ? 0xFFFDE68A : 0xCCD97706;
-        graphics.fill((int)(qx + 25), (int)(qy - 10), (int)(qx + 45), (int)(qy + 10), noteBg);
-        graphics.renderOutline((int)(qx + 25), (int)(qy - 10), 20, 20, noteBorder);
-        String noteIcon = "📝";
-        graphics.drawString(font, noteIcon, (int)(qx + 35 - font.width(noteIcon) / 2.0f), (int)(qy - 4), 0xFFFFFFFF, false);
+        RecipeNode srcNode = markerHandler.getQuickAddWireSourceNode();
+        int portIdx = markerHandler.getQuickAddWirePortIdx();
+        boolean isInput = markerHandler.isQuickAddWireInput();
+
+        if (isInput) {
+            renderInputWireFlyout(graphics, font, qx, qy, canvasMouseX, canvasMouseY, srcNode, portIdx, graph);
+        } else {
+            renderOutputWireFlyout(graphics, font, qx, qy, canvasMouseX, canvasMouseY, srcNode, portIdx, graph);
+        }
+    }
+
+    private static void renderOutputWireFlyout(
+            GuiGraphics graphics,
+            Font font,
+            double qx,
+            double qy,
+            double canvasMouseX,
+            double canvasMouseY,
+            RecipeNode srcNode,
+            int portIdx,
+            FlowGraph graph
+    ) {
+        FlowGraphSolver.PortFlowStats stats = (graph != null && srcNode != null) ? graph.getOutputPortStats(srcNode, portIdx) : null;
+        double surplus = stats != null ? Math.max(0.0, stats.requiredOrProducedRate() - stats.connectedRate()) : 0.0;
+
+        if (surplus > 0.0001) {
+            graphics.fill((int)(qx - 23), (int)(qy - 60), (int)(qx + 1), (int)(qy - 11), 0xDD0F172A);
+            graphics.renderOutline((int)(qx - 23), (int)(qy - 60), 24, 49, 0x88334155);
+
+            boolean drainHover = canvasMouseX >= qx - 21 && canvasMouseX <= qx - 1 && canvasMouseY >= qy - 34 && canvasMouseY <= qy - 14;
+            renderButton(graphics, font, (int)(qx - 21), (int)(qy - 34), drainHover, "↓", 0xEEEA580C, 0xBBF97316, 0xFFFDBA74, 0xCCF97316);
+
+            boolean voidHover = canvasMouseX >= qx - 21 && canvasMouseX <= qx - 1 && canvasMouseY >= qy - 58 && canvasMouseY <= qy - 38;
+            renderButton(graphics, font, (int)(qx - 21), (int)(qy - 58), voidHover, "✕", 0xEE9333EA, 0xBBA855F7, 0xFFD8B4FE, 0xCCA855F7);
+        } else {
+            graphics.fill((int)(qx - 23), (int)(qy - 36), (int)(qx + 1), (int)(qy - 11), 0xDD0F172A);
+            graphics.renderOutline((int)(qx - 23), (int)(qy - 36), 24, 25, 0x88334155);
+
+            boolean voidHover = canvasMouseX >= qx - 21 && canvasMouseX <= qx - 1 && canvasMouseY >= qy - 34 && canvasMouseY <= qy - 14;
+            renderButton(graphics, font, (int)(qx - 21), (int)(qy - 34), voidHover, "✕", 0xEE9333EA, 0xBBA855F7, 0xFFD8B4FE, 0xCCA855F7);
+        }
+    }
+
+    private static void renderInputWireFlyout(
+            GuiGraphics graphics,
+            Font font,
+            double qx,
+            double qy,
+            double canvasMouseX,
+            double canvasMouseY,
+            RecipeNode srcNode,
+            int portIdx,
+            FlowGraph graph
+    ) {
+        FlowGraphSolver.PortFlowStats stats = (graph != null && srcNode != null) ? graph.getInputPortStats(srcNode, portIdx) : null;
+        double deficit = stats != null ? Math.max(0.0, stats.requiredOrProducedRate() - stats.connectedRate()) : 0.0;
+
+        if (deficit > 0.0001) {
+            graphics.fill((int)(qx - 23), (int)(qy - 60), (int)(qx + 1), (int)(qy - 11), 0xDD0F172A);
+            graphics.renderOutline((int)(qx - 23), (int)(qy - 60), 24, 49, 0x88334155);
+
+            boolean supplyHover = canvasMouseX >= qx - 21 && canvasMouseX <= qx - 1 && canvasMouseY >= qy - 34 && canvasMouseY <= qy - 14;
+            renderButton(graphics, font, (int)(qx - 21), (int)(qy - 34), supplyHover, "↑", 0xEE059669, 0xBB10B981, 0xFF6EE7B7, 0xCC10B981);
+
+            boolean infHover = canvasMouseX >= qx - 21 && canvasMouseX <= qx - 1 && canvasMouseY >= qy - 58 && canvasMouseY <= qy - 38;
+            renderButton(graphics, font, (int)(qx - 21), (int)(qy - 58), infHover, "∞", 0xEE0369A1, 0xBB0284C7, 0xFF7DD3FC, 0xCC0284C7);
+        } else {
+            graphics.fill((int)(qx - 23), (int)(qy - 36), (int)(qx + 1), (int)(qy - 11), 0xDD0F172A);
+            graphics.renderOutline((int)(qx - 23), (int)(qy - 36), 24, 25, 0x88334155);
+
+            boolean infHover = canvasMouseX >= qx - 21 && canvasMouseX <= qx - 1 && canvasMouseY >= qy - 34 && canvasMouseY <= qy - 14;
+            renderButton(graphics, font, (int)(qx - 21), (int)(qy - 34), infHover, "∞", 0xEE0369A1, 0xBB0284C7, 0xFF7DD3FC, 0xCC0284C7);
+        }
     }
 
     public record BackgroundLoadingTask(String title, int percent, boolean indeterminate, String statusText, String subtitle) {}

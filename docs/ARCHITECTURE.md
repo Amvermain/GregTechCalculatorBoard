@@ -7,7 +7,7 @@
 > 📘 **Detailed Technical Specification Series**:
 > * 🇰🇷 **Korean Edition**: [docs/ko_kr/CODE_SPECIFICATION.md](ko_kr/CODE_SPECIFICATION.md)
 > * 🇺🇸 **English Edition**: [docs/en_us/CODE_SPECIFICATION.md](en_us/CODE_SPECIFICATION.md)
-> The complete v2.1.0 architecture specifications, 5 graph algorithms, Gauss-Jordan mass balance linear solver, `CategoryCapabilityMatrix`, and 2-tier on-demand streaming protocol are documented in the links above.
+> The complete v2.2.0-beta.4 architecture specifications, 5 graph algorithms, Gauss-Jordan mass balance linear solver, `CategoryCapabilityMatrix`, and 2-tier on-demand streaming protocol are documented in the links above.
 
 This document describes the internal architecture, mathematical solver engine, canvas rendering pipeline, and multi-mod compatibility layer (SPI) of **GregTech Calculator Board**.
 
@@ -21,43 +21,48 @@ GTCalcBoard is architected into 5 strictly isolated layers following **Clean Arc
 graph TD
     subgraph UI["1. Presentation & UI Layer (com.gtceu.calcboard.client.gui)"]
         BS["BoardScreen (Main Screen Orchestrator & Input Router)"]
-        BDM["BoardDialogManager (Modal Dialog Lifecycle & Priority Dispatch)"]
+        BDM["BoardDialogManager & ModalStack (LIFO Modal Lifecycle & ESC Dismissal)"]
         BCR["BoardCanvasRenderer (Viewport Culling & Canvas Rendering Coordinator)"]
         BAH["BoardActionHandler (Undo/Redo Actions & Node/Wire Removal Collector)"]
         BVT["BoardViewportTransform (Virtual GUI Scale Coordinate Transform Engine)"]
-        CIH["CanvasInteractionHandler (Pan, Zoom, Drag Multi-Selection, QuickAdd)"]
+        CIH["CanvasInteractionHandler & CanvasStateMachine (FSM-Driven Mutual Exclusion)"]
+        NLB["NodeLayoutBounds & NodeLayoutCalculator (Single-Source Hitbox & Layout Model)"]
+        RP["RenderProfiler (F3 Real-Time Rendering & Solver Latency Profiler HUD)"]
+        CUN["ClientUpdateNotifier (Background Check & In-Game Update Notification Badge)"]
         RENDER["Two-Pass Z-Order Rendering & Rate-Based Flow Wire Animation Shader"]
         WSI["WireSpatialIndex (128x128 AABB Uniform Grid O(log E) Spatial Indexing)"]
         NCTC["NodeCardTextCache (Dirty-Flag Based Text Truncation & Formatting Cache)"]
-        Widgets["widget.* (NodeWidget, ToolbarWidget, PageTabBarWidget, HotkeyHudWidget, SummaryOverlay)"]
-        Dialogs["dialog.* (BoardSettingsDialog, MachineConfigDialog, BOMDialog, SearchDialog, GlobalBalanceDialog, JunctionSupplyDialog)"]
-        Search["search.* (RecipeSearchCacheManager, RecipeSearchQueryEngine)"]
+        Widgets["widget.* (NodeWidget, ToolbarWidget, PageTabBarWidget, HotkeyHudWidget, SummaryOverlay, FavoritesDockWidget)"]
+        Dialogs["dialog.* (BoardSettingsDialog, MachineConfigDialog, BOMDialog, SearchDialog, GlobalBalanceDialog, JunctionSupplyDialog, FrameEditDialog)"]
+        Search["search.* (RecipeSearchCacheManager, RecipeSearchQueryEngine & Composable Specification)"]
     end
 
     subgraph Core["2. Core Domain & Math Engine (com.gtceu.calcboard.api)"]
         Storage["storage.* (BoardManager, BoardPage, HistoryManager, BlueprintCodec, RecipeNodeSerializer)"]
         Preset["preset.* (CategoryMachinePreset, CategoryMachinePresetManager)"]
-        Model["model.* (RecipeNode, ConnectionEdge, IngredientStack, NodeRateCalculator, NodeWorkstationResolver)"]
-        Solver["solver.* (FlowGraph, FlowGraphSolver, MassBalanceSolver, FlowBalanceMatrixSolver, FlowGraphTopologyAnalyzer, FlowSummaryAggregator, ProductionETACalculator)"]
-        Catalog["catalog.* (CapabilityMatrix, MachineAddonCatalog, PartCategory)"]
-        Type["type.* (GTVoltageTier, OverclockMode, EnergyType, SteamMode, FluidUnitMode, WireColorPreset, WireAnimationMode, SupplyMode)"]
-        Prop["property.* (NodeProperties, NodePropertyStore)"]
+        Model["model.* (RecipeNode, ConnectionEdge, IngredientStack, CanvasGroupFrame, NodeRateCalculator, NodeWorkstationResolver)"]
+        Solver["solver.* (FlowGraph, FlowGraphSolver, MassBalanceSolver, FlowBalanceMatrixSolver, FlowEdgeAllocator, FlowGraphModuleHandler)"]
+        Linear["solver.linear.* (TwoStageLinearFlowSolver, GaussJordanEliminator, LinearEquationSystem)"]
+        Stability["solver.* (ProcessStabilityAnalyzer, HarmonizedRatioOptimizer, AutoRatioEngine)"]
+        Catalog["catalog.* (CapabilityMatrix, MachineAddonCatalog, PartCategory, MultiblockDetector)"]
+        Type["type.* (GTVoltageTier, OverclockMode, EnergyType, SteamMode, FluidUnitMode, WireColorPreset, WireAnimationMode, SupplyMode, FlowSplitMode)"]
+        Prop["property.* (NodeProperties, NodePropertyStore, NodeBadgeRegistry)"]
+        SPI["spi.* (ModAdapterRegistry, IModAdapter, IModExtension, Providers)"]
     end
 
-    subgraph Compat["3. Mod Compatibility Common SPI (com.gtceu.calcboard.compat)"]
-        MAR["ModAdapterRegistry (Priority Dynamic Routing SPI)"]
-        IMA["IModAdapter (Lifecycle, Overclock, Energy, BOM Contribution & Validation)"]
+    subgraph Compat["3. Mod Compatibility Implementations (com.gtceu.calcboard.compat)"]
         subgraph Adapters["Domain Mod Adapters (100% Headless Safe)"]
-            GT["gtceu (GTCEuMachineAnalyzer, physics.GTBoilerPhysics, physics.GTTurbinePhysics, BOMResolver)"]
+            GT["gtceu (GTCEuMachineAnalyzer, physics.GTBoilerPhysics, physics.GTTurbinePhysics, physics.GTFusionHelper, helper.GTCombustionHelper, BOMResolver)"]
             CR_MOD["create (CreateSequencedRecipeExtractor, RPM/SU, Kinetic Machines)"]
+            CDG["createdieselgenerators (Diesel Engines, SU/Fuel, Distillation)"]
             CNA["createnewage (Motors, Generator Coils, Magnet Rings, FE/SU Conversion)"]
+            GR["greate (Tiered Kinetic Machines)"]
             TH["thermal (AugmentData, Tier Kits, Dynamos, RF/t)"]
             SY["systeams (Boilers, Steam Dynamos, Steam mB/s)"]
             ST["start (StarTReflectionBridge, Plasma Turbines, Threading Helix Structures, SPT/NPT Traits)"]
             VN["vanilla (Passive Unpowered Fallback)"]
         end
-        MAR --> IMA
-        IMA --> Adapters
+        SPI --> Adapters
     end
 
     subgraph ServerNet["4. Multiplayer Server & Network (server / network)"]
@@ -124,6 +129,54 @@ The Core Domain Engine (`com.gtceu.calcboard.api`) and Common Mod Adapters (`com
   1. Official APIs & Java Reflection.
   2. Physics Simulations & Internal Objects.
   3. Deterministic NBT numerical data structures & official `TagKey` lookups.
+
+### 2.6 Hierarchical Modal Dialog Stack & Canvas Interaction FSM (ADR-026 & ADR-027)
+* **LIFO Modal Stack (`ModalStack` & `IBoardModal`)**: Manages 26 workspace overlay dialogs with strict LIFO ordering, sequential ESC dismissal, and input isolation against ghost clicks.
+* **Finite State Machine (`CanvasStateMachine`)**: Enforces mutually exclusive interaction states (IDLE, DRAGGING_NODES, WIRING, BOX_SELECTING, RESIZING, PANNING) with clean rollback on abort.
+
+### 2.7 Composable Recipe Search & Extension Object SPI (ADR-028 & ADR-029)
+* **Specification Pattern Query Engine (`RecipeSearchQueryEngine`)**: Decomposes recipe search into composable predicates (`@mod`, `#tag`, `tier:`, `eut:`) with memoized token indexing.
+* **Interface Segregation & Extension Object Pattern (`IModAdapter`)**: Core lifecycle reduced to 86 lines; domain capabilities partitioned into 6 modular SPI providers (`IEnergySimulationProvider`, `ICompoundRecipeProvider`, `IHardwareAddonProvider`, `IMultiblockBOMProvider`, `IBoosterProvider`, `ICapabilityMatrixProvider`) with 100% backward compatibility.
+
+### 2.8 Single-Source Node Layout Bounds Model (`NodeLayoutBounds`, ADR-030)
+* **Decoupled Renderer & Hit Testing**: Hardcoded coordinates and offsets shared between card renderers and hit detection are consolidated into an immutable `NodeLayoutBounds` and `NodeLayoutCalculator` single source of truth.
+* **Slim Mode Layout Integrity**: Guarantees exact coordinate parity for ports, drag handles, and hitboxes across Standard and Slim modes with $O(1)$ hit testing.
+
+### 2.9 Shared Machine Pool Capacity Scaling & Stability Matrix (ADR-031 ~ ADR-033)
+* **Shared Machine Pool Scaling (`CanvasGroupFrame`)**: Scales all connected processes proportionally ($S = M_{\text{target}} / D_{\text{current}}$) to match physical machine capacity ($M_{\text{target}}$, default 1.0) on multi-process frame setups.
+* **Comprehensive Stability Defense Matrix (`ProcessStabilityAnalyzer`)**: Protects closed loops, positive feedback growth, catalyst decay, and conflicting anchors against infinite scaling runaway, presenting contextual warning badges (`[⚠ Loop]`, `[⚠ Growth]`) and actionable 5-line diagnostic tooltips via `NodeBadgeRegistry`.
+
+### 2.10 Two-Stage Linear Flow Balance Solver & Junction Anchoring (ADR-034 & ADR-035)
+* **Two-Stage Linear Flow Solver (`TwoStageLinearFlowSolver`)**: Combines continuous Gauss-Jordan flow solving with integer ceiling quantization to achieve single-click deterministic mass balance convergence across complex cyclic networks.
+* **Junction Buffer Wiring & Anchoring**: Enables port context dragging for 1-click creation of surplus drain, deficit supply, and void sink junctions, alongside pinning fixed junction nodes as anchors to drive upstream/downstream rate calculations.
+
+### 2.11 Domain Purity & SPI Separation (`com.gtceu.calcboard.api.spi`, ADR-037)
+* **SPI Decoupling**: Relocated `ModAdapterRegistry` and `IModAdapter` to `api.spi` to eliminate reverse architectural dependencies between API and compat layers.
+* **Pure Domain Models**: Completely stripped third-party mod field artifacts from `RecipeNode`, managing mode states, validation, and energy models strictly through SPI adapters and `NodePropertyStore`.
+
+### 2.12 Simulation Purity & Invariant Protection (ADR-038)
+* **Zero Side-Effect Solvers**: Guarantees mathematical calculation purity with 0 mutation of node ports or topology during graph evaluation.
+* **Compound Module Scale Preservation**: Restores sub-process node scaling factors deterministically across module collapse and expand lifecycles.
+
+### 2.13 Precision Cache Invalidation & Rendering Lifecycle (ADR-039)
+* **Isolated Invalidation Boundaries**: Dragging, resizing, or recoloring sticky notes and group frames updates local visual bounds without triggering global flow balance recalculation or node card text cache eviction.
+* **Cached Reflection & Search Acceleration**: Eliminates per-frame keyboard focus reflection overhead in recipe viewers (JEI/EMI) and leverages pre-indexed spatial bounds for immediate frame and auto-connect lookups.
+
+### 2.14 Split Modes & Hierarchical Priority Flow Allocation (ADR-041)
+* **Tri-State Split Modes (`FlowSplitMode`)**: Supports `PROPORTIONAL` (demand-weighted), `EQUAL` ($1/N$ uniform division), and `WEIGHTED` (user-defined explicit branch weights) split modes on junction nodes.
+* **Hierarchical Priority Cascades (`FlowEdgeAllocator`)**: Wires carry an integer `priority` tier; higher-priority consumers are satisfied first, while residual flow within each priority tier is distributed according to the junction's split mode.
+
+### 2.15 Shared Machine Pool In-Place Folding & Ratio Preservation (ADR-042)
+* **Topology-Preserving In-Place Folding**: Collapses multi-recipe shared machine pool frames into a single compact virtual machine card without removing or modifying internal nodes or connections.
+* **Proportional Scaling & Deficit Gating**: Preserves internal recipe duty ratios during machine count adjustments, while aggregating boundary I/O ports via `FlowGraphTopologyAnalyzer` and signaling upstream supply deficits.
+
+### 2.16 Dedicated Sub-Page Composite Modules & Boundary I/O Pins (ADR-043)
+* **1:1 Dedicated Sub-Page Isolation**: Upgrades compound modules to independent sub-pages (`PageType.MODULE`) accessible via double-click with breadcrumb and Escape navigation.
+* **Boundary Pin Domain Contracts (`BoundaryPinNode`)**: Defines explicit `ModuleInputPin` and `ModuleOutputPin` boundary interface nodes for sub-pages, eliminating ambiguous topological inferences.
+
+### 2.17 Damped Recirculation Loop Closed-Form Solver & Steady-State Visualization (ADR-044)
+* **Infinite Geometric Series Closed-Form Convergence**: Solves steady-state recirculating supply via $S_{\text{steady}} = \frac{S_{\text{ext}}}{1 - r}$ in $O(1)$ without artificial deficit warnings.
+* **Steady-State Operational Visualization**: Displays cyan circulating indicators for balanced recirculation loops and provides 1-click machine scaling to steady-state capacity.
 
 ---
 

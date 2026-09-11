@@ -3,7 +3,8 @@ package com.gtceu.calcboard.client.gui.dialog.config;
 import com.gtceu.calcboard.api.catalog.MultiblockDetector;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.type.GTThreadingHelix;
-import com.gtceu.calcboard.api.type.NodeThreadingConfig;
+import com.gtceu.calcboard.compat.start.helper.RecipeNodeThreadingHelper;
+import com.gtceu.calcboard.compat.start.model.NodeThreadingConfig;
 import com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -18,7 +19,7 @@ public class ThreadingHelixView {
     }
 
     public void render(GuiGraphics graphics, Font font, RecipeNode node, int startX, int startY, int width, int height, int mouseX, int mouseY) {
-        NodeThreadingConfig cfg = node.getThreadingConfig();
+        NodeThreadingConfig cfg = RecipeNodeThreadingHelper.getThreadingConfig(node);
         int maxHelix = MultiblockDetector.getMaxHelixCount(node);
         if (maxHelix > 0) {
             cfg.setMaxHelixCapacity(maxHelix);
@@ -30,7 +31,7 @@ public class ThreadingHelixView {
 
         int tabW = leftW / 4;
         String[] tabShortNames = {"Sup", "Spd", "Par", "Thrd"};
-        String[] tabIcons = {"⚛", "⚡", "⚙", "🧵"};
+        String[] tabIcons = {"⚛", "⚡", "⚙", "~"};
         for (int i = 0; i < 4; i++) {
             int tx = startX + i * tabW;
             boolean active = selectedHelixTab == i;
@@ -80,8 +81,8 @@ public class ThreadingHelixView {
         }
 
         String helixCapStr = maxHelix > 0
-                ? String.format("§e🧬 Helixes: §a%d §7/ §e%d", totalInstalled, maxHelix)
-                : String.format("§e🧬 Helixes: §a%d", totalInstalled);
+                ? String.format("§e✦ Helixes: §a%d §7/ §e%d", totalInstalled, maxHelix)
+                : String.format("§e✦ Helixes: §a%d", totalInstalled);
         graphics.drawString(font, helixCapStr, startX + 4, startY + height - 22, 0xFFFFFFFF, false);
 
         String baseStatsStr = String.format("§8Base: +%d Spd | +%d Eff | +%d Par | +%d Thrd",
@@ -104,7 +105,7 @@ public class ThreadingHelixView {
                 mouseX, mouseY);
 
         statRowY += 22;
-        renderStatAllocationRow(graphics, font, rightX, statRowY, rightW, "💡 Efficienta", cfg.getAssignedEfficiency(), cfg.getTotalEfficiency(),
+        renderStatAllocationRow(graphics, font, rightX, statRowY, rightW, "★ Efficienta", cfg.getAssignedEfficiency(), cfg.getTotalEfficiency(),
                 String.format("§e⚡ %.2fx Power (%.0f%% Cost)", cfg.calculateEnergyMultiplier(), cfg.calculateEnergyMultiplier() * 100.0),
                 mouseX, mouseY);
 
@@ -117,14 +118,14 @@ public class ThreadingHelixView {
 
         statRowY += 22;
         int effThrd = cfg.getEffectiveThreads();
-        renderStatAllocationRow(graphics, font, rightX, statRowY, rightW, "🧵 Filum", cfg.getAssignedThreading(), cfg.getTotalThreading(),
-                String.format("§9🧵 %d Threads", effThrd),
+        renderStatAllocationRow(graphics, font, rightX, statRowY, rightW, "~ Filum", cfg.getAssignedThreading(), cfg.getTotalThreading(),
+                String.format("§9~ %d Threads", effThrd),
                 mouseX, mouseY);
 
         int actY = startY + height - 15;
         renderMiniBtn(graphics, font, "↺ Reset", rightX + 4, actY, 40, mouseX, mouseY);
         renderMiniBtn(graphics, font, "⚡ Max Spd", rightX + 48, actY, 46, mouseX, mouseY);
-        renderMiniBtn(graphics, font, "💡 Max Eff", rightX + 98, actY, 46, mouseX, mouseY);
+        renderMiniBtn(graphics, font, "★ Max Eff", rightX + 98, actY, 46, mouseX, mouseY);
         renderMiniBtn(graphics, font, "⚙ Max Par", rightX + 148, actY, 42, mouseX, mouseY);
     }
 
@@ -147,7 +148,7 @@ public class ThreadingHelixView {
     }
 
     public boolean mouseClicked(int startX, int startY, int width, int height, double mouseX, double mouseY, RecipeNode node) {
-        NodeThreadingConfig cfg = node.getThreadingConfig();
+        NodeThreadingConfig cfg = RecipeNodeThreadingHelper.getThreadingConfig(node);
 
         int leftW = 184;
         if (mouseX >= startX && mouseX <= startX + leftW && mouseY >= startY && mouseY <= startY + height) {

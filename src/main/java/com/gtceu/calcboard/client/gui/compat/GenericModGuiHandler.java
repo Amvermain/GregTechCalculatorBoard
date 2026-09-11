@@ -2,6 +2,7 @@ package com.gtceu.calcboard.client.gui.compat;
 
 import com.gtceu.calcboard.api.catalog.AddonCategory;
 import com.gtceu.calcboard.api.history.BoardCommand;
+import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTBoilerTier;
@@ -11,7 +12,7 @@ import com.gtceu.calcboard.client.gui.BoardScreen;
 import com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog;
 import com.gtceu.calcboard.client.gui.render.NodeCardRenderer;
 import com.gtceu.calcboard.client.gui.widget.NodeWidget;
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -21,6 +22,8 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
+
+import java.util.List;
 
 /**
  * Generic fallback implementation of {@link IModGuiHandler}.
@@ -35,37 +38,75 @@ public class GenericModGuiHandler implements IModGuiHandler {
 
     @Override
     public void renderCardControls(GuiGraphics graphics, Font font, RecipeNode node, int x, int row2Y, int cardW, int mouseX, int mouseY, boolean isGlowing) {
-        GTVoltageTier tier = node.getTargetTier();
-        NodeCardRenderer.drawBtn(graphics, font, tier.getName(), x + 6, row2Y, 32, 14, mouseX, mouseY, tier.getColor());
+        renderCardControls(null, graphics, font, node, x, row2Y, cardW, mouseX, mouseY, isGlowing);
+    }
 
-        int nextCtrlX = x + 42;
+    @Override
+    public void populateRow2Buttons(NodeWidget widget, Font font, RecipeNode node, int cardW, boolean isOperational, List<com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button> buttons) {
+        if (node.getEnergyType() == EnergyType.NONE) {
+            String bannerText = "~ " + Component.translatable("gui.gtcalcboard.energy_passive_banner").getString();
+            int bannerW = cardW - 12;
+            int textW = font.width(bannerText);
+            buttons.add(new com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button(6, bannerW, bannerText, textW, 0xFF88D49E, false, false, com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button.ButtonRole.BANNER, null));
+            return;
+        }
+
+        GTVoltageTier tier = node.getTargetTier();
+        String tierName = tier != null ? tier.getName() : "LV";
+        int tierTextW = font.width(tierName);
+        int tierBtnW = 32;
+        int tierColor = tier != null ? tier.getColor() : 0xFFFFFFFF;
+        buttons.add(new com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button(6, tierBtnW, tierName, tierTextW, tierColor, false, false, com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button.ButtonRole.TIER, null));
+
+        int nextRelX = 6 + tierBtnW + 4;
+        FlowGraph graph = (widget != null && widget.getParent() != null) ? widget.getParent().getGraph() : (node != null ? node.getParentGraph() : null);
+        List<com.gtceu.calcboard.api.property.NodeBadge> badges = com.gtceu.calcboard.api.property.NodeBadgeRegistry.getBadgesForNode(node, graph);
+        for (com.gtceu.calcboard.api.property.NodeBadge badge : badges) {
+            int textW = font.width(badge.text());
+            int badgeW = textW + 8;
+            if (nextRelX + badgeW > cardW - 46) break;
+            buttons.add(new com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button(nextRelX, badgeW, badge.text(), textW, badge.outlineColor(), badge.isWarning(), false, com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button.ButtonRole.BADGE, badge));
+            nextRelX += badgeW + 3;
+        }
+
         if (node.isGenerator()) {
             String genBadge = Component.translatable("gui.gtcalcboard.gen_badge").getString();
-            int genW = Math.max(28, font.width(genBadge) + 4);
-            NodeCardRenderer.drawBtn(graphics, font, genBadge, nextCtrlX, row2Y, genW, 14, mouseX, mouseY, 0xFF55FF88);
-            nextCtrlX += genW + 3;
+            int genTextW = font.width(genBadge);
+            int genW = Math.max(28, genTextW + 4);
+            buttons.add(new com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button(nextRelX, genW, genBadge, genTextW, 0xFF55FF88, false, false, com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button.ButtonRole.GEN, null));
+            nextRelX += genW + 3;
 
             String dynamoPar = "⚙ " + node.getParallel() + "x";
             if (!node.getAddons().isEmpty()) {
                 dynamoPar += " (+" + node.getAddons().size() + ")";
             }
-            int parW = Math.max(46, (x + cardW - 6) - nextCtrlX);
-            NodeCardRenderer.drawBtn(graphics, font, dynamoPar, nextCtrlX, row2Y, parW, 14, mouseX, mouseY, !node.getAddons().isEmpty() ? 0xFF55FFFF : 0xFF58D3FF, isGlowing);
+            int parTextW = font.width(dynamoPar);
+            int parW = Math.max(46, (cardW - 6) - nextRelX);
+            int parCol = !node.getAddons().isEmpty() ? 0xFF55FFFF : 0xFF58D3FF;
+            buttons.add(new com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button(nextRelX, parW, dynamoPar, parTextW, parCol, false, false, com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button.ButtonRole.CONFIG, null));
         } else {
             String ocKey = node.getOverclockMode() == OverclockMode.PERFECT ? "gui.gtcalcboard.oc_perf" : "gui.gtcalcboard.oc_std";
             String ocText = Component.translatable(ocKey).getString();
             int ocColor = node.getOverclockMode() == OverclockMode.PERFECT ? 0xFF55FF55 : 0xFFAAAAAA;
-            int ocW = Math.max(50, font.width(ocText) + 6);
-            NodeCardRenderer.drawBtn(graphics, font, ocText, nextCtrlX, row2Y, ocW, 14, mouseX, mouseY, ocColor);
-            nextCtrlX += ocW + 3;
+            int ocTextW = font.width(ocText);
+            int ocW = Math.max(50, ocTextW + 6);
+            buttons.add(new com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button(nextRelX, ocW, ocText, ocTextW, ocColor, false, false, com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button.ButtonRole.OC, null));
+            nextRelX += ocW + 3;
 
             String parLabel = "⚙ " + node.getTotalParallel() + "x";
             if (!node.getAddons().isEmpty()) {
                 parLabel += " (+" + node.getAddons().size() + ")";
             }
-            int parW = Math.max(46, (x + cardW - 6) - nextCtrlX);
-            NodeCardRenderer.drawBtn(graphics, font, parLabel, nextCtrlX, row2Y, parW, 14, mouseX, mouseY, !node.getAddons().isEmpty() ? 0xFF55FFFF : 0xFF58D3FF, isGlowing);
+            int parTextW = font.width(parLabel);
+            int parW = Math.max(46, (cardW - 6) - nextRelX);
+            int parCol = !node.getAddons().isEmpty() ? 0xFF55FFFF : 0xFF58D3FF;
+            buttons.add(new com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button(nextRelX, parW, parLabel, parTextW, parCol, false, false, com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button.ButtonRole.CONFIG, null));
         }
+    }
+
+    @Override
+    public void renderCardControls(NodeWidget widget, GuiGraphics graphics, Font font, RecipeNode node, int x, int row2Y, int cardW, int mouseX, int mouseY, boolean isGlowing) {
+        IModGuiHandler.super.renderCardControls(widget, graphics, font, node, x, row2Y, cardW, mouseX, mouseY, isGlowing);
     }
 
     @Override
@@ -90,15 +131,26 @@ public class GenericModGuiHandler implements IModGuiHandler {
         } else {
             GTVoltageTier tier = node.getTargetTier();
             String tierText = (tier != null ? tier.getName() : "LV");
-            if (node.isMultiblock()) tierText = "🏛 " + tierText;
+            if (node.isMultiblock()) tierText = "▦ " + tierText;
             btnW = Math.max(32, safeFontWidth(tierText, 24) + 8);
         }
         return mouseX >= x + 6 && mouseX <= x + 6 + btnW && mouseY >= row2Y && mouseY <= row2Y + 14;
     }
 
     @Override
+    public boolean isTierOrSpeedControlHovered(NodeWidget widget, RecipeNode node, double mouseX, double mouseY) {
+        if (node == null) return false;
+        if (hasCachedButtons(widget)) {
+            return isCachedButtonHovered(widget, node, mouseX, mouseY,
+                    btn -> btn.role() == com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button.ButtonRole.TIER
+                            || btn.role() == com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button.ButtonRole.BANNER);
+        }
+        return isTierOrSpeedControlHovered(node, mouseX, mouseY);
+    }
+
+    @Override
     public boolean isSecondaryControlHovered(RecipeNode node, double mouseX, double mouseY) {
-        if (node == null || node.isGenerator() || node.isFusion() || node.getEnergyType() == EnergyType.HEAT_OR_SELF || node.getEnergyType() == EnergyType.NONE || (!node.isMultiblock() && node.getSteamMode() != null && node.getSteamMode().isSteam())) return false;
+        if (node == null || node.getEnergyType() == EnergyType.NONE || node.isGenerator() || node.isFusion() || node.getEnergyType() == EnergyType.HEAT_OR_SELF || (!node.isMultiblock() && node.getSteamMode() != null && node.getSteamMode().isSteam())) return false;
         int x = (int) node.getPosX();
         int y = (int) node.getPosY();
         int ctrlY = y + 20 + 6;
@@ -106,6 +158,16 @@ public class GenericModGuiHandler implements IModGuiHandler {
         int ocX = x + 42;
         int ocW = Math.max(50, safeFontWidth("STD OC", 44) + 6);
         return mouseX >= ocX && mouseX <= ocX + ocW && mouseY >= row2Y && mouseY <= row2Y + 14;
+    }
+
+    @Override
+    public boolean isSecondaryControlHovered(NodeWidget widget, RecipeNode node, double mouseX, double mouseY) {
+        if (node == null) return false;
+        if (hasCachedButtons(widget)) {
+            return isCachedButtonHovered(widget, node, mouseX, mouseY,
+                    btn -> btn.role() == com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button.ButtonRole.OC);
+        }
+        return isSecondaryControlHovered(node, mouseX, mouseY);
     }
 
     @Override
@@ -130,7 +192,50 @@ public class GenericModGuiHandler implements IModGuiHandler {
     }
 
     @Override
+    public boolean isMachineConfigHovered(NodeWidget widget, RecipeNode node, double mouseX, double mouseY) {
+        if (node == null) return false;
+        if (hasCachedButtons(widget)) {
+            return isCachedButtonHovered(widget, node, mouseX, mouseY,
+                    btn -> btn.role() == com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button.ButtonRole.CONFIG);
+        }
+        return isMachineConfigHovered(node, mouseX, mouseY);
+    }
+
+    private static boolean hasCachedButtons(NodeWidget widget) {
+        return widget != null && widget.getTextCache() != null && !widget.getTextCache().getRow2Buttons().isEmpty();
+    }
+
+    private static boolean isCachedButtonHovered(NodeWidget widget, RecipeNode node, double mouseX, double mouseY,
+                                                 java.util.function.Predicate<com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button> filter) {
+        int x = (int) node.getPosX();
+        int row2Y = (int) node.getPosY() + 20 + 6 + 18;
+        for (var btn : widget.getTextCache().getRow2Buttons()) {
+            if (!filter.test(btn)) continue;
+            int bx = x + btn.relX();
+            if (mouseX >= bx && mouseX <= bx + btn.width() && mouseY >= row2Y && mouseY <= row2Y + 14) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
     public boolean handleControlClick(NodeWidget widget, RecipeNode node, double mouseX, double mouseY, int button) {
+        int x = (int) node.getPosX();
+        int y = (int) node.getPosY();
+        int row2Y = y + 20 + 6 + 18;
+        int nextCtrlX = x + 42;
+        FlowGraph graph = (widget != null && widget.getParent() != null) ? widget.getParent().getGraph() : (node != null ? node.getParentGraph() : null);
+        List<com.gtceu.calcboard.api.property.NodeBadge> badges = com.gtceu.calcboard.api.property.NodeBadgeRegistry.getBadgesForNode(node, graph);
+        for (com.gtceu.calcboard.api.property.NodeBadge badge : badges) {
+            int badgeW = safeFontWidth(badge.text(), 30) + 8;
+            if (nextCtrlX + badgeW > x + node.getCardWidth() - 46) break;
+            if (mouseX >= nextCtrlX && mouseX <= nextCtrlX + badgeW && mouseY >= row2Y && mouseY <= row2Y + 14) {
+                if (triggerBadgeClick(widget, badge)) return true;
+            }
+            nextCtrlX += badgeW + 3;
+        }
+
         if (isTierOrSpeedControlHovered(node, mouseX, mouseY)) {
             widget.commitCountEdit();
             var adapter = ModAdapterRegistry.getAdapterForNode(node);
@@ -154,7 +259,7 @@ public class GenericModGuiHandler implements IModGuiHandler {
                 var frame = widget.getParent().getGraph().findFrameEnclosingNode(node);
                 if (frame != null && frame.isSharedMachineFrame()) {
                     frame.syncHardwareConfig(node, widget.getParent().getGraph());
-                    widget.getParent().rebuildWidgets();
+                    widget.getParent().rebuildBoardWidgets();
                 }
                 widget.getParent().markSummaryDirty();
             }
@@ -171,6 +276,27 @@ public class GenericModGuiHandler implements IModGuiHandler {
         }
 
         return false;
+    }
+
+    private boolean triggerBadgeClick(NodeWidget widget, com.gtceu.calcboard.api.property.NodeBadge badge) {
+        if (badge.onClick() == null) return false;
+        widget.commitCountEdit();
+        badge.onClick().run();
+        Minecraft.getInstance().getSoundManager().play(
+                SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.2F)
+        );
+        widget.invalidateCache();
+        notifyWidgetParentUpdated(widget);
+        return true;
+    }
+
+    private void notifyWidgetParentUpdated(NodeWidget widget) {
+        if (widget.getParent() == null) return;
+        if (widget.getNode() != null && widget.getNode().isBaseNode() && widget.getParent().getGraph() != null) {
+            widget.getParent().getGraph().setBaseNode(widget.getNode());
+        }
+        widget.getParent().rebuildBoardWidgets();
+        widget.getParent().markSummaryDirty();
     }
 
     @Override

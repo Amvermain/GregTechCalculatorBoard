@@ -131,4 +131,4 @@ src/main/java/com/gtceu/calcboard/
 
 ---
 
-> ➡️ **다음 장으로 이동**: [[01] 코어 도메인 모델 및 결정론적 수용능력 매트릭스](01_CORE_DOMAIN_AND_MODELS.md)
+> ➡ **다음 장으로 이동**: [[01] 코어 도메인 모델 및 결정론적 수용능력 매트릭스](01_CORE_DOMAIN_AND_MODELS.md)

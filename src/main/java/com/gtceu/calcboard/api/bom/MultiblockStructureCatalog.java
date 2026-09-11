@@ -1,8 +1,8 @@
 package com.gtceu.calcboard.api.bom;
 
-import com.gtceu.calcboard.api.event.CatalogLifecycleEvent;
-import com.gtceu.calcboard.compat.IModAdapter;
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.IModAdapter;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.viewer.RecipeViewerBridgeRegistry;
 
 import com.gtceu.calcboard.api.catalog.MultiblockDetector;
 import com.gtceu.calcboard.api.util.ModCompatHelper;
@@ -25,20 +25,30 @@ public class MultiblockStructureCatalog {
 
     private static final Map<ResourceLocation, MultiblockStructureDef> STRUCTURES = new ConcurrentHashMap<>();
     private static final Map<ResourceLocation, List<MultiblockStructureDef>> STRUCTURE_VARIANTS = new ConcurrentHashMap<>();
+    private static final Set<ResourceLocation> NEGATIVE_CACHE = ConcurrentHashMap.newKeySet();
     private static volatile boolean initialized = false;
     private static volatile boolean initializing = false;
 
     public static void clear() {
         STRUCTURES.clear();
         STRUCTURE_VARIANTS.clear();
+        NEGATIVE_CACHE.clear();
         initialized = false;
         initializing = false;
+    }
+
+    public static void invalidateTextCaches() {
+        clear();
+        for (IModAdapter adapter : ModAdapterRegistry.getAllLoadedAdapters()) {
+            adapter.invalidateTextCaches();
+        }
     }
 
     public static void clearStructure(ResourceLocation id) {
         if (id == null) return;
         STRUCTURES.remove(id);
         STRUCTURE_VARIANTS.remove(id);
+        NEGATIVE_CACHE.remove(id);
     }
 
     public static boolean isInitialized() {
@@ -63,7 +73,7 @@ public class MultiblockStructureCatalog {
     }
 
     private static void scanAdapterMultiblockStructures() {
-        for (com.gtceu.calcboard.compat.IModAdapter adapter : com.gtceu.calcboard.compat.ModAdapterRegistry.getAllLoadedAdapters()) {
+        for (IModAdapter adapter : ModAdapterRegistry.getAllLoadedAdapters()) {
             try {
                 adapter.scanMultiblockStructures();
             } catch (Throwable t) {
@@ -99,6 +109,7 @@ public class MultiblockStructureCatalog {
 
     public static void registerManualStructure(MultiblockStructureDef def) {
         if (def != null && def.controllerId() != null) {
+            NEGATIVE_CACHE.remove(def.controllerId());
             STRUCTURES.put(def.controllerId(), def);
             STRUCTURE_VARIANTS.computeIfAbsent(def.controllerId(), k -> new ArrayList<>()).add(def);
         }
@@ -107,12 +118,14 @@ public class MultiblockStructureCatalog {
     public static void registerStructure(MultiblockStructureDef canonicalDef, List<MultiblockStructureDef> variants) {
         if (canonicalDef == null || canonicalDef.controllerId() == null) return;
         ResourceLocation controllerId = canonicalDef.controllerId();
+        NEGATIVE_CACHE.remove(controllerId);
         STRUCTURES.put(controllerId, canonicalDef);
         if (variants != null && !variants.isEmpty()) {
             STRUCTURE_VARIANTS.put(controllerId, variants);
         }
         ResourceLocation infoAlias = ResourceLocation.tryParse(controllerId.getNamespace() + ":multiblock_info/" + controllerId.getPath());
         if (infoAlias != null) {
+            NEGATIVE_CACHE.remove(infoAlias);
             STRUCTURES.put(infoAlias, canonicalDef);
             if (variants != null && !variants.isEmpty()) {
                 STRUCTURE_VARIANTS.put(infoAlias, variants);
@@ -143,12 +156,19 @@ public class MultiblockStructureCatalog {
         if (id == null) return null;
         MultiblockStructureDef def = getStructureCached(id);
         if (def != null) return def;
+        if (NEGATIVE_CACHE.contains(id)) return null;
 
-        return scanStructureFromAdapters(id);
+        MultiblockStructureDef scanned = scanStructureFromAdapters(id);
+        if (scanned != null) {
+            STRUCTURES.put(id, scanned);
+            return scanned;
+        }
+        NEGATIVE_CACHE.add(id);
+        return null;
     }
 
     private static MultiblockStructureDef scanStructureFromAdapters(ResourceLocation id) {
-        for (com.gtceu.calcboard.compat.IModAdapter adapter : com.gtceu.calcboard.compat.ModAdapterRegistry.getAllLoadedAdapters()) {
+        for (IModAdapter adapter : ModAdapterRegistry.getAllLoadedAdapters()) {
             try {
                 MultiblockStructureDef scanned = adapter.scanMultiblockStructure(id);
                 if (scanned != null) return scanned;
@@ -200,13 +220,36 @@ public class MultiblockStructureCatalog {
     }
 
     private static void scanEmiMultiblockRecipes() {
-        if (!ModCompatHelper.isEmiLoaded()) return;
-        try {
-            EmiStructureScanner.scan();
-        } catch (Throwable ignored) {}
+        RecipeViewerBridgeRegistry.getActiveBridges().forEach(b -> b.discoverMultiblockStructures(def -> {
+            if (def != null && def.controllerId() != null) {
+                MultiblockStructureDef existing = STRUCTURES.get(def.controllerId());
+                STRUCTURES.put(def.controllerId(), mergeStructureDefs(existing, def));
+            }
+        }));
     }
 
-    private static final Map<net.minecraft.world.item.Item, String> ITEM_NAME_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
+    private static MultiblockStructureDef mergeStructureDefs(MultiblockStructureDef existing, MultiblockStructureDef emiDef) {
+        if (existing == null) return emiDef;
+        Set<String> mergedAbilities = new HashSet<>(existing.allowedAbilities());
+        mergedAbilities.addAll(emiDef.allowedAbilities());
+        Set<ResourceLocation> mergedCandidates = new HashSet<>(existing.candidateBlocks());
+        mergedCandidates.addAll(emiDef.candidateBlocks());
+        List<MultiblockStructurePart> parts = existing.parts().size() >= emiDef.parts().size() ? existing.parts() : emiDef.parts();
+        return new MultiblockStructureDef(
+                existing.controllerId(),
+                existing.controllerName(),
+                parts,
+                Math.max(existing.coilSlotCount(), emiDef.coilSlotCount()),
+                Math.max(existing.energyHatchSlotCount(), emiDef.energyHatchSlotCount()),
+                Math.max(existing.inputBusSlotCount(), emiDef.inputBusSlotCount()),
+                Math.max(existing.outputBusSlotCount(), emiDef.outputBusSlotCount()),
+                Math.max(existing.inputHatchSlotCount(), emiDef.inputHatchSlotCount()),
+                Math.max(existing.outputHatchSlotCount(), emiDef.outputHatchSlotCount()),
+                Math.max(existing.maintenanceSlotCount(), emiDef.maintenanceSlotCount()),
+                Collections.unmodifiableSet(mergedAbilities),
+                Collections.unmodifiableSet(mergedCandidates)
+        );
+    }
 
     public static class StructureSlotCounts {
         public int coilSlots = 0;
@@ -216,233 +259,6 @@ public class MultiblockStructureCatalog {
         public int inputHatchSlots = 0;
         public int outputHatchSlots = 0;
         public int maintenanceSlots = 0;
-    }
-
-    private static class EmiStructureScanner {
-        private static void scan() {
-            var recipeManager = dev.emi.emi.api.EmiApi.getRecipeManager();
-            if (recipeManager == null || recipeManager.getCategories() == null) return;
-            scanMultiblockCategories(recipeManager);
-        }
-
-        private static void scanMultiblockCategories(dev.emi.emi.api.recipe.EmiRecipeManager recipeManager) {
-            for (dev.emi.emi.api.recipe.EmiRecipeCategory cat : recipeManager.getCategories()) {
-                if (cat == null || cat.getId() == null) continue;
-                if (isMultiblockCategory(cat.getId())) {
-                    processCategoryRecipes(recipeManager, cat);
-                }
-            }
-        }
-
-        private static boolean isMultiblockCategory(ResourceLocation catId) {
-            String path = catId.getPath();
-            return path.contains("multiblock_info") || path.contains("multiblock");
-        }
-
-        private static void processCategoryRecipes(
-                dev.emi.emi.api.recipe.EmiRecipeManager recipeManager,
-                dev.emi.emi.api.recipe.EmiRecipeCategory cat
-        ) {
-            List<dev.emi.emi.api.recipe.EmiRecipe> recipes = recipeManager.getRecipes(cat);
-            if (recipes == null) return;
-            for (dev.emi.emi.api.recipe.EmiRecipe recipe : recipes) {
-                if (recipe != null) {
-                    parseEmiMultiblockRecipe(recipe);
-                }
-            }
-        }
-
-        private static void parseEmiMultiblockRecipe(dev.emi.emi.api.recipe.EmiRecipe recipe) {
-            Set<ResourceLocation> aliasIds = new HashSet<>();
-            ControllerInfo controllerInfo = resolveControllerInfo(recipe, aliasIds);
-            if (controllerInfo == null || controllerInfo.id == null) return;
-
-            MultiblockStructureDef existing = STRUCTURES.get(controllerInfo.id);
-            int existingBlockCount = calculateStructureBlockCount(existing);
-
-            StructureSlotCounts slotCounts = new StructureSlotCounts();
-            List<MultiblockStructurePart> parts = extractStructureParts(recipe, controllerInfo, slotCounts);
-            int newBlockCount = calculatePartsBlockCount(parts);
-
-            if (existing != null && existingBlockCount >= newBlockCount) return;
-
-            MultiblockStructureDef def = createMultiblockDef(controllerInfo, parts, slotCounts);
-            for (ResourceLocation id : aliasIds) {
-                STRUCTURES.put(id, def);
-            }
-        }
-
-        private record ControllerInfo(ResourceLocation id, String name) {}
-
-        private static ControllerInfo resolveControllerInfo(dev.emi.emi.api.recipe.EmiRecipe recipe, Set<ResourceLocation> aliasIds) {
-            ResourceLocation controllerId = extractControllerFromOutput(recipe, aliasIds);
-            String controllerName = extractControllerNameFromOutput(recipe);
-
-            if (recipe.getId() != null) {
-                aliasIds.add(recipe.getId());
-                String rPath = recipe.getId().getPath();
-                if (rPath.contains("/")) {
-                    String machineName = rPath.substring(rPath.lastIndexOf('/') + 1);
-                    ResourceLocation strippedId = ResourceLocation.tryParse(recipe.getId().getNamespace() + ":" + machineName);
-                    if (strippedId != null) {
-                        aliasIds.add(strippedId);
-                        if (controllerId == null) {
-                            controllerId = strippedId;
-                            controllerName = formatMachineName(machineName);
-                        }
-                    }
-                } else if (controllerId == null) {
-                    controllerId = recipe.getId();
-                    controllerName = formatMachineName(rPath);
-                }
-            }
-            if (controllerId == null) return null;
-            return new ControllerInfo(controllerId, controllerName);
-        }
-
-        private static ResourceLocation extractControllerFromOutput(dev.emi.emi.api.recipe.EmiRecipe recipe, Set<ResourceLocation> aliasIds) {
-            if (recipe.getOutputs().isEmpty()) return null;
-            dev.emi.emi.api.stack.EmiStack out = recipe.getOutputs().get(0);
-            if (out == null || out.getItemStack() == null) return null;
-            ItemStack stack = out.getItemStack();
-            if (stack.isEmpty()) return null;
-            ResourceLocation id = ForgeRegistries.ITEMS.getKey(stack.getItem());
-            if (id != null) aliasIds.add(id);
-            return id;
-        }
-
-        private static String extractControllerNameFromOutput(dev.emi.emi.api.recipe.EmiRecipe recipe) {
-            if (recipe.getOutputs().isEmpty()) return "";
-            dev.emi.emi.api.stack.EmiStack out = recipe.getOutputs().get(0);
-            if (out == null || out.getItemStack() == null) return "";
-            ItemStack stack = out.getItemStack();
-            if (stack.isEmpty()) return "";
-            return ITEM_NAME_CACHE.computeIfAbsent(stack.getItem(), itm -> itm.getDescription().getString());
-        }
-
-        private static int calculateStructureBlockCount(MultiblockStructureDef def) {
-            if (def == null) return 0;
-            int count = 0;
-            for (MultiblockStructurePart p : def.parts()) {
-                if (p != null) count += p.amount();
-            }
-            return count;
-        }
-
-        private static int calculatePartsBlockCount(List<MultiblockStructurePart> parts) {
-            int count = 0;
-            for (MultiblockStructurePart p : parts) {
-                if (p != null) count += p.amount();
-            }
-            return count;
-        }
-
-        private static List<MultiblockStructurePart> extractStructureParts(
-                dev.emi.emi.api.recipe.EmiRecipe recipe,
-                ControllerInfo controllerInfo,
-                StructureSlotCounts slotCounts
-        ) {
-            List<MultiblockStructurePart> parts = new ArrayList<>();
-            for (dev.emi.emi.api.stack.EmiIngredient ing : recipe.getInputs()) {
-                if (ing == null || ing.getEmiStacks().isEmpty()) continue;
-                processEmiIngredientPart(ing, controllerInfo.id, slotCounts, parts);
-            }
-            String ctrlDisplayName = (controllerInfo.name != null && !controllerInfo.name.isBlank())
-                    ? controllerInfo.name
-                    : controllerInfo.id.getPath();
-            parts.add(0, new MultiblockStructurePart(controllerInfo.id, ctrlDisplayName, 1, PartCategory.CONTROLLER));
-            return parts;
-        }
-
-        private static void processEmiIngredientPart(
-                dev.emi.emi.api.stack.EmiIngredient ing,
-                ResourceLocation controllerId,
-                StructureSlotCounts slotCounts,
-                List<MultiblockStructurePart> parts
-        ) {
-            for (dev.emi.emi.api.stack.EmiStack stack : ing.getEmiStacks()) {
-                if (stack == null || stack.getItemStack() == null) continue;
-                ItemStack is = stack.getItemStack();
-                if (is.isEmpty()) continue;
-                ResourceLocation itemId = ForgeRegistries.ITEMS.getKey(is.getItem());
-                if (itemId == null) continue;
-
-                int amount = Math.max(1, (int) stack.getAmount());
-                String name = ITEM_NAME_CACHE.computeIfAbsent(is.getItem(), itm -> is.getHoverName().getString());
-                PartCategory category = classifyPart(itemId);
-                accumulateSlotCounts(itemId, category, amount, slotCounts);
-
-                if (!itemId.equals(controllerId)) {
-                    parts.add(new MultiblockStructurePart(itemId, name, amount, category));
-                }
-                break;
-            }
-        }
-
-        private static void accumulateSlotCounts(ResourceLocation itemId, PartCategory category, int amount, StructureSlotCounts slots) {
-            ModAdapterRegistry.accumulateStructureSlots(itemId, category, amount, slots);
-        }
-
-        private static boolean isSteamController(ResourceLocation controllerId) {
-            if (controllerId == null) return false;
-            return MultiblockDetector.isSteamMultiblock(controllerId)
-                    || controllerId.getPath().startsWith("steam_");
-        }
-
-        private static boolean isSteamStructurePart(ResourceLocation itemId) {
-            if (itemId == null) return false;
-            String path = itemId.getPath().toLowerCase(Locale.ROOT);
-            return path.startsWith("steam_import_")
-                    || path.startsWith("steam_export_")
-                    || path.startsWith("steam_input_")
-                    || path.startsWith("steam_output_")
-                    || path.equals("steam_bus")
-                    || path.equals("steam_hatch");
-        }
-
-        private static MultiblockStructureDef createMultiblockDef(
-                ControllerInfo controllerInfo,
-                List<MultiblockStructurePart> parts,
-                StructureSlotCounts slots
-        ) {
-            Set<ResourceLocation> candidateBlocks = new HashSet<>();
-            boolean isSteam = isSteamController(controllerInfo.id);
-
-            for (MultiblockStructurePart p : parts) {
-                if (p == null || p.itemId() == null) continue;
-                candidateBlocks.add(p.itemId());
-                if (isSteamStructurePart(p.itemId())) {
-                    isSteam = true;
-                }
-            }
-
-            Set<String> allowedAbilities = determineAllowedAbilities(slots, isSteam);
-            return new MultiblockStructureDef(
-                    controllerInfo.id,
-                    controllerInfo.name,
-                    parts,
-                    slots.coilSlots,
-                    slots.energyHatchSlots,
-                    slots.inputBusSlots,
-                    slots.outputBusSlots,
-                    slots.inputHatchSlots,
-                    slots.outputHatchSlots,
-                    slots.maintenanceSlots,
-                    Collections.unmodifiableSet(allowedAbilities),
-                    Collections.unmodifiableSet(candidateBlocks)
-            );
-        }
-
-        private static Set<String> determineAllowedAbilities(StructureSlotCounts slots, boolean isSteam) {
-            Set<String> abilities = new HashSet<>();
-            if (slots.inputBusSlots > 0) abilities.add(isSteam ? "STEAM_IMPORT_ITEMS" : "IMPORT_ITEMS");
-            if (slots.outputBusSlots > 0) abilities.add(isSteam ? "STEAM_EXPORT_ITEMS" : "EXPORT_ITEMS");
-            if (slots.inputHatchSlots > 0) abilities.add(isSteam ? "STEAM_IMPORT_FLUIDS" : "IMPORT_FLUIDS");
-            if (slots.outputHatchSlots > 0) abilities.add(isSteam ? "STEAM_EXPORT_FLUIDS" : "EXPORT_FLUIDS");
-            if (slots.energyHatchSlots > 0 && !isSteam) abilities.add("INPUT_ENERGY");
-            if (slots.maintenanceSlots > 0 && !isSteam) abilities.add("MAINTENANCE");
-            return abilities;
-        }
     }
 
     public static PartCategory classifyPart(ResourceLocation itemId) {

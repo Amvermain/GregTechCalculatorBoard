@@ -17,4 +17,8 @@ public interface ILevelRecipeProvider {
     ItemStack getRecipeResultItem(Recipe<?> recipe);
 
     String getSelectedLanguage();
+
+    default net.minecraft.core.RegistryAccess getRegistryAccess() {
+        return null;
+    }
 }

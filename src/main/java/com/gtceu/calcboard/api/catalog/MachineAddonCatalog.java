@@ -2,8 +2,8 @@ package com.gtceu.calcboard.api.catalog;
 
 import com.gtceu.calcboard.api.event.CatalogLifecycleEvent;
 import com.gtceu.calcboard.api.model.RecipeNode;
-import com.gtceu.calcboard.compat.IModAdapter;
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.IModAdapter;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 
 import net.minecraft.Util;
 import java.util.ArrayList;
@@ -259,7 +259,7 @@ public class MachineAddonCatalog {
         List<MachineAddon> rec = new ArrayList<>();
         if (node == null) return rec;
 
-        com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
         List<MachineAddon> all = getAllAddons();
 
         for (MachineAddon addon : all) {

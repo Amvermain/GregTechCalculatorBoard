@@ -15,6 +15,9 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 
+import com.gtceu.calcboard.client.gui.dialog.modal.IBoardModal;
+import com.gtceu.calcboard.client.gui.dialog.modal.ModalRenderContext;
+
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
@@ -22,7 +25,7 @@ import java.util.List;
 /**
  * Modal dialog for viewing recent saves/commits on the team workspace and copying past revisions.
  */
-public class RecentSavesDialog {
+public class RecentSavesDialog implements IBoardModal {
 
     private final BoardScreen screen;
     private boolean visible = false;
@@ -44,6 +47,11 @@ public class RecentSavesDialog {
 
     public boolean isVisible() {
         return visible;
+    }
+
+    @Override
+    public void renderModal(ModalRenderContext context) {
+        render(context.graphics(), context.mouseX(), context.mouseY(), context.partialTicks());
     }
 
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
@@ -69,7 +77,7 @@ public class RecentSavesDialog {
         graphics.renderOutline(x, y, dialogW, dialogH, 0xFF4F5B73);
 
         // Title
-        String title = "📜 " + Component.translatable("gui.gtcalcboard.dialog.recent_saves_title").getString();
+        String title = "▪ " + Component.translatable("gui.gtcalcboard.dialog.recent_saves_title").getString();
         graphics.drawString(font, title, x + 12, y + 10, 0xFFFFFFFF, false);
 
         // Close button
@@ -220,7 +228,7 @@ public class RecentSavesDialog {
                 newPage.getGraph().addNode(n);
             }
             for (com.gtceu.calcboard.api.model.FlowGraph.ConnectionEdge e : copiedGraph.getConnections()) {
-                newPage.getGraph().getConnections().add(e);
+                newPage.getGraph().addConnection(e);
             }
         }
 

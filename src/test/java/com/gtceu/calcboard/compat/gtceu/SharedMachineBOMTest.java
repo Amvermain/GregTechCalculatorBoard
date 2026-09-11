@@ -49,14 +49,17 @@ public class SharedMachineBOMTest {
         ResourceLocation ebfId = ResourceLocation.tryParse("gtceu:electric_blast_furnace");
 
         RecipeNode node1 = RecipeNode.create(ebfId, "EBF Steel Recipe", 100.0, 120.0, GTVoltageTier.MV);
+        node1.addAddon(new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon("gtceu:mv_energy_hatch", "MV Energy Hatch", "", ResourceLocation.tryParse("gtceu:mv_energy_hatch"), GTVoltageTier.MV, 1, false, false, false));
         node1.setMachineCount(0.15);
         node1.setMultiblock(true);
 
         RecipeNode node2 = RecipeNode.create(ebfId, "EBF Aluminium Recipe", 100.0, 120.0, GTVoltageTier.MV);
+        node2.addAddon(new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon("gtceu:mv_energy_hatch", "MV Energy Hatch", "", ResourceLocation.tryParse("gtceu:mv_energy_hatch"), GTVoltageTier.MV, 1, false, false, false));
         node2.setMachineCount(0.20);
         node2.setMultiblock(true);
 
         RecipeNode node3 = RecipeNode.create(ebfId, "EBF Titanium Recipe", 100.0, 120.0, GTVoltageTier.MV);
+        node3.addAddon(new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon("gtceu:mv_energy_hatch", "MV Energy Hatch", "", ResourceLocation.tryParse("gtceu:mv_energy_hatch"), GTVoltageTier.MV, 1, false, false, false));
         node3.setMachineCount(0.10);
         node3.setMultiblock(true);
 
@@ -108,12 +111,14 @@ public class SharedMachineBOMTest {
     public void testSharedMachineSpatialContainment() {
         ResourceLocation ebfId = ResourceLocation.tryParse("gtceu:electric_blast_furnace");
         RecipeNode node1 = RecipeNode.create(ebfId, "EBF Spatial 1", 100.0, 120.0, GTVoltageTier.MV);
+        node1.addAddon(new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon("gtceu:mv_energy_hatch", "MV Energy Hatch", "", ResourceLocation.tryParse("gtceu:mv_energy_hatch"), GTVoltageTier.MV, 1, false, false, false));
         node1.setPosX(100);
         node1.setPosY(100);
         node1.setMachineCount(0.3);
         node1.setMultiblock(true);
 
         RecipeNode node2 = RecipeNode.create(ebfId, "EBF Spatial 2", 100.0, 120.0, GTVoltageTier.MV);
+        node2.addAddon(new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon("gtceu:mv_energy_hatch", "MV Energy Hatch", "", ResourceLocation.tryParse("gtceu:mv_energy_hatch"), GTVoltageTier.MV, 1, false, false, false));
         node2.setPosX(200);
         node2.setPosY(150);
         node2.setMachineCount(0.4);
@@ -138,16 +143,20 @@ public class SharedMachineBOMTest {
         ResourceLocation lcrId = ResourceLocation.tryParse("gtceu:large_chemical_reactor");
 
         RecipeNode ebf1 = RecipeNode.create(ebfId, "EBF 1", 100.0, 120.0, GTVoltageTier.MV);
+        ebf1.addAddon(new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon("gtceu:mv_energy_hatch", "MV Energy Hatch", "", ResourceLocation.tryParse("gtceu:mv_energy_hatch"), GTVoltageTier.MV, 1, false, false, false));
         ebf1.setMachineCount(0.3);
         ebf1.setMultiblock(true);
         RecipeNode ebf2 = RecipeNode.create(ebfId, "EBF 2", 100.0, 120.0, GTVoltageTier.MV);
+        ebf2.addAddon(new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon("gtceu:mv_energy_hatch", "MV Energy Hatch", "", ResourceLocation.tryParse("gtceu:mv_energy_hatch"), GTVoltageTier.MV, 1, false, false, false));
         ebf2.setMachineCount(0.3);
         ebf2.setMultiblock(true);
 
         RecipeNode lcr1 = RecipeNode.create(lcrId, "LCR 1", 100.0, 120.0, GTVoltageTier.MV);
+        lcr1.addAddon(new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon("gtceu:mv_energy_hatch", "MV Energy Hatch", "", ResourceLocation.tryParse("gtceu:mv_energy_hatch"), GTVoltageTier.MV, 1, false, false, false));
         lcr1.setMachineCount(0.4);
         lcr1.setMultiblock(true);
         RecipeNode lcr2 = RecipeNode.create(lcrId, "LCR 2", 100.0, 120.0, GTVoltageTier.MV);
+        lcr2.addAddon(new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon("gtceu:mv_energy_hatch", "MV Energy Hatch", "", ResourceLocation.tryParse("gtceu:mv_energy_hatch"), GTVoltageTier.MV, 1, false, false, false));
         lcr2.setMachineCount(0.4);
         lcr2.setMultiblock(true);
 
@@ -187,10 +196,12 @@ public class SharedMachineBOMTest {
     public void testMultiblockBOMSummaryMerge() {
         ResourceLocation ebfId = ResourceLocation.tryParse("gtceu:electric_blast_furnace");
         RecipeNode node1 = RecipeNode.create(ebfId, "EBF 1", 100.0, 120.0, GTVoltageTier.MV);
+        node1.addAddon(new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon("gtceu:mv_energy_hatch", "MV Energy Hatch", "", ResourceLocation.tryParse("gtceu:mv_energy_hatch"), GTVoltageTier.MV, 1, false, false, false));
         node1.setMachineCount(1.0);
         node1.setMultiblock(true);
 
         RecipeNode node2 = RecipeNode.create(ebfId, "EBF 2", 100.0, 120.0, GTVoltageTier.MV);
+        node2.addAddon(new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon("gtceu:mv_energy_hatch", "MV Energy Hatch", "", ResourceLocation.tryParse("gtceu:mv_energy_hatch"), GTVoltageTier.MV, 1, false, false, false));
         node2.setMachineCount(1.0);
         node2.setMultiblock(true);
 

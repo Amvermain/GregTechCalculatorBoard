@@ -2,8 +2,9 @@ package com.gtceu.calcboard.api.catalog;
 
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.util.ModCompatHelper;
-import com.gtceu.calcboard.compat.IModAdapter;
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.IModAdapter;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.viewer.RecipeViewerBridgeRegistry;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.registries.ForgeRegistries;
@@ -85,13 +86,12 @@ public class CategoryCapabilityMatrix {
         Map<ResourceLocation, CategoryBuilder> builders = new HashMap<>();
         this.currentBuilders = builders;
 
-        if (ModCompatHelper.isEmiLoaded()) {
-            EmiMatrixScanner.scan(builders);
-        }
-
-        if (ModCompatHelper.isJeiLoaded()) {
-            JeiMatrixScanner.scan(builders, emiRecipeManager);
-        }
+        RecipeViewerBridgeRegistry.getActiveBridges().forEach(bridge -> {
+            bridge.discoverCategoryWorkstations((catId, ws) -> {
+                CategoryBuilder b = builders.computeIfAbsent(catId, CategoryBuilder::new);
+                processScannedWorkstation(ws, b, catId);
+            });
+        });
 
         enrichCapabilitiesFromAdapters(emiRecipeManager);
         enrichCoilCategories(builders);
@@ -166,6 +166,7 @@ public class CategoryCapabilityMatrix {
         } else {
             if (isTurbine) supported.add(AddonCategory.ROTOR);
             if (isCoil) supported.add(AddonCategory.COIL);
+            supported.add(AddonCategory.ENERGY_HATCH);
             supported.add(AddonCategory.PARALLEL);
             supported.add(AddonCategory.MAINTENANCE);
             supported.add(AddonCategory.MULTIBLOCK_TRAIT);
@@ -296,6 +297,30 @@ public class CategoryCapabilityMatrix {
                 true, true, false, true, false, false, false, null, null, GTVoltageTier.EV, 4096.0
         );
         registerMockCategory(
+                ResourceLocation.tryParse("gtceu:combustion_generator"),
+                List.of(
+                        ResourceLocation.tryParse("gtceu:lv_combustion"),
+                        ResourceLocation.tryParse("gtceu:mv_combustion"),
+                        ResourceLocation.tryParse("gtceu:hv_combustion"),
+                        ResourceLocation.tryParse("gtceu:large_combustion_engine"),
+                        ResourceLocation.tryParse("gtceu:extreme_combustion_engine")
+                ),
+                ResourceLocation.tryParse("gtceu:large_combustion_engine"),
+                true, true, false, false, false, false, false, null, null, GTVoltageTier.EV, 4096.0
+        );
+        registerMockCategory(
+                ResourceLocation.tryParse("gtceu:combustion_generator_fuels"),
+                List.of(
+                        ResourceLocation.tryParse("gtceu:lv_combustion"),
+                        ResourceLocation.tryParse("gtceu:mv_combustion"),
+                        ResourceLocation.tryParse("gtceu:hv_combustion"),
+                        ResourceLocation.tryParse("gtceu:large_combustion_engine"),
+                        ResourceLocation.tryParse("gtceu:extreme_combustion_engine")
+                ),
+                ResourceLocation.tryParse("gtceu:large_combustion_engine"),
+                true, true, false, false, false, false, false, null, null, GTVoltageTier.EV, 4096.0
+        );
+        registerMockCategory(
                 ResourceLocation.tryParse("gtceu:plasma_turbine"),
                 List.of(
                         ResourceLocation.tryParse("gtceu:plasma_large_turbine"),
@@ -385,7 +410,7 @@ public class CategoryCapabilityMatrix {
         );
     }
 
-    private void registerMockCategory(ResourceLocation catId, List<ResourceLocation> ws, ResourceLocation defWs,
+    public void registerMockCategory(ResourceLocation catId, List<ResourceLocation> ws, ResourceLocation defWs,
                                       boolean single, boolean multi, boolean coil, boolean turbine, boolean thermal,
                                       boolean hasLp, boolean hasHp, ResourceLocation lpWs, ResourceLocation hpWs,
                                       GTVoltageTier tTier, double tProd) {
@@ -540,120 +565,16 @@ public class CategoryCapabilityMatrix {
             defaultWorkstation = bestDefault;
         }
     }
-
-    private static class EmiMatrixScanner {
-        private static void scan(Map<ResourceLocation, CategoryBuilder> builders) {
-            var recipeManager = dev.emi.emi.api.EmiApi.getRecipeManager();
-            if (recipeManager == null || recipeManager.getCategories() == null) return;
-            scanEmiCategories(recipeManager, builders);
+    private static void processScannedWorkstation(ResourceLocation ws, CategoryBuilder b, ResourceLocation catId) {
+        Object machineDef = queryMachineDefinition(ws);
+        boolean isMb = MultiblockDetector.inspectAndRegisterMachine(ws, machineDef, catId);
+        b.addWorkstation(ws, isMb);
+        if (MultiblockDetector.isCoilMultiblock(ws)) {
+            b.canUseCoils = true;
+            MultiblockDetector.registerCoilCategory(catId);
         }
-
-        private static void scanEmiCategories(
-                dev.emi.emi.api.recipe.EmiRecipeManager recipeManager,
-                Map<ResourceLocation, CategoryBuilder> builders
-        ) {
-            for (dev.emi.emi.api.recipe.EmiRecipeCategory category : recipeManager.getCategories()) {
-                if (category == null || category.getId() == null) continue;
-                processEmiCategory(recipeManager, category, builders);
-            }
-        }
-
-        private static void processEmiCategory(
-                dev.emi.emi.api.recipe.EmiRecipeManager recipeManager,
-                dev.emi.emi.api.recipe.EmiRecipeCategory category,
-                Map<ResourceLocation, CategoryBuilder> builders
-        ) {
-            List<dev.emi.emi.api.stack.EmiIngredient> workstations = recipeManager.getWorkstations(category);
-            if (workstations == null || workstations.isEmpty()) return;
-
-            CategoryBuilder builder = builders.computeIfAbsent(category.getId(), CategoryBuilder::new);
-            for (dev.emi.emi.api.stack.EmiIngredient ingredient : workstations) {
-                if (ingredient == null) continue;
-                processEmiIngredient(builder, category.getId(), ingredient);
-            }
-        }
-
-        private static void processEmiIngredient(
-                CategoryBuilder builder,
-                ResourceLocation categoryId,
-                dev.emi.emi.api.stack.EmiIngredient ingredient
-        ) {
-            if (ingredient.getEmiStacks() == null) return;
-            for (dev.emi.emi.api.stack.EmiStack stack : ingredient.getEmiStacks()) {
-                if (stack == null || stack.isEmpty() || stack.getId() == null) continue;
-                processScannedWorkstation(stack.getId(), builder, categoryId);
-            }
-        }
-
-        private static void processScannedWorkstation(ResourceLocation ws, CategoryBuilder b, ResourceLocation catId) {
-            Object machineDef = queryMachineDefinition(ws);
-            boolean isMb = MultiblockDetector.inspectAndRegisterMachine(ws, machineDef, catId);
-            b.addWorkstation(ws, isMb);
-            if (MultiblockDetector.isCoilMultiblock(ws)) {
-                b.canUseCoils = true;
-                MultiblockDetector.registerCoilCategory(catId);
-            }
-            if (MultiblockDetector.isTurbineMachine(ws) && MultiblockDetector.isTurbineRecipeCategory(catId)) {
-                b.isTurbine = true;
-            }
-        }
-    }
-
-    private static class JeiMatrixScanner {
-        private static void scan(Map<ResourceLocation, CategoryBuilder> builders, Object jeiRuntimeObj) {
-            Object runtimeCandidate = jeiRuntimeObj != null ? jeiRuntimeObj : com.gtceu.calcboard.integration.jei.JeiRecipeViewerAdapter.getJeiRuntime();
-            if (!(runtimeCandidate instanceof mezz.jei.api.runtime.IJeiRuntime runtime)) return;
-
-            var recipeManager = runtime.getRecipeManager();
-            var categoryLookup = recipeManager.createRecipeCategoryLookup();
-            if (categoryLookup == null) return;
-
-            scanJeiCategories(recipeManager, categoryLookup.get().toList(), builders);
-        }
-
-        private static void scanJeiCategories(
-                mezz.jei.api.recipe.IRecipeManager recipeManager,
-                Iterable<? extends mezz.jei.api.recipe.category.IRecipeCategory<?>> categories,
-                Map<ResourceLocation, CategoryBuilder> builders
-        ) {
-            for (mezz.jei.api.recipe.category.IRecipeCategory<?> cat : categories) {
-                if (cat == null || cat.getRecipeType() == null) continue;
-                processJeiCategory(recipeManager, cat, builders);
-            }
-        }
-
-        private static void processJeiCategory(
-                mezz.jei.api.recipe.IRecipeManager recipeManager,
-                mezz.jei.api.recipe.category.IRecipeCategory<?> cat,
-                Map<ResourceLocation, CategoryBuilder> builders
-        ) {
-            ResourceLocation catId = cat.getRecipeType().getUid();
-            CategoryBuilder builder = builders.computeIfAbsent(catId, CategoryBuilder::new);
-
-            var catalystLookup = recipeManager.createRecipeCatalystLookup(cat.getRecipeType());
-            if (catalystLookup == null) return;
-
-            for (var typedIng : catalystLookup.get().toList()) {
-                if (typedIng == null) continue;
-                registerJeiCatalyst(typedIng, builder, catId);
-            }
-        }
-
-        private static void registerJeiCatalyst(
-                mezz.jei.api.ingredients.ITypedIngredient<?> typedIng,
-                CategoryBuilder builder,
-                ResourceLocation catId
-        ) {
-            ItemStack is = typedIng.getItemStack().orElse(ItemStack.EMPTY);
-            if (is.isEmpty() && typedIng.getIngredient() instanceof ItemStack s) {
-                is = s;
-            }
-            if (is.isEmpty()) return;
-
-            ResourceLocation ws = ForgeRegistries.ITEMS.getKey(is.getItem());
-            if (ws != null) {
-                EmiMatrixScanner.processScannedWorkstation(ws, builder, catId);
-            }
+        if (MultiblockDetector.isTurbineMachine(ws) && MultiblockDetector.isTurbineRecipeCategory(catId)) {
+            b.isTurbine = true;
         }
     }
 }

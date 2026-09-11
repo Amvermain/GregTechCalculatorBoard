@@ -102,7 +102,10 @@ public final class GTTurbinePhysics {
 
     public static void syncTurbineMachineIcon(RecipeNode node) {
         if (node == null || !node.isTurbine()) return;
-        if (node.isMultiblock()) {
+        if (node.isMultiblock() || GTTurbineHelper.hasRotorAddon(node)) {
+            if (GTTurbineHelper.hasRotorAddon(node) && !node.isMultiblock()) {
+                node.setMultiblock(true);
+            }
             net.minecraft.resources.ResourceLocation mbWs = node.getMultiblockWorkstation();
             if (mbWs != null) {
                 node.setMachineIcon(mbWs);

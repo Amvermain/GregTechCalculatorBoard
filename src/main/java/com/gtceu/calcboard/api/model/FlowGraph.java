@@ -1,5 +1,6 @@
 package com.gtceu.calcboard.api.model;
 
+import com.gtceu.calcboard.api.solver.AutoRatioResult;
 import com.gtceu.calcboard.api.solver.BalanceSummary;
 import com.gtceu.calcboard.api.solver.FlowGraphModuleHandler;
 import com.gtceu.calcboard.api.solver.FlowGraphSolver;
@@ -23,34 +24,117 @@ public class FlowGraph {
     private final List<CanvasStickyNote> stickyNotes = new ArrayList<>();
     private final Map<String, RecipeNode> nodeMap = new HashMap<>();
     private final Map<PortKey, FlowGraphSolver.PortFlowStats> portStatsCache = new HashMap<>();
+    private BalanceSummary cachedSummary = null;
+    private boolean summaryDirty = true;
 
     public record PortKey(String nodeId, boolean isInput, int portIndex) {}
 
     public void invalidatePortStatsCache() {
         portStatsCache.clear();
+        markSummaryDirty();
+        for (RecipeNode n : nodes) {
+            n.markOperationalDirty();
+        }
+    }
+
+    public void markSummaryDirty() {
+        this.summaryDirty = true;
+        this.cachedSummary = null;
+    }
+
+    public boolean isSummaryDirty() {
+        return summaryDirty || cachedSummary == null;
+    }
+
+    public BalanceSummary getCachedSummary() {
+        return cachedSummary;
+    }
+
+    public void setCachedSummary(BalanceSummary cachedSummary) {
+        this.cachedSummary = cachedSummary;
+        this.summaryDirty = false;
     }
 
     public record ConnectionEdge(
         String fromNodeId,
         int outputIndex,
         String toNodeId,
-        int inputIndex
+        int inputIndex,
+        double fixedFlowLimit,
+        int priority,
+        double weight
     ) {
+        public ConnectionEdge {
+            weight = sanitizeWeight(weight);
+            fixedFlowLimit = Double.isFinite(fixedFlowLimit) ? Math.max(0.0, fixedFlowLimit) : 0.0;
+            priority = Math.max(0, Math.min(99, priority));
+        }
+
+        public static double sanitizeWeight(double w) {
+            if (!Double.isFinite(w) || Double.isNaN(w) || w < 0.0) {
+                return 1.0;
+            }
+            return w;
+        }
+
+        public ConnectionEdge(String fromNodeId, int outputIndex, String toNodeId, int inputIndex) {
+            this(fromNodeId, outputIndex, toNodeId, inputIndex, 0.0, 0, 1.0);
+        }
+
+        public ConnectionEdge(String fromNodeId, int outputIndex, String toNodeId, int inputIndex, double fixedFlowLimit) {
+            this(fromNodeId, outputIndex, toNodeId, inputIndex, fixedFlowLimit, 0, 1.0);
+        }
+
+        public ConnectionEdge(String fromNodeId, int outputIndex, String toNodeId, int inputIndex, double fixedFlowLimit, int priority) {
+            this(fromNodeId, outputIndex, toNodeId, inputIndex, fixedFlowLimit, priority, 1.0);
+        }
+
+        public boolean hasFixedLimit() {
+            return fixedFlowLimit > 0.0001;
+        }
+
+        public ConnectionEdge withFixedLimit(double limit) {
+            return new ConnectionEdge(fromNodeId, outputIndex, toNodeId, inputIndex, Math.max(0.0, limit), priority, weight);
+        }
+
+        public ConnectionEdge withPriority(int pri) {
+            return new ConnectionEdge(fromNodeId, outputIndex, toNodeId, inputIndex, fixedFlowLimit, Math.max(0, Math.min(99, pri)), weight);
+        }
+
+        public ConnectionEdge withWeight(double w) {
+            return new ConnectionEdge(fromNodeId, outputIndex, toNodeId, inputIndex, fixedFlowLimit, priority, sanitizeWeight(w));
+        }
+
         public CompoundTag serializeNBT() {
             CompoundTag tag = new CompoundTag();
             tag.putString("fromNode", fromNodeId);
             tag.putInt("outIdx", outputIndex);
             tag.putString("toNode", toNodeId);
             tag.putInt("inIdx", inputIndex);
+            if (hasFixedLimit()) {
+                tag.putDouble("fixedLimit", fixedFlowLimit);
+            }
+            if (priority != 0) {
+                tag.putInt("priority", priority);
+            }
+            if (Math.abs(weight - 1.0) > 0.0001 && weight >= 0.0) {
+                tag.putDouble("weight", weight);
+            }
             return tag;
         }
 
         public static ConnectionEdge deserializeNBT(CompoundTag tag) {
+            double fixedLimit = tag.contains("fixedLimit") ? tag.getDouble("fixedLimit") : 0.0;
+            int priority = tag.contains("priority") ? Math.max(0, Math.min(99, tag.getInt("priority"))) : 0;
+            double weight = tag.contains("weight") ? Math.max(0.0, tag.getDouble("weight")) : 1.0;
             return new ConnectionEdge(
                 tag.getString("fromNode"),
                 tag.getInt("outIdx"),
                 tag.getString("toNode"),
-                tag.getInt("inIdx")
+                tag.getInt("inIdx"),
+                fixedLimit,
+                priority,
+                weight
             );
         }
     }
@@ -60,15 +144,15 @@ public class FlowGraph {
     }
 
     public List<ConnectionEdge> getConnections() {
-        return connections;
+        return Collections.unmodifiableList(connections);
     }
 
     public List<CanvasGroupFrame> getFrames() {
-        return frames;
+        return Collections.unmodifiableList(frames);
     }
 
     public List<CanvasStickyNote> getStickyNotes() {
-        return stickyNotes;
+        return Collections.unmodifiableList(stickyNotes);
     }
 
     public void addStickyNote(CanvasStickyNote note) {
@@ -116,16 +200,34 @@ public class FlowGraph {
 
     public CanvasGroupFrame findFrameEnclosingNode(RecipeNode node) {
         if (node == null || frames.isEmpty()) return null;
+        double nw = node.getCardWidth() > 0 ? node.getCardWidth() : (node.isReroute() ? 32 : 180);
+        double nh = node.getCardHeight() > 0 ? node.getCardHeight() : (node.isReroute() ? 32 : 160);
+        double cx = node.getPosX() + nw / 2.0;
+        double cy = node.getPosY() + nh / 2.0;
+
         for (CanvasGroupFrame frame : frames) {
-            if (frame != null) {
-                if (frame.containsNode(node.getId())) {
-                    return frame;
-                }
-                for (RecipeNode enclosed : frame.getEnclosedNodes(this)) {
-                    if (enclosed != null && enclosed.getId().equals(node.getId())) {
-                        return frame;
-                    }
-                }
+            if (frame != null && (frame.containsNode(node.getId()) || frame.isPointInside(cx, cy))) {
+                return frame;
+            }
+        }
+        return null;
+    }
+
+    public boolean isNodeInFoldedFrame(String nodeId) {
+        if (nodeId == null || frames.isEmpty()) return false;
+        for (CanvasGroupFrame frame : frames) {
+            if (frame != null && frame.isFolded() && frame.containsNode(nodeId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public CanvasGroupFrame getFoldedFrameForNode(String nodeId) {
+        if (nodeId == null || frames.isEmpty()) return null;
+        for (CanvasGroupFrame frame : frames) {
+            if (frame != null && frame.isFolded() && frame.containsNode(nodeId)) {
+                return frame;
             }
         }
         return null;
@@ -138,6 +240,7 @@ public class FlowGraph {
 
     public void addNode(RecipeNode node) {
         if (node != null) {
+            node.setParentGraph(this);
             nodes.add(node);
             nodeMap.put(node.getId(), node);
             invalidatePortStatsCache();
@@ -159,6 +262,7 @@ public class FlowGraph {
             } else {
                 nodes.remove(node);
                 nodeMap.remove(node.getId());
+                node.setParentGraph(null);
                 connections.removeIf(edge -> edge.fromNodeId.equals(node.getId()) || edge.toNodeId.equals(node.getId()));
                 for (CanvasGroupFrame f : frames) {
                     f.removeNode(node.getId());
@@ -203,6 +307,7 @@ public class FlowGraph {
             siblingIds.add(n.getId());
             nodes.remove(n);
             nodeMap.remove(n.getId());
+            n.setParentGraph(null);
         }
 
         connections.removeIf(edge -> siblingIds.contains(edge.fromNodeId) || siblingIds.contains(edge.toNodeId));
@@ -228,7 +333,6 @@ public class FlowGraph {
             sibling.setParallel(sourceNode.getParallel());
             sibling.setSteamMode(sourceNode.getSteamMode());
             sibling.setMultiblock(sourceNode.isMultiblock());
-            sibling.setThreadingConfig(sourceNode.getThreadingConfig());
             sibling.setGenerator(sourceNode.isGenerator());
 
             sibling.getProperties().copyFrom(sourceNode.getProperties());
@@ -268,6 +372,9 @@ public class FlowGraph {
     }
 
     public void clear() {
+        for (RecipeNode n : nodes) {
+            n.setParentGraph(null);
+        }
         nodes.clear();
         connections.clear();
         frames.clear();
@@ -276,27 +383,138 @@ public class FlowGraph {
         invalidatePortStatsCache();
     }
 
-    public void addConnection(String fromNodeId, int outIdx, String toNodeId, int inIdx) {
-        for (ConnectionEdge edge : connections) {
-            if (edge.fromNodeId.equals(fromNodeId) && edge.outputIndex == outIdx
-                && edge.toNodeId.equals(toNodeId) && edge.inputIndex == inIdx) {
+    public void addConnection(String fromNodeId, int outIdx, String toNodeId, int inIdx, double fixedFlowLimit) {
+        addConnection(fromNodeId, outIdx, toNodeId, inIdx, fixedFlowLimit, 0, 1.0);
+    }
+
+    public void addConnection(String fromNodeId, int outIdx, String toNodeId, int inIdx, double fixedFlowLimit, int priority) {
+        addConnection(fromNodeId, outIdx, toNodeId, inIdx, fixedFlowLimit, priority, 1.0);
+    }
+
+    public void addConnection(String fromNodeId, int outIdx, String toNodeId, int inIdx, double fixedFlowLimit, int priority, double weight) {
+        double safeWeight = ConnectionEdge.sanitizeWeight(weight);
+        for (int i = 0; i < connections.size(); i++) {
+            ConnectionEdge edge = connections.get(i);
+            if (edge.fromNodeId().equals(fromNodeId) && edge.outputIndex() == outIdx
+                && edge.toNodeId().equals(toNodeId) && edge.inputIndex() == inIdx) {
+                if (Math.abs(edge.fixedFlowLimit() - fixedFlowLimit) > 0.0001 || edge.priority() != priority || Math.abs(edge.weight() - safeWeight) > 0.0001) {
+                    connections.set(i, new ConnectionEdge(fromNodeId, outIdx, toNodeId, inIdx, fixedFlowLimit, priority, safeWeight));
+                    invalidatePortStatsCache();
+                }
                 return;
             }
         }
-        connections.add(new ConnectionEdge(fromNodeId, outIdx, toNodeId, inIdx));
+        connections.add(new ConnectionEdge(fromNodeId, outIdx, toNodeId, inIdx, fixedFlowLimit, priority, safeWeight));
         invalidatePortStatsCache();
+    }
+
+    public void addConnection(String fromNodeId, int outIdx, String toNodeId, int inIdx) {
+        addConnection(fromNodeId, outIdx, toNodeId, inIdx, 0.0, 0, 1.0);
     }
 
     public void addConnection(ConnectionEdge edge) {
         if (edge != null) {
-            addConnection(edge.fromNodeId(), edge.outputIndex(), edge.toNodeId(), edge.inputIndex());
+            addConnection(edge.fromNodeId(), edge.outputIndex(), edge.toNodeId(), edge.inputIndex(), edge.fixedFlowLimit(), edge.priority(), edge.weight());
         }
     }
 
-    public void removeConnection(ConnectionEdge edge) {
-        if (connections.remove(edge)) {
+    public void addConnections(Collection<ConnectionEdge> edges) {
+        if (edges == null || edges.isEmpty()) return;
+        for (ConnectionEdge edge : edges) {
+            addConnection(edge);
+        }
+    }
+
+    public boolean removeConnection(ConnectionEdge edge) {
+        if (edge == null) return false;
+        boolean removed = connections.remove(edge);
+        if (removed) {
             invalidatePortStatsCache();
         }
+        return removed;
+    }
+
+    public boolean removeConnection(String fromNodeId, int outIdx, String toNodeId, int inIdx) {
+        boolean removed = connections.removeIf(edge ->
+            edge.fromNodeId().equals(fromNodeId) && edge.outputIndex() == outIdx
+            && edge.toNodeId().equals(toNodeId) && edge.inputIndex() == inIdx
+        );
+        if (removed) {
+            invalidatePortStatsCache();
+        }
+        return removed;
+    }
+
+    public boolean removeConnectionIf(java.util.function.Predicate<ConnectionEdge> filter) {
+        if (filter == null) return false;
+        boolean removed = connections.removeIf(filter);
+        if (removed) {
+            invalidatePortStatsCache();
+        }
+        return removed;
+    }
+
+    public void removeConnections(Collection<ConnectionEdge> edges) {
+        if (edges == null || edges.isEmpty()) return;
+        boolean removed = connections.removeAll(edges);
+        if (removed) {
+            invalidatePortStatsCache();
+        }
+    }
+
+    public void clearConnections() {
+        connections.clear();
+        invalidatePortStatsCache();
+    }
+
+    public void clearFrames() {
+        frames.clear();
+    }
+
+    public void clearStickyNotes() {
+        stickyNotes.clear();
+    }
+
+    public boolean setConnectionFixedLimit(ConnectionEdge targetEdge, double fixedLimit) {
+        if (targetEdge == null) return false;
+        for (int i = 0; i < connections.size(); i++) {
+            ConnectionEdge edge = connections.get(i);
+            if (edge.fromNodeId().equals(targetEdge.fromNodeId()) && edge.outputIndex() == targetEdge.outputIndex()
+                && edge.toNodeId().equals(targetEdge.toNodeId()) && edge.inputIndex() == targetEdge.inputIndex()) {
+                connections.set(i, edge.withFixedLimit(fixedLimit));
+                invalidatePortStatsCache();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public boolean setConnectionPriority(ConnectionEdge targetEdge, int priority) {
+        if (targetEdge == null) return false;
+        for (int i = 0; i < connections.size(); i++) {
+            ConnectionEdge edge = connections.get(i);
+            if (edge.fromNodeId().equals(targetEdge.fromNodeId()) && edge.outputIndex() == targetEdge.outputIndex()
+                && edge.toNodeId().equals(targetEdge.toNodeId()) && edge.inputIndex() == targetEdge.inputIndex()) {
+                connections.set(i, edge.withPriority(priority));
+                invalidatePortStatsCache();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public boolean setConnectionWeight(ConnectionEdge targetEdge, double weight) {
+        if (targetEdge == null) return false;
+        for (int i = 0; i < connections.size(); i++) {
+            ConnectionEdge edge = connections.get(i);
+            if (edge.fromNodeId().equals(targetEdge.fromNodeId()) && edge.outputIndex() == targetEdge.outputIndex()
+                && edge.toNodeId().equals(targetEdge.toNodeId()) && edge.inputIndex() == targetEdge.inputIndex()) {
+                connections.set(i, edge.withWeight(weight));
+                invalidatePortStatsCache();
+                return true;
+            }
+        }
+        return false;
     }
 
     public boolean cleanupInvalidConnections() {
@@ -304,19 +522,31 @@ public class FlowGraph {
             RecipeNode from = findNodeById(edge.fromNodeId());
             RecipeNode to = findNodeById(edge.toNodeId());
             if (from == null || to == null) return true;
-            if (edge.outputIndex() < 0 || edge.outputIndex() >= from.getOutputs().size()) return true;
-            if (edge.inputIndex() < 0 || edge.inputIndex() >= to.getInputs().size()) return true;
+            if (edge.outputIndex() < 0 || (!from.isReroute() && edge.outputIndex() >= from.getOutputs().size())) return true;
+            if (edge.inputIndex() < 0 || (!to.isReroute() && edge.inputIndex() >= to.getInputs().size())) return true;
 
-            IngredientStack outStack = from.getOutputs().get(edge.outputIndex());
-            IngredientStack inStack = to.getInputs().get(edge.inputIndex());
-            if (outStack == null || inStack == null) return true;
-            if (outStack.getId() == null || inStack.getId() == null) return true;
+            IngredientStack outStack = from.isReroute()
+                    ? (from.getOutputs().isEmpty() ? null : from.getOutputs().get(0))
+                    : from.getOutputs().get(edge.outputIndex());
+            IngredientStack inStack = to.isReroute()
+                    ? (to.getInputs().isEmpty() ? null : to.getInputs().get(0))
+                    : to.getInputs().get(edge.inputIndex());
+            if (outStack == null || inStack == null) {
+                if (from.isReroute() || to.isReroute()) return false;
+                return true;
+            }
+            if (outStack.getId() == null || inStack.getId() == null) {
+                if (from.isReroute() || to.isReroute()) return false;
+                return true;
+            }
 
             // Fluid vs Item compatibility check
             if (outStack.isFluid() != inStack.isFluid()) return true;
 
-            // Resource ID compatibility check
+            // Resource compatibility check
             if (outStack.getId().equals(inStack.getId())) return false;
+            if (outStack.matchesOrAlternative(inStack) || inStack.matchesOrAlternative(outStack)) return false;
+            if (outStack.isStressUnit() && inStack.isStressUnit()) return false;
 
             return true;
         });
@@ -346,16 +576,28 @@ public class FlowGraph {
     // Solver Delegations (FlowGraphSolver)
     // =========================================================================
 
-    public void autoRatioFromAnchor(RecipeNode anchor) {
-        FlowGraphSolver.autoRatioFromAnchor(this, anchor, true);
+    public AutoRatioResult autoRatioFromAnchor(RecipeNode anchor) {
+        return FlowGraphSolver.autoRatioFromAnchor(this, anchor, true);
     }
 
-    public void autoRatioFromAnchor(RecipeNode anchor, boolean integerCounts) {
-        FlowGraphSolver.autoRatioFromAnchor(this, anchor, integerCounts);
+    public AutoRatioResult autoRatioFromAnchor(RecipeNode anchor, boolean integerCounts) {
+        return FlowGraphSolver.autoRatioFromAnchor(this, anchor, integerCounts);
     }
 
-    public void autoRatioHarmonized(RecipeNode anchor) {
-        FlowGraphSolver.autoRatioHarmonized(this, anchor);
+    public AutoRatioResult autoRatioHarmonized(RecipeNode anchor) {
+        return FlowGraphSolver.autoRatioHarmonized(this, anchor);
+    }
+
+    public AutoRatioResult autoRatioFractional(RecipeNode anchor) {
+        return FlowGraphSolver.autoRatioFractional(this, anchor);
+    }
+
+    public Set<String> findUnfedDeficitLoopNodeIds() {
+        return FlowGraphSolver.findUnfedDeficitLoopNodeIds(this);
+    }
+
+    public int autoRatioFromSharedPool(CanvasGroupFrame poolFrame, double targetMachines, com.gtceu.calcboard.api.solver.AutoRatioMode mode) {
+        return FlowGraphSolver.autoRatioFromSharedPool(this, poolFrame, targetMachines, mode);
     }
 
     public Map<String, Double> computeNodeEfficiencies() {
@@ -382,8 +624,20 @@ public class FlowGraph {
         return stats;
     }
 
+    public FlowGraphSolver.PortFlowStats getBatchInputPortStats(RecipeNode node, int inputIndex) {
+        if (node == null) return new FlowGraphSolver.PortFlowStats(0, 0, 0, false);
+        return FlowGraphSolver.getBatchInputPortStats(this, node, inputIndex);
+    }
+
+    public FlowGraphSolver.PortFlowStats getBatchOutputPortStats(RecipeNode node, int outputIndex) {
+        if (node == null) return new FlowGraphSolver.PortFlowStats(0, 0, 0, false);
+        return FlowGraphSolver.getBatchOutputPortStats(this, node, outputIndex);
+    }
+
     public BalanceSummary computeSummary() {
-        return FlowGraphSolver.computeSummary(this);
+        BalanceSummary summary = FlowGraphSolver.computeSummary(this);
+        setCachedSummary(summary);
+        return summary;
     }
 
     public void optimizeMaxThroughput(boolean preferParallels, boolean integerCounts) {
@@ -419,14 +673,22 @@ public class FlowGraph {
     }
 
     public CompoundTag serializeNBT(double panX, double panY, double zoom) {
+        return serializeNBT(panX, panY, zoom, Collections.newSetFromMap(new IdentityHashMap<>()), 0);
+    }
+
+    public CompoundTag serializeNBT(double panX, double panY, double zoom, Set<FlowGraph> visitedGraphs, int depth) {
         CompoundTag tag = new CompoundTag();
         tag.putDouble("panX", panX);
         tag.putDouble("panY", panY);
         tag.putDouble("zoom", zoom);
 
+        if (visitedGraphs != null) {
+            visitedGraphs.add(this);
+        }
+
         ListTag nodeList = new ListTag();
         for (RecipeNode n : nodes) {
-            nodeList.add(n.serializeNBT());
+            nodeList.add(n.serializeNBT(visitedGraphs, depth));
         }
         tag.put("nodes", nodeList);
 
@@ -522,7 +784,7 @@ public class FlowGraph {
                     IngredientStack oldStack = oldInputs.get(oldInIdx);
                     int newInIdx = findMatchingPortIndex(newInputs, oldStack);
                     if (newInIdx >= 0) {
-                        newEdges.add(new ConnectionEdge(edge.fromNodeId(), edge.outputIndex(), nodeId, newInIdx));
+                        newEdges.add(new ConnectionEdge(edge.fromNodeId(), edge.outputIndex(), nodeId, newInIdx, edge.fixedFlowLimit(), edge.priority(), edge.weight()));
                     }
                 }
             } else if (edge.fromNodeId().equals(nodeId)) {
@@ -531,7 +793,7 @@ public class FlowGraph {
                     IngredientStack oldStack = oldOutputs.get(oldOutIdx);
                     int newOutIdx = findMatchingPortIndex(newOutputs, oldStack);
                     if (newOutIdx >= 0) {
-                        newEdges.add(new ConnectionEdge(nodeId, newOutIdx, edge.toNodeId(), edge.inputIndex()));
+                        newEdges.add(new ConnectionEdge(nodeId, newOutIdx, edge.toNodeId(), edge.inputIndex(), edge.fixedFlowLimit(), edge.priority(), edge.weight()));
                     }
                 }
             }
@@ -543,6 +805,7 @@ public class FlowGraph {
                 connections.add(e);
             }
         }
+        invalidatePortStatsCache();
 
         return new com.gtceu.calcboard.api.history.BoardCommand.SwitchRecipeCommand(nodeId, oldSnapshot, newSnapshot, oldEdges, newEdges);
     }
@@ -556,6 +819,63 @@ public class FlowGraph {
             }
         }
         return -1;
+    }
+
+    public boolean setConnectionFixedLimit(String fromNodeId, int outputIndex, String toNodeId, int inputIndex, double limit) {
+        for (int i = 0; i < connections.size(); i++) {
+            ConnectionEdge edge = connections.get(i);
+            if (edge.fromNodeId().equals(fromNodeId) && edge.outputIndex() == outputIndex
+                    && edge.toNodeId().equals(toNodeId) && edge.inputIndex() == inputIndex) {
+                connections.set(i, edge.withFixedLimit(limit));
+                invalidatePortStatsCache();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public boolean setConnectionPriority(String fromNodeId, int outputIndex, String toNodeId, int inputIndex, int priority) {
+        for (int i = 0; i < connections.size(); i++) {
+            ConnectionEdge edge = connections.get(i);
+            if (edge.fromNodeId().equals(fromNodeId) && edge.outputIndex() == outputIndex
+                    && edge.toNodeId().equals(toNodeId) && edge.inputIndex() == inputIndex) {
+                connections.set(i, edge.withPriority(priority));
+                invalidatePortStatsCache();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public boolean setConnectionWeight(String fromNodeId, int outputIndex, String toNodeId, int inputIndex, double weight) {
+        for (int i = 0; i < connections.size(); i++) {
+            ConnectionEdge edge = connections.get(i);
+            if (edge.fromNodeId().equals(fromNodeId) && edge.outputIndex() == outputIndex
+                    && edge.toNodeId().equals(toNodeId) && edge.inputIndex() == inputIndex) {
+                connections.set(i, edge.withWeight(weight));
+                invalidatePortStatsCache();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public boolean setConnectionProperties(String fromNodeId, int outputIndex, String toNodeId, int inputIndex, double limit, int priority, double weight) {
+        double safeWeight = ConnectionEdge.sanitizeWeight(weight);
+        for (int i = 0; i < connections.size(); i++) {
+            ConnectionEdge edge = connections.get(i);
+            if (edge.fromNodeId().equals(fromNodeId) && edge.outputIndex() == outputIndex
+                    && edge.toNodeId().equals(toNodeId) && edge.inputIndex() == inputIndex) {
+                connections.set(i, new ConnectionEdge(fromNodeId, outputIndex, toNodeId, inputIndex, Math.max(0.0, limit), Math.max(0, Math.min(99, priority)), safeWeight));
+                invalidatePortStatsCache();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public RecipeNode findConnectedBufferNode(RecipeNode consumer, int inputIndex) {
+        return FlowGraphSolver.findConnectedBufferNode(this, consumer, inputIndex);
     }
 }
 

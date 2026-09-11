@@ -14,12 +14,15 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 
+import com.gtceu.calcboard.client.gui.dialog.modal.IBoardModal;
+import com.gtceu.calcboard.client.gui.dialog.modal.ModalRenderContext;
+
 import java.util.UUID;
 
 /**
  * Modal dialog for confirming and writing a short note when saving a page to the shared team workspace.
  */
-public class SaveToTeamDialog {
+public class SaveToTeamDialog implements IBoardModal {
 
     private final BoardScreen screen;
     private boolean visible = false;
@@ -54,6 +57,11 @@ public class SaveToTeamDialog {
         return visible;
     }
 
+    @Override
+    public void renderModal(ModalRenderContext context) {
+        render(context.graphics(), context.mouseX(), context.mouseY(), context.partialTicks());
+    }
+
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
         if (!visible) return;
 
@@ -77,7 +85,7 @@ public class SaveToTeamDialog {
         graphics.renderOutline(x, y, dialogW, dialogH, 0xFF4F5B73);
 
         // Title
-        String title = "💾 " + Component.translatable("gui.gtcalcboard.dialog.save_to_team_title").getString();
+        String title = "✓ " + Component.translatable("gui.gtcalcboard.dialog.save_to_team_title").getString();
         graphics.drawString(font, title, x + 12, y + 10, 0xFFFFFFFF, false);
 
         String subtitle = Component.translatable("gui.gtcalcboard.dialog.save_to_team_sub").getString();
@@ -95,7 +103,7 @@ public class SaveToTeamDialog {
         boolean saveHover = mouseX >= saveBtnX && mouseX <= saveBtnX + saveBtnW && mouseY >= saveBtnY && mouseY <= saveBtnY + saveBtnH;
         graphics.fill(saveBtnX, saveBtnY, saveBtnX + saveBtnW, saveBtnY + saveBtnH, saveHover ? 0xFF2A6840 : 0xFF1E4D2F);
         graphics.renderOutline(saveBtnX, saveBtnY, saveBtnW, saveBtnH, 0xFF359050);
-        graphics.drawCenteredString(font, "💾 " + Component.translatable("gui.gtcalcboard.dialog.btn_save_sync").getString(), saveBtnX + saveBtnW / 2, saveBtnY + 7, 0xFFFFFFFF);
+        graphics.drawCenteredString(font, "✓ " + Component.translatable("gui.gtcalcboard.dialog.btn_save_sync").getString(), saveBtnX + saveBtnW / 2, saveBtnY + 7, 0xFFFFFFFF);
 
         // Cancel button
         int cancelBtnX = saveBtnX + saveBtnW + 8;
@@ -175,7 +183,8 @@ public class SaveToTeamDialog {
         UUID teamId = state.getCurrentTeamId() != null ? state.getCurrentTeamId() : (Minecraft.getInstance().player != null ? Minecraft.getInstance().player.getUUID() : UUID.randomUUID());
         String pageId = "page_main";
         String pageTitle = "Main Workspace";
-        int rev = state.getGlobalRevision();
+        var remotePage = state.getRemotePage(pageId);
+        int rev = (remotePage != null) ? remotePage.getPageRevision() : 1;
 
         String msg = messageBox != null ? messageBox.getValue().trim() : "";
         if (msg.isEmpty()) msg = "Updated factory layout";

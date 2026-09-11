@@ -12,8 +12,8 @@ import com.gtceu.calcboard.api.util.NumberFormatUtil;
 import com.gtceu.calcboard.client.gui.util.FormatUtil;
 import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.client.gui.widget.NodeWidget;
-import com.gtceu.calcboard.compat.IModAdapter;
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.IModAdapter;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 import net.minecraft.client.gui.Font;
 import net.minecraft.network.chat.Component;
 
@@ -24,6 +24,27 @@ import java.util.Locale;
 public class NodeCardTextCache {
 
     public record PortText(String text, int width, int textColor, int portColor) {}
+
+    public record Row2Button(
+        int relX,
+        int width,
+        String text,
+        int textWidth,
+        int color,
+        boolean isAlert,
+        boolean isGlowing,
+        ButtonRole role,
+        NodeBadge badge
+    ) {
+        public enum ButtonRole {
+            TIER,
+            BADGE,
+            GEN,
+            OC,
+            CONFIG,
+            BANNER
+        }
+    }
 
     private boolean dirty = true;
 
@@ -36,10 +57,16 @@ public class NodeCardTextCache {
 
     private final List<PortText> leftPortTexts = new ArrayList<>();
     private final List<PortText> rightPortTexts = new ArrayList<>();
+    private final List<Row2Button> row2Buttons = new ArrayList<>();
     private List<NodeBadge> badges = List.of();
+    private boolean starved = false;
 
     public boolean isDirty() {
         return dirty;
+    }
+
+    public boolean isStarved() {
+        return starved;
     }
 
     public void markDirty() {
@@ -78,6 +105,10 @@ public class NodeCardTextCache {
         return badges;
     }
 
+    public List<Row2Button> getRow2Buttons() {
+        return row2Buttons;
+    }
+
     public void update(NodeWidget widget, Font font, FlowGraph graph, RecipeNode node, int cardW, int titleX, int x, int headerBtnMargin) {
         if (!dirty) return;
 
@@ -85,15 +116,43 @@ public class NodeCardTextCache {
 
         updateTitle(node, cardW, titleX, x, headerBtnMargin, isOperational);
         updatePowerAndDuration(widget, font, node, cardW, isOperational);
-        updateBadges(node);
+        updateBadges(node, graph);
         updatePorts(widget, font, graph, node, cardW, isOperational);
+        updateStarved(graph, node);
+        updateRow2Buttons(widget, font, node, cardW, isOperational);
 
         this.dirty = false;
     }
 
+    private void updateRow2Buttons(NodeWidget widget, Font font, RecipeNode node, int cardW, boolean isOperational) {
+        this.row2Buttons.clear();
+        if (widget == null || font == null || node == null) return;
+        if (BoardManager.getInstance().isSlimCardMode()) return;
+        var handler = com.gtceu.calcboard.client.gui.compat.ModGuiHandlerRegistry.getHandlerForNode(node);
+        if (handler != null) {
+            handler.populateRow2Buttons(widget, font, node, cardW, isOperational, this.row2Buttons);
+        }
+    }
+
+    private void updateStarved(FlowGraph graph, RecipeNode node) {
+        if (graph == null || node == null) {
+            this.starved = false;
+            return;
+        }
+        int inputCount = node.getInputs().size();
+        for (int i = 0; i < inputCount; i++) {
+            var stats = graph.getInputPortStats(node, i);
+            if (stats != null && stats.isInputDeficit()) {
+                this.starved = true;
+                return;
+            }
+        }
+        this.starved = false;
+    }
+
     private void updateTitle(RecipeNode node, int cardW, int titleX, int x, int headerBtnMargin, boolean isOperational) {
         String baseTitle = (!isOperational ? "§c⚠ " : "")
-                + (node.isModule() ? "§d📦 " : (node.isFusion() ? "§d⚛ " : (node.isBaseNode() ? "§6★ " : (node.isGenerator() ? "§a⚡ " : ""))))
+                + (node.isModule() ? "§d▦ " : (node.isFusion() ? "§d⚛ " : (node.isBaseNode() ? "§6★ " : (node.isGenerator() ? "§a⚡ " : ""))))
                 + node.getName();
         int maxTitleChars = Math.max(8, (cardW - (titleX - x) - headerBtnMargin) / 6);
         if (baseTitle.length() > maxTitleChars) {
@@ -107,12 +166,17 @@ public class NodeCardTextCache {
         double durationSec = node.getEffectiveDurationSeconds();
         double effCps = node.getEffectiveCyclesPerSecond();
 
+        boolean isBatch = FormatUtil.getActiveTimeUnit().isRecipeBatchMode();
         if (!isOperational) {
-            this.rightInfoStr = String.format(Locale.ROOT, "§c%.2fs §7(§c0/s§7)", durationSec);
+            this.rightInfoStr = isBatch
+                    ? String.format(Locale.ROOT, "§c%.2fs §7(§c1x§7)", durationSec)
+                    : String.format(Locale.ROOT, "§c%.2fs §7(§c0/s§7)", durationSec);
         } else if (node.isModule()) {
-            this.rightInfoStr = "§d§l[📦 " + Component.translatable("gui.gtcalcboard.module").getString() + "]";
+            this.rightInfoStr = "§d§l[▦ " + Component.translatable("gui.gtcalcboard.module").getString() + "]";
         } else {
-            this.rightInfoStr = String.format(Locale.ROOT, "§b%.2fs §7(§f%s/s§7)", durationSec, NumberFormatUtil.formatCompactNumber(effCps));
+            this.rightInfoStr = isBatch
+                    ? String.format(Locale.ROOT, "§b%.2fs §7(§f1x§7)", durationSec)
+                    : String.format(Locale.ROOT, "§b%.2fs §7(§f%s/s§7)", durationSec, NumberFormatUtil.formatCompactNumber(effCps));
         }
         this.rightInfoW = font.width(this.rightInfoStr);
 
@@ -122,17 +186,47 @@ public class NodeCardTextCache {
         if (node.getEnergyType() == EnergyType.NONE) {
             powerStr = Component.translatable("gui.gtcalcboard.energy_passive_stat").getString();
         } else if (!isOperational) {
-            GTVoltageTier tier = node.getTargetTier();
-            String tierName = tier != null ? tier.getName() : "LV";
-            powerStr = "§c0.0 EU/t §7(0A " + tierName + ")";
+            powerStr = formatUnoperationalPower(node);
         } else {
             powerStr = adapter.formatEnergyStats(node, BoardManager.getInstance().getPowerDisplayMode());
         }
         this.fittedPowerStr = font.plainSubstrByWidth(powerStr, maxPowerW);
     }
 
-    private void updateBadges(RecipeNode node) {
-        this.badges = NodeBadgeRegistry.getBadgesForNode(node);
+    private String formatUnoperationalPower(RecipeNode node) {
+        EnergyType energyType = node.getEnergyType();
+        if (energyType == EnergyType.KINETIC_SU) {
+            if (node.getProperties().get(com.gtceu.calcboard.compat.greate.GreateProperties.IS_GREATE)) {
+                int mTier = Math.max(0, node.getProperties().get(com.gtceu.calcboard.compat.greate.GreateProperties.MACHINE_TIER));
+                int rTier = Math.max(0, node.getProperties().get(com.gtceu.calcboard.compat.greate.GreateProperties.REQUIRED_RECIPE_TIER));
+                double singleCap = com.gtceu.calcboard.compat.greate.GreateProperties.getShaftCapacityForTier(mTier);
+                double totalCap = singleCap * Math.max(1.0, node.getMachineCount());
+                IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
+                double singleStress = adapter.computeOverclock(node, node.getTargetTier(), false).eut() * node.getCombinedEutMultiplier();
+                double totalStress = singleStress * node.getMachineCount();
+                if (singleStress > singleCap) {
+                    return String.format(Locale.ROOT, "§c%,.0f / %,.0f SU", totalStress, totalCap);
+                }
+                if (mTier < rTier) {
+                    return "§c0 SU §7(Req: " + com.gtceu.calcboard.compat.greate.GreateProperties.getTierName(rTier) + ")";
+                }
+                return String.format(Locale.ROOT, "§c0 / %,.0f SU", totalCap);
+            }
+            return "§c0 SU";
+        }
+        if (energyType == EnergyType.ELECTRIC_FE) {
+            return "§c0 FE/t";
+        }
+        if (energyType == EnergyType.HEAT_OR_SELF) {
+            return "§c0 mB/t Steam";
+        }
+        GTVoltageTier tier = node.getTargetTier();
+        String tierName = tier != null ? tier.getName() : "LV";
+        return "§c0.0 EU/t §7(0A " + tierName + ")";
+    }
+
+    private void updateBadges(RecipeNode node, FlowGraph graph) {
+        this.badges = NodeBadgeRegistry.getBadgesForNode(node, graph);
     }
 
     private record RawPortData(String rateStr, int textColor, int portColor) {}
@@ -227,13 +321,24 @@ public class NodeCardTextCache {
     }
 
     private RawPortData computeInputPortData(NodeWidget widget, FlowGraph graph, RecipeNode node, IngredientStack in, int inOrigIdx, boolean isOperational) {
+        if (FormatUtil.getActiveTimeUnit().isRecipeBatchMode()) {
+            return computeBatchInputPortData(graph, node, in, inOrigIdx, isOperational);
+        }
         double rate = widget.getInputRate(inOrigIdx);
         FlowGraphSolver.PortFlowStats stats = graph != null ? graph.getInputPortStats(node, inOrigIdx) : null;
         boolean isConnected = stats != null && stats.isConnected();
         boolean isBalanced = stats != null && stats.isBalanced();
         boolean isDeficit = stats != null && stats.isInputDeficit();
+        boolean isThrottled = stats != null && stats.isUpstreamThrottled();
+        boolean isBuffered = graph != null && graph.findConnectedBufferNode(node, inOrigIdx) != null;
+        boolean isSteadyRecirc = stats != null && stats.isSteadyStateRecirculating();
 
-        int portColor = !isOperational ? 0xFF77333B : (!isConnected ? 0xFF5599FF : (isBalanced ? 0xFF55FF88 : (isDeficit ? 0xFFFFAA33 : 0xFF55FFFF)));
+        int portColor = !isOperational ? 0xFF77333B
+                : (!isConnected ? 0xFF5599FF
+                : (isBalanced ? 0xFF55FF88
+                : (isSteadyRecirc ? 0xFF55FFFF
+                : (isDeficit ? (isBuffered ? 0xFFFFD700 : 0xFFFFAA33)
+                : (isThrottled ? 0xFF5599FF : 0xFF55FFFF)))));
 
         if (!isOperational) {
             return new RawPortData("§c-" + FormatUtil.formatRate(0.0, in), 0xFFFF7777, portColor);
@@ -244,10 +349,40 @@ public class NodeCardTextCache {
         if (isBalanced) {
             return new RawPortData("§a" + FormatUtil.formatRate(rate, in) + " §2✔", 0xFFFFFFFF, portColor);
         }
-        return new RawPortData(FormatUtil.formatConnectedInput(stats.connectedRate(), rate, in, isDeficit), 0xFFFFFFFF, portColor);
+        double requiredRate = (isDeficit && stats != null) ? stats.requiredOrProducedRate() : rate;
+        return new RawPortData(FormatUtil.formatConnectedInput(stats.connectedRate(), requiredRate, in, isDeficit, isBuffered, isThrottled, isSteadyRecirc), 0xFFFFFFFF, portColor);
+    }
+
+    private RawPortData computeBatchInputPortData(FlowGraph graph, RecipeNode node, IngredientStack in, int inOrigIdx, boolean isOperational) {
+        FlowGraphSolver.PortFlowStats stats = graph != null ? graph.getBatchInputPortStats(node, inOrigIdx) : null;
+        boolean isConnected = stats != null && stats.isConnected();
+        boolean isBalanced = stats != null && stats.isBalanced();
+        boolean isDeficit = stats != null && stats.isInputDeficit();
+        boolean isSteadyRecirc = stats != null && stats.isSteadyStateRecirculating();
+
+        int portColor = !isOperational ? 0xFF77333B
+                : (!isConnected ? 0xFF5599FF
+                : (isBalanced ? 0xFF55FF88
+                : (isSteadyRecirc ? 0xFF55FFFF
+                : (isDeficit ? 0xFFFFAA33 : 0xFF55FFFF))));
+
+        if (!isOperational) {
+            return new RawPortData("§c-" + FormatUtil.formatRecipeBatchAmount(0.0, in), 0xFFFF7777, portColor);
+        }
+        double reqAmount = in.getAmount();
+        if (!isConnected) {
+            return new RawPortData("§7-" + FormatUtil.formatRecipeBatchAmount(reqAmount, in), 0xFFFFAAAA, portColor);
+        }
+        if (isBalanced) {
+            return new RawPortData("§a" + FormatUtil.formatRecipeBatchAmount(reqAmount, in) + " §2✔", 0xFFFFFFFF, portColor);
+        }
+        return new RawPortData(FormatUtil.formatBatchConnectedInput(stats.connectedRate(), reqAmount, in, isDeficit, isSteadyRecirc), 0xFFFFFFFF, portColor);
     }
 
     private RawPortData computeOutputPortData(NodeWidget widget, FlowGraph graph, RecipeNode node, IngredientStack out, int outOrigIdx, boolean isOperational) {
+        if (FormatUtil.getActiveTimeUnit().isRecipeBatchMode()) {
+            return computeBatchOutputPortData(graph, node, out, outOrigIdx, isOperational);
+        }
         double rate = widget.getOutputRate(outOrigIdx);
         FlowGraphSolver.PortFlowStats stats = graph != null ? graph.getOutputPortStats(node, outOrigIdx) : null;
         boolean isConnected = stats != null && stats.isConnected();
@@ -271,5 +406,29 @@ public class NodeCardTextCache {
             return new RawPortData("§a" + FormatUtil.formatRate(rate, out) + " §2✔", 0xFFFFFFFF, portColor);
         }
         return new RawPortData(FormatUtil.formatConnectedOutput(rate, stats.connectedRate(), out, isDeficit), 0xFFFFFFFF, portColor);
+    }
+
+    private RawPortData computeBatchOutputPortData(FlowGraph graph, RecipeNode node, IngredientStack out, int outOrigIdx, boolean isOperational) {
+        FlowGraphSolver.PortFlowStats stats = graph != null ? graph.getBatchOutputPortStats(node, outOrigIdx) : null;
+        boolean isConnected = stats != null && stats.isConnected();
+        boolean isBalanced = stats != null && stats.isBalanced();
+        boolean isDeficit = stats != null && stats.isOutputDeficit();
+
+        int portColor = !isOperational ? 0xFF77333B
+                : (!isConnected ? 0xFF55FF88
+                : (isBalanced ? 0xFF55FF88
+                : (isDeficit ? 0xFFFFAA33 : 0xFF55FFFF)));
+
+        if (!isOperational) {
+            return new RawPortData("§c" + FormatUtil.formatRecipeBatchAmount(0.0, out) + " §4⏸", 0xFFFF7777, portColor);
+        }
+        double prodAmount = out.getAmount() * out.getChance();
+        if (!isConnected) {
+            return new RawPortData("§a+" + FormatUtil.formatRecipeBatchAmount(prodAmount, out), 0xFFAAFFAA, portColor);
+        }
+        if (isBalanced) {
+            return new RawPortData("§a" + FormatUtil.formatRecipeBatchAmount(prodAmount, out) + " §2✔", 0xFFFFFFFF, portColor);
+        }
+        return new RawPortData(FormatUtil.formatBatchConnectedOutput(prodAmount, stats.connectedRate(), out, isDeficit), 0xFFFFFFFF, portColor);
     }
 }

@@ -11,10 +11,13 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import org.lwjgl.glfw.GLFW;
 
+import com.gtceu.calcboard.client.gui.dialog.modal.IBoardModal;
+import com.gtceu.calcboard.client.gui.dialog.modal.ModalRenderContext;
+
 import java.util.ArrayList;
 import java.util.List;
 
-public class TutorialExitConfirmDialog {
+public class TutorialExitConfirmDialog implements IBoardModal {
     private final BoardScreen parent;
     private boolean visible = false;
     private int targetPageIndex = -1;
@@ -57,6 +60,11 @@ public class TutorialExitConfirmDialog {
         return visible;
     }
 
+    @Override
+    public void renderModal(ModalRenderContext context) {
+        render(context.graphics(), context.screenWidth(), context.screenHeight(), context.mouseX(), context.mouseY());
+    }
+
     public void render(GuiGraphics graphics, int screenW, int screenH, int mouseX, int mouseY) {
         if (!visible) return;
 
@@ -79,7 +87,7 @@ public class TutorialExitConfirmDialog {
         graphics.renderOutline(modalX + 1, modalY + 1, modalW - 2, modalH - 2, 0x6600E676);
 
         // Header Title
-        graphics.drawString(font, "§a🎓 " + Component.translatable("gui.gtcalcboard.tutorial.exit_dialog.title").getString(), modalX + 12, modalY + 10, 0xFFFFFFFF, false);
+        graphics.drawString(font, "§a▶ " + Component.translatable("gui.gtcalcboard.tutorial.exit_dialog.title").getString(), modalX + 12, modalY + 10, 0xFFFFFFFF, false);
 
         // Description / Warning Text
         String desc = Component.translatable("gui.gtcalcboard.tutorial.exit_dialog.desc").getString();

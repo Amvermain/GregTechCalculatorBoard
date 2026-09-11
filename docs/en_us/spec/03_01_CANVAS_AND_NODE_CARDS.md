@@ -302,4 +302,34 @@ All inline editable text fields (`NodeNameEditor`, `NodeCountEditor`, `NodeParal
 
 ---
 
-> ➡️ **Next Sub-Specification**: [[03-02] Machine Configuration & Addon Rack UI](03_02_MACHINE_CONFIG_AND_ADDONS.md)
+## 8. Unified Node Layout Bounds Model (`NodeLayoutBounds`) (ADR-030)
+
+Provides a single-source-of-truth immutable layout model to decouple the rendering pipeline from event hit-testing logic:
+
+* **Immutable Bounds Record (`NodeLayoutBounds`)**:
+  - Encapsulates exact rectangular bounds (`RectBounds`) for visual segments: `headerBounds()`, `bodyBounds()`, `portBoundsMap()`, `resizeHandleBounds()`, etc.
+* **Layout Calculator (`NodeLayoutCalculator`)**:
+  - Implements early-return branch calculation for standard and slim reroute card modes (`computeStandardLayout()`, `computeRerouteLayout()`), computing layout coordinates in $O(1)$ time.
+  - Ensures hitboxes, mouse interactions, and wire socket anchor coordinates stay synchronized even when vertically resizing cards.
+
+---
+
+## 9. Contextual Instability Warning Badges & Diagnostic Action Guides (ADR-032, ADR-033, ADR-034)
+
+Visualizes divergence, conflict, and loop anomalies across complex flowsheets, offering instant resolution guides:
+
+* **5 Contextual Instability Badges (`NodeBadgeRegistry`)**:
+  - `[⚠ Loop]`: Closed self-contained loop lacking external makeup inputs, suppressing infinite scale explosion.
+  - `[⚠ Growth]`: Positive-feedback amplification loop where flow scales multiplicatively per cycle.
+  - `[⚠ Catalyst]`: Catalyst regeneration loop experiencing micro-fractional decay.
+  - `[⚠ Conflict]`: Conflicting flow rates imposed by multiple inconsistent target anchors.
+  - `[⚠ Yield]`: Sub-ppm micro-yield recipe requiring extreme production scaling ($< 10^{-5}$).
+* **5-Line Interactive Diagnostic Tooltip**:
+  - Displays a structured 5-line diagnostic breakdown on hover: `Cause Summary`, `In-Game Mechanism`, `Recommended Fix 1`, `Recommended Fix 2`, and `[Click] Action Shortcut`.
+  - Clicking the badge directly clears conflicting anchors or locks the node as a primary anchor in a single action.
+* **Contextual Port Drag Flyout Menu**:
+  - Dragging a connection wire from an input/output port into empty canvas space presents a quick-action flyout menu to instantiate surplus drains (`[+ Surplus Drain]`), deficit supplies (`[+ Deficit Supply]`), void sinks (`[+ Void Sink]`), or infinite sources (`[+ Infinite Source]`) at exact required flow rates.
+
+---
+
+> ➡ **Next Sub-Specification**: [[03-02] Machine Configuration & Addon Rack UI](03_02_MACHINE_CONFIG_AND_ADDONS.md)

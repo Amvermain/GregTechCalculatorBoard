@@ -1,10 +1,12 @@
 package com.gtceu.calcboard.network.packet.c2s;
 
 import com.gtceu.calcboard.network.NetworkHandler;
-import com.gtceu.calcboard.network.packet.s2c.S2CSyncWorkspacePacket;
+import com.gtceu.calcboard.network.packet.s2c.S2CSyncWorkspaceMetaPacket;
 import com.gtceu.calcboard.network.packet.s2c.S2CWorkspaceErrorPacket;
+import com.gtceu.calcboard.server.storage.ChunkedStreamHelper;
 import com.gtceu.calcboard.server.storage.TeamBoardSavedData;
 import com.gtceu.calcboard.server.storage.TeamWorkspaceData;
+import com.gtceu.calcboard.server.storage.TeamWorkspacePage;
 import com.gtceu.calcboard.server.team.TeamProviderRegistry;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
@@ -33,6 +35,14 @@ public class C2SRequestWorkspacePacket {
         buf.writeUtf(requestedPageId != null ? requestedPageId : "");
     }
 
+    public UUID getTeamId() {
+        return teamId;
+    }
+
+    public String getRequestedPageId() {
+        return requestedPageId;
+    }
+
     public void handle(Supplier<NetworkEvent.Context> ctxSupplier) {
         NetworkEvent.Context ctx = ctxSupplier.get();
         ctx.enqueueWork(() -> {
@@ -41,7 +51,7 @@ public class C2SRequestWorkspacePacket {
 
             UUID playerTeamId = TeamProviderRegistry.getInstance().getPlayerTeamId(player);
             if (playerTeamId == null) {
-                NetworkHandler.sendToPlayer(player, new S2CSyncWorkspacePacket(new UUID(0L, 0L), "", 0, java.util.Collections.emptyList(), java.util.Collections.emptyList()));
+                NetworkHandler.sendToPlayer(player, new S2CSyncWorkspaceMetaPacket(new UUID(0L, 0L), "", 0, java.util.Collections.emptyList()));
                 return;
             }
 
@@ -49,8 +59,21 @@ public class C2SRequestWorkspacePacket {
             if (savedData != null) {
                 String teamName = TeamProviderRegistry.getInstance().getTeamDisplayName(playerTeamId);
                 TeamWorkspaceData ws = savedData.getOrCreateWorkspace(playerTeamId, teamName);
-                NetworkHandler.sendToPlayer(player, new S2CSyncWorkspacePacket(ws));
+
+                // 1. Send lightweight workspace metadata first (RFC-003)
+                NetworkHandler.sendToPlayer(player, ws.buildMetaPacket());
                 NetworkHandler.broadcastPresenceForTeam(player.serverLevel(), playerTeamId);
+
+                // 2. Stream requested active page data safely
+                String targetPageId = (requestedPageId != null && !requestedPageId.isEmpty())
+                        ? requestedPageId : "page_main";
+                TeamWorkspacePage page = ws.getPage(targetPageId);
+                if (page == null && !ws.getPages().isEmpty()) {
+                    page = ws.getPages().iterator().next();
+                }
+                if (page != null) {
+                    ChunkedStreamHelper.sendPageDataSafely(player, page.getPageId(), page.getPageRevision(), page.getCompressedGraphData());
+                }
             }
         });
         ctx.setPacketHandled(true);

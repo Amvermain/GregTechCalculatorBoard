@@ -8,15 +8,19 @@ import com.gtceu.calcboard.api.catalog.CategoryCapabilityMatrix;
 import com.gtceu.calcboard.api.catalog.MachineAddon;
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.model.SearchableRecipe;
 import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.type.OverclockMode;
 import com.gtceu.calcboard.api.type.PowerDisplayMode;
-
-import com.gtceu.calcboard.api.model.SearchableRecipe;
-import com.gtceu.calcboard.compat.IModAdapter;
+import com.gtceu.calcboard.api.spi.IModAdapter;
+import com.gtceu.calcboard.api.spi.extension.ICapabilityMatrixProvider;
+import com.gtceu.calcboard.api.spi.extension.IEnergySimulationProvider;
+import com.gtceu.calcboard.api.spi.extension.IHardwareAddonProvider;
+import com.gtceu.calcboard.api.spi.extension.IModExtension;
+import com.gtceu.calcboard.api.spi.extension.IMultiblockBOMProvider;
 import com.gtceu.calcboard.compat.createnewage.addon.CreateMagnetAddon;
-import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
+import com.gtceu.calcboard.api.model.RecipeDetails;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
@@ -26,12 +30,25 @@ import net.minecraftforge.fml.loading.FMLLoader;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 /**
  * Dedicated Mod Adapter for Create: New Age (create_new_age).
  * Encapsulates Electricity Generation, Motors, Energising processing, and Magnet addons.
  */
 public class CreateNewAgeModAdapter implements IModAdapter {
+
+    private static final Set<Class<? extends IModExtension>> SUPPORTED_EXTENSIONS = Set.of(
+            IHardwareAddonProvider.class,
+            IMultiblockBOMProvider.class,
+            IEnergySimulationProvider.class,
+            ICapabilityMatrixProvider.class
+    );
+
+    @Override
+    public Set<Class<? extends IModExtension>> getSupportedExtensions() {
+        return SUPPORTED_EXTENSIONS;
+    }
 
     static {
         com.gtceu.calcboard.api.catalog.AddonFactoryRegistry.register(com.gtceu.calcboard.api.catalog.AddonCategory.MAGNET, (id, name, desc, icon, tag) -> new com.gtceu.calcboard.compat.createnewage.addon.CreateMagnetAddon(id, name, desc, icon, 0));
@@ -131,7 +148,7 @@ public class CreateNewAgeModAdapter implements IModAdapter {
     }
 
     @Override
-    public boolean adaptRecipeDetails(Object emiRecipe, Object backingRecipe, EmiRecipeConverter.RecipeDetails details) {
+    public boolean adaptRecipeDetails(Object emiRecipe, Object backingRecipe, RecipeDetails details) {
         return CreateNewAgeRecipeHandler.adaptRecipeDetails(emiRecipe, backingRecipe, details);
     }
 
@@ -178,6 +195,7 @@ public class CreateNewAgeModAdapter implements IModAdapter {
         } else {
             node.addAddon(addon.copy());
         }
+        syncGeneratorCoilInput(node);
     }
 
     @Override
@@ -188,13 +206,14 @@ public class CreateNewAgeModAdapter implements IModAdapter {
         } else {
             node.removeAddon(addon.getId());
         }
+        syncGeneratorCoilInput(node);
     }
 
     @Override
     public String formatAddonBadge(RecipeNode node, MachineAddon addon) {
         if (addon == null) return "";
         if (addon.getCategory().equals(AddonCategory.MAGNET) || addon.getMagneticForce() > 0) {
-            return String.format("🧲 %dx", addon.getMagneticForce());
+            return String.format("⚡ %dx", addon.getMagneticForce());
         }
         return "";
     }
@@ -212,27 +231,27 @@ public class CreateNewAgeModAdapter implements IModAdapter {
     public void buildAddonTooltip(RecipeNode node, MachineAddon addon, boolean isActiveAddon, List<Component> tooltip) {
         if (addon == null || tooltip == null) return;
         int force = addon.getMagneticForce();
-        tooltip.add(Component.literal("§6🧲 ").append(Component.translatable("gui.gtcalcboard.addon.magnetic_force", force)));
+        tooltip.add(Component.literal("§6⚡ ").append(Component.translatable("gui.gtcalcboard.addon.magnetic_force", force)));
 
         long totalMagnets = node.getAddons().stream().filter(a -> a.getCategory().equals(AddonCategory.MAGNET)).count();
         int targetCount = (int) node.getAddons().stream().filter(a -> a.getId().equals(addon.getId())).count();
 
         if (isActiveAddon) {
-            tooltip.add(Component.literal(String.format("§7Ring Slot: §e%d / 12", totalMagnets)));
-            tooltip.add(Component.literal("§c[Right-Click] Remove 1 Magnet"));
+            tooltip.add(Component.literal("§7").append(Component.translatable("gui.gtcalcboard.cna.ring_slot", totalMagnets)));
+            tooltip.add(Component.literal("§c").append(Component.translatable("gui.gtcalcboard.cna.remove_magnet_simple")));
         } else {
-            tooltip.add(Component.literal(String.format("§7Ring Slots: §e%d / 12", totalMagnets)));
+            tooltip.add(Component.literal("§7").append(Component.translatable("gui.gtcalcboard.cna.ring_slots", totalMagnets)));
             if (targetCount > 0) {
-                tooltip.add(Component.literal(String.format("§aInstalled: §e%d / 12 magnets", targetCount)));
+                tooltip.add(Component.literal("§a").append(Component.translatable("gui.gtcalcboard.cna.installed_magnets", targetCount)));
             }
             if (totalMagnets < 12) {
-                tooltip.add(Component.literal("§a[Left-Click] Add 1 Magnet (+1)"));
-                tooltip.add(Component.literal("§d[Shift+Left-Click] Fill All 12 Slots"));
+                tooltip.add(Component.literal("§a").append(Component.translatable("gui.gtcalcboard.cna.add_magnet_action")));
+                tooltip.add(Component.literal("§d").append(Component.translatable("gui.gtcalcboard.cna.fill_all_action")));
             } else {
-                tooltip.add(Component.literal("§e(Magnet Ring Full: 12/12)"));
+                tooltip.add(Component.literal("§e").append(Component.translatable("gui.gtcalcboard.cna.ring_full")));
             }
             if (targetCount > 0) {
-                tooltip.add(Component.literal("§c[Right-Click] Remove 1 Magnet (-1)"));
+                tooltip.add(Component.literal("§c").append(Component.translatable("gui.gtcalcboard.cna.remove_magnet_action")));
             }
         }
     }
@@ -246,6 +265,63 @@ public class CreateNewAgeModAdapter implements IModAdapter {
         }
     }
 
+    public static int calculateTotalMagnetStrength(RecipeNode node) {
+        if (node == null) return 0;
+        int totalStrength = 0;
+        for (MachineAddon addon : node.getAddons()) {
+            if (addon.getCategory().equals(AddonCategory.MAGNET) || addon.getMagneticForce() > 0) {
+                totalStrength += addon.getMagneticForce();
+            }
+        }
+        return totalStrength;
+    }
+
+    public static double calculateGeneratorCoilSuRequired(RecipeNode node) {
+        if (node == null) return 0.0;
+        int totalStrength = calculateTotalMagnetStrength(node);
+        int rpm = Math.abs(node.getRpm());
+        return (24.0 + totalStrength) * rpm;
+    }
+
+    public static void syncGeneratorCoilInput(RecipeNode node) {
+        if (node == null) return;
+        if (!node.getInputs().isEmpty() && node.getInputs().get(0).isStressUnit()) {
+            double req = calculateGeneratorCoilSuRequired(node);
+            if (Math.abs(node.getInputs().get(0).getAmount() - req) > 1e-6) {
+                node.getInputs().set(0, IngredientStack.stressUnit(req));
+            }
+        }
+    }
+
+    public boolean isGeneratorCoil(RecipeNode node) {
+        if (node == null) return false;
+        if (node.isGenerator() && node.getEnergyType() == EnergyType.ELECTRIC_FE) {
+            return true;
+        }
+        ResourceLocation icon = node.getMachineIcon();
+        return ITEM_GENERATOR_COIL.equals(icon) || ITEM_CARBON_BRUSHES.equals(icon);
+    }
+
+    @Override
+    public double computeEffectiveIngredientRate(RecipeNode node, IngredientStack stack, boolean isInput, double defaultRate) {
+        if (node != null && stack != null && isInput && stack.isStressUnit() && isGeneratorCoil(node)) {
+            double baseAmount = stack.getAmount();
+            double scale = baseAmount > 0.0001 ? (defaultRate / baseAmount) : (node.getMachineCount() * node.getTotalParallel() * node.getEfficiency());
+            return calculateGeneratorCoilSuRequired(node) * scale;
+        }
+        return defaultRate;
+    }
+
+    @Override
+    public double computeSingleMachineIngredientRate(RecipeNode node, IngredientStack stack, boolean isInput, double defaultRate) {
+        if (node != null && stack != null && isInput && stack.isStressUnit() && isGeneratorCoil(node)) {
+            double baseAmount = stack.getAmount();
+            double scale = baseAmount > 0.0001 ? (defaultRate / baseAmount) : (double) node.getTotalParallel();
+            return calculateGeneratorCoilSuRequired(node) * scale;
+        }
+        return defaultRate;
+    }
+
     @Override
     public OverclockMode.OverclockResult computeOverclock(RecipeNode node, GTVoltageTier targetTier, boolean isGenerator) {
         int rpm = node.getRpm();
@@ -253,24 +329,10 @@ public class CreateNewAgeModAdapter implements IModAdapter {
         double basePower = node.getBaseEUt();
 
         if (isGenerator && node.getEnergyType() == EnergyType.ELECTRIC_FE) {
-            // Create: New Age Generator Coil formula:
-            // Sum of all installed magnet strengths (up to 12 positions per coil ring).
-            int totalStrength = 0;
-            for (MachineAddon addon : node.getAddons()) {
-                if (addon.getCategory().equals(AddonCategory.MAGNET) || addon.getMagneticForce() > 0) {
-                    totalStrength += addon.getMagneticForce();
-                }
-            }
-
-            // Deductively queries NewAgeConfig.getCommon().suToEnergy ratio (e.g. 0.05 in modpacks, 15/512 default)
+            int totalStrength = calculateTotalMagnetStrength(node);
             double suToEnergy = getSuToEnergyRatio();
             double generatedFePerTick = totalStrength * Math.abs(rpm) * suToEnergy;
-            double requiredSuPerTick = (24.0 + totalStrength) * Math.abs(rpm);
-
-            if (!node.getInputs().isEmpty() && node.getInputs().get(0).isStressUnit()) {
-                node.getInputs().set(0, IngredientStack.stressUnit(requiredSuPerTick));
-            }
-
+            syncGeneratorCoilInput(node);
             return new OverclockMode.OverclockResult(baseDuration, generatedFePerTick, 1.0, 0);
         }
 
@@ -294,7 +356,7 @@ public class CreateNewAgeModAdapter implements IModAdapter {
     public String formatEnergyStats(RecipeNode node, PowerDisplayMode displayMode) {
         if (node == null) return "";
         if (node.getEnergyType() == EnergyType.ELECTRIC_FE) {
-            double effectivePower = node.getSingleMachineEUt() * node.getEfficiency();
+            double effectivePower = node.getSingleMachineEUt() * node.getMachineCount() * node.getEfficiency();
             String unit = "FE/t";
             if (node.isGenerator()) {
                 return String.format(Locale.ROOT, "+%,.2f %s", effectivePower, unit);
@@ -304,7 +366,7 @@ public class CreateNewAgeModAdapter implements IModAdapter {
         } else {
             double basePower = node.getBaseEUt();
             double speedFactor = Math.max(0.01, node.getRpm() / 32.0);
-            double effectiveSu = (node.isGenerator() ? basePower : (basePower * speedFactor)) * node.getEfficiency();
+            double effectiveSu = (node.isGenerator() ? basePower : (basePower * speedFactor)) * node.getMachineCount() * node.getEfficiency();
             if (node.isGenerator()) {
                 return String.format(Locale.ROOT, "+%,.0f SU", effectiveSu);
             } else {
@@ -321,23 +383,23 @@ public class CreateNewAgeModAdapter implements IModAdapter {
             double singlePower = node.getSingleMachineEUt();
             double totPower = node.getTotalEUt();
             if (node.isGenerator()) {
-                tooltipLines.add(Component.literal("§e⚡ " + Component.translatable("gui.gtcalcboard.single_gen").getString()));
-                tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Generation: §a+%,.2f FE/t §7(§a+%,.2f EU/t eq§7)", singlePower, singlePower / 4.0)));
+                tooltipLines.add(Component.literal("§e⚡ ").append(Component.translatable("gui.gtcalcboard.single_gen")));
+                tooltipLines.add(Component.literal("§7").append(Component.translatable("gui.gtcalcboard.cna.generation", String.format(Locale.ROOT, "%,.2f", singlePower), String.format(Locale.ROOT, "%,.2f", singlePower / 4.0))));
             } else {
-                tooltipLines.add(Component.literal("§e⚡ " + Component.translatable("gui.gtcalcboard.single_power").getString()));
-                tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Consumption: §c%,.2f FE/t §7(§c%,.2f EU/t eq§7)", singlePower, singlePower / 4.0)));
+                tooltipLines.add(Component.literal("§e⚡ ").append(Component.translatable("gui.gtcalcboard.single_power")));
+                tooltipLines.add(Component.literal("§7").append(Component.translatable("gui.gtcalcboard.cna.consumption", String.format(Locale.ROOT, "%,.2f", singlePower), String.format(Locale.ROOT, "%,.2f", singlePower / 4.0))));
             }
             tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Duration: §f%.4fs §7(§f%,.4f cycles/s§7)", node.getEffectiveDurationSeconds(), node.getEffectiveCyclesPerSecond())));
         } else {
             double totSU = node.getEffectiveTotalEUt();
             if (node.isGenerator()) {
-                tooltipLines.add(Component.literal("§6⚙ " + Component.translatable("gui.gtcalcboard.total_gen").getString()));
-                tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Total Capacity: §6+%,.0f SU", totSU)));
+                tooltipLines.add(Component.literal("§6⚙ ").append(Component.translatable("gui.gtcalcboard.total_gen")));
+                tooltipLines.add(Component.literal("§7").append(Component.translatable("gui.gtcalcboard.cna.total_capacity", String.format(Locale.ROOT, "%,.0f", totSU))));
             } else {
-                tooltipLines.add(Component.literal("§e⚙ " + Component.translatable("gui.gtcalcboard.total_power").getString()));
-                tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Total Stress Impact: §e%,.0f SU", totSU)));
+                tooltipLines.add(Component.literal("§e⚙ ").append(Component.translatable("gui.gtcalcboard.total_power")));
+                tooltipLines.add(Component.literal("§7").append(Component.translatable("gui.gtcalcboard.cna.total_stress_impact", String.format(Locale.ROOT, "%,.0f", totSU))));
             }
-            tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Rotation Speed: §6%d RPM", node.getRpm())));
+            tooltipLines.add(Component.literal("§7").append(Component.translatable("gui.gtcalcboard.cna.rotation_speed", node.getRpm())));
             tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Duration: §f%.4fs §7(§f%,.4f cycles/s§7)", node.getEffectiveDurationSeconds(), node.getEffectiveCyclesPerSecond())));
         }
         return tooltipLines;
@@ -375,13 +437,9 @@ public class CreateNewAgeModAdapter implements IModAdapter {
         return 15.0 / 512.0;
     }
 
-    public static List<SearchableRecipe> getVirtualSearchRecipes() {
-        return CreateNewAgeRecipeHandler.getVirtualSearchRecipes();
-    }
-
     @Override
-    public void registerSyntheticEmiRecipes(Object emiRegistry, Object emiCategory, java.util.Set<net.minecraft.world.item.Item> activeRecipeItems) {
-        CreateNewAgeRecipeHandler.registerSyntheticEmiRecipes(emiRegistry, emiCategory, activeRecipeItems);
+    public void collectNativeCatalogRecipes(List<SearchableRecipe> collector) {
+        CreateNewAgeRecipeHandler.collectNativeCatalogRecipes(collector);
     }
 }
 

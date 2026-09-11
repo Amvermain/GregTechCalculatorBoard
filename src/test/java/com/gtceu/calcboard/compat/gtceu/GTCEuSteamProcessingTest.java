@@ -13,7 +13,7 @@ import com.gtceu.calcboard.api.type.GTBoilerTier;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.type.SteamMode;
 import com.gtceu.calcboard.client.gui.widget.NodeWidget;
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 
 import com.gtceu.calcboard.compat.gtceu.GTTurbineHelper;
 import net.minecraft.nbt.CompoundTag;
@@ -301,8 +301,8 @@ public class GTCEuSteamProcessingTest {
         Assertions.assertEquals(ResourceLocation.tryParse("gtceu:lv_steam_turbine"), turbine.getMachineIcon());
         Assertions.assertFalse(turbine.isMultiblock());
         Assertions.assertFalse(com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.isLargeTurbine(turbine));
-        Assertions.assertFalse(com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(turbine).supportsAddons(turbine));
-        Assertions.assertTrue(com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(turbine).getApplicableAddonCategories(turbine).isEmpty());
+        Assertions.assertFalse(ModAdapterRegistry.getAdapterForNode(turbine).supportsAddons(turbine));
+        Assertions.assertTrue(ModAdapterRegistry.getAdapterForNode(turbine).getApplicableAddonCategories(turbine).isEmpty());
 
         // 2. Singleblock MV & HV Steam Turbine
         turbine.setTargetTier(GTVoltageTier.MV);
@@ -321,9 +321,9 @@ public class GTCEuSteamProcessingTest {
         Assertions.assertEquals(ResourceLocation.tryParse("gtceu:large_steam_turbine"), turbine.getMachineIcon());
         Assertions.assertTrue(turbine.isMultiblock());
         Assertions.assertTrue(com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.isLargeTurbine(turbine));
-        Assertions.assertTrue(com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(turbine).supportsAddons(turbine));
+        Assertions.assertTrue(ModAdapterRegistry.getAdapterForNode(turbine).supportsAddons(turbine));
 
-        var cats = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(turbine).getApplicableAddonCategories(turbine);
+        var cats = ModAdapterRegistry.getAdapterForNode(turbine).getApplicableAddonCategories(turbine);
         Assertions.assertTrue(cats.contains(com.gtceu.calcboard.api.catalog.AddonCategory.ROTOR));
         Assertions.assertTrue(cats.contains(com.gtceu.calcboard.api.catalog.AddonCategory.MAINTENANCE));
         Assertions.assertTrue(cats.contains(com.gtceu.calcboard.api.catalog.AddonCategory.CUSTOM));
@@ -369,20 +369,21 @@ public class GTCEuSteamProcessingTest {
     }
 
     @Test
-    void testUlvToSteamTierTransition() {
+    void testElectricAndSteamTierTransition() {
         RecipeNode node = RecipeNode.create("Tin Dust", 72.2 * 20.0, 2.0, GTVoltageTier.ULV);
         node.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:macerator"));
+        node.setTargetTier(GTVoltageTier.LV);
         node.getInputs().add(IngredientStack.item(ResourceLocation.tryParse("gtceu:huge_restrictive_tin_item_pipe"), "Pipe", 1.0));
         node.getOutputs().add(IngredientStack.item(ResourceLocation.tryParse("gtceu:tin_dust"), "Tin Dust", 1.0));
 
         com.gtceu.calcboard.client.gui.widget.NodeWidget widget = new com.gtceu.calcboard.client.gui.widget.NodeWidget(node);
 
-        assertEquals(GTVoltageTier.ULV, node.getTargetTier());
+        assertEquals(GTVoltageTier.LV, node.getTargetTier());
         assertEquals(SteamMode.NONE, node.getSteamMode());
 
-        // 1. Changing tier down (-1) from ULV should transition to HP Steam
+        // 1. Changing tier down (-1) from LV should transition to HP Steam
         boolean changed = widget.changeTier(-1);
-        assertTrue(changed, "Tier change down from ULV should succeed");
+        assertTrue(changed, "Tier change down from LV should succeed");
         assertEquals(SteamMode.HIGH_PRESSURE, node.getSteamMode());
 
         // 2. Changing tier down (-1) from HP Steam should transition to LP Steam
@@ -395,17 +396,17 @@ public class GTCEuSteamProcessingTest {
         assertTrue(changed, "Tier change up from LP Steam should succeed");
         assertEquals(SteamMode.HIGH_PRESSURE, node.getSteamMode());
 
-        // 4. Changing tier up (+1) from HP Steam should transition to ULV (since recipe tier is ULV)
+        // 4. Changing tier up (+1) from HP Steam should transition to LV (lowest available electric tier)
         changed = widget.changeTier(1);
         assertTrue(changed, "Tier change up from HP Steam should succeed");
         assertEquals(SteamMode.NONE, node.getSteamMode());
-        assertEquals(GTVoltageTier.ULV, node.getTargetTier());
-
-        // 5. Changing tier up (+1) from ULV should transition to LV
-        changed = widget.changeTier(1);
-        assertTrue(changed, "Tier change up from ULV should succeed");
-        assertEquals(SteamMode.NONE, node.getSteamMode());
         assertEquals(GTVoltageTier.LV, node.getTargetTier());
+
+        // 5. Changing tier up (+1) from LV should transition to MV
+        changed = widget.changeTier(1);
+        assertTrue(changed, "Tier change up from LV should succeed");
+        assertEquals(SteamMode.NONE, node.getSteamMode());
+        assertEquals(GTVoltageTier.MV, node.getTargetTier());
     }
 
     @Test

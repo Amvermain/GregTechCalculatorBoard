@@ -61,4 +61,4 @@ UI 계층의 각 화면과 컴포넌트별 상세 동작 명세 및 고품질 HT
 
 ---
 
-> ➡️ **다음 장으로 이동**: [[04] 멀티플레이어 동시성 제어 및 네트워크 프로토콜](04_MULTIPLAYER_AND_NETWORK_PROTOCOL.md)
+> ➡ **다음 장으로 이동**: [[04] 멀티플레이어 동시성 제어 및 네트워크 프로토콜](04_MULTIPLAYER_AND_NETWORK_PROTOCOL.md)

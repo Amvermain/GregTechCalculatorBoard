@@ -9,6 +9,9 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import org.lwjgl.glfw.GLFW;
 
+import com.gtceu.calcboard.client.gui.dialog.modal.IBoardModal;
+import com.gtceu.calcboard.client.gui.dialog.modal.ModalRenderContext;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -16,7 +19,7 @@ import java.util.List;
  * Interactive In-Game Manual & Tutorial Guidebook Modal Dialog.
  * Provides clear, categorized visual instructions with keycap highlights.
  */
-public class GuideDialog {
+public class GuideDialog implements IBoardModal {
     private final BoardScreen parent;
     private boolean visible = false;
     private int activeCategoryIndex = 0;
@@ -90,6 +93,11 @@ public class GuideDialog {
         setVisible(false);
     }
 
+    @Override
+    public void renderModal(ModalRenderContext context) {
+        render(context.graphics(), context.screenWidth(), context.screenHeight(), context.mouseX(), context.mouseY());
+    }
+
     public void render(GuiGraphics graphics, int screenWidth, int screenHeight, int mouseX, int mouseY) {
         if (!visible) return;
 
@@ -103,13 +111,11 @@ public class GuideDialog {
         int dialogX = (screenWidth - dialogW) / 2;
         int dialogY = (screenHeight - dialogH) / 2;
 
-        // 1. Dialog Main Container Background & Outline
         graphics.fill(dialogX, dialogY, dialogX + dialogW, dialogY + dialogH, 0xF0121722);
         graphics.renderOutline(dialogX, dialogY, dialogW, dialogH, 0xFF3D4B66);
 
-        // 2. Header Bar
         graphics.fill(dialogX, dialogY, dialogX + dialogW, dialogY + 24, 0xFF1C2433);
-        graphics.drawString(font, "§e📖 " + Component.translatable("gui.gtcalcboard.guide.modal_title").getString(), dialogX + 10, dialogY + 8, 0xFFFFFFFF, false);
+        graphics.drawString(font, "§e? " + Component.translatable("gui.gtcalcboard.guide.modal_title").getString(), dialogX + 10, dialogY + 8, 0xFFFFFFFF, false);
 
         // Close Button [✕]
         int closeX = dialogX + dialogW - 20;
@@ -119,7 +125,15 @@ public class GuideDialog {
         graphics.renderOutline(closeX, closeY, 16, 16, closeHover ? 0xFFFF4444 : 0xFF4A5A78);
         graphics.drawCenteredString(font, "✕", closeX + 8, closeY + 4, closeHover ? 0xFFFFFFFF : 0xFFAAAAAA);
 
-        // 3. Left Sidebar Tabs
+        String tutText = "▶ " + Component.translatable("gui.gtcalcboard.tutorial_btn").getString();
+        int tutBtnW = font.width(tutText) + 10;
+        int tutBtnX = closeX - tutBtnW - 6;
+        int tutBtnY = dialogY + 4;
+        boolean tutHover = mouseX >= tutBtnX && mouseX <= tutBtnX + tutBtnW && mouseY >= tutBtnY && mouseY <= tutBtnY + 16;
+        graphics.fill(tutBtnX, tutBtnY, tutBtnX + tutBtnW, tutBtnY + 16, tutHover ? 0xFF15803D : 0xFF14532D);
+        graphics.renderOutline(tutBtnX, tutBtnY, tutBtnW, 16, tutHover ? 0xFF22C55E : 0xFF166534);
+        graphics.drawString(font, tutText, tutBtnX + 5, tutBtnY + 4, tutHover ? 0xFFFFFFFF : 0xFF86EFAC, false);
+
         int sidebarX = dialogX + 6;
         int sidebarY = dialogY + 28;
         int tabH = 27;
@@ -139,11 +153,9 @@ public class GuideDialog {
             graphics.renderOutline(sidebarX, tabY, SIDEBAR_WIDTH, tabH, tabBorder);
 
             if (isSelected) {
-                // Active indicator line on the left
                 graphics.fill(sidebarX, tabY, sidebarX + 3, tabY + tabH, 0xFF00E5FF);
             }
 
-            // Two-line Tab title
             String tabText = cat.getTabName();
             String[] parts = tabText.split("\\|", 2);
             if (parts.length > 1) {
@@ -154,16 +166,13 @@ public class GuideDialog {
             }
         }
 
-        // Sidebar Separator Line
         graphics.fill(dialogX + SIDEBAR_WIDTH + 10, dialogY + 28, dialogX + SIDEBAR_WIDTH + 11, dialogY + dialogH - 6, 0xFF283448);
 
-        // 4. Right Content Area (Scrollable text & highlights)
         int contentX = dialogX + SIDEBAR_WIDTH + 18;
         int contentY = dialogY + 32;
         int contentW = dialogW - SIDEBAR_WIDTH - 28;
         int contentH = dialogH - 40;
 
-        // Content Area Background
         graphics.fill(contentX - 4, contentY - 4, contentX + contentW + 4, contentY + contentH + 4, 0xFF0D121B);
         graphics.renderOutline(contentX - 4, contentY - 4, contentW + 8, contentH + 8, 0xFF222B3B);
 
@@ -247,6 +256,16 @@ public class GuideDialog {
         int closeY = dialogY + 4;
         if (mouseX >= closeX && mouseX <= closeX + 16 && mouseY >= closeY && mouseY <= closeY + 16) {
             close();
+            return true;
+        }
+
+        String tutText = "▶ " + Component.translatable("gui.gtcalcboard.tutorial_btn").getString();
+        int tutBtnW = Minecraft.getInstance().font.width(tutText) + 10;
+        int tutBtnX = closeX - tutBtnW - 6;
+        int tutBtnY = dialogY + 4;
+        if (mouseX >= tutBtnX && mouseX <= tutBtnX + tutBtnW && mouseY >= tutBtnY && mouseY <= tutBtnY + 16) {
+            close();
+            com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().startTutorial(parent);
             return true;
         }
 

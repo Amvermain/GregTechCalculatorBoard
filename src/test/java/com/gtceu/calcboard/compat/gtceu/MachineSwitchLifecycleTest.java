@@ -5,7 +5,8 @@ import com.gtceu.calcboard.api.catalog.MultiblockDetector;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.type.GTThreadingHelix;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
-import com.gtceu.calcboard.api.type.NodeThreadingConfig;
+import com.gtceu.calcboard.compat.start.helper.RecipeNodeThreadingHelper;
+import com.gtceu.calcboard.compat.start.model.NodeThreadingConfig;
 import com.gtceu.calcboard.compat.gtceu.addon.GTCoilAddon;
 import com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon;
 import com.gtceu.calcboard.compat.gtceu.helper.CoilHelper;
@@ -108,16 +109,16 @@ public class MachineSwitchLifecycleTest {
         RecipeNode node = RecipeNode.create(threadId, "Threading Synthesis", 100.0, 30.0, GTVoltageTier.HV);
         NodeThreadingConfig cfg = new NodeThreadingConfig();
         cfg.setHelixCount(GTThreadingHelix.UEV_SUPREME, 10);
-        node.setThreadingConfig(cfg);
+        RecipeNodeThreadingHelper.setThreadingConfig(node, cfg);
 
-        Assertions.assertNotNull(node.getThreadingConfig());
+        Assertions.assertNotNull(RecipeNodeThreadingHelper.getThreadingConfig(node));
 
         // Switch to Non-Threading Singleblock
         node.setMachineIcon(singleId);
 
         // Verify ThreadingConfig is Purged
-        Assertions.assertEquals(0, node.getThreadingConfig().getTotalHelixCount(), "Threading helices must be cleared");
-        Assertions.assertEquals(0, node.getThreadingConfig().getMaxHelixCapacity(), "Threading capacity must be 0");
+        Assertions.assertEquals(0, RecipeNodeThreadingHelper.getThreadingConfig(node).getTotalHelixCount(), "Threading helices must be cleared");
+        Assertions.assertEquals(0, RecipeNodeThreadingHelper.getThreadingConfig(node).getMaxHelixCapacity(), "Threading capacity must be 0");
     }
 
     @Test

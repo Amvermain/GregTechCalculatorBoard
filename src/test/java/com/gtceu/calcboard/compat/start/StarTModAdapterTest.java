@@ -4,8 +4,8 @@ import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.NodeRateCalculator;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
-import com.gtceu.calcboard.compat.IModAdapter;
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.IModAdapter;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 import com.gtceu.calcboard.compat.gtceu.GTTurbineHelper;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -179,5 +179,47 @@ class StarTModAdapterTest {
         assertNotNull(adapter);
         assertFalse(adapter.supportsBoosterControl(lpt), "Standard LPT should not support booster control");
         assertNull(adapter.getBoosterDisplayComponent(lpt));
+    }
+
+    @Test
+    @DisplayName("StarTModAdapter: Machine switch preserves regular recipe booster fluids on non-plasma machines")
+    void testStarTMachineSwitchPreservesRegularRecipeIngredients() {
+        RecipeNode chem = new RecipeNode("chem_reactor", "Chemical Reactor", 100.0, 480.0, GTVoltageTier.HV);
+        chem.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:chemical_reactor"));
+        chem.setMachineIcon(ResourceLocation.tryParse("gtceu:hv_chemical_reactor"));
+
+        IngredientStack ws2 = IngredientStack.fluid(ResourceLocation.tryParse("gtceu:tungsten_disulfide"), "Tungsten Disulfide", 1000.0);
+        chem.addInput(ws2);
+
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(chem);
+        assertNotNull(adapter);
+
+        ResourceLocation oldIcon = ResourceLocation.tryParse("gtceu:hv_chemical_reactor");
+        ResourceLocation newIcon = ResourceLocation.tryParse("gtceu:large_chemical_reactor");
+        chem.setMachineIcon(newIcon);
+        adapter.onMachineIconChanged(chem, oldIcon, newIcon);
+
+        assertEquals(1, chem.getInputs().size());
+        assertEquals("gtceu:tungsten_disulfide", chem.getInputs().get(0).getId().toString());
+    }
+
+    @Test
+    @DisplayName("StarTModAdapter: Switching from Plasma Turbine to Non-Turbine machine cleans boosters")
+    void testStarTTurbineToNonTurbineSwitchCleansBoosters() {
+        RecipeNode spt = createSPTNode();
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(spt);
+        assertNotNull(adapter);
+
+        adapter.cycleBooster(spt, 1); // WS2 boost
+        assertEquals(2, spt.getInputs().size());
+
+        ResourceLocation oldIcon = ResourceLocation.tryParse("start_core:supreme_plasma_turbine");
+        ResourceLocation newIcon = ResourceLocation.tryParse("gtceu:mixer");
+        spt.setMachineIcon(newIcon);
+        spt.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:mixer"));
+        adapter.onMachineIconChanged(spt, oldIcon, newIcon);
+
+        assertEquals(1, spt.getInputs().size());
+        assertEquals("gtceu:argon_plasma", spt.getInputs().get(0).getId().toString());
     }
 }

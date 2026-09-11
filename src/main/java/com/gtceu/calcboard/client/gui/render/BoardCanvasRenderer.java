@@ -47,18 +47,24 @@ public class BoardCanvasRenderer {
         double screenTop = -panY / zoom - 100;
         double screenBottom = (-panY + height) / zoom + 100;
 
+        boolean showDebug = com.gtceu.calcboard.api.storage.BoardManager.getInstance().isShowDebugInfo();
+        com.gtceu.calcboard.client.gui.util.RenderProfiler profiler = com.gtceu.calcboard.client.gui.util.RenderProfiler.getInstance();
+
+        if (showDebug) profiler.startSection("Frames");
         CanvasGroupFrameRenderer.renderFrames(graphics, graph, canvasMouseX, canvasMouseY, null, screen.getSelectedFrameIds(), screenLeft, screenRight, screenTop, screenBottom);
         CanvasStickyNoteRenderer.renderNotes(graphics, graph, canvasMouseX, canvasMouseY, screen.getSelectedNoteIds(), screenLeft, screenRight, screenTop, screenBottom);
 
+        if (showDebug) profiler.startSection("Wires");
         if (wireRenderer != null) {
             wireRenderer.renderWires(graphics, screen, graph, canvasMouseX, canvasMouseY, screenLeft, screenRight, screenTop, screenBottom, zoom);
         }
 
-        renderNodeWidgets(graphics, screen, nodeWidgets, canvasMouseX, canvasMouseY, screenLeft, screenRight, screenTop, screenBottom, partialTicks);
+        if (showDebug) profiler.startSection("Nodes");
+        float topZ = renderNodeWidgets(graphics, screen, nodeWidgets, canvasMouseX, canvasMouseY, screenLeft, screenRight, screenTop, screenBottom, partialTicks);
         graphics.flush();
         RenderSystem.disableDepthTest();
 
-        renderQuickActionAndMarquee(graphics, canvasHandler, canvasMouseX, canvasMouseY);
+        renderQuickActionAndMarquee(graphics, canvasHandler, graph, canvasMouseX, canvasMouseY, topZ + 20.0f);
 
         graphics.pose().popPose();
         graphics.flush();
@@ -66,7 +72,7 @@ public class BoardCanvasRenderer {
         RenderSystem.disableDepthTest();
     }
 
-    private void renderNodeWidgets(
+    private float renderNodeWidgets(
             GuiGraphics graphics,
             BoardScreen screen,
             List<NodeWidget> nodeWidgets,
@@ -78,30 +84,36 @@ public class BoardCanvasRenderer {
             double screenBottom,
             float partialTicks
     ) {
-        if (nodeWidgets == null || nodeWidgets.isEmpty()) return;
+        if (nodeWidgets == null || nodeWidgets.isEmpty()) return 1.0f;
 
         List<NodeWidget> deferredSelected = null;
         for (int i = 0; i < nodeWidgets.size(); i++) {
             NodeWidget widget = nodeWidgets.get(i);
+            if (screen.getGraph() != null && screen.getGraph().isNodeInFoldedFrame(widget.getNode().getId())) {
+                continue;
+            }
             if (screen.isNodeSelected(widget.getNode().getId())) {
                 if (deferredSelected == null) deferredSelected = new ArrayList<>(4);
                 deferredSelected.add(widget);
                 continue;
             }
             if (isWithinViewport(widget, screenLeft, screenRight, screenTop, screenBottom)) {
-                renderSingleNode(graphics, widget, (float) (i * 100.0f + 50.0f), canvasMouseX, canvasMouseY, partialTicks);
+                renderSingleNode(graphics, widget, (float) (i * 0.5f + 1.0f), canvasMouseX, canvasMouseY, partialTicks);
             }
         }
 
+        float topZ = (float) (nodeWidgets.size() * 0.5f + 1.0f);
         if (deferredSelected != null) {
-            float selectedBaseZ = (float) (nodeWidgets.size() * 100.0f + 500.0f);
+            float selectedBaseZ = topZ + 50.0f;
             for (int i = 0; i < deferredSelected.size(); i++) {
                 NodeWidget widget = deferredSelected.get(i);
                 if (isWithinViewport(widget, screenLeft, screenRight, screenTop, screenBottom)) {
-                    renderSingleNode(graphics, widget, selectedBaseZ + (float) (i * 100.0f), canvasMouseX, canvasMouseY, partialTicks);
+                    renderSingleNode(graphics, widget, selectedBaseZ + (float) (i * 0.5f), canvasMouseX, canvasMouseY, partialTicks);
                 }
             }
+            topZ = selectedBaseZ + (float) (deferredSelected.size() * 0.5f);
         }
+        return topZ;
     }
 
     private boolean isWithinViewport(NodeWidget widget, double left, double right, double top, double bottom) {
@@ -113,19 +125,33 @@ public class BoardCanvasRenderer {
     }
 
     private void renderSingleNode(GuiGraphics graphics, NodeWidget widget, float zOffset, double mouseX, double mouseY, float partialTicks) {
+        RenderSystem.enableDepthTest();
+        RenderSystem.depthFunc(GL11.GL_LEQUAL);
         graphics.pose().pushPose();
         graphics.pose().translate(0.0f, 0.0f, zOffset);
         widget.render(graphics, (int) mouseX, (int) mouseY, partialTicks);
         graphics.pose().popPose();
     }
 
-    private void renderQuickActionAndMarquee(GuiGraphics graphics, CanvasInteractionHandler canvasHandler, double mouseX, double mouseY) {
+    private void renderQuickActionAndMarquee(GuiGraphics graphics, CanvasInteractionHandler canvasHandler, FlowGraph graph, double mouseX, double mouseY, float marqueeZ) {
         if (canvasHandler == null) return;
         canvasHandler.checkMarkerCursorDistance(mouseX, mouseY);
         if (canvasHandler.hasQuickAddMarker()) {
             Font font = Minecraft.getInstance().font;
-            BoardHudRenderer.renderQuickAddMarker(graphics, font, canvasHandler.getQuickAddMarkerCanvasX(), canvasHandler.getQuickAddMarkerCanvasY(), mouseX, mouseY);
+            BoardHudRenderer.renderQuickAddMarker(
+                    graphics,
+                    font,
+                    canvasHandler.getQuickAddMarkerCanvasX(),
+                    canvasHandler.getQuickAddMarkerCanvasY(),
+                    mouseX,
+                    mouseY,
+                    canvasHandler.getQuickAddMarkerHandler(),
+                    graph
+            );
         }
+        graphics.pose().pushPose();
+        graphics.pose().translate(0.0f, 0.0f, marqueeZ);
         canvasHandler.renderMarquee(graphics);
+        graphics.pose().popPose();
     }
 }

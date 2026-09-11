@@ -16,13 +16,16 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
 import org.lwjgl.glfw.GLFW;
 
+import com.gtceu.calcboard.client.gui.dialog.modal.IBoardModal;
+import com.gtceu.calcboard.client.gui.dialog.modal.ModalRenderContext;
+
 import java.util.*;
 
 /**
  * Interactive modal dialog that previews and filters auto-connect candidates by resource type (item/fluid).
  * Allows users to selectively exclude universal materials (e.g. water, oxygen, steam) before wiring.
  */
-public class AutoConnectFilterDialog {
+public class AutoConnectFilterDialog implements IBoardModal {
     private final BoardScreen parent;
     private boolean visible = false;
     private final List<ResourceEntry> entries = new ArrayList<>();
@@ -102,58 +105,7 @@ public class AutoConnectFilterDialog {
 
         for (RecipeNode from : graph.getNodes()) {
             for (int outIdx = 0; outIdx < from.getOutputs().size(); outIdx++) {
-                IngredientStack out = from.getOutputs().get(outIdx);
-                boolean fromFeedsReroute = !from.isReroute() && isOutputFeedingReroute(graph, from.getId(), outIdx);
-
-                for (RecipeNode to : graph.getNodes()) {
-                    if (from == to) continue;
-                    for (int inIdx = 0; inIdx < to.getInputs().size(); inIdx++) {
-                        IngredientStack in = to.getInputs().get(inIdx);
-
-                        boolean inputAlreadyFed = isInputPortFed(graph, to.getId(), inIdx);
-                        if (inputAlreadyFed) {
-                            if (!out.equals(in) && !Objects.equals(out.getId(), in.getId())) {
-                                continue;
-                            }
-                        } else {
-                            if (!out.equals(in) && !in.matchesOrAlternative(out)) {
-                                continue;
-                            }
-                        }
-
-                        if (isPortConnected(graph, from.getId(), outIdx, to.getId(), inIdx)) {
-                            continue;
-                        }
-                        if (fromFeedsReroute && !to.isReroute()) {
-                            continue;
-                        }
-                        if (isReachable(graph, to.getId(), from.getId())) {
-                            continue;
-                        }
-
-                        RecipeNode targetNode = to;
-                        int targetInIdx = inIdx;
-                        if (!from.isReroute() && !to.isReroute()) {
-                            RecipeNode feedingReroute = findFeedingRerouteNode(graph, to.getId(), inIdx);
-                            if (feedingReroute != null) {
-                                targetNode = feedingReroute;
-                                targetInIdx = 0;
-                                if (isPortConnected(graph, from.getId(), outIdx, targetNode.getId(), targetInIdx)) {
-                                    continue;
-                                }
-                            }
-                        }
-
-                        FlowGraph.ConnectionEdge edge = new FlowGraph.ConnectionEdge(from.getId(), outIdx, targetNode.getId(), targetInIdx);
-                        if (!graph.getConnections().contains(edge)) {
-                            ResourceLocation key = out.getId() != null ? out.getId() : in.getId();
-                            if (key != null) {
-                                sampleStacks.putIfAbsent(key, out.copy());
-                                wireCounts.put(key, wireCounts.getOrDefault(key, 0) + 1);
-                            }
-                        }
-                    }
-                }
+                scanOutputsForNode(graph, from, outIdx, sampleStacks, wireCounts);
             }
         }
 
@@ -173,6 +125,58 @@ public class AutoConnectFilterDialog {
         });
 
         return list;
+    }
+
+    private static void scanOutputsForNode(FlowGraph graph, RecipeNode from, int outIdx, Map<ResourceLocation, IngredientStack> sampleStacks, Map<ResourceLocation, Integer> wireCounts) {
+        IngredientStack out = from.getOutputs().get(outIdx);
+        boolean fromFeedsReroute = !from.isReroute() && isOutputFeedingReroute(graph, from.getId(), outIdx);
+
+        for (RecipeNode to : graph.getNodes()) {
+            if (from == to) continue;
+            scanCandidateInputsForNode(graph, from, outIdx, out, fromFeedsReroute, to, sampleStacks, wireCounts);
+        }
+    }
+
+    private static void scanCandidateInputsForNode(FlowGraph graph, RecipeNode from, int outIdx, IngredientStack out, boolean fromFeedsReroute, RecipeNode to, Map<ResourceLocation, IngredientStack> sampleStacks, Map<ResourceLocation, Integer> wireCounts) {
+        for (int inIdx = 0; inIdx < to.getInputs().size(); inIdx++) {
+            IngredientStack in = to.getInputs().get(inIdx);
+            tryRegisterCandidateWire(graph, from, outIdx, out, fromFeedsReroute, to, inIdx, in, sampleStacks, wireCounts);
+        }
+    }
+
+    private static void tryRegisterCandidateWire(FlowGraph graph, RecipeNode from, int outIdx, IngredientStack out, boolean fromFeedsReroute, RecipeNode to, int inIdx, IngredientStack in, Map<ResourceLocation, IngredientStack> sampleStacks, Map<ResourceLocation, Integer> wireCounts) {
+        if (!canConnectPort(graph, from, out, to, inIdx, in)) {
+            return;
+        }
+
+        if (isPortConnected(graph, from.getId(), outIdx, to.getId(), inIdx)) {
+            return;
+        }
+        if (fromFeedsReroute && !to.isReroute()) {
+            return;
+        }
+
+        RecipeNode targetNode = to;
+        int targetInIdx = inIdx;
+        if (!from.isReroute() && !to.isReroute()) {
+            RecipeNode feedingReroute = findFeedingRerouteNode(graph, to.getId(), inIdx);
+            if (feedingReroute != null) {
+                targetNode = feedingReroute;
+                targetInIdx = 0;
+                if (isPortConnected(graph, from.getId(), outIdx, targetNode.getId(), targetInIdx)) {
+                    return;
+                }
+            }
+        }
+
+        FlowGraph.ConnectionEdge edge = new FlowGraph.ConnectionEdge(from.getId(), outIdx, targetNode.getId(), targetInIdx);
+        if (!graph.getConnections().contains(edge)) {
+            ResourceLocation key = out.getId() != null ? out.getId() : in.getId();
+            if (key != null) {
+                sampleStacks.putIfAbsent(key, out.copy());
+                wireCounts.put(key, wireCounts.getOrDefault(key, 0) + 1);
+            }
+        }
     }
 
     private static boolean isPortConnected(FlowGraph graph, String fromNodeId, int outIdx, String toNodeId, int inIdx) {
@@ -269,6 +273,22 @@ public class AutoConnectFilterDialog {
         return false;
     }
 
+    private static boolean canConnectPort(FlowGraph graph, RecipeNode from, IngredientStack out, RecipeNode to, int inIdx, IngredientStack in) {
+        boolean isExactMatch = out.equals(in) || Objects.equals(out.getId(), in.getId());
+        if (isInputPortFed(graph, to.getId(), inIdx)) {
+            return isExactMatch;
+        }
+        if (isExactMatch) {
+            return true;
+        }
+        return in.matchesOrAlternative(out) && !isReachable(graph, to.getId(), from.getId());
+    }
+
+    @Override
+    public void renderModal(ModalRenderContext context) {
+        render(context.graphics(), context.screenWidth(), context.screenHeight(), context.mouseX(), context.mouseY());
+    }
+
     public void render(GuiGraphics graphics, int screenW, int screenH, int mouseX, int mouseY) {
         if (!visible) return;
 
@@ -283,16 +303,12 @@ public class AutoConnectFilterDialog {
         graphics.pose().translate(0, 0, 700.0f);
         com.mojang.blaze3d.systems.RenderSystem.disableDepthTest();
 
-        // 1. Semi-transparent backdrop
         graphics.fill(0, 0, screenW, screenH, 0x88000000);
-
-        // 2. Main Box Background & Border
         graphics.fill(dialogX, dialogY, dialogX + dialogW, dialogY + dialogH, 0xF5161C26);
         graphics.renderOutline(dialogX, dialogY, dialogW, dialogH, 0xFF3D4B66);
 
-        // 3. Header Bar
         graphics.fill(dialogX, dialogY, dialogX + dialogW, dialogY + 24, 0xFF1C2433);
-        graphics.drawString(font, "§e🔗 " + Component.translatable("gui.gtcalcboard.dialog.auto_connect.title").getString(), dialogX + 10, dialogY + 8, 0xFFFFFFFF, false);
+        graphics.drawString(font, "§e↔ " + Component.translatable("gui.gtcalcboard.dialog.auto_connect.title").getString(), dialogX + 10, dialogY + 8, 0xFFFFFFFF, false);
 
         // Close Button [✕]
         int closeX = dialogX + dialogW - 20;
@@ -302,11 +318,9 @@ public class AutoConnectFilterDialog {
         graphics.renderOutline(closeX, closeY, 16, 16, closeHover ? 0xFFFF4444 : 0xFF4A5A78);
         graphics.drawCenteredString(font, "✕", closeX + 8, closeY + 4, closeHover ? 0xFFFFFFFF : 0xFFAAAAAA);
 
-        // 4. Subtitle & Quick Selection Bar
         int subY = dialogY + 28;
         graphics.drawString(font, "§7" + Component.translatable("gui.gtcalcboard.dialog.auto_connect.desc").getString(), dialogX + 10, subY + 2, 0xFFAAAAAA, false);
 
-        // Select All / Deselect All Buttons
         int selAllW = 74;
         int deselAllW = 82;
         int btnH = 14;
@@ -316,7 +330,6 @@ public class AutoConnectFilterDialog {
         drawSmallBtn(graphics, font, Component.translatable("gui.gtcalcboard.dialog.auto_connect.select_all").getString(), selAllX, subY, selAllW, btnH, mouseX, mouseY, 0xFF55FF88, 0xFF1C3524, 0xFF2A5A38);
         drawSmallBtn(graphics, font, Component.translatable("gui.gtcalcboard.dialog.auto_connect.deselect_all").getString(), deselAllX, subY, deselAllW, btnH, mouseX, mouseY, 0xFFFF7777, 0xFF3D1C1C, 0xFF5A2A2A);
 
-        // 5. Scrollable Candidate Item List
         int listX = dialogX + 8;
         int listY = subY + 18;
         int listW = dialogW - 16;
@@ -343,7 +356,6 @@ public class AutoConnectFilterDialog {
                 graphics.renderOutline(listX + 2, curY, listW - 10, rowH - 2, 0xFF4A6080);
             }
 
-            // Checkbox
             int chkX = listX + 6;
             int chkY = curY + 3;
             graphics.fill(chkX, chkY, chkX + 12, chkY + 12, entry.isSelected() ? 0xFF1E4D2B : 0xFF222833);
@@ -389,7 +401,6 @@ public class AutoConnectFilterDialog {
             graphics.fill(sbX, thumbY, sbX + 3, thumbY + thumbH, 0xFFAAAAAA);
         }
 
-        // 6. Bottom Action Buttons
         int selectedWireCount = getSelectedWireCount();
         int bottomBtnH = 20;
         int bottomBtnY = dialogY + dialogH - bottomBtnH - 8;

@@ -5,10 +5,13 @@ import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.solver.FlowGraphSolver;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
+import com.gtceu.calcboard.api.type.SupplyMode;
 import net.minecraft.resources.ResourceLocation;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 public class AutoRatioBottleneckTest {
@@ -427,4 +430,296 @@ public class AutoRatioBottleneckTest {
             }
         }
     }
+
+    @Test
+    public void testRecirculationLoopDoesNotExplodeInBottleneckResolution() {
+        FlowGraph graph = new FlowGraph();
+
+        ResourceLocation idPyro = ResourceLocation.tryParse("gtceu:pyrolyse");
+        ResourceLocation idDtHeavy = ResourceLocation.tryParse("gtceu:dt_heavy");
+        ResourceLocation idLcr = ResourceLocation.tryParse("gtceu:lcr");
+        ResourceLocation idCracker = ResourceLocation.tryParse("gtceu:cracker");
+        ResourceLocation idDtEnd = ResourceLocation.tryParse("gtceu:dt_end");
+        ResourceLocation idElec = ResourceLocation.tryParse("gtceu:electrolyzer");
+
+        ResourceLocation fluidWoodTar = ResourceLocation.tryParse("gtceu:wood_tar");
+        ResourceLocation fluidSulfHeavy = ResourceLocation.tryParse("gtceu:sulf_heavy");
+        ResourceLocation fluidSulfLight = ResourceLocation.tryParse("gtceu:sulf_light");
+        ResourceLocation fluidSulfNaphtha = ResourceLocation.tryParse("gtceu:sulf_naphtha");
+        ResourceLocation fluidSulfGas = ResourceLocation.tryParse("gtceu:sulf_gas");
+        ResourceLocation fluidHeavy = ResourceLocation.tryParse("gtceu:heavy_fuel");
+        ResourceLocation fluidLight = ResourceLocation.tryParse("gtceu:light_fuel");
+        ResourceLocation fluidNaphtha = ResourceLocation.tryParse("gtceu:naphtha");
+        ResourceLocation fluidGas = ResourceLocation.tryParse("gtceu:gas");
+        ResourceLocation fluidH2 = ResourceLocation.tryParse("gtceu:hydrogen");
+        ResourceLocation fluidH2s = ResourceLocation.tryParse("gtceu:h2s");
+        ResourceLocation fluidCrackedHeavy = ResourceLocation.tryParse("gtceu:cracked_heavy");
+        ResourceLocation fluidCrackedLight = ResourceLocation.tryParse("gtceu:cracked_light");
+        ResourceLocation fluidCrackedNaphtha = ResourceLocation.tryParse("gtceu:cracked_naphtha");
+
+        RecipeNode pyro = RecipeNode.create(idPyro, "Pyrolyse", 20, 30, GTVoltageTier.MV);
+        pyro.getOutputs().add(IngredientStack.fluid(fluidWoodTar, "Wood Tar", 1.0));
+        graph.addNode(pyro);
+
+        RecipeNode dtHeavy = RecipeNode.create(idDtHeavy, "DT Heavy", 20, 30, GTVoltageTier.EV);
+        dtHeavy.getInputs().add(IngredientStack.fluid(fluidWoodTar, "Wood Tar", 1.0));
+        dtHeavy.getOutputs().add(IngredientStack.fluid(fluidSulfLight, "Sulf Light", 0.24));
+        dtHeavy.getOutputs().add(IngredientStack.fluid(fluidSulfHeavy, "Sulf Heavy", 0.25));
+        dtHeavy.getOutputs().add(IngredientStack.fluid(fluidSulfNaphtha, "Sulf Naphtha", 0.50));
+        dtHeavy.getOutputs().add(IngredientStack.fluid(fluidSulfGas, "Sulf Gas", 0.06));
+        graph.addNode(dtHeavy);
+
+        RecipeNode lcr1 = RecipeNode.create(idLcr, "LCR Light", 20, 30, GTVoltageTier.HV);
+        lcr1.getInputs().add(IngredientStack.fluid(fluidSulfLight, "Sulf Light", 0.24));
+        lcr1.getInputs().add(IngredientStack.fluid(fluidH2, "H2", 0.1));
+        lcr1.getOutputs().add(IngredientStack.fluid(fluidLight, "Light Fuel", 0.24));
+        lcr1.getOutputs().add(IngredientStack.fluid(fluidH2s, "H2S", 0.1));
+        graph.addNode(lcr1);
+
+        RecipeNode lcr2 = RecipeNode.create(idLcr, "LCR Heavy", 20, 30, GTVoltageTier.HV);
+        lcr2.getInputs().add(IngredientStack.fluid(fluidSulfHeavy, "Sulf Heavy", 0.25));
+        lcr2.getInputs().add(IngredientStack.fluid(fluidH2, "H2", 0.1));
+        lcr2.getOutputs().add(IngredientStack.fluid(fluidHeavy, "Heavy Fuel", 0.25));
+        lcr2.getOutputs().add(IngredientStack.fluid(fluidH2s, "H2S", 0.1));
+        graph.addNode(lcr2);
+
+        RecipeNode lcr3 = RecipeNode.create(idLcr, "LCR Naphtha", 20, 30, GTVoltageTier.HV);
+        lcr3.getInputs().add(IngredientStack.fluid(fluidSulfNaphtha, "Sulf Naphtha", 0.50));
+        lcr3.getInputs().add(IngredientStack.fluid(fluidH2, "H2", 0.1));
+        lcr3.getOutputs().add(IngredientStack.fluid(fluidNaphtha, "Naphtha", 0.50));
+        lcr3.getOutputs().add(IngredientStack.fluid(fluidH2s, "H2S", 0.1));
+        graph.addNode(lcr3);
+
+        RecipeNode lcr4 = RecipeNode.create(idLcr, "LCR Gas", 20, 30, GTVoltageTier.HV);
+        lcr4.getInputs().add(IngredientStack.fluid(fluidSulfGas, "Sulf Gas", 0.06));
+        lcr4.getInputs().add(IngredientStack.fluid(fluidH2, "H2", 0.1));
+        lcr4.getOutputs().add(IngredientStack.fluid(fluidGas, "Gas", 0.06));
+        lcr4.getOutputs().add(IngredientStack.fluid(fluidH2s, "H2S", 0.1));
+        graph.addNode(lcr4);
+
+        RecipeNode elec = RecipeNode.create(idElec, "Electrolyzer", 20, 30, GTVoltageTier.MV);
+        elec.getInputs().add(IngredientStack.fluid(fluidH2s, "H2S", 0.4));
+        elec.getOutputs().add(IngredientStack.fluid(fluidH2, "H2", 0.4));
+        graph.addNode(elec);
+
+        RecipeNode cracker1 = RecipeNode.create(idCracker, "Cracker Heavy", 20, 30, GTVoltageTier.HV);
+        cracker1.getAddons().add(new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon("gtceu:hv_energy_hatch", "HV Energy Hatch", "", null, GTVoltageTier.HV, 1, false, false, false));
+        cracker1.getInputs().add(IngredientStack.fluid(fluidHeavy, "Heavy Fuel", 0.25));
+        cracker1.getInputs().add(IngredientStack.fluid(fluidH2, "H2", 0.05));
+        cracker1.getOutputs().add(IngredientStack.fluid(fluidCrackedHeavy, "Cracked Heavy", 0.25));
+        graph.addNode(cracker1);
+
+        RecipeNode cracker2 = RecipeNode.create(idCracker, "Cracker Light", 20, 30, GTVoltageTier.HV);
+        cracker2.getAddons().add(new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon("gtceu:hv_energy_hatch", "HV Energy Hatch", "", null, GTVoltageTier.HV, 1, false, false, false));
+        cracker2.getInputs().add(IngredientStack.fluid(fluidLight, "Light Fuel", 0.24));
+        cracker2.getInputs().add(IngredientStack.fluid(fluidH2, "H2", 0.05));
+        cracker2.getOutputs().add(IngredientStack.fluid(fluidCrackedLight, "Cracked Light", 0.24));
+        graph.addNode(cracker2);
+
+        RecipeNode cracker3 = RecipeNode.create(idCracker, "Cracker Naphtha", 20, 30, GTVoltageTier.HV);
+        cracker3.getAddons().add(new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon("gtceu:hv_energy_hatch", "HV Energy Hatch", "", null, GTVoltageTier.HV, 1, false, false, false));
+        cracker3.getInputs().add(IngredientStack.fluid(fluidNaphtha, "Naphtha", 0.50));
+        cracker3.getInputs().add(IngredientStack.fluid(fluidH2, "H2", 0.05));
+        cracker3.getOutputs().add(IngredientStack.fluid(fluidCrackedNaphtha, "Cracked Naphtha", 0.50));
+        graph.addNode(cracker3);
+
+        RecipeNode end1 = RecipeNode.create(idDtEnd, "DT End Heavy", 20, 30, GTVoltageTier.EV);
+        end1.setMachineCount(0.3);
+        end1.setBaseNode(true);
+        end1.getInputs().add(IngredientStack.fluid(fluidCrackedHeavy, "Cracked Heavy", 0.25));
+        graph.addNode(end1);
+
+        RecipeNode end2 = RecipeNode.create(idDtEnd, "DT End Light", 20, 30, GTVoltageTier.EV);
+        end2.setMachineCount(0.3);
+        end2.getInputs().add(IngredientStack.fluid(fluidCrackedLight, "Cracked Light", 0.24));
+        graph.addNode(end2);
+
+        RecipeNode end3 = RecipeNode.create(idDtEnd, "DT End Naphtha", 20, 30, GTVoltageTier.EV);
+        end3.setMachineCount(0.3);
+        end3.getInputs().add(IngredientStack.fluid(fluidCrackedNaphtha, "Cracked Naphtha", 0.50));
+        graph.addNode(end3);
+
+        graph.addConnection(pyro.getId(), 0, dtHeavy.getId(), 0);
+        graph.addConnection(dtHeavy.getId(), 0, lcr1.getId(), 0);
+        graph.addConnection(dtHeavy.getId(), 1, lcr2.getId(), 0);
+        graph.addConnection(dtHeavy.getId(), 2, lcr3.getId(), 0);
+        graph.addConnection(dtHeavy.getId(), 3, lcr4.getId(), 0);
+
+        graph.addConnection(lcr1.getId(), 1, elec.getId(), 0);
+        graph.addConnection(lcr2.getId(), 1, elec.getId(), 0);
+        graph.addConnection(lcr3.getId(), 1, elec.getId(), 0);
+        graph.addConnection(lcr4.getId(), 1, elec.getId(), 0);
+
+        graph.addConnection(elec.getId(), 0, lcr1.getId(), 1);
+        graph.addConnection(elec.getId(), 0, lcr2.getId(), 1);
+        graph.addConnection(elec.getId(), 0, lcr3.getId(), 1);
+        graph.addConnection(elec.getId(), 0, lcr4.getId(), 1);
+
+        graph.addConnection(elec.getId(), 0, cracker1.getId(), 1);
+        graph.addConnection(elec.getId(), 0, cracker2.getId(), 1);
+        graph.addConnection(elec.getId(), 0, cracker3.getId(), 1);
+
+        graph.addConnection(lcr1.getId(), 0, cracker2.getId(), 0);
+        graph.addConnection(lcr2.getId(), 0, cracker1.getId(), 0);
+        graph.addConnection(lcr3.getId(), 0, cracker3.getId(), 0);
+
+        graph.addConnection(cracker1.getId(), 0, end1.getId(), 0);
+        graph.addConnection(cracker2.getId(), 0, end2.getId(), 0);
+        graph.addConnection(cracker3.getId(), 0, end3.getId(), 0);
+
+        FlowGraphSolver.autoRatioFromAnchor(graph, end1, true);
+
+        // Assertions:
+        Assertions.assertEquals(0.3, end1.getMachineCount(), 1e-4);
+        Assertions.assertTrue(lcr2.getMachineCount() <= 5.0,
+                "LCR Heavy must not explode in count! Actual: " + lcr2.getMachineCount());
+        Assertions.assertTrue(lcr1.getMachineCount() <= 5.0,
+                "LCR Light must not explode in count! Actual: " + lcr1.getMachineCount());
+        Assertions.assertTrue(dtHeavy.getMachineCount() <= 5.0,
+                "DT Heavy must not explode in count! Actual: " + dtHeavy.getMachineCount());
+        Assertions.assertTrue(pyro.getMachineCount() <= 5.0,
+                "Pyrolyse must not explode in count! Actual: " + pyro.getMachineCount());
+    }
+
+    @Test
+    public void testDrainJunctionWithUpstreamRecirculationConvergesInSinglePass() {
+        FlowGraph graph = new FlowGraph();
+
+        ResourceLocation itemNetherStar = ResourceLocation.tryParse("gtceu:nether_star");
+        ResourceLocation itemNetherDust = ResourceLocation.tryParse("gtceu:nether_star_dust");
+        ResourceLocation itemPolarizedRod = ResourceLocation.tryParse("gtceu:polarized_rod");
+        ResourceLocation itemDemagnetizedRod = ResourceLocation.tryParse("gtceu:demagnetized_rod");
+        ResourceLocation itemExplosive = ResourceLocation.tryParse("gtceu:explosive");
+
+        RecipeNode autoclave = RecipeNode.create(ResourceLocation.tryParse("gtceu:autoclave"), "Autoclave", 20, 30, GTVoltageTier.HV);
+        autoclave.getInputs().add(IngredientStack.item(itemPolarizedRod, "Polarized Rod", 1.0));
+        autoclave.getOutputs().add(IngredientStack.item(itemNetherDust, "Nether Star Dust", 1.0));
+        autoclave.getOutputs().add(IngredientStack.item(itemDemagnetizedRod, "Demagnetized Rod", 1.0));
+        graph.addNode(autoclave);
+
+        RecipeNode polarizer = RecipeNode.create(ResourceLocation.tryParse("gtceu:polarizer"), "Polarizer", 20, 30, GTVoltageTier.HV);
+        polarizer.getInputs().add(IngredientStack.item(itemDemagnetizedRod, "Demagnetized Rod", 1.0));
+        polarizer.getOutputs().add(IngredientStack.item(itemPolarizedRod, "Polarized Rod", 1.0));
+        graph.addNode(polarizer);
+
+        RecipeNode explosiveSource = RecipeNode.create(ResourceLocation.tryParse("gtceu:chemical_reactor"), "Chemical Reactor", 20, 30, GTVoltageTier.HV);
+        explosiveSource.getOutputs().add(IngredientStack.item(itemExplosive, "Explosive", 2.0));
+        graph.addNode(explosiveSource);
+
+        RecipeNode implosion = RecipeNode.create(ResourceLocation.tryParse("gtceu:implosion_compressor"), "Implosion Compressor", 20, 30, GTVoltageTier.HV);
+        implosion.getInputs().add(IngredientStack.item(itemNetherDust, "Nether Star Dust", 1.0));
+        implosion.getInputs().add(IngredientStack.item(itemExplosive, "Explosive", 2.0));
+        implosion.getOutputs().add(IngredientStack.item(itemNetherStar, "Nether Star", 1.0));
+        graph.addNode(implosion);
+
+        RecipeNode drainJunction = RecipeNode.create(ResourceLocation.tryParse("gtcalcboard:junction"), "Nether Star Junction", 0, 0, GTVoltageTier.ULV);
+        drainJunction.setReroute(true);
+        drainJunction.setSupplyMode(SupplyMode.FIXED_DRAIN);
+        drainJunction.setExternalDrainRate(50.0);
+        drainJunction.bindRerouteIngredient(IngredientStack.item(itemNetherStar, "Nether Star", 1.0));
+        graph.addNode(drainJunction);
+
+        graph.addConnection(autoclave.getId(), 1, polarizer.getId(), 0);
+        graph.addConnection(polarizer.getId(), 0, autoclave.getId(), 0);
+        graph.addConnection(autoclave.getId(), 0, implosion.getId(), 0);
+        graph.addConnection(explosiveSource.getId(), 0, implosion.getId(), 1);
+        graph.addConnection(implosion.getId(), 0, drainJunction.getId(), 0);
+
+        autoclave.setMachineCount(1.0);
+        polarizer.setMachineCount(1.0);
+        explosiveSource.setMachineCount(1.0);
+        implosion.setMachineCount(1.0);
+
+        AutoRatioResult result = FlowGraphSolver.autoRatioFromAnchor(graph, drainJunction, true);
+
+        Assertions.assertEquals(50.0, implosion.getMachineCount(), 1e-4);
+        Assertions.assertEquals(50.0, autoclave.getMachineCount(), 1e-4);
+        Assertions.assertEquals(50.0, polarizer.getMachineCount(), 1e-4);
+        Assertions.assertEquals(50.0, explosiveSource.getMachineCount(), 1e-4);
+
+        double netherStarSupply = AutoRatioEngine.calculateEffectiveIncomingSupply(graph, drainJunction, 0, null, true);
+        Assertions.assertTrue(netherStarSupply >= 50.0 - 1e-4,
+                "Drain junction must receive full demand in a single AutoRatio call! Actual: " + netherStarSupply);
+        Assertions.assertTrue(result.divergentNodeIds().isEmpty(),
+                "Balanced cycle must not report false divergence warnings! Actual: " + result.divergentNodeIds());
+    }
+
+    @Test
+    public void testComplexStarTechLoopWithDrainJunctionConvergesInSinglePass() {
+        FlowGraph graph = new FlowGraph();
+
+        ResourceLocation itemNetherStar = ResourceLocation.tryParse("gtceu:nether_star");
+        ResourceLocation itemNetherDust = ResourceLocation.tryParse("gtceu:nether_star_dust");
+        ResourceLocation itemEnergizedStar = ResourceLocation.tryParse("gtceu:energized_star");
+        ResourceLocation itemPressedStar = ResourceLocation.tryParse("gtceu:pressed_star");
+        ResourceLocation itemPolarized = ResourceLocation.tryParse("gtceu:polarized_star");
+        ResourceLocation fluidBlaze = ResourceLocation.tryParse("gtceu:blaze_fluid");
+
+        List<RecipeNode> autoclaves = new ArrayList<>();
+        for (int i = 0; i < 4; i++) {
+            RecipeNode extractor = RecipeNode.create(ResourceLocation.tryParse("gtceu:extractor_" + i), "Extractor " + i, 22, 30, GTVoltageTier.LV);
+            extractor.getOutputs().add(IngredientStack.fluid(fluidBlaze, "Blaze Fluid", 1.0));
+            graph.addNode(extractor);
+
+            RecipeNode ac = RecipeNode.create(ResourceLocation.tryParse("gtceu:autoclave_" + i), "Autoclave " + i, 240, 30, GTVoltageTier.ZPM);
+            ac.getInputs().add(IngredientStack.fluid(fluidBlaze, "Blaze Fluid", 1.0));
+            ac.getInputs().add(IngredientStack.item(itemNetherDust, "Nether Dust", 1.0));
+            ac.getOutputs().add(IngredientStack.item(itemEnergizedStar, "Energized Star", 1.0));
+            graph.addNode(ac);
+            autoclaves.add(ac);
+
+            graph.addConnection(extractor.getId(), 0, ac.getId(), 0);
+        }
+
+        RecipeNode press = RecipeNode.create(ResourceLocation.tryParse("gtceu:forming_press"), "Forming Press", 300, 30, GTVoltageTier.IV);
+        for (int i = 0; i < 4; i++) {
+            press.getInputs().add(IngredientStack.item(itemEnergizedStar, "Energized Star", 1.0));
+        }
+        press.getOutputs().add(IngredientStack.item(itemPressedStar, "Pressed Star", 1.0));
+        graph.addNode(press);
+
+        for (int i = 0; i < 4; i++) {
+            graph.addConnection(autoclaves.get(i).getId(), 0, press.getId(), i);
+        }
+
+        RecipeNode implosion = RecipeNode.create(ResourceLocation.tryParse("gtceu:implosion_compressor"), "Implosion Compressor", 200, 30, GTVoltageTier.EV);
+        implosion.getInputs().add(IngredientStack.item(itemPressedStar, "Pressed Star", 1.0));
+        implosion.getOutputs().add(IngredientStack.item(itemNetherStar, "Nether Star", 1.0));
+        implosion.getOutputs().add(IngredientStack.item(itemNetherStar, "Nether Star Recycle", 4.0));
+        graph.addNode(implosion);
+
+        RecipeNode polarizer = RecipeNode.create(ResourceLocation.tryParse("gtceu:polarizer"), "Polarizer", 40, 30, GTVoltageTier.EV);
+        polarizer.getInputs().add(IngredientStack.item(itemNetherStar, "Nether Star", 4.0));
+        polarizer.getOutputs().add(IngredientStack.item(itemPolarized, "Polarized Star", 4.0));
+        graph.addNode(polarizer);
+
+        RecipeNode hammer = RecipeNode.create(ResourceLocation.tryParse("gtceu:forge_hammer"), "Forge Hammer", 300, 30, GTVoltageTier.HV);
+        hammer.getInputs().add(IngredientStack.item(itemPolarized, "Polarized Star", 4.0));
+        hammer.getOutputs().add(IngredientStack.item(itemNetherDust, "Nether Dust", 4.0));
+        graph.addNode(hammer);
+
+        RecipeNode drainJunction = RecipeNode.create(ResourceLocation.tryParse("gtcalcboard:junction"), "Nether Star Junction", 0, 0, GTVoltageTier.ULV);
+        drainJunction.setReroute(true);
+        drainJunction.setSupplyMode(SupplyMode.FIXED_DRAIN);
+        drainJunction.setExternalDrainRate(2.0);
+        drainJunction.bindRerouteIngredient(IngredientStack.item(itemNetherStar, "Nether Star", 1.0));
+        graph.addNode(drainJunction);
+
+        for (int i = 0; i < 4; i++) {
+            graph.addConnection(hammer.getId(), 0, autoclaves.get(i).getId(), 1);
+        }
+        graph.addConnection(press.getId(), 0, implosion.getId(), 0);
+        graph.addConnection(implosion.getId(), 0, drainJunction.getId(), 0);
+        graph.addConnection(implosion.getId(), 1, polarizer.getId(), 0);
+        graph.addConnection(polarizer.getId(), 0, hammer.getId(), 0);
+
+        AutoRatioResult result = FlowGraphSolver.autoRatioFromAnchor(graph, drainJunction, true);
+
+        double supply = AutoRatioEngine.calculateEffectiveIncomingSupply(graph, drainJunction, 0, null, true);
+        Assertions.assertTrue(supply >= 2.0 - 1e-4,
+                "Drain junction must receive 2.0/s in a single AutoRatio call! Actual: " + supply);
+        Assertions.assertTrue(result.divergentNodeIds().isEmpty(),
+                "Loop should not report false divergence warnings! Actual: " + result.divergentNodeIds());
+    }
 }
+

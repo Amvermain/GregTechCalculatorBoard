@@ -39,27 +39,26 @@ public final class GlobalBalanceAggregator {
         Map<IngredientStack, List<GlobalBalanceSummary.PageContribution>> itemContributions = new LinkedHashMap<>();
 
         for (BoardPage page : selectedPagesList) {
-            if (page == null || page.getGraph() == null) continue;
+            if (page == null || page.getGraph() == null || page.isModuleSubPage()) continue;
 
             FlowGraph graph = page.getGraph();
-            BalanceSummary pageSummary = FlowGraphSolver.computeSummary(graph);
+            BalanceSummary pageSummary = (!graph.isSummaryDirty() && graph.getCachedSummary() != null)
+                ? graph.getCachedSummary()
+                : FlowGraphSolver.computeSummary(graph);
 
-            // 1. Machine count and breakdown aggregation
             totalMachineCount += pageSummary.totalMachineCount();
             for (Map.Entry<String, Integer> entry : pageSummary.machineBreakdown().entrySet()) {
                 machineBreakdown.put(entry.getKey(), machineBreakdown.getOrDefault(entry.getKey(), 0) + entry.getValue());
             }
 
-            // 2. Voltage Tier
             if (pageSummary.highestVoltageTier() != null && pageSummary.highestVoltageTier().ordinal() > highestTier.ordinal()) {
                 highestTier = pageSummary.highestVoltageTier();
             }
 
-            // 3. Power Generation vs Consumption calculation per page
             for (RecipeNode node : graph.getNodes()) {
                 double nodeEffectiveEUt = node.getEffectiveTotalEUt();
                 if (node.getEnergyType() == EnergyType.ELECTRIC_FE) {
-                    nodeEffectiveEUt = nodeEffectiveEUt / 4.0; // 4 RF = 1 EU
+                    nodeEffectiveEUt = nodeEffectiveEUt / 4.0;
                 } else if (node.getEnergyType() != EnergyType.ELECTRIC_EU) {
                     nodeEffectiveEUt = 0.0;
                 }
@@ -74,11 +73,9 @@ public final class GlobalBalanceAggregator {
                 }
             }
 
-            // 4. Per-page Production and Consumption aggregation
             Map<IngredientStack, Double> pageProd = pageSummary.totalProduction();
             Map<IngredientStack, Double> pageCons = pageSummary.totalConsumption();
 
-            // Collect all unique stacks present in this page
             List<IngredientStack> pageStacks = new ArrayList<>();
             for (IngredientStack s : pageProd.keySet()) {
                 if (!containsMatching(pageStacks, s)) pageStacks.add(s);
@@ -106,7 +103,6 @@ public final class GlobalBalanceAggregator {
             }
         }
 
-        // 5. Compute global net balances (Produced - Consumed)
         Map<IngredientStack, Double> rawInputs = new LinkedHashMap<>();
         Map<IngredientStack, Double> netOutputs = new LinkedHashMap<>();
         Map<IngredientStack, Double> fullyBalanced = new LinkedHashMap<>();

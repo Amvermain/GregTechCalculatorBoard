@@ -6,7 +6,7 @@ import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.util.ModCompatHelper;
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 import com.gtceu.calcboard.compat.create.CreateRecipeHandler;
 import com.gtceu.calcboard.compat.createnewage.CreateNewAgeRecipeHandler;
 import com.gtceu.calcboard.compat.gtceu.GTCEuLayeredRecipeExtractor;
@@ -14,8 +14,8 @@ import com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter;
 import com.gtceu.calcboard.compat.gtceu.GTCEuRecipeHandler;
 import com.gtceu.calcboard.compat.systeams.SysteamsRecipeHandler;
 import com.gtceu.calcboard.compat.thermal.ThermalRecipeHandler;
-import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
-import mezz.jei.api.recipe.IFocusGroup;
+import com.gtceu.calcboard.api.model.RecipeDetails;
+import com.gtceu.calcboard.api.util.RecipeConversionHelper;
 import mezz.jei.api.recipe.category.IRecipeCategory;
 import mezz.jei.api.runtime.IJeiRuntime;
 import net.minecraft.nbt.CompoundTag;
@@ -90,12 +90,23 @@ public class JeiRecipeConverter {
         List<IngredientStack> inputs = new ArrayList<>();
         List<IngredientStack> outputs = new ArrayList<>();
 
+        // Details extraction
         boolean isGT = GTCEuRecipeHandler.isGTRecipe(recipe) || (catId != null && GTCEuRecipeHandler.isGTCategoryNamespace(catId.getNamespace()));
+        RecipeDetails details = new RecipeDetails();
+        if (isGT) {
+            GTCEuRecipeHandler.extractGTRecipeDetails(recipe, details);
+            GTCEuRecipeHandler.adaptRecipeDetails(null, recipe, details);
+        }
+
         if (isGT) {
             List<IngredientStack> gtIns = GTCEuRecipeHandler.extractGTRecipeContents(recipe, "inputs");
             List<IngredientStack> gtOuts = GTCEuRecipeHandler.extractGTRecipeContents(recipe, "outputs");
+            List<IngredientStack> gtTickIns = GTCEuRecipeHandler.extractTickIngredients(recipe, "tickInputs", details.durationTicks);
+            List<IngredientStack> gtTickOuts = GTCEuRecipeHandler.extractTickIngredients(recipe, "tickOutputs", details.durationTicks);
             if (gtIns != null && !gtIns.isEmpty()) inputs.addAll(gtIns);
+            if (gtTickIns != null && !gtTickIns.isEmpty()) inputs.addAll(gtTickIns);
             if (gtOuts != null && !gtOuts.isEmpty()) outputs.addAll(gtOuts);
+            if (gtTickOuts != null && !gtTickOuts.isEmpty()) outputs.addAll(gtTickOuts);
         }
 
         if (inputs.isEmpty()) {
@@ -105,30 +116,12 @@ public class JeiRecipeConverter {
             outputs.addAll(collector.extractOutputs());
         }
 
-        // Synchronize chance and tierChanceBoost for outputs if extracted via layout collector
+        if (isGT && !inputs.isEmpty()) {
+            syncSlotChances(inputs, GTCEuRecipeHandler.extractGTRecipeContents(recipe, "inputs"));
+        }
+
         if (isGT && !outputs.isEmpty()) {
-            List<IngredientStack> gtOuts = GTCEuRecipeHandler.extractGTRecipeContents(recipe, "outputs");
-            if (gtOuts != null && !gtOuts.isEmpty()) {
-                boolean[] used = new boolean[gtOuts.size()];
-                for (int i = 0; i < outputs.size(); i++) {
-                    IngredientStack out = outputs.get(i);
-                    if (out == null || out.getId() == null) continue;
-                    if (i < gtOuts.size() && !used[i] && gtOuts.get(i) != null && out.getId().equals(gtOuts.get(i).getId())) {
-                        out.setChance(gtOuts.get(i).getChance());
-                        out.setTierChanceBoost(gtOuts.get(i).getTierChanceBoost());
-                        used[i] = true;
-                    } else {
-                        for (int j = 0; j < gtOuts.size(); j++) {
-                            if (!used[j] && gtOuts.get(j) != null && out.getId().equals(gtOuts.get(j).getId())) {
-                                out.setChance(gtOuts.get(j).getChance());
-                                out.setTierChanceBoost(gtOuts.get(j).getTierChanceBoost());
-                                used[j] = true;
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
+            syncSlotChances(outputs, GTCEuRecipeHandler.extractGTRecipeContents(recipe, "outputs"));
         }
 
         // Vanilla Recipe Fallback extraction (Smelting, Crafting, Blasting, Stonecutting, etc.)
@@ -136,16 +129,11 @@ public class JeiRecipeConverter {
             extractVanillaRecipeContents(recipe, inputs, outputs);
         }
 
-        // Details extraction
-        EmiRecipeConverter.RecipeDetails details = new EmiRecipeConverter.RecipeDetails();
-        if (isGT) {
-            GTCEuRecipeHandler.extractGTRecipeDetails(recipe, details);
-            GTCEuRecipeHandler.adaptRecipeDetails(null, recipe, details);
-        } else if (ModCompatHelper.isThermalLoaded() && catId != null && "thermal".equals(catId.getNamespace())) {
+        if (!isGT && ModCompatHelper.isThermalLoaded() && catId != null && "thermal".equals(catId.getNamespace())) {
             ThermalRecipeHandler.adaptRecipeDetails(null, recipe, details);
-        } else if (ModCompatHelper.isCreateLoaded() && catId != null && !"create_new_age".equals(catId.getNamespace()) && ModCompatHelper.isCreateFamilyNamespace(catId.getNamespace())) {
+        } else if (!isGT && ModCompatHelper.isCreateLoaded() && catId != null && !"create_new_age".equals(catId.getNamespace()) && ModCompatHelper.isCreateFamilyNamespace(catId.getNamespace())) {
             CreateRecipeHandler.adaptRecipeDetails(null, recipe, details);
-        } else if (ModCompatHelper.isCreateNewAgeLoaded() && catId != null && CreateNewAgeRecipeHandler.MOD_ID.equals(catId.getNamespace())) {
+        } else if (!isGT && ModCompatHelper.isCreateNewAgeLoaded() && catId != null && CreateNewAgeRecipeHandler.MOD_ID.equals(catId.getNamespace())) {
             CreateNewAgeRecipeHandler.adaptRecipeDetails(null, recipe, details);
         }
 
@@ -249,7 +237,17 @@ public class JeiRecipeConverter {
 
         ResourceLocation icon = preferredWorkstation;
         if (icon == null && !node.getAvailableWorkstations().isEmpty()) {
-            icon = node.getAvailableWorkstations().get(0);
+            var adapter = ModAdapterRegistry.getAdapterForNode(node);
+            GTVoltageTier initialTier = details.tier != null ? details.tier : GTVoltageTier.LV;
+            if (adapter != null) {
+                initialTier = adapter.sanitizeTargetTier(node, initialTier);
+            }
+            ResourceLocation tieredWs = node.getWorkstationForTier(initialTier);
+            if (tieredWs != null && (node.getAvailableWorkstations().contains(tieredWs) || ForgeRegistries.ITEMS.containsKey(tieredWs))) {
+                icon = tieredWs;
+            } else {
+                icon = node.getAvailableWorkstations().get(0);
+            }
         }
         if (icon == null && catId != null) {
             if (ForgeRegistries.ITEMS.containsKey(catId)) {
@@ -296,12 +294,12 @@ public class JeiRecipeConverter {
         }
 
         for (IngredientStack in : inputs) {
-            if (in != null && in.getId() != null && !EmiRecipeConverter.isIgnoredInput(in.getId(), in.getChance())) {
+            if (in != null && in.getId() != null && !RecipeConversionHelper.isIgnoredInput(in.getId(), in.getChance())) {
                 node.addInput(in);
             }
         }
         for (IngredientStack out : outputs) {
-            if (out != null && out.getId() != null && !EmiRecipeConverter.isDummyConditionMarker(out.getId())) {
+            if (out != null && out.getId() != null && !RecipeConversionHelper.isDummyConditionMarker(out.getId())) {
                 node.addOutput(out);
             }
         }
@@ -325,6 +323,14 @@ public class JeiRecipeConverter {
         if (preferredWorkstation == null) {
             com.gtceu.calcboard.api.preset.CategoryMachinePresetManager.getInstance().applyPresetIfPresent(node);
         }
+
+        var adapter = ModAdapterRegistry.getAdapterForNode(node);
+        GTVoltageTier effectiveTier = node.getTargetTier() != null ? node.getTargetTier() : (node.getRecipeTier() != null ? node.getRecipeTier() : GTVoltageTier.LV);
+        if (adapter != null) {
+            effectiveTier = adapter.sanitizeTargetTier(node, effectiveTier);
+        }
+        node.setTargetTier(effectiveTier);
+        com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.ensureCombustionInputs(node);
 
         return node;
     }
@@ -399,5 +405,31 @@ public class JeiRecipeConverter {
             sb.append(" ");
         }
         return sb.toString().trim();
+    }
+
+    private static void syncSlotChances(List<IngredientStack> targetList, List<IngredientStack> gtList) {
+        if (targetList == null || gtList == null || gtList.isEmpty()) return;
+        boolean[] used = new boolean[gtList.size()];
+        for (int i = 0; i < targetList.size(); i++) {
+            matchAndApplyChance(targetList.get(i), i, gtList, used);
+        }
+    }
+
+    private static void matchAndApplyChance(IngredientStack stack, int index, List<IngredientStack> gtList, boolean[] used) {
+        if (stack == null || stack.getId() == null) return;
+        ResourceLocation id = stack.getId();
+        if (index < gtList.size() && !used[index] && gtList.get(index) != null && id.equals(gtList.get(index).getId())) {
+            stack.setChance(gtList.get(index).getChance());
+            stack.setTierChanceBoost(gtList.get(index).getTierChanceBoost());
+            used[index] = true;
+            return;
+        }
+        for (int j = 0; j < gtList.size(); j++) {
+            if (used[j] || gtList.get(j) == null || !id.equals(gtList.get(j).getId())) continue;
+            stack.setChance(gtList.get(j).getChance());
+            stack.setTierChanceBoost(gtList.get(j).getTierChanceBoost());
+            used[j] = true;
+            return;
+        }
     }
 }

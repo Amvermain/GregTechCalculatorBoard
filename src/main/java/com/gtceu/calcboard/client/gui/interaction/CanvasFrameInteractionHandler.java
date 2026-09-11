@@ -7,14 +7,22 @@ import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.client.gui.BoardScreen;
 import com.gtceu.calcboard.client.gui.render.CanvasGroupFrameRenderer;
+import com.gtceu.calcboard.api.solver.AutoRatioMode;
+import com.gtceu.calcboard.api.solver.FlowGraphSolver;
+import com.gtceu.calcboard.api.storage.BoardManager;
+import com.gtceu.calcboard.client.gui.widget.BoardToast;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
+import net.minecraft.network.chat.Component;
+import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -66,8 +74,20 @@ public class CanvasFrameInteractionHandler {
                 return executeFrameAction(action, frame, canvasMouseX, canvasMouseY, button, screen);
             }
 
-            if (frame.isPointInHeader(canvasMouseX, canvasMouseY) && button == 0) {
-                return handleFrameHeaderClick(frame, canvasMouseX, canvasMouseY, screen, dragStartPositions);
+            if (frame.isSharedMachineFrame() && frame.isFolded()) {
+                if (handleFoldedCardClick(frame, canvasMouseX, canvasMouseY, button, screen)) {
+                    return true;
+                }
+            }
+
+            if (frame.isPointInHeader(canvasMouseX, canvasMouseY)) {
+                if (button == 0) {
+                    return handleFrameHeaderClick(frame, canvasMouseX, canvasMouseY, screen, dragStartPositions);
+                }
+                if (button == 1) {
+                    screen.getContextMenuManager().openForFrame(screen.toScreenX(canvasMouseX), screen.toScreenY(canvasMouseY), frame);
+                    return true;
+                }
             }
         }
         return false;
@@ -90,13 +110,21 @@ public class CanvasFrameInteractionHandler {
             return deleteFrame(frame, screen);
         }
         if (action == CanvasGroupFrameRenderer.FrameAction.COLOR && button == 0) {
+            int oldColor = frame.getColor();
             frame.cycleColor();
-            screen.markSummaryDirty();
+            screen.recordCommand(new BoardCommand.ModifyFramePropertiesCommand(
+                    frame.getId(),
+                    frame.getTitle(), frame.getTitle(),
+                    oldColor, frame.getColor(),
+                    frame.isSharedMachineFrame(), frame.isSharedMachineFrame()
+            ));
+            if (screen.getWireRenderer() != null) {
+                screen.getWireRenderer().markDirty();
+            }
             return true;
         }
         if (action == CanvasGroupFrameRenderer.FrameAction.COLLAPSE && button == 0) {
-            screen.collapseFrameIntoModule(frame);
-            return true;
+            return handleFrameCollapse(frame, screen);
         }
         if (action == CanvasGroupFrameRenderer.FrameAction.AUTOFIT && button == 0) {
             return autoFitFrame(frame, screen);
@@ -105,7 +133,87 @@ public class CanvasFrameInteractionHandler {
             screen.openSharedFrameConfigDialog(frame);
             return true;
         }
+        if (action == CanvasGroupFrameRenderer.FrameAction.AUTO_RATIO && button == 0) {
+            return executeSharedPoolAutoRatio(frame, screen);
+        }
         return false;
+    }
+
+    private boolean executeSharedPoolAutoRatio(CanvasGroupFrame frame, BoardScreen screen) {
+        FlowGraph graph = screen.getGraph();
+        if (graph == null || frame == null) return false;
+
+        AutoRatioMode mode = resolveAutoRatioMode();
+        Map<String, Double> oldCounts = snapshotMachineCounts(graph);
+
+        int changed = FlowGraphSolver.autoRatioFromSharedPool(graph, frame, frame.getTargetPoolCapacity(), mode);
+        if (changed <= 0) {
+            notifyEmptyPool();
+            return true;
+        }
+
+        recordAutoRatioHistory(graph, frame, oldCounts, mode, screen);
+        notifySuccessPool(frame, changed, mode);
+        screen.markSummaryDirty();
+        screen.rebuildWidgets();
+        return true;
+    }
+
+    private AutoRatioMode resolveAutoRatioMode() {
+        if (Screen.hasAltDown()) {
+            return AutoRatioMode.FRACTIONAL;
+        }
+        if (Screen.hasShiftDown()) {
+            return AutoRatioMode.HARMONIZED;
+        }
+        return BoardManager.getInstance().isAutoRatioFractionalDefault()
+                ? AutoRatioMode.FRACTIONAL
+                : AutoRatioMode.INTEGER_CEIL;
+    }
+
+    private Map<String, Double> snapshotMachineCounts(FlowGraph graph) {
+        Map<String, Double> counts = new HashMap<>();
+        for (RecipeNode n : graph.getNodes()) {
+            counts.put(n.getId(), n.getMachineCount());
+        }
+        return counts;
+    }
+
+    private void recordAutoRatioHistory(FlowGraph graph, CanvasGroupFrame frame, Map<String, Double> oldCounts, AutoRatioMode mode, BoardScreen screen) {
+        List<BoardCommand> subCmds = new ArrayList<>();
+        for (RecipeNode n : graph.getNodes()) {
+            double oldC = oldCounts.getOrDefault(n.getId(), 1.0);
+            double newC = n.getMachineCount();
+            if (Math.abs(oldC - newC) > 0.0001) {
+                subCmds.add(BoardCommand.ModifyPropertyCommand.machineCount(n.getId(), oldC, newC));
+            }
+        }
+        if (subCmds.isEmpty()) return;
+
+        String modeTag = switch (mode) {
+            case FRACTIONAL -> " (Fractional)";
+            case HARMONIZED -> " (Harmonized)";
+            case INTEGER_CEIL -> "";
+        };
+        String actionName = "Pool Auto Ratio: " + frame.getTitle() + modeTag;
+        screen.recordCommand(new BoardCommand.CompoundCommand(subCmds, actionName));
+    }
+
+    private void notifySuccessPool(CanvasGroupFrame frame, int changedCount, AutoRatioMode mode) {
+        String capacityStr = String.format(Locale.ROOT, "%.1f", frame.getTargetPoolCapacity());
+        String icon = switch (mode) {
+            case FRACTIONAL -> "§b⚡ ";
+            case HARMONIZED -> "§6✨ ";
+            case INTEGER_CEIL -> "§a⚖ ";
+        };
+        BoardToast.show(Component.literal(icon).append(Component.translatable("message.gtcalcboard.pool_auto_ratio_success", changedCount, frame.getTitle(), capacityStr)));
+        SoundEvent sound = (mode == AutoRatioMode.HARMONIZED) ? SoundEvents.PLAYER_LEVELUP : SoundEvents.EXPERIENCE_ORB_PICKUP;
+        Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(sound, 1.2F));
+    }
+
+    private void notifyEmptyPool() {
+        BoardToast.show(Component.literal("§c✕ ").append(Component.translatable("message.gtcalcboard.pool_auto_ratio_empty")));
+        Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 0.8F));
     }
 
     private boolean startFrameResize(CanvasGroupFrame frame, double canvasMouseX, double canvasMouseY) {
@@ -161,6 +269,32 @@ public class CanvasFrameInteractionHandler {
         screen.recordCommand(new BoardCommand.CompoundCommand(cmds, "Delete " + frame.getTitle()));
     }
 
+    private boolean handleFrameCollapse(CanvasGroupFrame frame, BoardScreen screen) {
+        if (!frame.isSharedMachineFrame()) {
+            screen.collapseFrameIntoModule(frame);
+            return true;
+        }
+
+        boolean prevFolded = frame.isFolded();
+        frame.toggleFolded(screen.getGraph());
+        if (frame.isFolded()) {
+            deselectFoldedFrameNodes(frame, screen);
+        }
+        screen.recordCommand(new BoardCommand.ToggleFrameFoldCommand(frame.getId(), prevFolded, frame.isFolded()));
+        screen.rebuildWidgets();
+        screen.markSummaryDirty();
+        if (screen.getWireRenderer() != null) {
+            screen.getWireRenderer().markDirty();
+        }
+        return true;
+    }
+
+    private void deselectFoldedFrameNodes(CanvasGroupFrame frame, BoardScreen screen) {
+        for (String nid : frame.getContainedNodeIds()) {
+            screen.deselectNode(nid);
+        }
+    }
+
     private boolean autoFitFrame(CanvasGroupFrame frame, BoardScreen screen) {
         FlowGraph graph = screen.getGraph();
         if (graph == null) return false;
@@ -174,7 +308,11 @@ public class CanvasFrameInteractionHandler {
             screen.recordCommand(new BoardCommand.ResizeFrameCommand(
                     frame.getId(), oldX, oldY, oldW, oldH, frame.getPosX(), frame.getPosY(), frame.getWidth(), frame.getHeight(), "Auto-fit frame " + frame.getTitle()
             ));
-            screen.markSummaryDirty();
+            if (frame.isSharedMachineFrame()) {
+                screen.markSummaryDirty();
+            } else if (screen.getWireRenderer() != null) {
+                screen.getWireRenderer().markDirty();
+            }
             Minecraft.getInstance().getSoundManager().play(
                     SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.2F)
             );
@@ -447,7 +585,11 @@ public class CanvasFrameInteractionHandler {
                     resizingFrame.getPosX(), resizingFrame.getPosY(), resizingFrame.getWidth(), resizingFrame.getHeight(),
                     "Resize frame " + resizingFrame.getTitle()
             ));
-            screen.markSummaryDirty();
+            if (resizingFrame.isSharedMachineFrame()) {
+                screen.markSummaryDirty();
+            } else if (screen.getWireRenderer() != null) {
+                screen.getWireRenderer().markDirty();
+            }
         }
     }
 
@@ -490,8 +632,108 @@ public class CanvasFrameInteractionHandler {
 
         if (!nodeDeltas.isEmpty() || !noteDeltas.isEmpty() || !frameDeltas.isEmpty()) {
             screen.recordCommand(new BoardCommand.MoveComponentsCommand(nodeDeltas, noteDeltas, frameDeltas));
-            screen.markSummaryDirty();
+            boolean needsSummary = !nodeDeltas.isEmpty() || hasSharedFrameDelta(graph, frameDeltas.keySet());
+            if (needsSummary) {
+                screen.markSummaryDirty();
+            } else if (screen.getWireRenderer() != null) {
+                screen.getWireRenderer().markDirty();
+            }
         }
         dragStartPositions.clear();
     }
+
+    private boolean hasSharedFrameDelta(FlowGraph graph, Set<String> frameIds) {
+        for (String fid : frameIds) {
+            CanvasGroupFrame f = graph.findFrameById(fid);
+            if (f != null && f.isSharedMachineFrame()) return true;
+        }
+        return false;
+    }
+
+    private boolean handleFoldedCardClick(
+            CanvasGroupFrame frame,
+            double canvasMouseX,
+            double canvasMouseY,
+            int button,
+            BoardScreen screen
+    ) {
+        if (button != 0) return false;
+        int x = (int) frame.getPosX();
+        int y = (int) frame.getPosY();
+        int ctrlY = y + 26;
+
+        if (canvasMouseY < ctrlY || canvasMouseY > ctrlY + 14) return false;
+
+        FlowGraph graph = screen.getGraph();
+        if (graph == null) return false;
+        if (!screen.ensureEditPermission()) return true;
+
+        int countMinusX = x + 38;
+        int countBoxX = countMinusX + 16;
+        net.minecraft.client.gui.Font font = Minecraft.getInstance().font;
+        String countText = String.format(Locale.ROOT, "%.2f", frame.computeTotalMachineDuty(graph));
+        int countBoxW = Math.max(32, font.width(countText) + 8);
+        int countPlusX = countBoxX + countBoxW + 2;
+        int div2X = countPlusX + 16;
+        int mul2X = countPlusX + 34;
+
+        if (canvasMouseX >= countMinusX && canvasMouseX <= countMinusX + 14) {
+            double currentDuty = frame.computeTotalMachineDuty(graph);
+            if (currentDuty <= 0.0001) currentDuty = 1.0;
+            double targetDuty = Math.max(0.1, Math.round((currentDuty - 1.0) * 10.0) / 10.0);
+            double factor = targetDuty / currentDuty;
+            scaleFoldedFrameAndRefresh(frame, graph, factor, screen);
+            return true;
+        }
+
+        if (canvasMouseX >= countPlusX && canvasMouseX <= countPlusX + 14) {
+            double currentDuty = frame.computeTotalMachineDuty(graph);
+            if (currentDuty <= 0.0001) currentDuty = 1.0;
+            double targetDuty = Math.round((currentDuty + 1.0) * 10.0) / 10.0;
+            double factor = targetDuty / currentDuty;
+            scaleFoldedFrameAndRefresh(frame, graph, factor, screen);
+            return true;
+        }
+
+        if (canvasMouseX >= div2X && canvasMouseX <= div2X + 16) {
+            scaleFoldedFrameAndRefresh(frame, graph, 0.5, screen);
+            return true;
+        }
+
+        if (canvasMouseX >= mul2X && canvasMouseX <= mul2X + 16) {
+            scaleFoldedFrameAndRefresh(frame, graph, 2.0, screen);
+            return true;
+        }
+
+        return false;
+    }
+
+    private void scaleFoldedFrameAndRefresh(CanvasGroupFrame frame, FlowGraph graph, double factor, BoardScreen screen) {
+        List<RecipeNode> enclosed = frame.getEnclosedNodes(graph);
+        Map<String, Double> oldCounts = new HashMap<>();
+        for (RecipeNode n : enclosed) {
+            oldCounts.put(n.getId(), n.getMachineCount());
+        }
+        frame.scaleEnclosedNodes(graph, factor);
+        List<BoardCommand> subCmds = new ArrayList<>();
+        for (RecipeNode n : enclosed) {
+            double oldC = oldCounts.getOrDefault(n.getId(), 1.0);
+            double newC = n.getMachineCount();
+            if (Math.abs(oldC - newC) > 0.0001) {
+                subCmds.add(BoardCommand.ModifyPropertyCommand.machineCount(n.getId(), oldC, newC));
+            }
+        }
+        if (!subCmds.isEmpty()) {
+            screen.recordCommand(new BoardCommand.CompoundCommand(subCmds, "Scale Folded Pool: " + frame.getTitle()));
+        }
+        screen.markSummaryDirty();
+        screen.rebuildWidgets();
+        if (screen.getWireRenderer() != null) {
+            screen.getWireRenderer().markDirty();
+        }
+        Minecraft.getInstance().getSoundManager().play(
+                SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
+        );
+    }
 }
+

@@ -136,7 +136,7 @@ public class PortSelectionAndBatchWiringTest {
         graph.addNode(consumer2);
 
         CanvasGroupFrame poolFrame = CanvasGroupFrame.createFromNodes("Chemical Pool", List.of(consumer1, consumer2), CanvasGroupFrame.COLOR_CYAN);
-        graph.getFrames().add(poolFrame);
+        graph.addFrame(poolFrame);
 
         Set<PortRef> selectedPorts = Set.of(
                 PortRef.of(producer.getId(), false, 0),
@@ -200,7 +200,7 @@ public class PortSelectionAndBatchWiringTest {
 
         CanvasGroupFrame poolFrame = CanvasGroupFrame.createFromNodes("Cutter Pool", List.of(cutter1), CanvasGroupFrame.COLOR_CYAN);
         poolFrame.setSharedMachineFrame(true);
-        graph.getFrames().add(poolFrame);
+        graph.addFrame(poolFrame);
 
         // 3. User bundle drops 3 ports onto Cutter Pool
         Set<PortRef> selectedPorts = Set.of(

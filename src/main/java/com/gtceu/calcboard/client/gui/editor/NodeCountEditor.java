@@ -38,7 +38,11 @@ public class NodeCountEditor {
         try {
             double parsed = Double.parseDouble(text);
             if (parsed > 0 && Math.abs(parsed - oldVal) > 0.0001) {
-                widget.getNode().setMachineCount(parsed);
+                if (widget.getNode().isModule()) {
+                    com.gtceu.calcboard.api.solver.FlowGraphModuleHandler.scaleModuleSubPage(widget.getNode(), parsed);
+                } else {
+                    widget.getNode().setMachineCount(parsed);
+                }
                 if (widget.getParent() != null) {
                     widget.getParent().recordCommand(BoardCommand.ModifyPropertyCommand.machineCount(
                         widget.getNode().getId(),
@@ -47,7 +51,10 @@ public class NodeCountEditor {
                     ));
                     if (widget.getNode().isCompoundNode()) {
                         widget.getParent().getGraph().syncCompoundParameters(widget.getNode());
-                        widget.getParent().rebuildWidgets();
+                        widget.getParent().rebuildBoardWidgets();
+                        widget.getParent().markSummaryDirty();
+                    } else if (widget.getNode().isModule()) {
+                        widget.getParent().rebuildBoardWidgets();
                         widget.getParent().markSummaryDirty();
                     }
                 }

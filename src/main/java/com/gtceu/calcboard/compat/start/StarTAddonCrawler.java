@@ -4,6 +4,7 @@ import com.gtceu.calcboard.api.catalog.DynamicAddonCrawler;
 import com.gtceu.calcboard.api.catalog.MachineAddon;
 import com.gtceu.calcboard.compat.gtceu.helper.ParallelHelper;
 import com.gtceu.calcboard.compat.gtceu.helper.ReflectorHelper;
+import com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -96,6 +97,76 @@ public class StarTAddonCrawler {
         sterileMaint.setEutMultiplier(1.0);
         sterileMaint.setDiscoverySource("Star Technology Sterile Cleaning Maintenance Hatch Specification");
         tryAddTrait(list, seenIds, sterileMaint);
+
+        MachineAddon distilledWater = new MachineAddon(
+                "start_core:distilled_water_coolant",
+                "gui.gtcalcboard.addon.distilled_water_coolant",
+                MachineAddon.Category.MULTIBLOCK_TRAIT,
+                "gui.gtcalcboard.addon.distilled_water_coolant.desc",
+                GTCombustionHelper.START_MCF
+        );
+        distilledWater.setEutMultiplier(1.2);
+        distilledWater.setDiscoverySource("Star Technology MCF Distilled Water Cooling Boost (+20%)");
+        tryAddTrait(list, seenIds, distilledWater);
+
+        MachineAddon deionizedWater = new MachineAddon(
+                "start_core:deionized_water_coolant",
+                "gui.gtcalcboard.addon.deionized_water_coolant",
+                MachineAddon.Category.MULTIBLOCK_TRAIT,
+                "gui.gtcalcboard.addon.deionized_water_coolant.desc",
+                GTCombustionHelper.START_MCF
+        );
+        deionizedWater.setEutMultiplier(1.4);
+        deionizedWater.setDiscoverySource("Star Technology MCF Deionized Water Cooling Boost (+40%)");
+        tryAddTrait(list, seenIds, deionizedWater);
+
+        MachineAddon t1Oxidizer = new MachineAddon(
+                "start_core:t1_oxidizer_boost",
+                "gui.gtcalcboard.addon.t1_oxidizer_boost",
+                MachineAddon.Category.MULTIBLOCK_TRAIT,
+                "gui.gtcalcboard.addon.t1_oxidizer_boost.desc",
+                GTCombustionHelper.START_T1_COMBUSTION
+        );
+        t1Oxidizer.setParallelMultiplier(2);
+        t1Oxidizer.setEutMultiplier(5.0);
+        t1Oxidizer.setDiscoverySource("Star Technology T1 Combustion Module WFNA Boost (5x EU/t, 2x fuel)");
+        tryAddTrait(list, seenIds, t1Oxidizer);
+
+        MachineAddon t2Oxidizer = new MachineAddon(
+                "start_core:t2_oxidizer_boost",
+                "gui.gtcalcboard.addon.t2_oxidizer_boost",
+                MachineAddon.Category.MULTIBLOCK_TRAIT,
+                "gui.gtcalcboard.addon.t2_oxidizer_boost.desc",
+                GTCombustionHelper.START_T2_COMBUSTION
+        );
+        t2Oxidizer.setParallelMultiplier(2);
+        t2Oxidizer.setEutMultiplier(6.0);
+        t2Oxidizer.setDiscoverySource("Star Technology T2 Combustion Module RFNA Boost (6x EU/t, 2x fuel)");
+        tryAddTrait(list, seenIds, t2Oxidizer);
+
+        MachineAddon t3Oxidizer = new MachineAddon(
+                "start_core:t3_oxidizer_boost",
+                "gui.gtcalcboard.addon.t3_oxidizer_boost",
+                MachineAddon.Category.MULTIBLOCK_TRAIT,
+                "gui.gtcalcboard.addon.t3_oxidizer_boost.desc",
+                GTCombustionHelper.START_T3_COMBUSTION
+        );
+        t3Oxidizer.setParallelMultiplier(2);
+        t3Oxidizer.setEutMultiplier(4.0);
+        t3Oxidizer.setDiscoverySource("Star Technology T3 Rocket Module O2F2 Boost (8A UV, 2x fuel)");
+        tryAddTrait(list, seenIds, t3Oxidizer);
+
+        MachineAddon t4Oxidizer = new MachineAddon(
+                "start_core:t4_oxidizer_boost",
+                "gui.gtcalcboard.addon.t4_oxidizer_boost",
+                MachineAddon.Category.MULTIBLOCK_TRAIT,
+                "gui.gtcalcboard.addon.t4_oxidizer_boost.desc",
+                GTCombustionHelper.START_T4_COMBUSTION
+        );
+        t4Oxidizer.setParallelMultiplier(2);
+        t4Oxidizer.setEutMultiplier(6.0);
+        t4Oxidizer.setDiscoverySource("Star Technology T4 Rocket Module FCSO Boost (12A UEV, 2x fuel)");
+        tryAddTrait(list, seenIds, t4Oxidizer);
     }
 
     public static MachineAddon parseStarTMaintenanceHatch(ItemStack stack, ResourceLocation id) {

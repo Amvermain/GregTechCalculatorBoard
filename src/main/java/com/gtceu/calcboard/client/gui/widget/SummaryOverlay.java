@@ -12,7 +12,7 @@ import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.solver.BalanceSummary;
 import com.gtceu.calcboard.api.storage.BoardManager;
-import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.api.IBoardScreenContext;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -29,6 +29,7 @@ import java.util.Map;
  */
 public class SummaryOverlay {
     public static final int WIDTH = 240;
+    private final IBoardScreenContext screen;
     private boolean collapsed = false;
     private double scrollY = 0;
     private double maxScrollY = 0;
@@ -45,6 +46,24 @@ public class SummaryOverlay {
     private boolean hoveredVoidHeader = false;
     private BalanceSummary lastSummary = null;
 
+    private int rightOffset = 0;
+
+    public SummaryOverlay() {
+        this(null);
+    }
+
+    public SummaryOverlay(IBoardScreenContext screen) {
+        this.screen = screen;
+    }
+
+    public int getRightOffset() {
+        return rightOffset;
+    }
+
+    public void setRightOffset(int rightOffset) {
+        this.rightOffset = Math.max(0, rightOffset);
+    }
+
     public boolean isCollapsed() {
         return collapsed;
     }
@@ -60,13 +79,34 @@ public class SummaryOverlay {
             scrollY = 0;
         }
         BoardManager.getInstance().setSummaryOverlayCollapsed(this.collapsed);
+        if (screen != null) {
+            screen.onSummaryOverlayToggled();
+        } else if (Minecraft.getInstance().screen instanceof IBoardScreenContext bs) {
+            bs.onSummaryOverlayToggled();
+        }
     }
 
     public static int getEffectiveWidth(int screenWidth) {
-        if (screenWidth < 520) {
-            return Math.min(WIDTH, Math.max(160, screenWidth - 160));
+        return getEffectiveWidth(screenWidth, 0);
+    }
+
+    public static int getEffectiveWidth(int screenWidth, int rightOffset) {
+        int avail = screenWidth - rightOffset - 40;
+        if (avail < WIDTH) {
+            return Math.max(160, avail);
         }
         return WIDTH;
+    }
+
+    public int getPanelX(int screenWidth) {
+        int effectiveW = getEffectiveWidth(screenWidth, rightOffset);
+        int right = (rightOffset > 0) ? (screenWidth - rightOffset - 4) : (screenWidth - 10);
+        return Math.max(36, right - effectiveW);
+    }
+
+    public int getTabX(int screenWidth) {
+        int tabW = 24;
+        return (rightOffset > 0) ? (screenWidth - rightOffset - tabW - 4) : (screenWidth - tabW - 4);
     }
 
     public void render(GuiGraphics graphics, int screenWidth, int screenHeight, BalanceSummary summary, int mouseX, int mouseY) {
@@ -76,18 +116,17 @@ public class SummaryOverlay {
         graphics.pose().pushPose();
         com.mojang.blaze3d.systems.RenderSystem.disableDepthTest();
 
-        int effectiveW = getEffectiveWidth(screenWidth);
-        int x = screenWidth - effectiveW - 10;
+        int effectiveW = getEffectiveWidth(screenWidth, rightOffset);
+        int x = getPanelX(screenWidth);
         int y = 66;
         int height = screenHeight - 74;
         hoveredStack = null;
         hoveredMachines = false;
 
         if (collapsed) {
-            // Mini collapsed tab
             int tabW = 24;
             int tabH = 50;
-            int tabX = screenWidth - tabW - 4;
+            int tabX = getTabX(screenWidth);
             graphics.fill(tabX, y, tabX + tabW, y + tabH, 0xEE1E2430);
             graphics.renderOutline(tabX, y, tabW, tabH, 0xFF3D4B66);
             graphics.drawCenteredString(font, "⚡", tabX + tabW / 2, y + 8, 0xFFFFAA00);
@@ -199,7 +238,7 @@ public class SummaryOverlay {
         int curY = contentY - (int) scrollY;
 
         // Section A: Raw Inputs
-        graphics.drawString(font, "§c📥 " + Component.translatable("gui.gtcalcboard.raw_inputs").getString(), x + 8, curY, 0xFFFFFFFF, false);
+        graphics.drawString(font, "§c« " + Component.translatable("gui.gtcalcboard.raw_inputs").getString(), x + 8, curY, 0xFFFFFFFF, false);
         curY += 14;
 
         if (summary.rawInputs().isEmpty()) {
@@ -216,7 +255,7 @@ public class SummaryOverlay {
 
         // Section B: Net Outputs
         curY += 8;
-        graphics.drawString(font, "§a📤 " + Component.translatable("gui.gtcalcboard.net_outputs").getString(), x + 8, curY, 0xFFFFFFFF, false);
+        graphics.drawString(font, "§a» " + Component.translatable("gui.gtcalcboard.net_outputs").getString(), x + 8, curY, 0xFFFFFFFF, false);
         curY += 14;
 
         if (summary.netOutputs().isEmpty()) {
@@ -277,7 +316,7 @@ public class SummaryOverlay {
         IngredientRenderer.render(graphics, stack, x + 8, y - 2);
 
         String ratePrefix = rate > 0 ? "+" : "";
-        String rateStr = ratePrefix + formatRate(rate, stack.isFluid());
+        String rateStr = ratePrefix + formatRate(rate, stack);
         int rateW = font.width(rateStr);
 
         int textPaddingRight = hasActionButton ? 18 : 0;
@@ -296,7 +335,7 @@ public class SummaryOverlay {
                 hoveredActionStack = stack;
                 hoveredActionIsRestore = isVoidSection;
             }
-            String btnIcon = isVoidSection ? "§a↩" : "§d🗑";
+            String btnIcon = isVoidSection ? "§a↩" : "§d✖";
             graphics.drawString(font, btnIcon, btnX + 2, btnY + 2, 0xFFFFFFFF, false);
         }
 
@@ -327,9 +366,9 @@ public class SummaryOverlay {
             tooltip.add(Component.literal("§6⚙ " + Component.translatable("gui.gtcalcboard.total_stress").getString()));
             double totSU = lastSummary.totalSU();
             if (totSU >= 0) {
-                tooltip.add(Component.literal(String.format(java.util.Locale.ROOT, "§7Capacity Surplus: §a+%,.0f SU", totSU)));
+                tooltip.add(Component.literal("§7").append(Component.translatable("gui.gtcalcboard.summary.capacity_surplus", String.format(java.util.Locale.ROOT, "%,.0f", totSU))));
             } else {
-                tooltip.add(Component.literal(String.format(java.util.Locale.ROOT, "§7Stress Deficit: §c-%,.0f SU", -totSU)));
+                tooltip.add(Component.literal("§7").append(Component.translatable("gui.gtcalcboard.summary.stress_deficit", String.format(java.util.Locale.ROOT, "%,.0f", -totSU))));
                 tooltip.add(Component.literal("§4⚠ " + Component.translatable("gui.gtcalcboard.tooltip.overstressed").getString()));
             }
             BoardTooltipRenderer.renderComponentTooltip(graphics, font, tooltip, mouseX, mouseY);
@@ -339,7 +378,7 @@ public class SummaryOverlay {
         if (hoveredFusion && lastSummary != null && lastSummary.totalFusionStartupEU() > 0) {
             List<Component> tooltip = new ArrayList<>();
             tooltip.add(Component.literal("§d⚛ " + Component.translatable("gui.gtcalcboard.fusion_start_buffer_title").getString()));
-            tooltip.add(Component.literal(String.format(java.util.Locale.ROOT, "§7Total Required Startup Energy: §e%,d EU", lastSummary.totalFusionStartupEU())));
+            tooltip.add(Component.literal("§7").append(Component.translatable("gui.gtcalcboard.badge.required_ignition_energy", String.format(java.util.Locale.ROOT, "§e%,d", lastSummary.totalFusionStartupEU()))));
             tooltip.add(Component.literal(String.format(java.util.Locale.ROOT, "§7Formatted: §f%s EU", FormatUtil.formatCompactNumber(lastSummary.totalFusionStartupEU()))));
             tooltip.add(Component.literal("§8§m------------------------"));
             tooltip.add(Component.literal("§b" + Component.translatable("gui.gtcalcboard.fusion_breakdown_title").getString()));
@@ -358,7 +397,7 @@ public class SummaryOverlay {
 
         if (hoveredMachines && lastSummary != null && !lastSummary.machineBreakdown().isEmpty()) {
             List<Component> tooltip = new ArrayList<>();
-            tooltip.add(Component.literal("§6🏭 " + Component.translatable("gui.gtcalcboard.total_machines_breakdown").getString()));
+            tooltip.add(Component.literal("§6▦ " + Component.translatable("gui.gtcalcboard.total_machines_breakdown").getString()));
             for (Map.Entry<String, Integer> entry : lastSummary.machineBreakdown().entrySet()) {
                 tooltip.add(Component.literal("§7• " + entry.getKey() + ": §f" + entry.getValue() + Component.translatable("gui.gtcalcboard.machine_unit").getString()));
             }
@@ -375,23 +414,26 @@ public class SummaryOverlay {
         if (hoveredStack != null) {
             List<Component> tooltip = new ArrayList<>();
             tooltip.add(Component.literal(hoveredStack.getDisplayName()));
-            String exactRateStr = FormatUtil.formatExactRate(hoveredRate, hoveredStack.isFluid());
+            String exactRateStr = FormatUtil.formatExactRate(hoveredRate, hoveredStack);
             String ratePrefix = hoveredRate > 0 ? "+" : "";
-            tooltip.add(Component.literal("§7Rate: §f" + ratePrefix + exactRateStr));
+            tooltip.add(Component.literal("§7").append(Component.translatable("gui.gtcalcboard.summary.rate", "§f" + ratePrefix + exactRateStr)));
             tooltip.add(Component.literal("§8").append(Component.translatable("gui.gtcalcboard.tooltip.recipes_uses")));
             BoardTooltipRenderer.renderComponentTooltip(graphics, font, tooltip, mouseX, mouseY);
         }
     }
 
-    private String formatRate(double rate, boolean isFluid) {
-        return NodeCardRenderer.formatRate(rate, isFluid);
+    private String formatRate(double rate, IngredientStack stack) {
+        if (stack != null && stack.isStressUnit()) {
+            return FormatUtil.formatRate(rate, stack);
+        }
+        return NodeCardRenderer.formatRate(rate, stack != null && stack.isFluid());
     }
 
     public boolean mouseScrolled(double mouseX, double mouseY, double delta, int screenWidth, int screenHeight) {
         if (collapsed) return false;
 
-        int effectiveW = getEffectiveWidth(screenWidth);
-        int x = screenWidth - effectiveW - 10;
+        int effectiveW = getEffectiveWidth(screenWidth, rightOffset);
+        int x = getPanelX(screenWidth);
         int y = 66;
         int height = screenHeight - 74;
 
@@ -408,7 +450,7 @@ public class SummaryOverlay {
         if (collapsed) {
             int tabW = 24;
             int tabH = 50;
-            int tabX = screenWidth - tabW - 4;
+            int tabX = getTabX(screenWidth);
             int y = 66;
             if (mouseX >= tabX && mouseX <= tabX + tabW && mouseY >= y && mouseY <= y + tabH) {
                 toggle();
@@ -417,8 +459,8 @@ public class SummaryOverlay {
             return false;
         }
 
-        int effectiveW = getEffectiveWidth(screenWidth);
-        int x = screenWidth - effectiveW - 10;
+        int effectiveW = getEffectiveWidth(screenWidth, rightOffset);
+        int x = getPanelX(screenWidth);
         int y = 66;
 
         // Void Section Header Click -> collapse/expand void section
@@ -452,9 +494,13 @@ public class SummaryOverlay {
     }
 
     private void executeVoidAction(IngredientStack stack, boolean restore) {
-        if (Minecraft.getInstance().screen instanceof BoardScreen bs) {
-            if (!bs.ensureEditPermission()) return;
-            FlowGraph graph = bs.getGraph();
+        IBoardScreenContext ctx = this.screen;
+        if (ctx == null && Minecraft.getInstance().screen instanceof IBoardScreenContext bs) {
+            ctx = bs;
+        }
+        if (ctx != null) {
+            if (!ctx.ensureEditPermission()) return;
+            FlowGraph graph = ctx.getGraph();
             if (graph == null) return;
             boolean changed = false;
             for (RecipeNode node : graph.getNodes()) {
@@ -477,7 +523,7 @@ public class SummaryOverlay {
                 }
             }
             if (changed) {
-                bs.markSummaryDirty();
+                ctx.markSummaryDirty();
                 Minecraft.getInstance().getSoundManager().play(
                     net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
                         SoundEvents.UI_BUTTON_CLICK, restore ? 1.4F : 0.9F

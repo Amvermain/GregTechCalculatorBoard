@@ -163,6 +163,7 @@ public class C2SChunkedCommitPacket {
             // 2. Optimistic concurrency control / revision conflict check (RFC-003)
             if (page != null && page.getPageRevision() != this.revision) {
                 NetworkHandler.sendToPlayer(player, new S2CWorkspaceErrorPacket(409, "gui.gtcalcboard.error.revision_conflict"));
+                NetworkHandler.sendToPlayer(player, ws.buildMetaPacket());
                 return;
             }
 

@@ -11,7 +11,7 @@ import com.gtceu.calcboard.api.type.PowerDisplayMode;
 import com.gtceu.calcboard.api.type.RateTimeUnit;
 import com.gtceu.calcboard.client.gui.util.FormatUtil;
 
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 import com.gtceu.calcboard.compat.thermal.helper.ThermalAugmentHelper;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
@@ -153,7 +153,7 @@ public class SysteamsBoilerTest {
         }
 
         // 4. Verify GUI Header and Tooltip match the in-game display
-        var adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(evBoiler);
+        var adapter = ModAdapterRegistry.getAdapterForNode(evBoiler);
         String formattedStats = adapter.formatEnergyStats(evBoiler, PowerDisplayMode.EUT);
         Assertions.assertTrue(formattedStats.contains("576") && formattedStats.contains("Steam"), "Header should format 576 Steam: " + formattedStats);
         Assertions.assertTrue(formattedStats.contains("B/s") || formattedStats.contains("mB/s"), "Header must include fluid unit: " + formattedStats);
@@ -386,7 +386,7 @@ public class SysteamsBoilerTest {
         boiler.setRecipeCategoryId(ResourceLocation.tryParse("systeams:boiling"));
         boiler.setMachineIcon(ResourceLocation.tryParse("systeams:lapidary_boiler"));
 
-        var adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(boiler);
+        var adapter = ModAdapterRegistry.getAdapterForNode(boiler);
         Assertions.assertTrue(adapter instanceof com.gtceu.calcboard.compat.systeams.SysteamsModAdapter);
 
         CompoundTag lvTag = new CompoundTag();

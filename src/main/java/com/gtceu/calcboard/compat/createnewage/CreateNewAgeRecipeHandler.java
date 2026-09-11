@@ -8,7 +8,7 @@ import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.model.SearchableRecipe;
-import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
+import com.gtceu.calcboard.api.model.RecipeDetails;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -27,7 +27,7 @@ public class CreateNewAgeRecipeHandler {
 
     public static final String MOD_ID = "create_new_age";
 
-    public static boolean adaptRecipeDetails(Object emiRecipe, Object backingRecipe, EmiRecipeConverter.RecipeDetails details) {
+    public static boolean adaptRecipeDetails(Object emiRecipe, Object backingRecipe, RecipeDetails details) {
         ResourceLocation catId = null;
         if (com.gtceu.calcboard.api.util.ModCompatHelper.isEmiLoaded()) {
             catId = EmiCreateNewAgeHelper.getCategoryId(emiRecipe);
@@ -171,133 +171,58 @@ public class CreateNewAgeRecipeHandler {
         return null;
     }
 
-    public static List<SearchableRecipe> getVirtualSearchRecipes() {
-        if (!ModCompatHelper.isCreateNewAgeLoaded()) {
-            return Collections.emptyList();
-        }
-        List<SearchableRecipe> list = new ArrayList<>();
-        String catId = "create_new_age:generation";
-        String catName = Component.translatable("category.gtcalcboard.create_new_age").getString();
-        if (catName.isEmpty() || catName.startsWith("category.gtcalcboard")) {
-            catName = "Create: New Age";
-        }
+    public static void collectNativeCatalogRecipes(List<SearchableRecipe> collector) {
+        if (!ModCompatHelper.isCreateNewAgeLoaded()) return;
 
-        ResourceLocation[] items = {
-                ResourceLocation.tryParse("create_new_age:generator_coil"),
-                ResourceLocation.tryParse("create_new_age:carbon_brushes"),
-                ResourceLocation.tryParse("create_new_age:basic_motor"),
-                ResourceLocation.tryParse("create_new_age:advanced_motor"),
-                ResourceLocation.tryParse("create_new_age:reinforced_motor"),
-                ResourceLocation.tryParse("create_new_age:stirling_engine"),
-                ResourceLocation.tryParse("create_new_age:solar_heating_plate"),
-                ResourceLocation.tryParse("create_new_age:energiser_t1")
-        };
+        record CNACandidate(String path, String defaultName, com.gtceu.calcboard.compat.create.KineticCategory category) {}
 
-        String[] fallbackNames = {
-                "Generator Coil",
-                "Carbon Brushes",
-                "Basic Motor",
-                "Advanced Motor",
-                "Reinforced Motor",
-                "Stirling Engine",
-                "Solar Heating Plate",
-                "Energiser T1"
-        };
+        List<CNACandidate> candidates = List.of(
+                new CNACandidate("generator_coil", "Generator Coil", com.gtceu.calcboard.compat.create.KineticCategory.ALTERNATOR),
+                new CNACandidate("carbon_brushes", "Carbon Brushes", com.gtceu.calcboard.compat.create.KineticCategory.ALTERNATOR),
+                new CNACandidate("basic_motor", "Basic Motor", com.gtceu.calcboard.compat.create.KineticCategory.MOTOR),
+                new CNACandidate("advanced_motor", "Advanced Motor", com.gtceu.calcboard.compat.create.KineticCategory.MOTOR),
+                new CNACandidate("reinforced_motor", "Reinforced Motor", com.gtceu.calcboard.compat.create.KineticCategory.MOTOR),
+                new CNACandidate("stirling_engine", "Stirling Engine", com.gtceu.calcboard.compat.create.KineticCategory.FUEL_ENGINE)
+        );
 
-        for (int i = 0; i < items.length; i++) {
-            if (items[i] == null) continue;
-            try {
-                var regItem = net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(items[i]);
-                if (regItem != null && regItem != net.minecraft.world.item.Items.AIR && com.gtceu.calcboard.api.catalog.DynamicAddonCrawler.isItemDisabledOrHidden(regItem, null)) {
-                    continue;
+        for (CNACandidate c : candidates) {
+            ResourceLocation itemId = ResourceLocation.tryParse(MOD_ID + ":" + c.path);
+            String name = c.defaultName;
+
+            if (isRealModLoaded(MOD_ID) && ForgeRegistries.ITEMS != null) {
+                var item = ForgeRegistries.ITEMS.getValue(itemId);
+                if (item == null || item == net.minecraft.world.item.Items.AIR) continue;
+                if (DynamicAddonCrawler.isItemDisabledOrHidden(item, null)) continue;
+                String hover = new ItemStack(item).getHoverName().getString();
+                if (hover != null && !hover.isEmpty()) {
+                    name = hover;
                 }
-            } catch (Throwable ignored) {}
-            RecipeNode node = createKineticGeneratorNode(items[i], fallbackNames[i]);
-            if (node != null) {
-                String displayName = node.getName();
-                String modId = items[i].getNamespace();
-
-                List<String> outputNames = new ArrayList<>();
-                List<String> outputIds = new ArrayList<>();
-                for (IngredientStack out : node.getOutputs()) {
-                    outputNames.add(out.getDisplayName().toLowerCase(Locale.ROOT));
-                    if (out.getId() != null) outputIds.add(out.getId().toString().toLowerCase(Locale.ROOT));
-                    if (out.isStressUnit()) {
-                        outputNames.add("stress");
-                        outputNames.add("unit");
-                        outputNames.add("units");
-                        outputNames.add("su");
-                        outputNames.add("su/s");
-                        outputNames.add("kinetic");
-                        outputNames.add("스트레스");
-                    }
-                }
-                outputNames.add(displayName.toLowerCase(Locale.ROOT));
-                outputNames.add(fallbackNames[i].toLowerCase(Locale.ROOT));
-                if (items[i] != null) {
-                    outputIds.add(items[i].toString().toLowerCase(Locale.ROOT));
-                    outputIds.add(items[i].getPath().toLowerCase(Locale.ROOT));
-                }
-
-                List<String> inputNames = new ArrayList<>();
-                List<String> inputIds = new ArrayList<>();
-                for (IngredientStack in : node.getInputs()) {
-                    inputNames.add(in.getDisplayName().toLowerCase(Locale.ROOT));
-                    if (in.getId() != null) inputIds.add(in.getId().toString().toLowerCase(Locale.ROOT));
-                    if (in.isStressUnit()) {
-                        inputNames.add("stress");
-                        inputNames.add("unit");
-                        inputNames.add("units");
-                        inputNames.add("su");
-                        inputNames.add("su/s");
-                        inputNames.add("kinetic");
-                        inputNames.add("스트레스");
-                    }
-                }
-                inputNames.add(displayName.toLowerCase(Locale.ROOT));
-                inputNames.add(fallbackNames[i].toLowerCase(Locale.ROOT));
-                if (items[i] != null) {
-                    inputIds.add(items[i].toString().toLowerCase(Locale.ROOT));
-                    inputIds.add(items[i].getPath().toLowerCase(Locale.ROOT));
-                }
-
-                String outputSearchIndex = (String.join(" ", outputNames) + " " + String.join(" ", outputIds)).trim();
-                String inputSearchIndex = (String.join(" ", inputNames) + " " + String.join(" ", inputIds) + " " + fallbackNames[i].toLowerCase(Locale.ROOT) + " " + displayName.toLowerCase(Locale.ROOT) + " kinetic stress units generator create su fe electricity new age magnet coil").trim();
-
-                List<ResourceLocation> inIdsList = new ArrayList<>();
-                for (IngredientStack in : node.getInputs()) {
-                    if (in.getId() != null) inIdsList.add(in.getId());
-                }
-                List<ResourceLocation> outIdsList = new ArrayList<>();
-                for (IngredientStack out : node.getOutputs()) {
-                    if (out.getId() != null) outIdsList.add(out.getId());
-                }
-                ResourceLocation[] inArr = inIdsList.isEmpty() ? null : inIdsList.toArray(new ResourceLocation[0]);
-                ResourceLocation[] outArr = outIdsList.isEmpty() ? null : outIdsList.toArray(new ResourceLocation[0]);
-                String[] inNamesArr = inputNames.isEmpty() ? null : inputNames.toArray(new String[0]);
-                String[] outNamesArr = outputNames.isEmpty() ? null : outputNames.toArray(new String[0]);
-
-                list.add(new SearchableRecipe(
-                        node,
-                        displayName,
-                        modId.intern(),
-                        catId.intern(),
-                        catName.intern(),
-                        inputSearchIndex,
-                        outputSearchIndex,
-                        inArr,
-                        outArr,
-                        inNamesArr,
-                        outNamesArr
-                ));
             }
+
+            final String finalName = name;
+            RecipeNode templateNode = createKineticGeneratorNode(itemId, finalName);
+            if (templateNode == null) continue;
+
+            String catId = c.category.getCategoryId().toString();
+            String catName = Component.translatable(c.category.getLangKey()).getString();
+
+            collector.add(com.gtceu.calcboard.api.catalog.NativeCatalogSearchHelper.createRecipe(
+                    templateNode,
+                    itemId,
+                    catId,
+                    catName,
+                    () -> createKineticGeneratorNode(itemId, finalName)
+            ));
         }
-        return list;
     }
 
-    public static void registerSyntheticEmiRecipes(Object emiRegistryObj, Object emiCategoryObj, java.util.Set<net.minecraft.world.item.Item> activeRecipeItems) {
-        if (!com.gtceu.calcboard.api.util.ModCompatHelper.isEmiLoaded()) return;
-        EmiCreateNewAgeHelper.registerSyntheticEmiRecipes(emiRegistryObj, emiCategoryObj, activeRecipeItems);
+    private static boolean isRealModLoaded(String modId) {
+        try {
+            var list = net.minecraftforge.fml.ModList.get();
+            return list != null && list.isLoaded(modId);
+        } catch (Throwable t) {
+            return false;
+        }
     }
 
     private static class EmiCreateNewAgeHelper {
@@ -306,70 +231,6 @@ public class CreateNewAgeRecipeHandler {
                 return recipe.getCategory().getId();
             }
             return null;
-        }
-
-        private static void registerSyntheticEmiRecipes(Object emiRegistryObj, Object emiCategoryObj, java.util.Set<net.minecraft.world.item.Item> activeRecipeItems) {
-            if (!(emiRegistryObj instanceof dev.emi.emi.api.EmiRegistry registry) || !(emiCategoryObj instanceof dev.emi.emi.api.recipe.EmiRecipeCategory category)) {
-                return;
-            }
-
-            record CNACandidate(String path, String defaultName, double amount, boolean isGen, List<IngredientStack> inputs, EnergyType energyType) {}
-
-            List<CNACandidate> candidates = List.of(
-                    new CNACandidate("generator_coil", "Generator Coil", 512.0, true,
-                            List.of(IngredientStack.stressUnit(768.0)), EnergyType.ELECTRIC_FE),
-                    new CNACandidate("carbon_brushes", "Carbon Brushes", 256.0, true,
-                            List.of(IngredientStack.stressUnit(768.0)), EnergyType.ELECTRIC_FE),
-                    new CNACandidate("basic_motor", "Basic Motor", 512.0, false,
-                            List.of(), EnergyType.ELECTRIC_FE),
-                    new CNACandidate("advanced_motor", "Advanced Motor", 2048.0, false,
-                            List.of(), EnergyType.ELECTRIC_FE),
-                    new CNACandidate("reinforced_motor", "Reinforced Motor", 8192.0, false,
-                            List.of(), EnergyType.ELECTRIC_FE),
-                    new CNACandidate("stirling_engine", "Stirling Engine", 1024.0, true,
-                            null, EnergyType.KINETIC_SU)
-            );
-
-            for (CNACandidate c : candidates) {
-                var itemId = ResourceLocation.tryParse(MOD_ID + ":" + c.path);
-                var item = ForgeRegistries.ITEMS.getValue(itemId);
-                if (item == null || item == net.minecraft.world.item.Items.AIR) continue;
-
-                // Strict check: if the item is disabled or hidden from recipe viewers or has no recipes in modpack, do NOT register!
-                if (com.gtceu.calcboard.api.catalog.DynamicAddonCrawler.isItemDisabledOrHidden(item, (activeRecipeItems != null && !activeRecipeItems.isEmpty()) ? activeRecipeItems : null)) {
-                    continue;
-                }
-
-                var block = ForgeRegistries.BLOCKS.getValue(itemId);
-                double amount = com.gtceu.calcboard.compat.create.CreateRecipeHandler.getDynamicStressCapacity(block, c.amount);
-
-                var stack = new ItemStack(item);
-                String name = stack.getHoverName().getString();
-                if (name == null || name.isEmpty()) name = c.defaultName;
-
-                List<IngredientStack> outStacks = new ArrayList<>();
-                if (c.energyType == EnergyType.KINETIC_SU) {
-                    outStacks.add(IngredientStack.stressUnit(amount));
-                }
-
-                var recipe = new com.gtceu.calcboard.integration.emi.KineticGenerationEmiRecipe(
-                        ResourceLocation.tryParse("gtcalcboard:kinetic_gen/" + MOD_ID + "/" + c.path),
-                        category,
-                        itemId,
-                        name,
-                        20.0,
-                        amount,
-                        GTVoltageTier.LV,
-                        c.energyType,
-                        c.isGen,
-                        c.inputs != null ? c.inputs : List.of(),
-                        outStacks,
-                        stack
-                );
-
-                registry.addWorkstation(category, dev.emi.emi.api.stack.EmiStack.of(stack));
-                registry.addRecipe(recipe);
-            }
         }
     }
 }

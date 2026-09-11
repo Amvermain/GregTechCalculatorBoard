@@ -183,6 +183,16 @@ public class ThermalAugmentHelper {
         return 1.0;
     }
 
+    private static final java.util.Set<String> DYNAMO_AUGMENT_TYPES = java.util.Set.of("dynamo", "fuel");
+    private static final java.util.Set<String> MACHINE_AUGMENT_TYPES = java.util.Set.of("machine", "process");
+
+    private static final java.util.Set<String> DYNAMO_AUGMENT_PATHS = java.util.Set.of(
+            "dynamo", "reaction_chamber", "injector", "flux_linkage"
+    );
+    private static final java.util.Set<String> MACHINE_AUGMENT_PATHS = java.util.Set.of(
+            "machine", "sieve", "reclamation", "catalyst", "filter"
+    );
+
     private static ThermalAugmentAddon.AugmentTarget resolveAugmentTarget(CompoundTag augTag, ResourceLocation id, boolean isKit) {
         if (isKit) return ThermalAugmentAddon.AugmentTarget.ALL;
 
@@ -192,13 +202,12 @@ public class ThermalAugmentHelper {
         boolean hasDynamoKeys = augTag.contains("DynamoPower") || augTag.contains("DynPower") || augTag.contains("DynamoEnergy") || augTag.contains("DynEnergy") || augTag.contains("FuelMod");
         boolean hasMachineKeys = augTag.contains("MachinePower") || augTag.contains("ProcessPower") || augTag.contains("MachineSpeed") || augTag.contains("ProcessSpeed") || augTag.contains("MachineEnergy");
 
-        if (hasDynamoKeys || typeStr.contains("dynamo") || typeStr.contains("fuel")
-                || path.contains("dynamo") || path.contains("reaction_chamber") || path.contains("injector")
-                || path.contains("flux_linkage")) {
+        boolean isDynamo = hasDynamoKeys || DYNAMO_AUGMENT_TYPES.contains(typeStr) || path.startsWith("dynamo") || DYNAMO_AUGMENT_PATHS.contains(path);
+        boolean isMachine = hasMachineKeys || MACHINE_AUGMENT_TYPES.contains(typeStr) || path.startsWith("machine") || MACHINE_AUGMENT_PATHS.contains(path);
+
+        if (isDynamo) {
             return ThermalAugmentAddon.AugmentTarget.DYNAMO;
-        } else if (hasMachineKeys || typeStr.contains("machine") || typeStr.contains("process")
-                || path.contains("machine") || path.contains("sieve") || path.contains("reclamation")
-                || path.contains("catalyst") || path.contains("filter")) {
+        } else if (isMachine) {
             return ThermalAugmentAddon.AugmentTarget.MACHINE;
         }
 
@@ -207,13 +216,13 @@ public class ThermalAugmentHelper {
 
     private static String formatAugmentDescription(boolean isKit, int parallel, double eutMult, double durMult) {
         if (isKit) {
-            return String.format(Locale.ROOT, "⚡ %dx Scale Factor", parallel);
+            return String.format(Locale.ROOT, "⚡ %dx Scale", parallel);
         } else if (eutMult != 1.0 && durMult != 1.0) {
-            return String.format(Locale.ROOT, "⚡ Max Output: +%d%% (%.2fx) | ⏱ Fuel: %.2fx", (int) Math.round((eutMult - 1.0) * 100), eutMult, durMult);
+            return String.format(Locale.ROOT, "⚡%+d%% · ⏱%+d%%", (int) Math.round((eutMult - 1.0) * 100), (int) Math.round((durMult - 1.0) * 100));
         } else if (durMult != 1.0) {
-            return String.format(Locale.ROOT, "⏱ Fuel Energy: %.2fx (%+d%%)", durMult, (int) Math.round((durMult - 1.0) * 100));
+            return String.format(Locale.ROOT, "⏱ Fuel: %+d%%", (int) Math.round((durMult - 1.0) * 100));
         } else if (eutMult != 1.0) {
-            return String.format(Locale.ROOT, "⚡ Max Output: +%d%% (%.2fx)", (int) Math.round((eutMult - 1.0) * 100), eutMult);
+            return String.format(Locale.ROOT, "⚡ Output: %+d%%", (int) Math.round((eutMult - 1.0) * 100));
         }
         return "";
     }
@@ -502,7 +511,7 @@ public class ThermalAugmentHelper {
         if (isThermalUpgradeKit(addon)) {
             buildUpgradeKitTooltip(node, addon, isActiveAddon, tooltip);
         } else {
-            buildRegularAugmentTooltip(node, addon, tooltip);
+            buildRegularAugmentTooltip(node, addon, isActiveAddon, tooltip);
         }
     }
 
@@ -511,7 +520,7 @@ public class ThermalAugmentHelper {
         if (isActiveAddon) {
             tooltip.add(Component.literal("§c").append(Component.translatable("gui.gtcalcboard.addon.thermal.remove_kit")));
         } else {
-            boolean isInst = node.getAddons().stream().anyMatch(a -> a.getId().equals(addon.getId()));
+            boolean isInst = node != null && node.getAddons().stream().anyMatch(a -> a.getId().equals(addon.getId()));
             if (isInst) {
                 tooltip.add(Component.literal("§c").append(Component.translatable("gui.gtcalcboard.addon.thermal.remove_kit")));
             } else {
@@ -520,17 +529,45 @@ public class ThermalAugmentHelper {
         }
     }
 
-    private static void buildRegularAugmentTooltip(RecipeNode node, MachineAddon addon, List<Component> tooltip) {
-        long totalRegAugs = node.getAddons().stream().filter(a -> !isThermalUpgradeKit(a)).count();
-        int targetCount = (int) node.getAddons().stream().filter(a -> a.getId().equals(addon.getId())).count();
+    private static void buildRegularAugmentTooltip(RecipeNode node, MachineAddon addon, boolean isActiveAddon, List<Component> tooltip) {
+        boolean isGenerator = node != null && (node.isGenerator() || isDynamoNode(node));
+        double eutMult = addon.getEutMultiplier();
+        double durMult = addon.getDurationMultiplier();
+        int parallel = addon.getParallelMultiplier();
+
+        if (parallel > 1) {
+            tooltip.add(Component.literal("§d⚡ ").append(Component.translatable("gui.gtcalcboard.addon.thermal.scale_factor", parallel)));
+        }
+        if (eutMult != 1.0) {
+            String pctStr = String.format(Locale.ROOT, "%+d%%", (int) Math.round((eutMult - 1.0) * 100));
+            String multStr = String.format(Locale.ROOT, "%.2fx", eutMult);
+            String key = isGenerator ? "gui.gtcalcboard.addon.thermal.power_output" : "gui.gtcalcboard.addon.thermal.machine_power";
+            tooltip.add(Component.literal("§b⚡ ").append(Component.translatable(key, pctStr, multStr)));
+        }
+        if (durMult != 1.0) {
+            String multStr = String.format(Locale.ROOT, "%.2fx", durMult);
+            String pctStr = String.format(Locale.ROOT, "%+d%%", (int) Math.round((durMult - 1.0) * 100));
+            String key = isGenerator ? "gui.gtcalcboard.addon.thermal.fuel_energy" : "gui.gtcalcboard.addon.thermal.process_duration";
+            tooltip.add(Component.literal("§e⏱ ").append(Component.translatable(key, multStr, pctStr)));
+        }
+
+        long totalRegAugs = node != null ? node.getAddons().stream().filter(a -> !isThermalUpgradeKit(a)).count() : 0;
+        int targetCount = node != null ? (int) node.getAddons().stream().filter(a -> a.getId().equals(addon.getId())).count() : 0;
+
+        if (targetCount > 1 && (eutMult != 1.0 || durMult != 1.0 || parallel > 1)) {
+            String combSummary = formatCombinedSummary(eutMult, durMult, parallel, targetCount);
+            tooltip.add(Component.literal("§a  ↳ ").append(Component.translatable("gui.gtcalcboard.addon.thermal.combined_effect", targetCount, combSummary)));
+        }
 
         tooltip.add(Component.literal("§7").append(Component.translatable("gui.gtcalcboard.addon.thermal.slots", totalRegAugs)));
         if (targetCount > 0) {
             tooltip.add(Component.literal("§a").append(Component.translatable("gui.gtcalcboard.addon.thermal.installed", targetCount)));
-            if (totalRegAugs < 3) {
-                tooltip.add(Component.literal("§a").append(Component.translatable("gui.gtcalcboard.addon.thermal.add_copy")));
+            if (!isActiveAddon) {
+                if (totalRegAugs < 3) {
+                    tooltip.add(Component.literal("§a").append(Component.translatable("gui.gtcalcboard.addon.thermal.add_copy")));
+                }
+                tooltip.add(Component.literal("§c").append(Component.translatable("gui.gtcalcboard.addon.thermal.remove_copy")));
             }
-            tooltip.add(Component.literal("§c").append(Component.translatable("gui.gtcalcboard.addon.thermal.remove_copy")));
         } else {
             if (totalRegAugs < 3) {
                 tooltip.add(Component.literal("§a").append(Component.translatable("gui.gtcalcboard.addon.thermal.install")));
@@ -538,6 +575,20 @@ public class ThermalAugmentHelper {
                 tooltip.add(Component.literal("§e").append(Component.translatable("gui.gtcalcboard.addon.thermal.slots_full")));
             }
         }
+    }
+
+    private static String formatCombinedSummary(double eutMult, double durMult, int parallel, int count) {
+        StringBuilder sb = new StringBuilder();
+        if (parallel > 1) {
+            sb.append(String.format(Locale.ROOT, "⚡%dx ", (int) Math.pow(parallel, count)));
+        }
+        if (eutMult != 1.0) {
+            sb.append(String.format(Locale.ROOT, "⚡%.2fx ", Math.pow(eutMult, count)));
+        }
+        if (durMult != 1.0) {
+            sb.append(String.format(Locale.ROOT, "⏱%.2fx ", Math.pow(durMult, count)));
+        }
+        return sb.toString().trim();
     }
 }
 

@@ -8,7 +8,7 @@
 
 | 항목 | 내용 |
 | :--- | :--- |
-| **문서 버전** | `v2.1.0` (ADR-001 ~ ADR-019 정합 완료) |
+| **문서 버전** | `v2.2.0-beta.4` (ADR-001 ~ ADR-044 정합 완료) |
 | **대상 플랫폼** | Minecraft 1.20.1 (Minecraft Forge 47.2.0+) |
 | **의존성** | Java 17+, GregTech CEu Modern, EMI / JEI (Recipe Viewer) |
 | **소프트 의존성** | FTB Teams, Phoenix Guilds (멀티플레이 팀 연동) |
@@ -23,7 +23,7 @@
 docs/ko_kr/
 ├── CODE_SPECIFICATION.md                    # 📑 [한국어 마스터 인덱스]
 ├── TEST_CHECKLIST.md                        # 🧪 [한국어 종합 QA 체크리스트]
-├── ARCHITECTURE.md                          # 🏛️ [한국어 아키텍처 가이드]
+├── ARCHITECTURE.md                          # 🏛 [한국어 아키텍처 가이드]
 └── spec/
     ├── [00] 시스템 아키텍처 개요 및 설계 원칙 ────────► 00_OVERVIEW.md
     ├── [01] 코어 도메인 모델 및 수용능력 매트릭스 ──────► 01_CORE_DOMAIN_AND_MODELS.md

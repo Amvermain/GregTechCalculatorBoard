@@ -5,6 +5,8 @@
 </p>
 
 <p align="center">
+  <a href="https://www.curseforge.com/minecraft/mc-mods/gregtech-calculator-board"><img src="https://img.shields.io/curseforge/dt/1183699?logo=curseforge&logoColor=white&color=f16436&label=CurseForge" alt="CurseForge"></a>
+  <a href="https://modrinth.com/mod/gtcalcboard"><img src="https://img.shields.io/modrinth/dt/gtcalcboard?logo=modrinth&logoColor=white&color=00AF5C&label=Modrinth" alt="Modrinth"></a>
   <img src="https://img.shields.io/badge/Minecraft-1.20.1-brightgreen.svg" alt="Minecraft 1.20.1">
   <img src="https://img.shields.io/badge/Loader-Forge%2047.2.0+-orange.svg" alt="Forge">
   <img src="https://img.shields.io/badge/GregTech-CEu%20Modern-blue.svg" alt="GTCEu Modern">
@@ -92,10 +94,13 @@
 | 파이프라인 연결 | 포트 클릭 드래그 -> 대상 포트에 드롭 |
 | 드래그 앤 검색 & 자동 연결 | 포트에서 빈 캔버스로 드래그 -> 레시피 선택 |
 | 스마트 자동 맞춤 연결 | Shift + 드래그 연결 (정수 올림 1:1 맞춤) |
+| 목표 생산량 역산 대화창 | 출력 포트 Ctrl + 좌클릭 |
+| 맥락형 컨텍스트 메뉴 | 빈 캔버스, 노드, 포트, 선택 영역 우클릭 |
+| 언리얼 패닝 및 대각선 이동 | 우클릭 드래그 또는 WASD / 방향키 (Shift 가속) |
 | 와이어 / 포트 연결 해제 | 연결선 또는 포트 소켓 우클릭 |
 | 보이드 처리 토글 | 출력 포트 Alt + 우클릭 |
 | 인플레이스 레시피 전환 | 기계 설정창의 [🔄 Switch Recipe] 또는 노드 우클릭 메뉴 |
-| 시간 단위계 순환 | T (/s -> /min -> /h -> /d -> /t) |
+| 시간 단위계 순환 | T (/s -> /min -> /h -> /d -> /t -> 1x 1회 배치) |
 | 전역 유체 단위계 순환 | Shift + T (Auto -> Always mB -> Always B) |
 | 기계 설정창 UI 배율 조절 | [Aa 1.0x] 버튼 클릭(좌/우), 휠 스크롤, 또는 [+] / [-] 키 |
 | 기준 기계(Anchor) 지정 | 기계 카드 헤더의 닻(Anchor) 아이콘 클릭 |
@@ -109,6 +114,13 @@
 | 탭 및 툴바 스크롤 | 마우스 휠 또는 [«] / [»] 오버플로우 화살표 클릭 |
 
 </details>
+
+---
+
+## 다운로드 (Downloads)
+
+- **CurseForge**: [GregTech Calculator Board - Minecraft Mods - CurseForge](https://www.curseforge.com/minecraft/mc-mods/gregtech-calculator-board)
+- **Modrinth**: [GTCalcBoard - Minecraft Mod](https://modrinth.com/mod/gtcalcboard)
 
 ---
 
@@ -136,6 +148,7 @@
   - [Applied Energistics 2 (AE2)](https://curseforge.com/minecraft/mc-mods/applied-energistics-2) (오토크래프팅 패턴 바인딩 & DAG 완료 시간 연산)
   - [Create](https://curseforge.com/minecraft/mc-mods/create) (0.5.1 / 6.0+)
   - [Create: New Age](https://curseforge.com/minecraft/mc-mods/create-new-age)
+  - [Greate](https://curseforge.com/minecraft/mc-mods/greate) (티어별 키네틱 기계 및 샤프트 연동)
   - [Thermal Series](https://curseforge.com/minecraft/mc-mods/thermal-expansion) (Expansion, Foundation, Cultivation)
   - [Systeams](https://curseforge.com/minecraft/mc-mods/systeams)
 - **멀티플레이어 팀 동기화 (선택)**:
@@ -151,7 +164,7 @@ git clone https://github.com/Amvermain/GregTechCalculatorBoard.git
 cd GregTechCalculatorBoard
 ./gradlew build
 ```
-컴파일된 jar 파일은 `build/libs/gtcalcboard-1.20.1-2.1.0.jar` 경로에 생성됩니다.
+컴파일된 jar 파일은 `build/libs/gtcalcboard-1.20.1-2.2.0-beta.4.jar` 경로에 생성됩니다.
 
 ---
 
@@ -176,6 +189,7 @@ cd GregTechCalculatorBoard
 
 - **The Reel One** - 계산기 보드의 사용성 개선을 위한 UX/UI 피드백, 디자인 제안 및 지속적인 테스트를 지원해 주셨습니다.
 - **rafaelpnsm** - 계산기 보드의 사용성 개선을 위한 UX/UI 피드백, 디자인 제안 및 지속적인 테스트를 지원해 주셨습니다.
+- **GenerusWeebius** - 꼼꼼한 테스트와 빈틈없는 버그 리포트로 완성도 향상에 기여해 주셨으며, 수학적 검증을 도와주셨습니다.
 
 ---
 

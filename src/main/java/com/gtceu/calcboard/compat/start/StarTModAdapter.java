@@ -6,10 +6,11 @@ import com.gtceu.calcboard.api.catalog.MultiblockDetector;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTThreadingHelix;
-import com.gtceu.calcboard.api.type.NodeThreadingConfig;
+import com.gtceu.calcboard.compat.start.helper.RecipeNodeThreadingHelper;
+import com.gtceu.calcboard.compat.start.model.NodeThreadingConfig;
 
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
 import com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter;
+import com.gtceu.calcboard.api.spi.extension.IBoosterProvider;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.fml.ModList;
@@ -17,8 +18,17 @@ import net.minecraftforge.fml.ModList;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 
 public class StarTModAdapter extends GTCEuModAdapter {
+
+    @Override
+    public <T> Optional<T> getExtension(Class<T> extensionClass) {
+        if (IBoosterProvider.class.equals(extensionClass)) {
+            return Optional.empty();
+        }
+        return super.getExtension(extensionClass);
+    }
 
     @Override
     public String getModId() {
@@ -45,6 +55,10 @@ public class StarTModAdapter extends GTCEuModAdapter {
     public boolean handlesCategory(ResourceLocation categoryId) {
         if (categoryId == null) return false;
         String ns = categoryId.getNamespace().toLowerCase(Locale.ROOT);
+        String path = categoryId.getPath().toLowerCase(Locale.ROOT);
+        if (path.equals("large_rotor_machine") || path.equals("gate_construction") || path.equals("stargate_component_assembly")) {
+            return true;
+        }
         return ns.equals("start_core") || ns.equals("gtceu_start") || ns.equals("start") || ns.equals("star_technology");
     }
 
@@ -71,7 +85,7 @@ public class StarTModAdapter extends GTCEuModAdapter {
             return true;
         }
 
-        return node.getThreadingConfig() != null && node.getThreadingConfig().isActive();
+        return RecipeNodeThreadingHelper.hasThreading(node);
     }
 
     @Override
@@ -111,8 +125,8 @@ public class StarTModAdapter extends GTCEuModAdapter {
         super.onAddonRemoved(node, addon);
         if (node != null && addon != null && addon.getCategory().equals(AddonCategory.THREADING)) {
             GTThreadingHelix helix = GTThreadingHelix.fromId(addon.getId());
-            if (helix != null && node.getThreadingConfig() != null) {
-                node.getThreadingConfig().setHelixCount(helix, 0);
+            if (helix != null) {
+                RecipeNodeThreadingHelper.getThreadingConfig(node).setHelixCount(helix, 0);
             }
         }
     }
@@ -125,8 +139,8 @@ public class StarTModAdapter extends GTCEuModAdapter {
                 int count = 1;
                 if (addon.getItemStackSample() != null && addon.getItemStackSample().getCount() > 0) {
                     count = addon.getItemStackSample().getCount();
-                } else if (node != null && node.getThreadingConfig() != null) {
-                    count = node.getThreadingConfig().getHelixCount(helix);
+                } else if (node != null) {
+                    count = RecipeNodeThreadingHelper.getThreadingConfig(node).getHelixCount(helix);
                 }
                 return count > 1 ? (count + "x " + helix.getTier().name()) : helix.getTier().name();
             }
@@ -144,7 +158,7 @@ public class StarTModAdapter extends GTCEuModAdapter {
 
     public static void syncThreadingAddons(RecipeNode node) {
         if (node == null) return;
-        NodeThreadingConfig cfg = node.getThreadingConfig();
+        NodeThreadingConfig cfg = RecipeNodeThreadingHelper.getThreadingConfig(node);
         if (cfg == null) return;
 
         // Remove existing THREADING addons from the active list
@@ -264,7 +278,7 @@ public class StarTModAdapter extends GTCEuModAdapter {
         } else if (lub) {
             tt.add(net.minecraft.network.chat.Component.literal("§e" + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.tooltip.turbine_boost_passive_desc", passMult).getString()));
             tt.add(net.minecraft.network.chat.Component.literal("§7• WS₂ (" + (curModel == com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel.NPT ? "2,500" : "1,000") + " mB/hr)"));
-            tt.add(net.minecraft.network.chat.Component.literal("§a💡 " + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.tooltip.turbine_boost_hint_full", activeFluid, fullMult).getString()));
+            tt.add(net.minecraft.network.chat.Component.literal("§a★ " + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.tooltip.turbine_boost_hint_full", activeFluid, fullMult).getString()));
         } else {
             tt.add(net.minecraft.network.chat.Component.literal("§c" + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.tooltip.turbine_boost_none_desc", noneMult).getString()));
             tt.add(net.minecraft.network.chat.Component.literal("§7• " + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.tooltip.turbine_boost_none_warn").getString()));
@@ -274,7 +288,30 @@ public class StarTModAdapter extends GTCEuModAdapter {
     @Override
     public void onMachineIconChanged(RecipeNode node, ResourceLocation oldIcon, ResourceLocation newIcon) {
         super.onMachineIconChanged(node, oldIcon, newIcon);
-        StarTTurbineHelper.syncBoosterInputs(node);
+        boolean wasPlasmaTurbine = StarTTurbineHelper.isPlasmaTurbineIcon(oldIcon);
+        boolean isPlasmaTurbine = StarTTurbineHelper.supportsBoost(node);
+        if (wasPlasmaTurbine || isPlasmaTurbine) {
+            if (wasPlasmaTurbine && !isPlasmaTurbine) {
+                StarTTurbineHelper.removeBoosterInputs(node);
+            } else {
+                StarTTurbineHelper.syncBoosterInputs(node);
+            }
+        }
+    }
+
+    @Override
+    public boolean isThreadingAvailable(RecipeNode node) {
+        return RecipeNodeThreadingHelper.isThreadingAvailable(node);
+    }
+
+    @Override
+    public boolean hasThreading(RecipeNode node) {
+        return RecipeNodeThreadingHelper.hasThreading(node);
+    }
+
+    @Override
+    public void setThreadingActive(RecipeNode node, boolean active) {
+        RecipeNodeThreadingHelper.setThreadingActive(node, active);
     }
 }
 

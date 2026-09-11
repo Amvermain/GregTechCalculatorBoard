@@ -8,7 +8,7 @@ This document serves as the official Master Index for the **GregTech Calculator 
 
 | Item | Specification |
 | :--- | :--- |
-| **Document Version** | `v2.1.0` (Aligned with ADR-001 ~ ADR-019) |
+| **Document Version** | `v2.2.0-beta.4` (Aligned with ADR-001 ~ ADR-044) |
 | **Target Platform** | Minecraft 1.20.1 (Minecraft Forge 47.2.0+) |
 | **Dependencies** | Java 17+, GregTech CEu Modern, EMI / JEI (Recipe Viewer) |
 | **Soft Dependencies** | FTB Teams, Phoenix Guilds (Multiplayer Team Integration) |
@@ -23,7 +23,7 @@ This document serves as the official Master Index for the **GregTech Calculator 
 docs/en_us/
 ├── CODE_SPECIFICATION.md                    # 📑 [English Master Index]
 ├── TEST_CHECKLIST.md                        # 🧪 [English QA Test Checklist]
-├── ARCHITECTURE.md                          # 🏛️ [English Architecture Guide]
+├── ARCHITECTURE.md                          # 🏛 [English Architecture Guide]
 └── spec/
     ├── [00] System Architecture & Design Principles ─────► 00_OVERVIEW.md
     ├── [01] Core Domain Models & Capability Matrix ──────► 01_CORE_DOMAIN_AND_MODELS.md

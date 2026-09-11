@@ -4,7 +4,6 @@ import com.gtceu.calcboard.api.catalog.MachineAddon;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.property.NodePropertyStore;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
-import com.gtceu.calcboard.api.type.NodeThreadingConfig;
 import com.gtceu.calcboard.api.type.OverclockMode;
 import com.gtceu.calcboard.api.type.SteamMode;
 import net.minecraft.nbt.CompoundTag;
@@ -32,7 +31,6 @@ public class CategoryMachinePreset {
     private SteamMode steamMode = SteamMode.NONE;
     private final List<MachineAddon> addons = new ArrayList<>();
     private final NodePropertyStore properties = new NodePropertyStore();
-    private NodeThreadingConfig threadingConfig;
 
     public CategoryMachinePreset(ResourceLocation categoryId) {
         this.categoryId = Objects.requireNonNull(categoryId, "categoryId cannot be null");
@@ -60,9 +58,6 @@ public class CategoryMachinePreset {
             }
         }
         preset.getProperties().copyFrom(node.getProperties());
-        if (node.getThreadingConfig() != null) {
-            preset.setThreadingConfig(node.getThreadingConfig().copy());
-        }
         return preset;
     }
 
@@ -114,9 +109,6 @@ public class CategoryMachinePreset {
 
         // 6. Properties & Threading
         node.getProperties().copyFrom(this.properties);
-        if (this.threadingConfig != null) {
-            node.setThreadingConfig(this.threadingConfig.copy());
-        }
 
         // 7. Post-processing physics
         node.autoCalculateTurbineParallel();
@@ -182,14 +174,6 @@ public class CategoryMachinePreset {
         return properties;
     }
 
-    public NodeThreadingConfig getThreadingConfig() {
-        return threadingConfig;
-    }
-
-    public void setThreadingConfig(NodeThreadingConfig threadingConfig) {
-        this.threadingConfig = threadingConfig;
-    }
-
     public CompoundTag serializeNBT() {
         CompoundTag tag = new CompoundTag();
         tag.putString("categoryId", categoryId.toString());
@@ -221,10 +205,6 @@ public class CategoryMachinePreset {
         CompoundTag propTag = properties.serializeNBT();
         if (!propTag.isEmpty()) {
             tag.put("properties", propTag);
-        }
-
-        if (threadingConfig != null && threadingConfig.isActive()) {
-            tag.putString("threadingJson", threadingConfig.toJson().toString());
         }
 
         return tag;
@@ -274,15 +254,10 @@ public class CategoryMachinePreset {
 
         if (tag.contains("properties", Tag.TAG_COMPOUND)) {
             preset.getProperties().deserializeNBT(tag.getCompound("properties"));
-        }
-
-        if (tag.contains("threadingJson")) {
-            try {
-                com.google.gson.JsonObject jo = com.google.gson.JsonParser.parseString(tag.getString("threadingJson")).getAsJsonObject();
-                NodeThreadingConfig tc = new NodeThreadingConfig();
-                tc.fromJson(jo);
-                preset.setThreadingConfig(tc);
-            } catch (Exception ignored) {}
+        } else if (tag.contains("threadingJson")) {
+            CompoundTag legacyProps = new CompoundTag();
+            legacyProps.putString("threadingJson", tag.getString("threadingJson"));
+            preset.getProperties().deserializeNBT(legacyProps);
         }
 
         return preset;

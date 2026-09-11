@@ -29,6 +29,7 @@ public class RecipeFilterConfig {
     private static final RecipeFilterConfig INSTANCE = new RecipeFilterConfig();
 
     private final Set<String> excludedCategories = new HashSet<>(DEFAULT_EXCLUSIONS);
+    private final List<Runnable> changeListeners = new java.util.concurrent.CopyOnWriteArrayList<>();
     private boolean includeUnsupported = false;
     private boolean initialized = false;
 
@@ -40,19 +41,49 @@ public class RecipeFilterConfig {
         return INSTANCE;
     }
 
+    public void addChangeListener(Runnable listener) {
+        if (listener != null && !changeListeners.contains(listener)) {
+            changeListeners.add(listener);
+        }
+    }
+
+    public void removeChangeListener(Runnable listener) {
+        changeListeners.remove(listener);
+    }
+
+    private void notifyListeners() {
+        for (Runnable listener : changeListeners) {
+            try {
+                listener.run();
+            } catch (Throwable ignored) {}
+        }
+    }
+
     public boolean isIncludeUnsupported() {
         return includeUnsupported;
     }
 
     public void setIncludeUnsupported(boolean include) {
         this.includeUnsupported = include;
+        notifyListeners();
         save();
     }
 
     public boolean isCategoryExcluded(String categoryId) {
         if (categoryId == null || categoryId.isEmpty()) return false;
         String lower = categoryId.toLowerCase(Locale.ROOT);
-        return excludedCategories.contains(lower) || (categoryId.contains(":") && excludedCategories.contains(lower.substring(lower.indexOf(':') + 1)));
+        if (excludedCategories.contains(lower)) return true;
+
+        if (categoryId.contains(":")) {
+            String path = lower.substring(lower.indexOf(':') + 1);
+            return excludedCategories.contains(path);
+        }
+
+        String suffix = ":" + lower;
+        for (String exc : excludedCategories) {
+            if (exc.endsWith(suffix)) return true;
+        }
+        return false;
     }
 
     public void setCategoryExcluded(String categoryId, boolean excluded) {
@@ -60,12 +91,19 @@ public class RecipeFilterConfig {
         String lower = categoryId.toLowerCase(Locale.ROOT);
         if (excluded) {
             excludedCategories.add(lower);
+            if (lower.contains(":")) {
+                excludedCategories.add(lower.substring(lower.indexOf(':') + 1));
+            }
         } else {
             excludedCategories.remove(lower);
             if (lower.contains(":")) {
                 excludedCategories.remove(lower.substring(lower.indexOf(':') + 1));
+            } else {
+                String suffix = ":" + lower;
+                excludedCategories.removeIf(s -> s.endsWith(suffix));
             }
         }
+        notifyListeners();
         save();
     }
 
@@ -77,25 +115,33 @@ public class RecipeFilterConfig {
         excludedCategories.clear();
         excludedCategories.addAll(DEFAULT_EXCLUSIONS);
         includeUnsupported = false;
+        notifyListeners();
         save();
     }
 
     public void selectAll(Collection<String> allCategories) {
-        // "Select all" means show all -> empty excluded list
         excludedCategories.clear();
+        notifyListeners();
         save();
     }
 
     public void deselectAll(Collection<String> allCategories) {
-        // "Deselect all" means exclude all
         if (allCategories != null) {
             for (String cat : allCategories) {
-                if (cat != null) {
-                    excludedCategories.add(cat.toLowerCase(Locale.ROOT));
-                }
+                addCategoryToExclusions(cat);
             }
         }
+        notifyListeners();
         save();
+    }
+
+    private void addCategoryToExclusions(String cat) {
+        if (cat == null) return;
+        String lower = cat.toLowerCase(Locale.ROOT);
+        excludedCategories.add(lower);
+        if (lower.contains(":")) {
+            excludedCategories.add(lower.substring(lower.indexOf(':') + 1));
+        }
     }
 
     private File getConfigFile() {

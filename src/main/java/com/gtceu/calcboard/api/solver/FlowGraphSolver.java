@@ -1,9 +1,11 @@
 package com.gtceu.calcboard.api.solver;
 
+import com.gtceu.calcboard.api.model.CanvasGroupFrame;
 import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.model.RecipeNode;
 
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Pure calculation & graph algorithm solver facade for Calculator Board.
@@ -23,8 +25,31 @@ public final class FlowGraphSolver {
         double requiredOrProducedRate,
         double connectedRate,
         int connectionCount,
-        boolean isConnected
+        boolean isConnected,
+        double effectiveRate,
+        boolean isUpstreamThrottled,
+        boolean isSteadyStateRecirculating,
+        double externalSupplyRate,
+        double loopSupplyRate,
+        double recirculationRatio,
+        boolean isUnfedDampedLoop
     ) {
+        public PortFlowStats(double requiredOrProducedRate, double connectedRate, int connectionCount, boolean isConnected) {
+            this(requiredOrProducedRate, connectedRate, connectionCount, isConnected, requiredOrProducedRate, false, false, 0.0, 0.0, 0.0, false);
+        }
+
+        public PortFlowStats(double requiredOrProducedRate, double connectedRate, int connectionCount, boolean isConnected, double effectiveRate, boolean isUpstreamThrottled) {
+            this(requiredOrProducedRate, connectedRate, connectionCount, isConnected, effectiveRate, isUpstreamThrottled, false, 0.0, 0.0, 0.0, false);
+        }
+
+        public PortFlowStats(double requiredOrProducedRate, double connectedRate, int connectionCount, boolean isConnected, double effectiveRate, boolean isUpstreamThrottled, boolean isSteadyStateRecirculating) {
+            this(requiredOrProducedRate, connectedRate, connectionCount, isConnected, effectiveRate, isUpstreamThrottled, isSteadyStateRecirculating, 0.0, 0.0, 0.0, false);
+        }
+
+        public PortFlowStats(double requiredOrProducedRate, double connectedRate, int connectionCount, boolean isConnected, double effectiveRate, boolean isUpstreamThrottled, boolean isSteadyStateRecirculating, double externalSupplyRate, double loopSupplyRate, double recirculationRatio) {
+            this(requiredOrProducedRate, connectedRate, connectionCount, isConnected, effectiveRate, isUpstreamThrottled, isSteadyStateRecirculating, externalSupplyRate, loopSupplyRate, recirculationRatio, false);
+        }
+
         public double getRatio() {
             if (requiredOrProducedRate <= 0.0001) return 1.0;
             return connectedRate / requiredOrProducedRate;
@@ -39,11 +64,26 @@ public final class FlowGraphSolver {
         }
 
         public boolean isInputDeficit() {
-            return isConnected && connectedRate < requiredOrProducedRate - 0.001;
+            if (!isConnected || isSteadyStateRecirculating) return false;
+            double effectiveReq = effectiveRate > 0.0001 ? effectiveRate : requiredOrProducedRate;
+            return connectedRate < requiredOrProducedRate - 0.001 && connectedRate <= effectiveReq + 0.001;
+        }
+
+        public boolean isNominalDeficit() {
+            if (!isConnected || isSteadyStateRecirculating) return false;
+            return connectedRate < requiredOrProducedRate - 0.001;
+        }
+
+        public boolean isUpstreamThrottled() {
+            return isConnected
+                    && (effectiveRate < requiredOrProducedRate - 0.001)
+                    && (connectedRate > effectiveRate + 0.001);
         }
 
         public boolean isInputSurplus() {
-            return isConnected && connectedRate > requiredOrProducedRate + 0.001;
+            if (!isConnected) return false;
+            double effectiveReq = effectiveRate > 0.0001 ? effectiveRate : requiredOrProducedRate;
+            return connectedRate > effectiveReq + 0.001;
         }
 
         public boolean isOutputSurplus() {
@@ -66,8 +106,16 @@ public final class FlowGraphSolver {
     /**
      * Propagates machine counts across the graph starting from the anchor node.
      */
-    public static void autoRatioFromAnchor(FlowGraph graph, RecipeNode anchor, boolean integerCounts) {
-        FlowBalanceMatrixSolver.autoRatioFromAnchor(graph, anchor, integerCounts);
+    public static AutoRatioResult autoRatioFromAnchor(FlowGraph graph, RecipeNode anchor, boolean integerCounts) {
+        return FlowBalanceMatrixSolver.autoRatioFromAnchor(graph, anchor, integerCounts);
+    }
+
+    public static AutoRatioResult autoRatioFractional(FlowGraph graph, RecipeNode anchor) {
+        return FlowBalanceMatrixSolver.autoRatioFromAnchor(graph, anchor, false);
+    }
+
+    public static int autoRatioFromSharedPool(FlowGraph graph, CanvasGroupFrame poolFrame, double targetMachines, AutoRatioMode mode) {
+        return FlowBalanceMatrixSolver.autoRatioFromSharedPool(graph, poolFrame, targetMachines, mode);
     }
 
     /**
@@ -84,11 +132,16 @@ public final class FlowGraphSolver {
         return FlowSummaryAggregator.getInputPortStats(graph, node, inputIndex);
     }
 
-    /**
-     * Obtains output port flow statistics.
-     */
     public static PortFlowStats getOutputPortStats(FlowGraph graph, RecipeNode node, int outputIndex) {
         return FlowSummaryAggregator.getOutputPortStats(graph, node, outputIndex);
+    }
+
+    public static PortFlowStats getBatchInputPortStats(FlowGraph graph, RecipeNode node, int inputIndex) {
+        return FlowSummaryAggregator.getBatchInputPortStats(graph, node, inputIndex);
+    }
+
+    public static PortFlowStats getBatchOutputPortStats(FlowGraph graph, RecipeNode node, int outputIndex) {
+        return FlowSummaryAggregator.getBatchOutputPortStats(graph, node, outputIndex);
     }
 
     /**
@@ -137,8 +190,28 @@ public final class FlowGraphSolver {
      * Executes Harmonized Auto-Ratio: scales the anchor and all upstream/downstream machines
      * to the minimal clean integer ratio with zero waste/bottleneck.
      */
-    public static void autoRatioHarmonized(FlowGraph graph, RecipeNode anchor) {
-        FlowBalanceMatrixSolver.autoRatioHarmonized(graph, anchor);
+    public static AutoRatioResult autoRatioHarmonized(FlowGraph graph, RecipeNode anchor) {
+        return FlowBalanceMatrixSolver.autoRatioHarmonized(graph, anchor);
+    }
+
+    public static Set<String> findUnfedDeficitLoopNodeIds(FlowGraph graph) {
+        return FlowBalanceMatrixSolver.findUnfedDeficitLoopNodeIds(graph);
+    }
+
+    /**
+     * Finds any connected upstream buffer node for a specific consumer input port.
+     */
+    public static RecipeNode findConnectedBufferNode(FlowGraph graph, RecipeNode consumer, int inputIndex) {
+        if (graph == null || consumer == null) return null;
+        for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+            if (edge.toNodeId().equals(consumer.getId()) && edge.inputIndex() == inputIndex) {
+                RecipeNode p = graph.findNodeById(edge.fromNodeId());
+                if (p != null && p.isJunctionBuffer()) {
+                    return p;
+                }
+            }
+        }
+        return null;
     }
 }
 

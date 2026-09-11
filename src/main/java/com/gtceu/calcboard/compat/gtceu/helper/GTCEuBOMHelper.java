@@ -14,6 +14,9 @@ import com.gtceu.calcboard.api.bom.MultiblockStructureDef;
 import com.gtceu.calcboard.api.bom.MultiblockStructurePart;
 import com.gtceu.calcboard.api.bom.PartCategory;
 import com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon;
+import com.gtceu.calcboard.compat.start.helper.RecipeNodeThreadingHelper;
+import com.gtceu.calcboard.api.spi.IModAdapter;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 import net.minecraft.resources.ResourceLocation;
 
 import java.util.*;
@@ -40,7 +43,7 @@ public final class GTCEuBOMHelper {
         int reqFluidOut = (int) node.getOutputs().stream().filter(IngredientStack::isFluid).count();
         int reqItemOut = (int) node.getOutputs().stream().filter(IngredientStack::isItem).count();
 
-        boolean isDT = machineId.getPath().contains("distillation_tower");
+        boolean isDT = com.gtceu.calcboard.compat.gtceu.handler.GTAddonCompatibilityHandler.DISTILLATION_TOWER_ID.equals(machineId);
         for (MachineAddon addon : node.getAddons()) {
             if (addon instanceof GTHatchAddon gh) {
                 int cap = gh.getSlotCapacity();
@@ -96,7 +99,7 @@ public final class GTCEuBOMHelper {
 
         if (def == null) {
             ResourceLocation machineId = node.getMachineIcon();
-            com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+            IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
             if (adapter != null) {
                 ResourceLocation tieredWs = adapter.getWorkstationForTier(node, tier);
                 if (tieredWs != null) {
@@ -170,8 +173,8 @@ public final class GTCEuBOMHelper {
 
         boolean handledHelixes = false;
         Map<com.gtceu.calcboard.api.type.GTThreadingHelix, Integer> equippedHelixes = null;
-        if (node.hasThreading() && node.getThreadingConfig() != null && node.getThreadingConfig().getTotalHelixCount() > 0) {
-            equippedHelixes = node.getThreadingConfig().getHelixCounts();
+        if (node.hasThreading() && RecipeNodeThreadingHelper.getThreadingConfig(node).getTotalHelixCount() > 0) {
+            equippedHelixes = RecipeNodeThreadingHelper.getThreadingConfig(node).getHelixCounts();
         }
 
         List<GTHatchAddon> equippedCustomHatches = new ArrayList<>();
@@ -298,7 +301,7 @@ public final class GTCEuBOMHelper {
                     list.add(part);
                 }
             } else if (part.category() == PartCategory.COIL || CoilHelper.isHeatingCoil(part.itemId())) {
-                if (equippedCoil != null && equippedCoil.getItemIcon() != null) {
+                if (equippedCoil != null && equippedCoil.getItemIcon() != null && def.coilSlotCount() > 0) {
                     list.add(new MultiblockStructurePart(
                         equippedCoil.getItemIcon(),
                         equippedCoil.getName(),

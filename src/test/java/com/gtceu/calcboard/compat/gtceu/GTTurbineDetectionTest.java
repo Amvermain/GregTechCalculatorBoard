@@ -5,7 +5,7 @@ import com.gtceu.calcboard.api.catalog.MachineAddon;
 import com.gtceu.calcboard.api.catalog.MultiblockDetector;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 import net.minecraft.resources.ResourceLocation;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -240,5 +240,26 @@ public class GTTurbineDetectionTest {
         assertTrue(MultiblockDetector.isTurbineMachine(legacyGas));
         assertEquals(GTVoltageTier.EV, MultiblockDetector.getTurbineBaseTier(officialGas));
         assertEquals(GTVoltageTier.EV, MultiblockDetector.getTurbineBaseTier(legacyGas));
+    }
+
+    @Test
+    @DisplayName("Verify Distillation Tower is strictly excluded from turbine classification")
+    void testDistillationTowerRegressionNotTurbine() {
+        ResourceLocation dtId = ResourceLocation.tryParse("gtceu:distillation_tower");
+        RecipeNode node = RecipeNode.create(dtId, "Distillation Tower (Light Fuel)", 100.0, 64.0, GTVoltageTier.MV);
+        node.setRecipeCategoryId(dtId);
+        node.setMachineIcon(dtId);
+        node.setMultiblock(true);
+        node.setGenerator(false);
+
+        assertFalse(GTTurbineHelper.isTurbine(node));
+        assertFalse(GTTurbineHelper.isLargeTurbine(node));
+        assertFalse(node.isTurbine());
+        assertFalse(node.isLargeTurbine());
+        assertFalse(MultiblockDetector.isTurbineMachine(dtId));
+        assertFalse(MultiblockDetector.isTurbineRecipeCategory(dtId));
+
+        List<AddonCategory> cats = MachineAddon.getRelevantCategories(node);
+        assertFalse(cats.contains(AddonCategory.ROTOR), "Distillation Tower must never have ROTOR category");
     }
 }

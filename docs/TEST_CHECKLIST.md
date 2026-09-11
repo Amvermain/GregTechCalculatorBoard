@@ -17,6 +17,9 @@ This document is the official QA verification checklist for `GregTechCalculatorB
   - [ ] `Ctrl + A` select-all functionality.
   - [ ] `Delete` / `Backspace` keys batch delete selected nodes/frames.
   - [ ] `Ctrl + Z` (Undo) and `Ctrl + Y` (Redo) history stack execution.
+  - [ ] **Module Collapse & SubPage Undo/Redo (`SubPageModuleUndoRedoBugTest`)**: Undoing module collapse cleanly removes its dedicated subpage from the board and prevents orphan subpage proliferation. Redoing restores the subpage with 100% fidelity.
+  - [ ] **Canvas Interaction Cancellation**: Pressing `ESC` or right-clicking during node dragging or wire drawing immediately cancels operation and restores positions.
+  - [ ] **Multi-Selection Floating Action Bar**: Selecting 2+ nodes renders floating toolbar (`SelectionFloatingToolbarWidget`) with Frame (`▤`), Module (`📦`), Shared Machine Frame (`⧉`), Auto Ratio (`⚖`), Copy (`📋`), and Delete (`✕`).
 
 ### 1.2 Wire Connections & Ratio Scaling
 - [ ] **Basic Wiring**: Verify spline wire connects when clicking an output port (green) $\rightarrow$ input port (blue).
@@ -28,6 +31,10 @@ This document is the official QA verification checklist for `GregTechCalculatorB
   - [ ] `Shift + Connect` from junction nodes calculates ratios based on diverted flow.
   - [ ] **Target Batch Quantity (ET / DT)**: Clicking the bottom badge on a junction opens the inline target batch editor. Setting a quantity displays real-time Estimated Completion Time (`ET: xx.xs`) or Depletion Time (`DT: xx.xs`).
   - [ ] **Junction Supply & Reset**: Right-clicking opens supply mode dialog (Infinite/Fixed Rate); `Shift + Right-Click` resets target batch quantity to 0.
+  - [ ] **Junction Priority Split & Fixed Limit (ADR-020)**: Flow Allocation tab in junction dialog allows setting per-line fixed flow caps, allocating fixed limits first before distributing remainder proportionally.
+  - [ ] **Junction Accumulation Buffer (ADR-020)**: Batch Buffer mode calculates charge duration $T_{\text{charge}} = B / Q_{\text{in}}$, displaying buffer badge `Bx` and preventing false-positive downstream starvation.
+  - [ ] **Particle Animation Batching (ADR-020)**: Fast recipes under 1.0s clamp animation cycle to $T \ge 1.0\text{s}$ with `Mx` badge overlay.
+  - [ ] **Orthogonal Dual-Stream Modulation (ADR-020)**: Incoming deficit wires pulse with warning brightness ($f = 1.0 + 3.0(1-\phi)\text{Hz}$), while outgoing wires smoothly derate speed ($v = v_{\text{base}} \times \eta$) to convey machine cycle delay.
 - [ ] **Wire Cutting**: Right-clicking a wire or clicking a connected socket port severs the connection immediately.
 - [ ] **Drag-to-Search**:
   - [ ] Dragging from a port into empty canvas displays a 4-button quick action marker (🔍 Search, ➕ Junction, 📋 Copy, etc.).
@@ -45,6 +52,10 @@ This document is the official QA verification checklist for `GregTechCalculatorB
 - [ ] **Blueprint Sharing**:
   - [ ] `📋 Share` exports the entire factory into a compressed Base64 string to the clipboard.
   - [ ] `📥 Import` restores external blueprints with 100% layout and parameter fidelity.
+- [ ] **Multiplayer Team / Party Workspace Collaboration**:
+  - [ ] `WorkspaceCollaborationSyncTest`: Joining/creating a party (FTB Teams, Phoenix Guilds, Scoreboard) immediately activates the team workspace tab (`[■ Team Board]`) and left activity bar team button (`👥`) across both dedicated server clients and singleplayer LAN hosts.
+  - [ ] Opening board screen (`BoardScreen.init()`) automatically requests and syncs the latest team workspace metadata (`C2SRequestWorkspacePacket`).
+  - [ ] Realtime FTB Teams lifecycle events (`PLAYER_JOINED_PARTY`, `PLAYER_LEFT_PARTY`, `PLAYER_CHANGED`, `CREATED`, `DELETED`, `PROPERTIES_CHANGED`) instantly broadcast synchronized workspace metadata to all online party members.
 
 ### 1.4 Recipe Switching & Accessibility
 - [ ] **In-Place Recipe Switching**:
@@ -69,8 +80,21 @@ This document is the official QA verification checklist for `GregTechCalculatorB
   - [ ] `Ctrl + Left/Right` jumps across word boundaries; `Ctrl + Backspace/Delete` deletes words.
   - [ ] `Ctrl + A` selects all text; `Ctrl + C / X / V` copies, cuts, and pastes clipboard text.
   - [ ] Global hotkeys are not triggered while typing in inline text editors.
+- [ ] **Alternative Input Cycling & Slim Card Mode Port Isolation**:
+  - [ ] Scrolling over an input port with alternative ingredients cycles alternative items without altering the machine voltage tier (`SlimCardInteractionTest`).
+  - [ ] In Slim Card Mode, hidden card controls (tier buttons, overclock badges, etc.) do not intercept port hover, scroll, or mouse clicks.
 - [ ] **ArchUnit Architectural Boundary Enforcement**:
   - [ ] `ArchitectureTest` automated JUnit suite passes 100% without architectural violations.
+
+### 1.6 Modal Dialog Stack & Activity Bar Navigation
+- [ ] **Sequential ESC Dismissal (LIFO Modal Stack)**:
+  - [ ] When multiple dialogs are open, pressing `ESC` or clicking outside dismisses only the topmost dialog in reverse order.
+  - [ ] Mouse and keyboard input does not leak through to background canvas or underlying dialogs.
+- [ ] **Left Activity Bar Integration**:
+  - [ ] Multiblock BOM (`▦`) and Global Balance Dashboard (`📊`) open directly from the Left Activity Bar.
+  - [ ] Redundant chip buttons removed from bottom status bar.
+- [ ] **Wire Tab Saturation Preview**:
+  - [ ] Board Settings Dialog Wire tab displays real-time preview curve and gradient bar for saturation colors.
 
 ---
 
@@ -88,6 +112,17 @@ This document is the official QA verification checklist for `GregTechCalculatorB
   - [ ] Verify exact cycles per second: $\text{CPS} = 20.0 \times \text{BatchesPerTick} \times \text{Parallel} \times \text{MachineCount}$.
 - [ ] **Tier Chance Boost for Probabilistic Outputs**:
   - [ ] Verify boosted output chance on tier increase: $\text{Effective Chance} = \min(1.0, \text{BaseChance} + (\Delta\text{Tier} \times \text{TierChanceBoost}))$.
+- [ ] **Input Consumption Chance & Tier Chance Boost (Including Reductions)**:
+  - [ ] Verify probabilistic input flow calculation: $\text{Rate} = \text{Amount} \times \text{EffectiveChance} \times \text{CPS}$.
+  - [ ] Verify signed tier chance boost: $\text{Effective Chance} = \text{clamp}(0.0, 1.0, \text{BaseChance} + (\Delta\text{Tier} \times \text{TierChanceBoost}))$.
+  - [ ] Verify Star Technology Cyclonic Sifter Netherite Mesh consumption rate at base ZPM ($3\% \rightarrow 0.0025\text{/s}$) and UV overclock ($2.8\% \rightarrow 0.00467\text{/s}$).
+  - [ ] Verify input port tooltip rendering of dynamic consumption chance and signed boost ($\%+.1f\%/\text{Tier}$).
+  - [ ] `InputConsumptionChanceTest` automated JUnit regression suite passes 100%.
+- [ ] **Energy Hatch & Voltage Tier Deficit Gating (Gating & Operational Validation)**:
+  - [ ] Verify that electric multiblock machines equipped with lower-tier energy hatches fail validation (`isOperational = false`) and halt power consumption ($0.0\text{ EU/t}$), preventing abnormal current drawing (e.g. 960A ULV on IV recipes).
+  - [ ] Verify dual energy hatch installation allows $+1\text{ Tier}$ skip overclocking when both hatches have matching tiers on multiblocks supporting $2$ hatches.
+  - [ ] Verify informative deficit warning banners and tooltips on tier buttons (`gui.gtcalcboard.node_warning.energy_hatch_tier_deficit` / `voltage_tier_deficit`).
+  - [ ] `EnergyHatchTierDeficitGatingTest` automated JUnit suite passes 100%.
 
 ### 2.2 Gauss-Jordan Mass Conservation Solver (`MassBalanceSolver`)
 - [ ] **Closed-Loop Linear Formulation ($A\mathbf{x} = \mathbf{b}$)**:
@@ -97,6 +132,33 @@ This document is the official QA verification checklist for `GregTechCalculatorB
   - [ ] Validate complex closed loops (e.g. ethylbenzene recycling, platinum group refinement) traversing reroute junctions.
 - [ ] **10-Pass Fixed-Point Bottleneck Relaxation**:
   - [ ] In supply-deficient DAGs, converge downstream machine efficiencies ($\eta_v \in [0.0, 1.0]$) within 10 iterations ($\Delta\eta < 10^{-4}$).
+- [ ] **Auto-Ratio Bottleneck Resolution & Recirculation Guard (`AutoRatioBottleneckTest`)**:
+  - [ ] Resolve single-slot limiting reagent and chance bottlenecks by scaling upstream producers.
+  - [ ] Cyclic loop detection excludes strongly connected components (SCCs) and directed feedback cycles from bottleneck amplification, preventing runaway scaling in closed recirculation loops.
+  - [ ] `AutoRatioBottleneckTest` automated JUnit regression suite passes 100%.
+  - [ ] **Multi-Step Recirculation Single-Pass Convergence (`testDrainJunctionWithUpstreamRecirculationConvergesInSinglePass`)**: Validate that AutoRatio from a drain junction or downstream product anchor converges to the balanced machine ratio in a single execution without requiring repeated clicks, and does not emit false loop warnings on balanced cycles.
+- [ ] **Auto-Ratio Recirculation Divergence Detection & Guidance (`AutoRatioDivergenceTest`, ADR-032)**:
+  - [ ] Suppress runaway machine scaling on closed recirculation loops lacking external supplies and return `AutoRatioResult(hasDivergence = true)`.
+  - [ ] Flag affected nodes with `NodeProperties.DIVERGENCE_WARNING` and display amber warning badge `[⚠ Loop]` / `[⚠ 루프]` on node card headers.
+  - [ ] Render 5-line actionable guidance tooltip on hover explaining root cause and recommended actions.
+  - [ ] Clicking the warning badge promotes the node to an Anchor (`node.setBaseNode(true)`) and clears the warning.
+  - [ ] Self-healing lifecycle automatically clears divergence warning when balanced external supply is connected.
+  - [ ] Downstream scaling with multi-output anchors respects bottleneck constraints across co-products, preventing machine count blowup (`FractionalAutoRatioTest`).
+  - [ ] `AutoRatioDivergenceTest` automated JUnit regression suite passes 100%.
+- [ ] **Comprehensive Process Divergence Defense Matrix (`ComprehensiveDivergenceMatrixTest`, ADR-033)**:
+  - [ ] Detect positive feedback growth loops ($\rho > 1.0$) lacking external sinks, clamp machine counts to 1 cycle, and display `[⚠ Growth]` / `[⚠ 증식]` cyan warning badge.
+  - [ ] Detect catalyst/solvent decay loops ($0.95 \le \rho < 1.0$) lacking external makeup, and display `[⚠ Catalyst]` / `[⚠ 촉매]` warning badge.
+  - [ ] Detect conflicting multiple anchors with stoichiometric mismatches, display `[⚠ Conflict]` / `[⚠ 충돌]` red badge, and permit one-click unpin.
+  - [ ] Differentiate extreme micro-yield recipes ($< 10^{-4}$) from cascade runaway and display `[⚠ Yield]` / `[⚠ 극소]` warning badge.
+  - [ ] `ComprehensiveDivergenceMatrixTest` automated JUnit regression suite passes 100%.
+- [ ] **Damped Recirculation Loop Analytical Solver & Visualization (ADR-044, `DampedRecirculationLoopTest`)**:
+  - [ ] Infinite geometric series $O(1)$ analytical convergence: $S_{\text{steady}} = \frac{S_{\text{ext}}}{1 - r}$ ($r = P/D < 1 - 10^{-4}$), computing machine efficiencies directly without iteration decay.
+  - [ ] Port flow stats identify steady-state recirculating input ports, suppressing false-positive deficit warnings (⚠) and displaying cyan `§b🔄` indicator.
+  - [ ] 7-line detailed hover tooltip providing external net supply, internal loop recirculation, recirculation ratio, total throughput, and effective machine duty.
+  - [ ] Shift + Right-Click or context menu action [🔄 정상 상태에 대수 맞춤] scales all loop machines to steady-state capacity in a single click.
+  - [ ] Global balance dashboard displays internal recirculation breakdown for recirculating resources.
+  - [ ] Multi-step recirculation loops with external supply correctly treat internal intermediates without external feed edges as active internal flows rather than unfed damped extinction (`testMultiStepBrineLoopWithExternalFeed`).
+  - [ ] `DampedRecirculationLoopTest` automated JUnit regression suite passes 100%.
 - [ ] **Target Batch ETA & Total Resource Integration (`ProductionETACalculator`)**:
   - [ ] Compute batch duration $T_{\text{ET}} = \frac{A_{\text{target}}}{\text{Rate}_{\text{in}}}$.
   - [ ] Compute total cumulative energy $E_{\text{total}} = \sum (n.\text{getTotalEUt}() \times 20 \times T_{\text{ET}})\text{ [EU]}$ and raw material totals.
@@ -113,6 +175,13 @@ This document is the official QA verification checklist for `GregTechCalculatorB
   - [ ] **Dual Hatch Overclock**: Dual equal-tier energy hatches apply a $+1\text{ Tier}$ overclock boost.
   - [ ] **Asymmetrical Hatches**: Asymmetrical configurations evaluate effective tiers based on peak power capacity.
 
+### 2.4 Property-Based Testing & Fuzz Verification (`FlowSolverPropertyBasedFuzzTest`)
+- [ ] **Arithmetic Safety Invariant**: Validate that across randomized DAG, cyclic feedback, junction, and mixed topologies, no machine count, edge flow, port rate, or efficiency produces `NaN`, `Infinite`, or negative values.
+- [ ] **Mass Conservation Invariant**: Validate that in closed stoichiometric networks and balanced reroute junctions, total production equals total consumption and inflow equals outflow within $10^{-4}$ numerical tolerance.
+- [ ] **Finite Termination & Convergence Invariant**: Validate that pathological topologies (self-loops, dense feedback cliques, extreme rate disparities) terminate promptly without deadlocks, infinite recursion, or crashes.
+- [ ] **Deterministic Reproducibility**: Validate that seed-based graph generation and solver executions produce 100% bit-exact results across repeated runs.
+- [ ] `FlowSolverPropertyBasedFuzzTest` automated JUnit suite passes 100%.
+
 ---
 
 ## 3. Mod Compatibility SPI Layers & Non-Standard Calculations (Mod Compat SPI)
@@ -123,6 +192,15 @@ This document is the official QA verification checklist for `GregTechCalculatorB
   - [ ] **Pyrolyse Oven**: Verify duration multiplier $\text{DurationMult} = \frac{100.0}{\text{PyrolyseSpeed}\%}$.
   - [ ] **Cracking Unit**: Verify power multiplier $\text{EUtMult} = \frac{\text{CrackingEnergy}\%}{100.0}$.
   - [ ] **Multi Smelter**: Verify coil tier dedicated parallel scaling ($32\text{x}, 64\text{x}, 128\text{x}\dots$).
+  - [ ] **Structural Fixed Coil Protection & Machine-Specific Coil Gating**:
+    - [ ] Multiblock machines containing fixed structural coil blocks (e.g. Heat Chamber, Draco Infusion, Titan Forge, etc.) are protected from being detected as functional coil multiblocks (`isCoilMultiblock == false`, `coilSlotCount == 0`, parts classified as `PartCategory.CASING` in BOM).
+    - [ ] Non-coil machines (e.g. Void Extractor) in recipe categories that contain higher-tier coil multiblocks (e.g. Void Excavator) do not display the `♨` coil badge on cards or expose coil options in the parts dialog.
+    - [ ] `StructuralCoilProtectionTest` and `CoilGatingRegressionTest` automated JUnit suites pass 100%.
+- [ ] **Continuous Tick I/O Scaling & Extraction (`GTRecipeTickFluidExtractionTest`)**:
+  - [ ] Extract continuous per-tick fluid and item ingredients defined in `GTRecipe.tickInputs` and `GTRecipe.tickOutputs`.
+  - [ ] Normalize per-tick amounts to recipe batch totals ($\text{Amount}_{\text{batch}} = \text{Amount}_{\text{perTick}} \times \text{DurationTicks}$), ensuring rate calculations in mB/t and mB/s match in-game physics and recipe viewer displays.
+  - [ ] Preserve consumption/production chance and tier chance boosts for continuous tick ingredients.
+  - [ ] `GTRecipeTickFluidExtractionTest` automated JUnit regression suite passes 100%.
 - [ ] **Large Turbines & Rotor Holder Physics (`GTTurbinePhysics`)**:
   - [ ] **Rotor Holder Throughput Cap**: Verify tier base capacity (EV 4,096 EU/t base, doubling per tier) and rotor power scaling $\lfloor \text{BaseCap} \times \frac{\text{RotorPower}}{100} \rfloor$.
   - [ ] **Rotor Efficiency & Holder Bonus**: Combine rotor base efficiency + holder tier bonus ($\Delta\text{Tier} \times 10\%$) to scale fuel cycle duration.
@@ -135,6 +213,7 @@ This document is the official QA verification checklist for `GregTechCalculatorB
 - [ ] **Fusion Reactor Physics (`GTFusionHelper`)**:
   - [ ] Start EU ignition tiering (Mk1 $\le 160\text{M}$, Mk2 $\le 320\text{M}$, Mk3 $\le 640\text{M}$, Mk4/Mk5).
   - [ ] Special Fusion Overclock: **$2\times\text{ Power}, 2\times\text{ Speed}$ (Energy Factor 2.0, Speed Factor 2.0)**.
+  - [ ] **Reflector Overclock Boost**: When installed reflector tier exceeds recipe requirement ($\Delta\text{Reflector} = \text{InstalledTier} - \text{RequiredTier} > 0$), grant $\Delta\text{Reflector}$ additional 2:2 perfect overclock tiers ($2\times\text{ Speed}, 2\times\text{ EU/t}$ per tier, e.g. T2 required + T3 installed $\rightarrow 2\times\text{ Speed}$, T4 installed $\rightarrow 4\times\text{ Speed}$).
 
 ### 3.2 Create
 - [ ] **RPM-Based Non-Linear Scaling**:
@@ -185,6 +264,18 @@ This document is the official QA verification checklist for `GregTechCalculatorB
   - [ ] Supreme Plasma Turbine (SPT, 6x parallel, $98,304\text{ EU/t}$ base).
   - [ ] Nyinsane Plasma Turbine (NPT, 12x parallel, $196,608\text{ EU/t}$ base).
 
+### 3.7 Create: Diesel Generators
+- [ ] **Diesel Engine Kinetic Generation & Fuel Metrics**:
+  - [ ] **Default Diesel Engine**: 96 RPM base, 6,144 SU stress capacity, 1.0 mB/s diesel consumption.
+  - [ ] **Modular Diesel Engine (`large_diesel_engine`)**: 96 RPM base, 16,384 SU stress capacity, 2.0 mB/s diesel consumption per modular unit.
+  - [ ] **Huge Diesel Engine**: 48 RPM base, 65,536 SU stress capacity, 8.0 mB/s diesel consumption.
+  - [ ] Dynamic extraction from `createdieselgenerators:fuel_type` registry using cached reflection with graceful fallback to default specs.
+- [ ] **Non-Kinetic Recipe Categories**:
+  - [ ] Basin Fermenting (`basin_fermenting`): Processing duration, fluid/item inputs, and fermented outputs.
+  - [ ] Distillation (`distillation`): Multi-fluid distillation outputs from crude oil with temperature/duration modeling.
+  - [ ] Compression Molding (`compression_molding`): Mold ingredients, plastic consumption, and shaped outputs.
+- [ ] `CreateDieselGeneratorsTest` automated JUnit regression suite passes 100%.
+
 ---
 
 ## 4. Group Frames & Compound Modules (Group Frames & Compound Modules)
@@ -203,6 +294,29 @@ This document is the official QA verification checklist for `GregTechCalculatorB
   - [ ] **Aggregated Metrics**: Top badge displays total power consumption/generation and machine counts.
 - [ ] **Module Expansion (`⤢`)**:
   - [ ] Expanding the module restores original node positions, configurations, and wiring with **100% layout fidelity**.
+- [ ] **Unconnected Port Preservation & Self-Balancing Loop Isolation (`GroupCollapsePortBugTest`)**:
+  - [ ] When collapsing a group into a module, unconnected input/output ports sharing the same ingredient (e.g., catalyst or heating fluids like Hot Brine) are preserved on module boundaries and not inadvertently cancelled out by global balance summary.
+- [ ] **Junction Node Encapsulation & Net Worth Conservation (`JunctionModuleCompressRegressionTest`)**:
+  - [ ] When grouping/compressing nodes containing intermediate reroute/buffer junctions into a module, junction nodes are correctly recognized as pass-through routing elements rather than physical machines.
+  - [ ] Pseudo-demand/pseudo-supply rates from reroute slots are suppressed, ensuring that balanced internal circulation (e.g., Hot Brine) does not spawn phantom module I/O ports or distort the process summary net worth.
+  - [ ] When compressing machines connected to an external junction/supply into a module, ensure only the net remaining demand (subtracting internal supply) is allocated to the boundary input port, preventing operating efficiency drops and ghost surplus output ports.
+  - [ ] `JunctionModuleCompressRegressionTest` automated JUnit regression suite passes 100%.
+
+### 4.3 Shared Machine Pool In-Place Folding (ADR-042)
+- [ ] **In-Place Folding & Expansion (`⤡` / `⤢`)**:
+  - [ ] Collapsing a shared machine pool compacts the frame into a single virtual machine card without removing internal nodes.
+  - [ ] Header accurately displays shared machine icon, name, tier, overclock mode, and total simulated duty count.
+  - [ ] Machine icon is resolved through item/block registries (`SharedPoolFoldedTest`) rather than raw texture paths, preventing missing texture anomalies.
+  - [ ] Internal recipes preserve proportional ratios upon machine count adjustment.
+  - [ ] Group frame edit dialog focus management, Tab key toggle, and target capacity input layout separation (`FrameEditDialogTest`).
+### 4.4 Dedicated Sub-Page Composite Modules & Boundary I/O Pins (ADR-043)
+- [ ] **1:1 Dedicated Sub-Page Navigation**:
+  - [ ] Double-clicking a compound module card smoothly navigates into its isolated sub-page (`PageType.MODULE`).
+  - [ ] Breadcrumb toolbar and Escape key return cleanly to the parent board page without state corruption.
+  - [ ] Undo/Redo cycles across module creation and deletion cleanly restore and garbage-collect module sub-pages (`SubPageModuleUndoRedoBugTest`).
+- [ ] **Boundary I/O Pin Interaction**:
+  - [ ] Boundary pins render as compact 32x32 ingredient cards displaying live flow rates, direction badges, and origin metadata (`DedicatedSubPageModuleTest`).
+  - [ ] Hover quick-deletion (`[x]`), inline pin renaming, right-click context menu, and pin inspector panel function correctly without affecting parent page topology.
 
 ---
 
@@ -272,6 +386,11 @@ This document is the official QA verification checklist for `GregTechCalculatorB
   - [ ] Checkbox selection for selective multi-port resource linking.
 - [ ] **Blueprint Metadata & Import Preview (`[📥] / [📤]`)**:
   - [ ] Title/description/tags metadata and pre-import node/material summaries.
+- [ ] **Multiplayer Team Workspace & Collaboration (`WorkspaceCollaborationSyncTest`, ADR-003)**:
+  - [ ] Self-lock recognition: ensure player holding page lock can continuously edit without being blocked by self-lock badge or deadlock.
+  - [ ] Per-page revision tracking: auto-commit and export send target page revision instead of workspace-wide revision, preventing false 409 conflict errors.
+  - [ ] Automatic conflict recovery: on 409 revision conflict, client cleanly queries fresh metadata and synchronizes without data loss.
+  - [ ] Obfuscation-safe widget rebuild: tab switching and workspace navigation use `rebuildBoardWidgets()` avoiding runtime `NoSuchMethodError` on `IBoardScreenContext`.
 - [ ] **i18n Consistency (4 Languages)**:
   - [ ] `en_us.json`, `ko_kr.json`, `zh_cn.json`, and `ru_ru.json` format tokens (`%s`, `%d`) match with zero missing translation keys.
   - [ ] `check_i18n.py` and `testI18nCompletenessAndConsistency` unit test pass 100%.

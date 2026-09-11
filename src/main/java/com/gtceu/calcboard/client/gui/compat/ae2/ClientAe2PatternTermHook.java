@@ -10,8 +10,6 @@ import com.gtceu.calcboard.integration.ae2.generator.Ae2PatternPageGenerator;
 import com.gtceu.calcboard.integration.ae2.model.PatternId;
 import com.gtceu.calcboard.integration.ae2.registry.PatternGraphRegistry;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
@@ -19,10 +17,6 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.client.event.ScreenEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
 
 import java.util.List;
 import java.util.Optional;
@@ -31,26 +25,32 @@ import java.util.Optional;
  * Client Forge screen event hook for AE2 Pattern Encoding Terminal.
  * Injects a dedicated GTCalcBoard page generation button and handles Shift+A pattern shortcuts.
  */
-@Mod.EventBusSubscriber(modid = GregTechCalcBoard.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)
 public class ClientAe2PatternTermHook {
 
-    @SubscribeEvent
-    public static void onScreenInit(ScreenEvent.Init.Post event) {
-        if (!ModCompatHelper.isAe2Loaded()) return;
-        Screen screen = event.getScreen();
-        if (!isPatternEncodingScreen(screen)) return;
+    private static Class<?> patternTermScreenClass = null;
+    private static boolean reflectionInitialized = false;
 
-        AbstractContainerScreen<?> containerScreen = (AbstractContainerScreen<?>) screen;
-        int btnX = containerScreen.getGuiLeft() + 80;
-        int btnY = containerScreen.getGuiTop() - 18;
+    static {
+        initReflection();
+    }
 
-        Button calcBoardBtn = Button.builder(Component.literal("§b⚡ CalcBoard"), btn -> handleTerminalButtonClick(containerScreen))
-                .pos(btnX, btnY)
-                .size(76, 18)
-                .tooltip(Tooltip.create(Component.translatable("gui.gtcalcboard.tooltip.btn_ae2_create_page")))
-                .build();
+    private static void initReflection() {
+        if (reflectionInitialized) return;
+        patternTermScreenClass = resolveClass(
+                "appeng.client.gui.me.items.PatternEncodingTermScreen",
+                "appeng.client.gui.me.PatternEncodingTermScreen"
+        );
+        reflectionInitialized = true;
+    }
 
-        event.addListener(calcBoardBtn);
+    private static Class<?> resolveClass(String... candidates) {
+        for (String candidate : candidates) {
+            try {
+                return Class.forName(candidate);
+            } catch (Throwable ignored) {
+            }
+        }
+        return null;
     }
 
     public static boolean tryHandlePatternShortcut(Screen screen, double mouseX, double mouseY) {
@@ -65,7 +65,7 @@ public class ClientAe2PatternTermHook {
         return tryCreateFromTerminal(containerScreen);
     }
 
-    private static void handleTerminalButtonClick(AbstractContainerScreen<?> screen) {
+    private static void createOrSwitchFromTerminal(AbstractContainerScreen<?> screen) {
         if (!(screen.getMenu() instanceof PatternEncodingTermMenu termMenu)) return;
 
         PatternId patternId = Ae2PatternPageGenerator.createPatternIdFromTerminalMenu(termMenu);
@@ -100,7 +100,7 @@ public class ClientAe2PatternTermHook {
         if (!isPatternEncodingScreen(screen)) return false;
         if (!(screen.getMenu() instanceof PatternEncodingTermMenu termMenu)) return false;
 
-        handleTerminalButtonClick(screen);
+        createOrSwitchFromTerminal(screen);
         return true;
     }
 
@@ -131,7 +131,7 @@ public class ClientAe2PatternTermHook {
     }
 
     private static boolean isPatternEncodingScreen(Screen screen) {
-        if (screen == null) return false;
-        return screen.getClass().getName().contains("PatternEncodingTermScreen");
+        if (screen == null || patternTermScreenClass == null) return false;
+        return patternTermScreenClass.isInstance(screen);
     }
 }

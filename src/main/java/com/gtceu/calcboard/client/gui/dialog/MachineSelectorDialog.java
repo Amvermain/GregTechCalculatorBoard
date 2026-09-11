@@ -18,6 +18,8 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraftforge.registries.ForgeRegistries;
 import org.lwjgl.glfw.GLFW;
+import com.gtceu.calcboard.client.gui.dialog.modal.IBoardModal;
+import com.gtceu.calcboard.client.gui.dialog.modal.ModalRenderContext;
 
 import java.util.*;
 
@@ -25,7 +27,7 @@ import java.util.*;
  * Modal dialog for inspecting and switching available machine workstations / multiblock controllers
  * for a RecipeNode. Automatically applies machine presets upon selection.
  */
-public class MachineSelectorDialog {
+public class MachineSelectorDialog implements IBoardModal {
 
     public record MachineEntry(
             ResourceLocation id,
@@ -208,7 +210,6 @@ public class MachineSelectorDialog {
             }
         }
 
-        // Sort: Multiblocks first, then Steam, then Singleblocks sorted by Tier (ULV -> OpV)
         allEntries.sort((a, b) -> {
             if (a.isMultiblock() != b.isMultiblock()) {
                 return a.isMultiblock() ? -1 : 1;
@@ -216,10 +217,14 @@ public class MachineSelectorDialog {
             if (a.isSteam() != b.isSteam()) {
                 return a.isSteam() ? -1 : 1;
             }
-            if (a.tier() != null && b.tier() != null) {
-                return Integer.compare(a.tier().ordinal(), b.tier().ordinal());
+            int tierA = a.tier() != null ? a.tier().ordinal() : -1;
+            int tierB = b.tier() != null ? b.tier().ordinal() : -1;
+            if (tierA != tierB) {
+                return Integer.compare(tierA, tierB);
             }
-            return a.displayName().compareToIgnoreCase(b.displayName());
+            int nameCmp = a.displayName().compareToIgnoreCase(b.displayName());
+            if (nameCmp != 0) return nameCmp;
+            return a.id().toString().compareTo(b.id().toString());
         });
     }
 
@@ -235,14 +240,7 @@ public class MachineSelectorDialog {
     }
 
     private String formatId(ResourceLocation id) {
-        String path = id.getPath();
-        StringBuilder sb = new StringBuilder();
-        for (String part : path.split("_")) {
-            if (!part.isEmpty()) {
-                sb.append(Character.toUpperCase(part.charAt(0))).append(part.substring(1)).append(" ");
-            }
-        }
-        return sb.toString().trim();
+        return NodeWorkstationResolver.formatId(id);
     }
 
     private GTVoltageTier extractTier(ResourceLocation ws) {
@@ -255,6 +253,11 @@ public class MachineSelectorDialog {
             }
         }
         return null;
+    }
+
+    @Override
+    public void renderModal(ModalRenderContext context) {
+        render(context.graphics(), context.screenWidth(), context.screenHeight(), context.mouseX(), context.mouseY());
     }
 
     public void render(GuiGraphics graphics, int screenWidth, int screenHeight, int mouseX, int mouseY) {
@@ -514,7 +517,7 @@ public class MachineSelectorDialog {
             int clickedIdx = (int) (vMouseY / ROW_HEIGHT);
             if (clickedIdx >= 0 && clickedIdx < filteredEntries.size()) {
                 MachineEntry selected = filteredEntries.get(clickedIdx);
-                parent.switchMachineWorkstation(node, selected.id());
+                parent.switchMachineWorkstation(node, selected.id(), selected.displayName());
                 Minecraft.getInstance().getSoundManager().play(
                         net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.1F)
                 );
@@ -549,7 +552,7 @@ public class MachineSelectorDialog {
             }
             if (keyCode == GLFW.GLFW_KEY_ENTER && !filteredEntries.isEmpty()) {
                 MachineEntry selected = filteredEntries.get(0);
-                parent.switchMachineWorkstation(node, selected.id());
+                parent.switchMachineWorkstation(node, selected.id(), selected.displayName());
                 Minecraft.getInstance().getSoundManager().play(
                         net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.1F)
                 );

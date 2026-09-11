@@ -5,6 +5,8 @@ import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 
+import com.gtceu.calcboard.api.spi.IModAdapter;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 import net.minecraft.resources.ResourceLocation;
 
 import java.util.ArrayList;
@@ -73,7 +75,8 @@ public record CategoryCapability(
             if (node.isMultiblock() || node.hasMultiblockOption() || hasMultiblockOption) {
                 cats.add(AddonCategory.ROTOR);
                 cats.add(AddonCategory.MAINTENANCE);
-                if (com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel.isPlasmaTurbine(node)) {
+                IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
+                if (adapter != null && adapter.isPlasmaTurbine(node)) {
                     cats.add(AddonCategory.MULTIBLOCK_TRAIT);
                 }
                 cats.add(AddonCategory.CUSTOM);
@@ -109,17 +112,19 @@ public record CategoryCapability(
             }
             boolean supportsCoil = false;
             if (def != null) {
-                supportsCoil = (def.supportsAbility("HEATING_COILS") && def.coilSlotCount() > 0)
-                        || MultiblockDetector.isCoilMultiblock(mbId)
-                        || (com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.getCoilMachineSpec(mbId).kind() != com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.CoilMachineKind.GENERIC);
+                supportsCoil = def.supportsAbility("HEATING_COILS")
+                        || def.coilSlotCount() > 0
+                        || MultiblockDetector.isCoilMultiblock(mbId);
             } else {
-                supportsCoil = MultiblockDetector.isCoilMultiblock(mbId)
-                        || (com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.getCoilMachineSpec(mbId).kind() != com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.CoilMachineKind.GENERIC);
+                supportsCoil = MultiblockDetector.isCoilMultiblock(mbId);
             }
             if (supportsCoil) {
                 cats.add(AddonCategory.COIL);
             }
-            if (!isSteamMb && (MultiblockDetector.supportsParallelHatch(node.getMachineIcon(), node.getAvailableWorkstations(), node.getRecipeCategoryId()) || (def != null && def.supportsAbility("PARALLEL_HATCH")))) {
+            boolean supportsPar = mbId != null
+                    ? (MultiblockDetector.supportsParallelHatch(mbId) || (def != null && def.supportsAbility("PARALLEL_HATCH")))
+                    : MultiblockDetector.supportsParallelHatch(null, node.getAvailableWorkstations(), node.getRecipeCategoryId());
+            if (!isSteamMb && supportsPar) {
                 cats.add(AddonCategory.PARALLEL);
             }
             if (!isSteamMb && (def == null || def.supportsAbility("MAINTENANCE") || def.maintenanceSlotCount() > 0 || node.getEnergyType() != EnergyType.NONE)) {

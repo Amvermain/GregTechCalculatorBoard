@@ -180,4 +180,39 @@ public class AutoConnectFilterTest {
         // 8. Verify the existing steam connections were not corrupted
         Assertions.assertEquals(warmSteamId, boiler3.getInputs().get(1).getId(), "Boiler 3 input alternative must NOT be mutated to Steam");
     }
+
+    @Test
+    public void testAutoConnectConnectsRecirculationLoop() {
+        FlowGraph graph = new FlowGraph();
+
+        ResourceLocation catalystId = ResourceLocation.tryParse("minecraft:nether_star");
+        ResourceLocation intermediateId = ResourceLocation.tryParse("minecraft:iron_ingot");
+
+        RecipeNode stageA = new RecipeNode("stageA", "Stage A", 100, 100, GTVoltageTier.HV);
+        stageA.getInputs().add(IngredientStack.item(catalystId, "Catalyst", 1.0));
+        stageA.getOutputs().add(IngredientStack.item(intermediateId, "Intermediate", 1.0));
+        graph.addNode(stageA);
+
+        RecipeNode stageB = new RecipeNode("stageB", "Stage B", 100, 100, GTVoltageTier.HV);
+        stageB.getInputs().add(IngredientStack.item(intermediateId, "Intermediate", 1.0));
+        stageB.getOutputs().add(IngredientStack.item(catalystId, "Regenerated Catalyst", 1.0));
+        graph.addNode(stageB);
+
+        graph.addConnection(stageA.getId(), 0, stageB.getId(), 0);
+        Assertions.assertEquals(1, graph.getConnections().size());
+
+        List<AutoConnectFilterDialog.ResourceEntry> candidates = AutoConnectFilterDialog.scanCandidates(graph);
+        Assertions.assertEquals(1, candidates.size());
+        Assertions.assertEquals(catalystId, candidates.get(0).getStack().getId());
+        Assertions.assertEquals(1, candidates.get(0).getPotentialWireCount());
+
+        List<FlowGraph.ConnectionEdge> added = ToolbarWidget.autoConnect(graph, null, null);
+        Assertions.assertEquals(1, added.size());
+        Assertions.assertEquals(stageB.getId(), added.get(0).fromNodeId());
+        Assertions.assertEquals(0, added.get(0).outputIndex());
+        Assertions.assertEquals(stageA.getId(), added.get(0).toNodeId());
+        Assertions.assertEquals(0, added.get(0).inputIndex());
+
+        Assertions.assertEquals(2, graph.getConnections().size());
+    }
 }

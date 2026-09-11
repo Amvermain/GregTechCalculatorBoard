@@ -8,7 +8,6 @@ import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.solver.FlowGraphModuleHandler;
 import com.gtceu.calcboard.api.storage.NodeClipboard;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
-import com.gtceu.calcboard.client.gui.BoardSelectionModel;
 
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
@@ -479,6 +478,105 @@ public class CanvasGroupFrameTest {
 
         com.gtceu.calcboard.api.solver.BalanceSummary restoredSummary = com.gtceu.calcboard.api.solver.FlowGraphSolver.computeSummary(graph);
         Assertions.assertEquals(expectedTotalPower, restoredSummary.totalEUt(), 0.1, "Total power must be preserved after expanding module");
+    }
+
+    @Test
+    public void testGroupFrameCollapseAndExpandPreservesJunctionPortAllocation() {
+        FlowGraph graph = new FlowGraph();
+        ResourceLocation benzene = ResourceLocation.tryParse("gtceu:benzene");
+
+        RecipeNode supplier = RecipeNode.create("Distillation Tower", 20.0, 100.0, GTVoltageTier.MV);
+        supplier.addOutput(IngredientStack.fluid(benzene, "Benzene", 100.0));
+        supplier.setPos(50, 100);
+
+        RecipeNode junction = RecipeNode.createReroute(200, 100);
+        junction.bindRerouteIngredient(IngredientStack.fluid(benzene, "Benzene", 100.0));
+
+        RecipeNode turbine1 = RecipeNode.create("Gas Turbine 1", 20.0, 32.0, GTVoltageTier.LV);
+        turbine1.addInput(IngredientStack.fluid(benzene, "Benzene", 2.0));
+        turbine1.setPos(400, 50);
+
+        RecipeNode turbine2 = RecipeNode.create("Gas Turbine 2", 20.0, 32.0, GTVoltageTier.LV);
+        turbine2.addInput(IngredientStack.fluid(benzene, "Benzene", 2.0));
+        turbine2.setPos(400, 150);
+
+        graph.addNode(supplier);
+        graph.addNode(junction);
+        graph.addNode(turbine1);
+        graph.addNode(turbine2);
+
+        graph.addConnection(supplier.getId(), 0, junction.getId(), 0);
+        graph.addConnection(junction.getId(), 0, turbine1.getId(), 0, 2.0);
+        graph.addConnection(junction.getId(), 0, turbine2.getId(), 0, 2.0);
+
+        CanvasGroupFrame frame = CanvasGroupFrame.createFromNodes("Group Frame", List.of(junction, turbine1, turbine2), CanvasGroupFrame.COLOR_PURPLE);
+        graph.addFrame(frame);
+
+        RecipeNode module = graph.groupIntoModule(Set.of(junction.getId(), turbine1.getId(), turbine2.getId()), "Group Frame", frame);
+        Assertions.assertNotNull(module);
+        Assertions.assertTrue(module.isModule());
+
+        FlowGraph subGraph = module.getSubGraph();
+        Assertions.assertNotNull(subGraph);
+
+        List<FlowGraph.ConnectionEdge> junctionEdges = subGraph.getConnections().stream()
+                .filter(FlowGraph.ConnectionEdge::hasFixedLimit)
+                .toList();
+        Assertions.assertEquals(2, junctionEdges.size());
+        for (FlowGraph.ConnectionEdge edge : junctionEdges) {
+            Assertions.assertEquals(junction.getId(), edge.fromNodeId());
+            Assertions.assertEquals(2.0, edge.fixedFlowLimit(), 0.001);
+            Assertions.assertTrue(edge.hasFixedLimit());
+        }
+
+        boolean expanded = graph.expandModule(module);
+        Assertions.assertTrue(expanded);
+        Assertions.assertEquals(3, graph.getConnections().size());
+
+        for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+            if (edge.fromNodeId().equals(junction.getId())) {
+                Assertions.assertEquals(2.0, edge.fixedFlowLimit(), 0.001);
+                Assertions.assertTrue(edge.hasFixedLimit());
+            }
+        }
+    }
+
+    @Test
+    public void testClipboardPastePreservesFixedFlowLimitAndSharedPoolProperties() {
+        FlowGraph sourceGraph = new FlowGraph();
+        ResourceLocation fluidId = ResourceLocation.tryParse("gtceu:lubricant");
+
+        RecipeNode junc = RecipeNode.createReroute(100, 100);
+        RecipeNode consumer = RecipeNode.create("Cutter", 20.0, 30.0, GTVoltageTier.LV);
+        consumer.addInput(IngredientStack.fluid(fluidId, "Lubricant", 10.0));
+        consumer.setPos(300, 100);
+
+        sourceGraph.addNode(junc);
+        sourceGraph.addNode(consumer);
+        sourceGraph.addConnection(junc.getId(), 0, consumer.getId(), 0, 5.5);
+
+        CanvasGroupFrame frame = new CanvasGroupFrame("shared_pool", "Shared Cutter Pool", CanvasGroupFrame.COLOR_EMERALD, 80, 80, 400, 250);
+        frame.setSharedMachineFrame(true);
+        frame.setTargetPoolCapacity(8.0);
+        frame.addNode(consumer.getId());
+        sourceGraph.addFrame(frame);
+
+        NodeClipboard.getInstance().copy(sourceGraph, Set.of(junc.getId(), consumer.getId()), java.util.Collections.emptySet(), Set.of(frame.getId()));
+
+        FlowGraph destGraph = new FlowGraph();
+        NodeClipboard.PasteResult result = NodeClipboard.getInstance().paste(destGraph, 500, 500);
+
+        Assertions.assertEquals(2, result.nodes().size());
+        Assertions.assertEquals(1, result.frames().size());
+        Assertions.assertEquals(1, result.edges().size());
+
+        CanvasGroupFrame pastedFrame = result.frames().get(0);
+        Assertions.assertTrue(pastedFrame.isSharedMachineFrame());
+        Assertions.assertEquals(8.0, pastedFrame.getTargetPoolCapacity(), 0.001);
+
+        FlowGraph.ConnectionEdge pastedEdge = result.edges().get(0);
+        Assertions.assertEquals(5.5, pastedEdge.fixedFlowLimit(), 0.001);
+        Assertions.assertTrue(pastedEdge.hasFixedLimit());
     }
 }
 

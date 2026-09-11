@@ -41,7 +41,7 @@ Unified search dialog for finding recipes across tens of thousands of entries in
       <!-- Result 1 -->
       <div style="background: #14171e; border: 1px solid #334155; border-radius: 4px; padding: 6px 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
         <div style="display: flex; align-items: center; gap: 8px;">
-          <span>⚗️</span>
+          <span>⚗</span>
           <div>
             <div style="color: #f8fafc; font-weight: bold; font-size: 12px;">Benzene Cracking ➔ Ethylene & Gasoline</div>
             <div style="color: #64748b; font-size: 10px;">Large Chemical Reactor | Duration: 1.25s | Power: 480 EU/t (LV)</div>
@@ -220,6 +220,9 @@ Dedicated sidebar dock located at the top-left of the board to view pinned EMI f
 * **One-Click & Drag-and-Drop Spawning**:
   - Click: Automatically places node at the next available canvas position.
   - Drag: Drag any recipe row and release anywhere on the canvas to spawn at that exact coordinate.
+* **Draggable Scrollbar Interaction**:
+  - Automatically activates a minimal scrollbar along the right border when pinned favorite items exceed the available panel height.
+  - Supports thumb dragging and track click jumping in addition to mouse wheel scrolling for rapid navigation across extensive favorite lists.
 
 #### `FavoritesDockWidget` UI Wireframe
 
@@ -250,7 +253,7 @@ Dedicated sidebar dock located at the top-left of the board to view pinned EMI f
         </div>
         <div style="background: #141b2a; border: 1px solid #232d3d; border-radius: 3px; padding: 3px 5px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
           <div style="display: flex; align-items: center; gap: 6px;">
-            <span>⚗️</span>
+            <span>⚗</span>
             <span style="color: #cbd5e1; font-size: 11px;">Sulfuric Acid</span>
           </div>
           <span style="color: #64748b; font-size: 10px;">1</span>
@@ -408,4 +411,34 @@ IDE-style lightweight modal activated via `Ctrl + K` for instant fuzzy searching
 
 ---
 
-> ➡️ **Next Chapter**: [[04] Multiplayer Concurrency & Network Protocols](04_MULTIPLAYER_AND_NETWORK_PROTOCOL.md)
+## 9. Real-Time Rendering & Calculation Performance Profiler HUD (`RenderProfiler`, F3) (ADR-031)
+
+An in-game diagnostic profiler overlay designed to assess rendering and linear solver computational performance across large flowsheets:
+
+* **Toggle Shortcut**: Press `F3` to toggle the performance profiler HUD on and off in real time.
+* **Tracked Metrics & Timing**:
+  - `Layout Time`: Time spent calculating node and wire bounding boxes ($\mu\text{s}$).
+  - `Render Time`: Time spent rendering node cards, bezier curves, and badge overlays ($\mu\text{s}$).
+  - `Solve Time`: Time spent evaluating the 2-stage linear flow solver and cyclic loops ($\mu\text{s}$).
+  - `FPS & Frame Time`: Current screen refresh rate and total frame time ($\text{ms}$).
+* **Visual Graph & Color Thresholds**:
+  - Displays a 60-frame rolling time histogram mini-chart at the top-right corner.
+  - Visualizes headroom against the 60 FPS frame budget ($16.6\text{ms}$) with green (healthy), amber (warning), and red (over-budget) indicators.
+
+---
+
+## 10. In-Game Mod Version Update Notification System (`ClientUpdateNotifier`) (ADR-035)
+
+Performs background release checks to inform users of the latest improvements and bug fixes:
+
+* **Asynchronous Release Polling (`ClientUpdateNotifier`)**:
+  - Periodically polls the remote release manifest (`update.json`) on an isolated background daemon thread to query the latest release tags and changelog summaries.
+  - Gracefully falls back on timeouts or network unreachability without causing client frame drops or UI hitching.
+* **In-Game Notification Badge & Settings Tab**:
+  - Renders an update notification badge (`[NEW vX.Y.Z]`) on the settings gear icon and settings dialog.
+  - Clicking displays a release summary popup with direct navigation to mod download assets.
+  - Features an explicit enable/disable toggle within the `SettingsTab` configuration panel.
+
+---
+
+> ➡ **Next Chapter**: [[04] Multiplayer Concurrency & Network Protocols](04_MULTIPLAYER_AND_NETWORK_PROTOCOL.md)

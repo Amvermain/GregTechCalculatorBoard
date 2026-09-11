@@ -89,6 +89,7 @@ public class CanvasNoteInteractionHandler {
         }
         if (action == CanvasStickyNoteRenderer.NoteAction.DELETE && button == 0) {
             screen.getGraph().removeStickyNote(note);
+            screen.recordCommand(new BoardCommand.RemoveStickyNotesCommand(List.of(note), "Delete sticky note"));
             screen.markSummaryDirty();
             Minecraft.getInstance().getSoundManager().play(
                     SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
@@ -96,8 +97,17 @@ public class CanvasNoteInteractionHandler {
             return true;
         }
         if (action == CanvasStickyNoteRenderer.NoteAction.COLOR && button == 0) {
+            int oldColor = note.getColor();
             note.cycleColor();
-            screen.markSummaryDirty();
+            screen.recordCommand(new BoardCommand.ModifyNotePropertiesCommand(
+                    note.getId(),
+                    note.getTitle(), note.getTitle(),
+                    note.getContent(), note.getContent(),
+                    oldColor, note.getColor()
+            ));
+            if (screen.getWireRenderer() != null) {
+                screen.getWireRenderer().markDirty();
+            }
             Minecraft.getInstance().getSoundManager().play(
                     SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.2F)
             );
@@ -287,8 +297,17 @@ public class CanvasNoteInteractionHandler {
             Map<String, double[]> dragStartPositions
     ) {
         if (resizingNote != null && button == 0) {
+            double newW = resizingNote.getWidth();
+            double newH = resizingNote.getHeight();
+            if (Math.abs(origNoteWidth - newW) > 0.1 || Math.abs(origNoteHeight - newH) > 0.1) {
+                screen.recordCommand(new BoardCommand.ResizeStickyNoteCommand(
+                        resizingNote.getId(), origNoteWidth, origNoteHeight, newW, newH, "Resize sticky note"
+                ));
+            }
             resizingNote = null;
-            screen.markSummaryDirty();
+            if (screen.getWireRenderer() != null) {
+                screen.getWireRenderer().markDirty();
+            }
             return true;
         }
 
@@ -339,8 +358,21 @@ public class CanvasNoteInteractionHandler {
 
         if (!nodeDeltas.isEmpty() || !noteDeltas.isEmpty() || !frameDeltas.isEmpty()) {
             screen.recordCommand(new BoardCommand.MoveComponentsCommand(nodeDeltas, noteDeltas, frameDeltas));
-            screen.markSummaryDirty();
+            boolean needsSummary = !nodeDeltas.isEmpty() || hasSharedFrameDelta(graph, frameDeltas.keySet());
+            if (needsSummary) {
+                screen.markSummaryDirty();
+            } else if (screen.getWireRenderer() != null) {
+                screen.getWireRenderer().markDirty();
+            }
         }
         dragStartPositions.clear();
+    }
+
+    private boolean hasSharedFrameDelta(FlowGraph graph, Set<String> frameIds) {
+        for (String fid : frameIds) {
+            CanvasGroupFrame f = graph.findFrameById(fid);
+            if (f != null && f.isSharedMachineFrame()) return true;
+        }
+        return false;
     }
 }

@@ -11,6 +11,10 @@ import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
 import net.minecraft.client.Minecraft;
 import net.minecraft.resources.ResourceLocation;
 
+import com.gtceu.calcboard.client.gui.search.spec.RecipeQuerySpecificationBuilder;
+import com.gtceu.calcboard.client.gui.search.spec.RecipeSpecification;
+import com.gtceu.calcboard.client.gui.search.spec.SearchExecutionContext;
+
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -121,8 +125,16 @@ public final class RecipeSearchQueryEngine {
 
         RecipeFilterConfig filterConfig = RecipeFilterConfig.getInstance();
         Set<ResourceLocation> allFavoriteIds = RecipeSearchCacheManager.getFavoriteRecipeIds();
-        Set<ResourceLocation> favoriteIds = showFavoritesOnly ? allFavoriteIds : null;
         boolean hasQuery = (query != null && !query.trim().isEmpty());
+
+        SearchExecutionContext searchContext = new SearchExecutionContext(
+                contextualWireTarget,
+                showFavoritesOnly,
+                allFavoriteIds,
+                filterConfig,
+                isTutorial
+        );
+        RecipeSpecification searchSpecification = RecipeQuerySpecificationBuilder.buildDefault(parsedQuery, searchContext);
 
         ResourceLocation contextualDefaultRecipeId = null;
         if (hasContext && contextualWireTarget.sourceStack != null && ModCompatHelper.isEmiLoaded()) {
@@ -132,21 +144,7 @@ public final class RecipeSearchQueryEngine {
         final ResourceLocation finalContextualDefaultId = contextualDefaultRecipeId;
 
         List<ScoredRecipe> candidateList = sourceList.parallelStream()
-                .filter(sr -> {
-                    if (showFavoritesOnly) {
-                        ResourceLocation rId = sr.recipeId();
-                        if (rId == null || favoriteIds == null || !favoriteIds.contains(rId)) {
-                            return false;
-                        }
-                    }
-                    if (filterConfig.isCategoryExcluded(sr.categoryId())) {
-                        return false;
-                    }
-                    if (!filterConfig.isIncludeUnsupported() && !sr.isSupported()) {
-                        return false;
-                    }
-                    return RecipeSearchEngine.matches(sr, parsedQuery);
-                })
+                .filter(sr -> searchSpecification.isSatisfiedBy(sr, searchContext))
                 .map(sr -> {
                     int contextualScore = 0;
                     if (hasContext) {
@@ -160,7 +158,7 @@ public final class RecipeSearchQueryEngine {
                                 contextualScore = 80000;
                             } else if (targetName != null && sr.hasExactInputName(targetName)) {
                                 contextualScore = 50000;
-                            } else if (isStress && (sr.inputIndex().contains("stress_units") || sr.inputIndex().contains("create:stress_units") || (ModCompatHelper.isEmiLoaded() && !com.gtceu.calcboard.integration.emi.EmiSearchHelper.isKineticGenerator(sr.recipe())))) {
+                            } else if (isStress && (sr.inputIndex().contains("stress_units") || sr.inputIndex().contains("create:stress_units"))) {
                                 contextualScore = 90000;
                             }
                         } else {
@@ -171,7 +169,7 @@ public final class RecipeSearchQueryEngine {
                                 contextualScore = 80000;
                             } else if (targetName != null && sr.hasExactOutputName(targetName)) {
                                 contextualScore = 50000;
-                            } else if (isStress && (sr.outputIndex().contains("stress_units") || sr.outputIndex().contains("create:stress_units") || (ModCompatHelper.isEmiLoaded() && com.gtceu.calcboard.integration.emi.EmiSearchHelper.isKineticGenerator(sr.recipe())))) {
+                            } else if (isStress && (sr.outputIndex().contains("stress_units") || sr.outputIndex().contains("create:stress_units"))) {
                                 contextualScore = 90000;
                             }
                         }

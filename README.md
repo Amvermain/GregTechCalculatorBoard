@@ -5,6 +5,8 @@
 </p>
 
 <p align="center">
+  <a href="https://www.curseforge.com/minecraft/mc-mods/gregtech-calculator-board"><img src="https://img.shields.io/curseforge/dt/1656634?logo=curseforge&logoColor=white&color=f16436&label=CurseForge" alt="CurseForge"></a>
+  <a href="https://modrinth.com/mod/gtcalcboard"><img src="https://img.shields.io/modrinth/dt/gtcalcboard?logo=modrinth&logoColor=white&color=00AF5C&label=Modrinth" alt="Modrinth"></a>
   <img src="https://img.shields.io/badge/Minecraft-1.20.1-brightgreen.svg" alt="Minecraft 1.20.1">
   <img src="https://img.shields.io/badge/Loader-Forge%2047.2.0+-orange.svg" alt="Forge">
   <img src="https://img.shields.io/badge/GregTech-CEu%20Modern-blue.svg" alt="GTCEu Modern">
@@ -92,10 +94,13 @@ An in-game node graph calculator and flowchart editor for GregTech CEu Modern, E
 | Connect Wire | Left Click & Drag between ports |
 | Drag to Search & Auto-Wire | Drag from port onto empty canvas -> Select recipe |
 | Smart Match Connect (Bidirectional) | Shift + Drag between ports (Integer Ceiling matching) |
+| Target Output Rate Inverse Solver | Ctrl + Left Click on output port |
+| Context Menu | Right Click on empty canvas, node, port, or selection |
+| Unreal Pan & Diagonal Movement | Right-Click Drag or WASD / Arrow Keys (Shift to accelerate) |
 | Disconnect Wire / Port | Right Click on wire or port socket |
 | Toggle Void Marking | Alt + Right Click on output port |
 | Switch Recipe (In-Place) | Click [🔄 Switch Recipe] in Machine Config or Node Context Menu |
-| Cycle Rate Time Unit | T (/s -> /min -> /h -> /d -> /t) |
+| Cycle Rate Time Unit | T (/s -> /min -> /h -> /d -> /t -> 1x per-craft batch) |
 | Cycle Global Fluid Unit | Shift + T (Auto -> Always mB -> Always B) |
 | Adjust UI Font Scale | Click [Aa 1.0x] (Left/Right), Mouse Wheel, or [+] / [-] |
 | Set Master Anchor | Click Anchor icon on recipe card header |
@@ -109,6 +114,13 @@ An in-game node graph calculator and flowchart editor for GregTech CEu Modern, E
 | Scroll Tabs & Toolbar | Mouse Wheel or click [«] / [»] overflow indicators |
 
 </details>
+
+---
+
+## Downloads
+
+- **CurseForge**: [GregTech Calculator Board - Minecraft Mods - CurseForge](https://www.curseforge.com/minecraft/mc-mods/gregtech-calculator-board)
+- **Modrinth**: [GTCalcBoard - Minecraft Mod](https://modrinth.com/mod/gtcalcboard)
 
 ---
 
@@ -136,6 +148,7 @@ GregTech Calculator Board is completely optional on both client and server sides
   - [Applied Energistics 2 (AE2)](https://curseforge.com/minecraft/mc-mods/applied-energistics-2) (Autocrafting pattern binding & DAG ETA evaluation)
   - [Create](https://curseforge.com/minecraft/mc-mods/create) (0.5.1 / 6.0+)
   - [Create: New Age](https://curseforge.com/minecraft/mc-mods/create-new-age)
+  - [Greate](https://curseforge.com/minecraft/mc-mods/greate) (Tiered kinetic machine & shaft integration)
   - [Thermal Series](https://curseforge.com/minecraft/mc-mods/thermal-expansion) (Expansion, Foundation, Cultivation)
   - [Systeams](https://curseforge.com/minecraft/mc-mods/systeams)
 - **Optional Team Synchronization**:
@@ -151,7 +164,7 @@ git clone https://github.com/Amvermain/GregTechCalculatorBoard.git
 cd GregTechCalculatorBoard
 ./gradlew build
 ```
-The compiled jar will be located in `build/libs/gtcalcboard-1.20.1-2.1.0.jar`.
+The compiled jar will be located in `build/libs/gtcalcboard-1.20.1-2.2.0-beta.4.jar`.
 
 ---
 
@@ -176,6 +189,7 @@ The compiled jar will be located in `build/libs/gtcalcboard-1.20.1-2.1.0.jar`.
 
 - **The Reel One** - For providing UX/UI feedback, design suggestions, and community testing.
 - **rafaelpnsm** - For providing UX/UI feedback, design suggestions, and community testing.
+- **GenerusWeebius** - For thorough testing, meticulous bug reporting, and mathematical verification.
 
 ---
 

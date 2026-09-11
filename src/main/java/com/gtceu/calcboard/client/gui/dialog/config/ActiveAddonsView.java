@@ -4,8 +4,9 @@ import com.gtceu.calcboard.api.catalog.MachineAddon;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.client.gui.BoardScreen;
 import com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog;
-import com.gtceu.calcboard.compat.IModAdapter;
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.IModAdapter;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
+import com.gtceu.calcboard.compat.start.helper.RecipeNodeThreadingHelper;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
@@ -112,6 +113,9 @@ public class ActiveAddonsView {
             tooltip.add(Component.literal("§f" + hoveredActiveAddon.getName()));
             IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
             adapter.buildAddonTooltip(node, hoveredActiveAddon, true, tooltip);
+            if (tooltip.size() <= 1 && hoveredActiveAddon.getDescription() != null && !hoveredActiveAddon.getDescription().isEmpty()) {
+                tooltip.add(Component.literal("§7" + hoveredActiveAddon.getDescription()));
+            }
             tooltip.add(Component.literal("§c").append(Component.translatable("gui.gtcalcboard.config.remove")));
             MachineConfigDialog.appendAdvancedTooltipDebugInfo(tooltip, hoveredActiveAddon);
             dialog.setDeferredTooltip(tooltip);
@@ -129,9 +133,9 @@ public class ActiveAddonsView {
                 for (MachineAddon a : toRemove) {
                     adapter.handleUninstallAddon(node, a);
                 }
-                if (node.getThreadingConfig() != null) {
-                    node.getThreadingConfig().getHelixCounts().clear();
-                    node.getThreadingConfig().reset();
+                if (RecipeNodeThreadingHelper.hasThreading(node)) {
+                    RecipeNodeThreadingHelper.getThreadingConfig(node).getHelixCounts().clear();
+                    RecipeNodeThreadingHelper.getThreadingConfig(node).reset();
                 }
                 node.getAddons().clear();
                 node.setRotorEfficiency(100);

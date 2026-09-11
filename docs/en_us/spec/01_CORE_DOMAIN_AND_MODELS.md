@@ -160,10 +160,19 @@ To preserve `RecipeNode` as a pure POJO domain model, rate integration and works
   - `getNodes()` and `getEdges()` return unmodifiable views, forcing state mutations through explicit methods (`addNode`, `removeNode`, `connect`, `disconnect`).
 * **$O(1)$ Fast Node Index Synchronization (`nodeMap`)**:
   - Internal `Map<String, RecipeNode> nodeMap` is synchronized during node addition, removal, and clearing, guaranteeing $O(1)$ lookup time for `getNode(id)`.
-* **`ConnectionEdge` Immutable Record**:
+* **`ConnectionEdge` Immutable Record (ADR-041)**:
   ```java
-  public record ConnectionEdge(String fromNodeId, int outputIndex, String toNodeId, int inputIndex)
+  public record ConnectionEdge(
+      String fromNodeId,
+      int outputIndex,
+      String toNodeId,
+      int inputIndex,
+      double fixedFlowLimit,
+      int priority
+  )
   ```
+  - `fixedFlowLimit`: Maximum flow rate cap allowed across this connection (unlimited if negative).
+  - `priority`: Connection priority tier (default `0`). Higher-priority connections receive flow allocation first.
 
 ---
 
@@ -182,21 +191,31 @@ To preserve `RecipeNode` as a pure POJO domain model, rate integration and works
 
 ---
 
-### 1.8 `SupplyMode` & External Flow Model (ADR-012)
-Defines infinite resource supply or specified fixed per-second rates for Junction nodes and raw material ingress points.
+### 1.8 `SupplyMode` & `FlowSplitMode` (Flow Supply & Branching Model, ADR-012, ADR-019, ADR-041)
+Defines external supply/drain behavior and branching modes for Junction nodes and raw material endpoints.
 
 ```java
 public enum SupplyMode {
     NONE,         // No external supply (relies entirely on connected upstream node flow)
     INFINITE,     // Infinite resource supply (blocks upstream demand propagation, satisfies 100% downstream demand)
-    FIXED_RATE    // Fixed rate supply (supplies up to externalSupplyRate items/s or mB/s)
+    FIXED_RATE,   // Fixed rate supply (supplies up to externalSupplyRate items/s or mB/s)
+    VOID_SINK,    // Infinite void sink (absorbs and deletes all incoming surplus byproducts)
+    FIXED_DRAIN   // Fixed rate drain (enforces a fixed outflow quota downstream)
 }
 ```
 
-* **`RecipeNode` External Supply Properties**:
+```java
+public enum FlowSplitMode {
+    PROPORTIONAL, // Demand-weighted proportional distribution across downstream consumers
+    EQUAL         // Mechanical equal split across downstream connection count (1/N)
+}
+```
+
+* **`RecipeNode` External Supply & Branching Properties**:
   - `supplyMode` (`SupplyMode`, default `NONE`): External supply mode of the node.
-  - `externalSupplyRate` (`double`, default `0.0`): Fixed external supply rate in items/s or mB/s when in `FIXED_RATE` mode.
+  - `externalSupplyRate` (`double`, default `0.0`): Fixed rate in items/s or mB/s when in `FIXED_RATE` or `FIXED_DRAIN` mode.
   - `customParallel` (`int`, default `0`): User-specified custom manual parallel count.
+  - `NodeProperties.JUNCTION_SPLIT_MODE` (`FlowSplitMode`, default `PROPORTIONAL`): Branching distribution mode for Junction nodes.
 
 ---
 
@@ -428,4 +447,28 @@ Controls pulse dot rendering behaviors on canvas connection wires:
 
 ---
 
-> ➡️ **Next Chapter**: [[02] Mathematical Engine & Graph Analysis Algorithms](02_MATH_AND_ALGORITHMS.md)
+## 12. Flowsheet Control & Target Quantity Anchor Domain Models (`TargetAnchor`, `SharedMachinePool`) (ADR-030, ADR-032)
+
+### 12.1 Junction & Node Flow Target Anchors (`TargetAnchor`)
+Serves as fixed boundary conditions for flow scaling across cyclic loops and terminal batch evaluations:
+
+* **Anchor Properties & Determination**:
+  - `isTargetAnchor()`: Identifies whether a node has been pinned by the user with a fixed rate or target batch quantity.
+  - `targetBatchAmount`, `targetBatchTimeSec`: Target batch production quantity and completion deadline constraints for terminal nodes.
+  - The 2-stage linear flow solver (`TwoStageLinearFlowSolver`) adopts these anchors as strict boundary conditions to solve for unique, consistent flow rates.
+* **Conflict Detection (`AnchorConflict`)**:
+  - Sets a conflict flag and activates the `[⚠ Conflict]` badge if multiple mutually inconsistent flow anchors reside in the same connected subgraph component.
+
+### 12.2 Shared Machine Pool Frame Domain Model (`SharedMachinePool`)
+A frame-based domain model grouping multiple heterogeneous recipe nodes to run on a time-shared physical machine cluster:
+
+* **Duty Allocation & Machine Count Calculation**:
+  $$\text{Total Duty} = \sum_{i=1}^N \text{machineCount}_i$$
+  $$\text{Required Physical Machines} = \lceil \text{Total Duty} \rceil$$
+* **BOM & Power Aggregation Integration**:
+  - When generating a Bill of Materials (`GTCEuBOMHelper`), fractional machine counts are not rounded up individually; only $\lceil \text{Total Duty} \rceil$ hulls and multiblock structures are requested for the pooled cluster.
+  - Generates zero idle power loss, computing effective dynamic electrical load proportional to active utilization ($\text{Total Duty} / \text{Required Physical Machines}$).
+
+---
+
+> ➡ **Next Chapter**: [[02] Mathematical Engine & Graph Analysis Algorithms](02_MATH_AND_ALGORITHMS.md)

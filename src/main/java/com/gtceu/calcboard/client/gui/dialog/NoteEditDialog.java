@@ -1,28 +1,36 @@
 package com.gtceu.calcboard.client.gui.dialog;
 
-import com.gtceu.calcboard.client.gui.BoardScreen;
-
+import com.gtceu.calcboard.api.history.BoardCommand;
 import com.gtceu.calcboard.api.model.CanvasStickyNote;
+import com.gtceu.calcboard.client.gui.BoardScreen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.components.MultiLineEditBox;
+import com.gtceu.calcboard.client.gui.widget.BoardMultiLineEditBox;
 import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import org.lwjgl.glfw.GLFW;
 
+import com.gtceu.calcboard.client.gui.dialog.modal.IBoardModal;
+import com.gtceu.calcboard.client.gui.dialog.modal.ModalRenderContext;
+
+import java.util.Objects;
+
 /**
  * Modal dialog for editing Sticky Note Title, Multi-line Content, and Theme Color.
  */
-public class NoteEditDialog {
+public class NoteEditDialog implements IBoardModal {
     private final BoardScreen parent;
     private boolean visible = false;
     private CanvasStickyNote targetNote = null;
 
     private EditBox titleInput;
-    private MultiLineEditBox contentInput;
+    private BoardMultiLineEditBox contentInput;
     private int selectedColor;
+    private String initialTitle;
+    private String initialContent;
+    private int initialColor;
 
     public NoteEditDialog(BoardScreen parent) {
         this.parent = parent;
@@ -32,6 +40,9 @@ public class NoteEditDialog {
         if (note == null) return;
         this.targetNote = note;
         this.selectedColor = note.getColor();
+        this.initialTitle = note.getTitle() != null ? note.getTitle() : "";
+        this.initialContent = note.getContent() != null ? note.getContent() : "";
+        this.initialColor = note.getColor();
         this.visible = true;
 
         Font font = Minecraft.getInstance().font;
@@ -46,7 +57,7 @@ public class NoteEditDialog {
         this.titleInput.setValue(note.getTitle() != null ? note.getTitle() : "");
         this.titleInput.setFocused(false);
 
-        this.contentInput = new MultiLineEditBox(font, x + 16, y + 82, dialogW - 32, 90, Component.literal(""), Component.literal("Content"));
+        this.contentInput = new BoardMultiLineEditBox(font, x + 16, y + 82, dialogW - 32, 90, Component.literal(""), Component.literal("Content"));
         this.contentInput.setCharacterLimit(1024);
         this.contentInput.setValue(note.getContent() != null ? note.getContent() : "");
         this.contentInput.setFocused(true);
@@ -61,6 +72,11 @@ public class NoteEditDialog {
 
     public boolean isVisible() {
         return visible;
+    }
+
+    @Override
+    public void renderModal(ModalRenderContext context) {
+        render(context.graphics(), context.screenWidth(), context.screenHeight(), context.mouseX(), context.mouseY());
     }
 
     public void render(GuiGraphics graphics, int screenW, int screenH, int mouseX, int mouseY) {
@@ -208,6 +224,44 @@ public class NoteEditDialog {
         return true;
     }
 
+    @Override
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (!visible) return false;
+        if (contentInput != null && contentInput.mouseReleased(mouseX, mouseY, button)) {
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY, int screenWidth, int screenHeight) {
+        if (!visible) return false;
+        if (contentInput != null && contentInput.mouseDragged(mouseX, mouseY, button, dragX, dragY)) {
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+        if (!visible) return false;
+        if (contentInput != null && contentInput.mouseScrolled(mouseX, mouseY, delta)) {
+            return true;
+        }
+        return true;
+    }
+
+    @Override
+    public void tick() {
+        if (!visible) return;
+        if (titleInput != null) {
+            titleInput.tick();
+        }
+        if (contentInput != null) {
+            contentInput.tick();
+        }
+    }
+
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         if (!visible) return false;
 
@@ -251,12 +305,28 @@ public class NoteEditDialog {
     private void commitSave() {
         if (targetNote != null) {
             String newTitle = titleInput != null ? titleInput.getValue().trim() : "";
-            if (!newTitle.isEmpty()) {
-                targetNote.setTitle(newTitle);
+            if (newTitle.isEmpty() && initialTitle != null) {
+                newTitle = initialTitle;
             }
-            targetNote.setContent(contentInput != null ? contentInput.getValue() : "");
-            targetNote.setColor(selectedColor);
-            parent.markSummaryDirty();
+            String newContent = contentInput != null ? contentInput.getValue() : "";
+            int newColor = selectedColor;
+
+            boolean changed = !Objects.equals(initialTitle, newTitle)
+                    || !Objects.equals(initialContent, newContent)
+                    || initialColor != newColor;
+
+            if (changed) {
+                targetNote.setTitle(newTitle);
+                targetNote.setContent(newContent);
+                targetNote.setColor(newColor);
+                parent.recordCommand(new BoardCommand.ModifyNotePropertiesCommand(
+                        targetNote.getId(),
+                        initialTitle, newTitle,
+                        initialContent, newContent,
+                        initialColor, newColor
+                ));
+                parent.markSummaryDirty();
+            }
             Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F));
         }
         close();

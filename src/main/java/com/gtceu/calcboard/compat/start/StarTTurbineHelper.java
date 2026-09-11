@@ -9,7 +9,22 @@ import net.minecraft.resources.ResourceLocation;
 public class StarTTurbineHelper {
 
     public static final ResourceLocation SUPREME_PLASMA_TURBINE_ID = ResourceLocation.tryParse("start_core:supreme_plasma_turbine");
+    public static final ResourceLocation GTCEU_SUPREME_PLASMA_TURBINE_ID = ResourceLocation.tryParse("gtceu:supreme_plasma_turbine");
     public static final ResourceLocation NYINSANE_PLASMA_TURBINE_ID = ResourceLocation.tryParse("start_core:nyinsane_plasma_turbine");
+    public static final ResourceLocation GTCEU_NYINSANE_PLASMA_TURBINE_ID = ResourceLocation.tryParse("gtceu:nyinsane_plasma_turbine");
+
+    public static boolean isSptIcon(ResourceLocation icon) {
+        return SUPREME_PLASMA_TURBINE_ID.equals(icon) || GTCEU_SUPREME_PLASMA_TURBINE_ID.equals(icon);
+    }
+
+    public static boolean isNptIcon(ResourceLocation icon) {
+        return NYINSANE_PLASMA_TURBINE_ID.equals(icon) || GTCEU_NYINSANE_PLASMA_TURBINE_ID.equals(icon);
+    }
+
+    public static boolean isPlasmaTurbineIcon(ResourceLocation icon) {
+        if (icon == null) return false;
+        return isSptIcon(icon) || isNptIcon(icon);
+    }
 
     public static boolean isStarTTurbine(RecipeNode node) {
         if (node == null) return false;
@@ -19,11 +34,7 @@ public class StarTTurbineHelper {
         }
         ResourceLocation icon = node.getMachineIcon();
         if (icon != null) {
-            if (icon.equals(SUPREME_PLASMA_TURBINE_ID) || icon.equals(NYINSANE_PLASMA_TURBINE_ID)) {
-                return true;
-            }
-            String p = icon.getPath();
-            return p.contains("supreme_plasma_turbine") || p.contains("nyinsane_plasma_turbine");
+            return isSptIcon(icon) || isNptIcon(icon);
         }
         return false;
     }
@@ -84,18 +95,29 @@ public class StarTTurbineHelper {
         syncBoosterInputs(node);
     }
 
+    public static final ResourceLocation TUNGSTEN_DISULFIDE = ResourceLocation.tryParse("gtceu:tungsten_disulfide");
+    public static final ResourceLocation SUPERSTATE_HELIUM_3 = ResourceLocation.tryParse("gtceu:superstate_helium_3");
+    public static final ResourceLocation BEC_OG = ResourceLocation.tryParse("gtceu:bec_og");
+
+    private static final java.util.Set<ResourceLocation> STAR_T_BOOSTER_FLUIDS = java.util.Set.of(
+            TUNGSTEN_DISULFIDE,
+            SUPERSTATE_HELIUM_3,
+            BEC_OG
+    );
+
     public static boolean isBoosterFluid(com.gtceu.calcboard.api.model.IngredientStack in) {
         if (in == null || !in.isFluid() || in.getId() == null) return false;
-        String p = in.getId().getPath();
-        return p.contains("tungsten_disulfide") || p.contains("superstate_helium_3")
-                || p.contains("superstate") || p.contains("bec_og") || p.contains("oganesson");
+        return STAR_T_BOOSTER_FLUIDS.contains(in.getId());
+    }
+
+    public static void removeBoosterInputs(RecipeNode node) {
+        if (node == null) return;
+        node.getInputs().removeIf(StarTTurbineHelper::isBoosterFluid);
     }
 
     public static void syncBoosterInputs(RecipeNode node) {
-        if (node == null) return;
-        node.getInputs().removeIf(StarTTurbineHelper::isBoosterFluid);
-
-        if (!supportsBoost(node)) return;
+        if (node == null || !supportsBoost(node)) return;
+        removeBoosterInputs(node);
 
         GTPlasmaTurbineModel model = GTPlasmaTurbineModel.getModel(node);
         boolean lub = Boolean.TRUE.equals(node.getProperties().get(GTCEuProperties.LUBRICANT_BOOST));
@@ -132,7 +154,15 @@ public class StarTTurbineHelper {
     public static boolean isStarTTrait(MachineAddon addon) {
         if (addon == null || addon.getId() == null) return false;
         String id = addon.getId();
-        return id.startsWith("start_core:spt_") || id.startsWith("start_core:npt_") || id.contains("spt_") || id.contains("npt_");
+        return isSptTraitId(id) || isNptTraitId(id);
+    }
+
+    private static boolean isSptTraitId(String id) {
+        return id.startsWith("start_core:spt_") || id.startsWith("gtceu:spt_");
+    }
+
+    private static boolean isNptTraitId(String id) {
+        return id.startsWith("start_core:npt_") || id.startsWith("gtceu:npt_");
     }
 
     public static boolean isCompatibleStarTTrait(RecipeNode node, MachineAddon addon) {
@@ -141,10 +171,10 @@ public class StarTTurbineHelper {
         }
         ResourceLocation icon = node.getMachineIcon();
         if (icon != null) {
-            if (icon.equals(SUPREME_PLASMA_TURBINE_ID) || icon.getPath().contains("supreme_plasma_turbine")) {
-                return addon.getId().contains("spt_");
-            } else if (icon.equals(NYINSANE_PLASMA_TURBINE_ID) || icon.getPath().contains("nyinsane_plasma_turbine")) {
-                return addon.getId().contains("npt_");
+            if (isSptIcon(icon)) {
+                return isSptTraitId(addon.getId());
+            } else if (isNptIcon(icon)) {
+                return isNptTraitId(addon.getId());
             }
         }
         return false;

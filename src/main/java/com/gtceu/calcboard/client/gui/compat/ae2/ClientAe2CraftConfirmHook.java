@@ -1,7 +1,5 @@
 package com.gtceu.calcboard.client.gui.compat.ae2;
 
-import appeng.api.stacks.AEFluidKey;
-import appeng.api.stacks.AEItemKey;
 import com.gtceu.calcboard.GregTechCalcBoard;
 import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.api.storage.BoardPage;
@@ -12,6 +10,8 @@ import com.gtceu.calcboard.integration.ae2.model.Ae2PlanEvaluationResult;
 import com.gtceu.calcboard.integration.ae2.model.Ae2PlanStep;
 import com.gtceu.calcboard.integration.ae2.model.PatternId;
 import com.gtceu.calcboard.integration.ae2.registry.PatternGraphRegistry;
+import appeng.api.stacks.AEItemKey;
+import appeng.api.stacks.AEFluidKey;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -26,7 +26,6 @@ import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.ScreenEvent;
 import net.minecraftforge.event.entity.player.ItemTooltipEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.registries.ForgeRegistries;
 
 import java.lang.reflect.Method;
@@ -36,7 +35,6 @@ import java.util.*;
  * Client Forge screen event hook for AE2 CraftConfirmScreen and item tooltips.
  * Renders an unobtrusive top header Total ETA banner, linked graph indicators, step breakdowns, and interactive bottleneck deep-link badges.
  */
-@Mod.EventBusSubscriber(modid = GregTechCalcBoard.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)
 public class ClientAe2CraftConfirmHook {
 
     private static int lastBottleneckX = 0;
@@ -45,10 +43,17 @@ public class ClientAe2CraftConfirmHook {
     private static int lastBottleneckH = 0;
     private static String lastBottleneckPageId = "";
 
+    private static Class<?> craftConfirmScreenClass = null;
     private static Method getPlanMethod = null;
     private static Method getEntriesMethod = null;
     private static Method getCpuCoProcessorsMethod = null;
+    private static Method isEncodedPatternMethod = null;
+    private static Method getCraftAmountMethod = null;
+    private static Method getWhatMethod = null;
     private static boolean reflectionInitialized = false;
+
+    private static Object lastEvaluatedPlan = null;
+    private static Ae2PlanEvaluationResult cachedPlanResult = null;
 
     static {
         initReflection();
@@ -56,16 +61,53 @@ public class ClientAe2CraftConfirmHook {
 
     private static void initReflection() {
         if (reflectionInitialized) return;
-        try {
-            Class<?> menuClass = Class.forName("appeng.menu.me.crafting.CraftConfirmMenu");
-            getCpuCoProcessorsMethod = menuClass.getMethod("getCpuCoProcessors");
-            getPlanMethod = menuClass.getMethod("getPlan");
 
-            Class<?> planSummaryClass = Class.forName("appeng.menu.me.crafting.CraftingPlanSummary");
-            getEntriesMethod = planSummaryClass.getMethod("getEntries");
-        } catch (Throwable ignored) {
+        craftConfirmScreenClass = resolveClass(
+                "appeng.client.gui.me.crafting.CraftConfirmScreen",
+                "appeng.client.gui.me.CraftConfirmScreen"
+        );
+
+        Class<?> menuClass = resolveClass("appeng.menu.me.crafting.CraftConfirmMenu");
+        if (menuClass != null) {
+            getCpuCoProcessorsMethod = resolveMethod(menuClass, "getCpuCoProcessors");
+            getPlanMethod = resolveMethod(menuClass, "getPlan");
         }
+
+        Class<?> planSummaryClass = resolveClass("appeng.menu.me.crafting.CraftingPlanSummary");
+        if (planSummaryClass != null) {
+            getEntriesMethod = resolveMethod(planSummaryClass, "getEntries");
+        }
+
+        Class<?> entryClass = resolveClass("appeng.menu.me.crafting.CraftingPlanSummaryEntry");
+        if (entryClass != null) {
+            getCraftAmountMethod = resolveMethod(entryClass, "getCraftAmount");
+            getWhatMethod = resolveMethod(entryClass, "getWhat");
+        }
+
+        Class<?> patternHelperClass = resolveClass("appeng.api.crafting.PatternDetailsHelper");
+        if (patternHelperClass != null) {
+            isEncodedPatternMethod = resolveMethod(patternHelperClass, "isEncodedPattern", ItemStack.class);
+        }
+
         reflectionInitialized = true;
+    }
+
+    private static Class<?> resolveClass(String... candidates) {
+        for (String candidate : candidates) {
+            try {
+                return Class.forName(candidate);
+            } catch (Throwable ignored) {
+            }
+        }
+        return null;
+    }
+
+    private static Method resolveMethod(Class<?> targetClass, String name, Class<?>... parameterTypes) {
+        try {
+            return targetClass.getMethod(name, parameterTypes);
+        } catch (Throwable ignored) {
+            return null;
+        }
     }
 
     @SubscribeEvent
@@ -99,21 +141,39 @@ public class ClientAe2CraftConfirmHook {
         if (stack.isEmpty()) return;
 
         PatternGraphRegistry registry = PatternGraphRegistry.getInstance();
+        boolean isPattern = isEncodedPattern(stack);
+
+        if (isPattern) {
+            PatternId patternId = PatternId.of(stack);
+            Optional<BoardPage> boundOpt = registry.getDirectBoundPage(patternId);
+            if (boundOpt.isPresent()) {
+                BoardPage page = boundOpt.get();
+                event.getToolTip().add(Component.literal("§b⚡ " + Component.translatable("gui.gtcalcboard.ae2.tooltip.linked_page", page.getName()).getString()));
+            } else {
+                event.getToolTip().add(Component.literal("§8• " + Component.translatable("gui.gtcalcboard.ae2.tooltip.create_hint").getString()));
+            }
+            return;
+        }
+
         Optional<BoardPage> boundOpt = registry.getBoundPage(stack);
         if (boundOpt.isPresent()) {
             BoardPage page = boundOpt.get();
             event.getToolTip().add(Component.literal("§b⚡ " + Component.translatable("gui.gtcalcboard.ae2.tooltip.linked_page", page.getName()).getString()));
-            return;
         }
+    }
 
-        if (appeng.api.crafting.PatternDetailsHelper.isEncodedPattern(stack)) {
-            event.getToolTip().add(Component.literal("§8• " + Component.translatable("gui.gtcalcboard.ae2.tooltip.create_hint").getString()));
+    private static boolean isEncodedPattern(ItemStack stack) {
+        if (isEncodedPatternMethod == null || stack == null || stack.isEmpty()) return false;
+        try {
+            return Boolean.TRUE.equals(isEncodedPatternMethod.invoke(null, stack));
+        } catch (Throwable ignored) {
+            return false;
         }
     }
 
     private static boolean isCraftConfirmScreen(Screen screen) {
-        if (screen == null) return false;
-        return screen.getClass().getName().contains("CraftConfirmScreen");
+        if (screen == null || craftConfirmScreenClass == null) return false;
+        return craftConfirmScreenClass.isInstance(screen);
     }
 
     private static Ae2PlanEvaluationResult resolveEtaResult(AbstractContainerScreen<?> containerScreen) {
@@ -129,14 +189,29 @@ public class ClientAe2CraftConfirmHook {
         if (menu == null || getPlanMethod == null || getEntriesMethod == null) return null;
         try {
             Object planSummary = getPlanMethod.invoke(menu);
-            if (planSummary == null) return null;
+            if (planSummary == null) {
+                lastEvaluatedPlan = null;
+                cachedPlanResult = null;
+                return null;
+            }
+
+            if (planSummary == lastEvaluatedPlan && cachedPlanResult != null) {
+                return cachedPlanResult;
+            }
 
             int coProcessors = getCpuCoProcessorsMethod != null ? (int) getCpuCoProcessorsMethod.invoke(menu) : 0;
             List<?> entries = (List<?>) getEntriesMethod.invoke(planSummary);
-            if (entries == null || entries.isEmpty()) return null;
+            if (entries == null || entries.isEmpty()) {
+                lastEvaluatedPlan = planSummary;
+                cachedPlanResult = null;
+                return null;
+            }
 
             Map<PatternId, Long> patternCounts = extractPatternCountsFromEntries(entries);
-            return Ae2CraftingPlanEvaluator.evaluatePatternCounts(patternCounts, coProcessors);
+            Ae2PlanEvaluationResult result = Ae2CraftingPlanEvaluator.evaluatePatternCounts(patternCounts, coProcessors);
+            lastEvaluatedPlan = planSummary;
+            cachedPlanResult = result;
+            return result;
         } catch (Throwable t) {
             return null;
         }
@@ -151,13 +226,15 @@ public class ClientAe2CraftConfirmHook {
     }
 
     private static void processEntry(Object entry, Map<PatternId, Long> map) {
+        if (entry == null) return;
         try {
-            Method getCraftAmount = entry.getClass().getMethod("getCraftAmount");
-            Method getWhat = entry.getClass().getMethod("getWhat");
-            long craftAmount = (long) getCraftAmount.invoke(entry);
+            Method craftAmountMethod = (getCraftAmountMethod != null) ? getCraftAmountMethod : entry.getClass().getMethod("getCraftAmount");
+            Method whatMethod = (getWhatMethod != null) ? getWhatMethod : entry.getClass().getMethod("getWhat");
+
+            long craftAmount = (long) craftAmountMethod.invoke(entry);
             if (craftAmount <= 0) return;
 
-            Object aeKey = getWhat.invoke(entry);
+            Object aeKey = whatMethod.invoke(entry);
             if (aeKey instanceof AEItemKey ak) {
                 ResourceLocation itemId = ForgeRegistries.ITEMS.getKey(ak.getItem());
                 ItemStack icon = ak.toStack(1);
@@ -247,7 +324,7 @@ public class ClientAe2CraftConfirmHook {
             displayBName = displayBName.substring(0, displayBName.length() - 3) + "...";
         }
 
-        String fullStr = "§e🔗 " + displayBName + " §a↗";
+        String fullStr = "§e↔ " + displayBName + " §a↗";
         int btnW = font.width(fullStr) + 6;
         int btnH = 10;
         int btnX = panelX + 4;

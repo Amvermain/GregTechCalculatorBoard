@@ -30,10 +30,14 @@ public class CreateKineticTest {
         Assertions.assertEquals("Large Water Wheel", node.getName());
         Assertions.assertEquals(EnergyType.KINETIC_SU, node.getEnergyType());
         Assertions.assertTrue(node.isGenerator());
+        Assertions.assertEquals(4, node.getRpm());
         Assertions.assertEquals(512.0, node.getBaseEUt(), 0.001);
         Assertions.assertEquals(512.0, node.getSingleMachineEUt(), 0.001);
         Assertions.assertEquals(1.0, node.getEffectiveDurationSeconds(), 0.001);
         Assertions.assertEquals(ResourceLocation.tryParse("create:large_water_wheel"), node.getMachineIcon());
+
+        node.setRpm(8);
+        Assertions.assertEquals(1024.0, node.getSingleMachineEUt(), 0.001);
     }
 
     @Test
@@ -63,23 +67,22 @@ public class CreateKineticTest {
         Assertions.assertTrue(node.isGenerator());
         Assertions.assertEquals(2048.0, node.getBaseEUt(), 0.001);
         Assertions.assertFalse(node.getInputs().isEmpty());
-        Assertions.assertEquals("gtceu:steam", node.getInputs().get(0).getId().toString());
+        Assertions.assertEquals("minecraft:water", node.getInputs().get(0).getId().toString());
     }
 
     @Test
-    public void testVirtualKineticSearchRecipes() {
-        List<SearchableRecipe> virtualRecipes = CreateModAdapter.getVirtualKineticSearchRecipes();
-        Assertions.assertFalse(virtualRecipes.isEmpty());
-
-        boolean foundLargeWaterWheel = false;
-        for (SearchableRecipe sr : virtualRecipes) {
-            if (sr.displayName().equals("Large Water Wheel")) {
-                foundLargeWaterWheel = true;
-                Assertions.assertTrue(sr.inputSearchIndex().contains("kinetic") || sr.outputSearchIndex().contains("kinetic"));
-                Assertions.assertTrue(sr.recipe() instanceof RecipeNode);
-            }
-        }
-        Assertions.assertTrue(foundLargeWaterWheel);
+    public void testKineticGeneratorNodeCreation() {
+        RecipeNode node = CreateRecipeHandler.createKineticGeneratorNode(
+                ResourceLocation.tryParse("create:large_water_wheel"),
+                "Large Water Wheel"
+        );
+        Assertions.assertNotNull(node);
+        Assertions.assertEquals("Large Water Wheel", node.getName());
+        Assertions.assertEquals(EnergyType.KINETIC_SU, node.getEnergyType());
+        Assertions.assertTrue(node.isGenerator());
+        Assertions.assertEquals(512.0, node.getBaseEUt(), 1e-4);
+        Assertions.assertFalse(node.getOutputs().isEmpty());
+        Assertions.assertTrue(node.getOutputs().get(0).isStressUnit());
     }
 
     @Test
@@ -285,41 +288,32 @@ public class CreateKineticTest {
         Assertions.assertEquals(EnergyType.KINETIC_SU, stirling.getEnergyType());
         Assertions.assertEquals(1024.0, stirling.getBaseEUt(), 0.001);
 
-        // 5. Virtual Search includes Create New Age items
-        List<SearchableRecipe> virtualRecipes = CreateModAdapter.getVirtualKineticSearchRecipes();
-        boolean foundCoil = virtualRecipes.stream().anyMatch(sr -> sr.displayName().equals("Generator Coil"));
-        boolean foundBrushes = virtualRecipes.stream().anyMatch(sr -> sr.displayName().equals("Carbon Brushes"));
-        boolean foundMotor = virtualRecipes.stream().anyMatch(sr -> sr.displayName().equals("Basic Motor"));
-
-        Assertions.assertTrue(foundCoil);
-        Assertions.assertTrue(foundBrushes);
-        Assertions.assertTrue(foundMotor);
     }
 
     @Test
     public void testKineticRecipeSearchAndFavoriteMatching() {
-        List<SearchableRecipe> virtualRecipes = CreateModAdapter.getVirtualKineticSearchRecipes();
+        var waterWheelId = ResourceLocation.tryParse("create:large_water_wheel");
+        var node = CreateRecipeHandler.createKineticGeneratorNode(waterWheelId, "Large Water Wheel");
+        SearchableRecipe sr = com.gtceu.calcboard.api.catalog.NativeCatalogSearchHelper.createRecipe(
+                node,
+                waterWheelId,
+                "gtcalcboard:kinetic_source",
+                "Kinetic Source",
+                () -> CreateRecipeHandler.createKineticGeneratorNode(waterWheelId, "Large Water Wheel")
+        );
+        Assertions.assertNotNull(sr);
 
         // 1. Search by "<su"
         RecipeSearchEngine.ParsedQuery querySu = RecipeSearchEngine.parseQuery("<su");
-        List<SearchableRecipe> matchesSu = virtualRecipes.stream()
-                .filter(sr -> RecipeSearchEngine.matches(sr, querySu))
-                .toList();
-        Assertions.assertTrue(matchesSu.stream().anyMatch(sr -> sr.displayName().equals("Large Water Wheel")));
+        Assertions.assertTrue(RecipeSearchEngine.matches(sr, querySu));
 
         // 2. Search by "<stress"
         RecipeSearchEngine.ParsedQuery queryStress = RecipeSearchEngine.parseQuery("<stress");
-        List<SearchableRecipe> matchesStress = virtualRecipes.stream()
-                .filter(sr -> RecipeSearchEngine.matches(sr, queryStress))
-                .toList();
-        Assertions.assertTrue(matchesStress.stream().anyMatch(sr -> sr.displayName().equals("Large Water Wheel")));
+        Assertions.assertTrue(RecipeSearchEngine.matches(sr, queryStress));
 
         // 3. Search by "large water wheel"
         RecipeSearchEngine.ParsedQuery queryLww = RecipeSearchEngine.parseQuery("large water wheel");
-        List<SearchableRecipe> matchesLww = virtualRecipes.stream()
-                .filter(sr -> RecipeSearchEngine.matches(sr, queryLww))
-                .toList();
-        Assertions.assertTrue(matchesLww.stream().anyMatch(sr -> sr.displayName().equals("Large Water Wheel")));
+        Assertions.assertTrue(RecipeSearchEngine.matches(sr, queryLww));
     }
 
     @Test
@@ -362,6 +356,263 @@ public class CreateKineticTest {
         Assertions.assertTrue(com.gtceu.calcboard.api.util.ModCompatHelper.isCreateMachine(lathe));
         Assertions.assertEquals(EnergyType.KINETIC_SU, lathe.getEnergyType());
         Assertions.assertEquals(256.0, lathe.getSingleMachineEUt(), 0.001);
+    }
+
+    @Test
+    public void testCreateStressHelperFallbacks() {
+        CreateStressHelper.KineticStats stats = CreateStressHelper.deduceGeneratorStats(
+                ResourceLocation.tryParse("create:large_water_wheel"),
+                128.0,
+                4
+        );
+        Assertions.assertEquals(128.0, stats.capacityPerRpm(), 0.001);
+        Assertions.assertEquals(4, stats.rpm());
+        Assertions.assertEquals(512.0, stats.totalSu(), 0.001);
+    }
+
+    @Test
+    public void testSteamEngineTierCalculations() {
+        Assertions.assertEquals(2048.0, CreateStressHelper.calculateSteamEngineTotalSu(-1), 0.001);
+        Assertions.assertEquals(320.0, CreateStressHelper.calculateSteamConsumption(-1), 0.001);
+
+        Assertions.assertEquals(32.0, CreateStressHelper.calculateSteamEngineTotalSu(0), 0.001);
+        Assertions.assertEquals(80.0, CreateStressHelper.calculateSteamConsumption(0), 0.001);
+
+        Assertions.assertEquals(128.0, CreateStressHelper.calculateSteamEngineTotalSu(1), 0.001);
+        Assertions.assertEquals(320.0, CreateStressHelper.calculateSteamConsumption(1), 0.001);
+
+        Assertions.assertEquals(512.0, CreateStressHelper.calculateSteamEngineTotalSu(2), 0.001);
+        Assertions.assertEquals(1280.0, CreateStressHelper.calculateSteamConsumption(2), 0.001);
+
+        Assertions.assertEquals(2048.0, CreateStressHelper.calculateSteamEngineTotalSu(3), 0.001);
+        Assertions.assertEquals(5120.0, CreateStressHelper.calculateSteamConsumption(3), 0.001);
+
+        Assertions.assertEquals(8192.0, CreateStressHelper.calculateSteamEngineTotalSu(4), 0.001);
+        Assertions.assertEquals(20480.0, CreateStressHelper.calculateSteamConsumption(4), 0.001);
+    }
+
+    @Test
+    public void testCreateBoilerLevelScaling() {
+        RecipeNode boiler = CreateRecipeHandler.createCreateBoilerNode();
+        Assertions.assertNotNull(boiler);
+        Assertions.assertTrue(CreateProperties.isCreateBoiler(boiler));
+        Assertions.assertEquals(0, (int) boiler.getProperties().get(CreateProperties.BOILER_LEVEL));
+        Assertions.assertTrue(boiler.getProperties().get(CreateProperties.BOILER_WATER_MODE));
+        Assertions.assertEquals(2048.0, boiler.getBaseEUt(), 0.001);
+        Assertions.assertEquals(16, boiler.getRpm());
+        Assertions.assertEquals("minecraft:water", boiler.getInputs().get(0).getId().toString());
+        Assertions.assertEquals(200.0, boiler.getInputs().get(0).getAmount(), 0.001);
+
+        CreateProperties.applyBoilerLevel(boiler, 9);
+        Assertions.assertEquals(9, (int) boiler.getProperties().get(CreateProperties.BOILER_LEVEL));
+        Assertions.assertEquals(147456.0, boiler.getBaseEUt(), 0.001);
+        Assertions.assertEquals(64, boiler.getRpm());
+        Assertions.assertEquals("minecraft:water", boiler.getInputs().get(0).getId().toString());
+        Assertions.assertEquals(1800.0, boiler.getInputs().get(0).getAmount(), 0.001);
+
+        CreateProperties.applyBoilerLevel(boiler, 18);
+        Assertions.assertEquals(18, (int) boiler.getProperties().get(CreateProperties.BOILER_LEVEL));
+        Assertions.assertEquals(294912.0, boiler.getBaseEUt(), 0.001);
+        Assertions.assertEquals(64, boiler.getRpm());
+        Assertions.assertEquals("minecraft:water", boiler.getInputs().get(0).getId().toString());
+        Assertions.assertEquals(3600.0, boiler.getInputs().get(0).getAmount(), 0.001);
+    }
+
+    @Test
+    public void testCreateBoilerHeaterAddons() {
+        CreateModAdapter adapter = new CreateModAdapter();
+        List<com.gtceu.calcboard.api.catalog.MachineAddon> collector = new java.util.ArrayList<>();
+        adapter.discoverAddons(collector, List.of());
+
+        Assertions.assertEquals(2, collector.size());
+        com.gtceu.calcboard.compat.create.addon.CreateHeaterAddon heated = (com.gtceu.calcboard.compat.create.addon.CreateHeaterAddon) collector.get(0);
+        com.gtceu.calcboard.compat.create.addon.CreateHeaterAddon superheated = (com.gtceu.calcboard.compat.create.addon.CreateHeaterAddon) collector.get(1);
+
+        Assertions.assertEquals(1, heated.getHeatLevel());
+        Assertions.assertFalse(heated.isSuperheated());
+        Assertions.assertEquals(2, superheated.getHeatLevel());
+        Assertions.assertTrue(superheated.isSuperheated());
+
+        RecipeNode boiler = CreateRecipeHandler.createCreateBoilerNode();
+        Assertions.assertTrue(adapter.supportsAddons(boiler));
+
+        for (int i = 0; i < 9; i++) {
+            Assertions.assertTrue(adapter.canInstallAddon(boiler, heated));
+            adapter.onAddonInstalled(boiler, heated.copy());
+        }
+        Assertions.assertEquals(9, (int) boiler.getProperties().get(CreateProperties.BOILER_LEVEL));
+        Assertions.assertEquals(147456.0, boiler.getBaseEUt(), 0.001);
+        Assertions.assertFalse(adapter.canInstallAddon(boiler, heated));
+
+        boiler.getAddons().clear();
+        CreateProperties.setBoilerSize(boiler, 72);
+        CreateProperties.setBoilerWater(boiler, 180);
+        CreateProperties.setBoilerHeat(boiler, 0);
+
+        for (int i = 0; i < 9; i++) {
+            Assertions.assertTrue(adapter.canInstallAddon(boiler, superheated));
+            adapter.onAddonInstalled(boiler, superheated.copy());
+        }
+        Assertions.assertEquals(18, (int) boiler.getProperties().get(CreateProperties.BOILER_LEVEL));
+        Assertions.assertEquals(294912.0, boiler.getBaseEUt(), 0.001);
+        Assertions.assertFalse(adapter.canInstallAddon(boiler, superheated));
+
+        com.gtceu.calcboard.api.catalog.MachineAddon removed = boiler.getAddons().remove(0);
+        adapter.onAddonRemoved(boiler, removed);
+        Assertions.assertEquals(16, (int) boiler.getProperties().get(CreateProperties.BOILER_LEVEL));
+        Assertions.assertEquals(262144.0, boiler.getBaseEUt(), 0.001);
+    }
+
+    @Test
+    public void testCreateBoilerThreeAxisBottleneckCalculation() {
+        RecipeNode boiler = CreateRecipeHandler.createCreateBoilerNode();
+
+        Assertions.assertEquals(CreateProperties.BoilerBottleneck.NONE,
+                CreateProperties.getBottleneck(16, 0, 40));
+        Assertions.assertEquals(0, CreateProperties.calculateEffectiveLevel(16, 0, 40));
+
+        CreateProperties.setBoilerSize(boiler, 16);
+        CreateProperties.setBoilerHeat(boiler, 9);
+        CreateProperties.setBoilerWater(boiler, 180);
+        Assertions.assertEquals(CreateProperties.BoilerBottleneck.SIZE,
+                CreateProperties.getBottleneck(16, 9, 180));
+        Assertions.assertEquals(4, (int) boiler.getProperties().get(CreateProperties.BOILER_LEVEL));
+        Assertions.assertEquals(65536.0, boiler.getBaseEUt(), 0.001);
+        Assertions.assertEquals(64, boiler.getRpm());
+
+        CreateProperties.setBoilerSize(boiler, 72);
+        CreateProperties.setBoilerHeat(boiler, 9);
+        CreateProperties.setBoilerWater(boiler, 40);
+        Assertions.assertEquals(CreateProperties.BoilerBottleneck.WATER,
+                CreateProperties.getBottleneck(72, 9, 40));
+        Assertions.assertEquals(4, (int) boiler.getProperties().get(CreateProperties.BOILER_LEVEL));
+        Assertions.assertEquals(65536.0, boiler.getBaseEUt(), 0.001);
+
+        CreateProperties.setBoilerSize(boiler, 72);
+        CreateProperties.setBoilerHeat(boiler, 4);
+        CreateProperties.setBoilerWater(boiler, 180);
+        Assertions.assertEquals(CreateProperties.BoilerBottleneck.HEAT,
+                CreateProperties.getBottleneck(72, 4, 180));
+        Assertions.assertEquals(4, (int) boiler.getProperties().get(CreateProperties.BOILER_LEVEL));
+        Assertions.assertEquals(65536.0, boiler.getBaseEUt(), 0.001);
+
+        CreateProperties.setBoilerSize(boiler, 36);
+        CreateProperties.setBoilerHeat(boiler, 9);
+        CreateProperties.setBoilerWater(boiler, 90);
+        Assertions.assertEquals(CreateProperties.BoilerBottleneck.NONE,
+                CreateProperties.getBottleneck(36, 9, 90));
+        Assertions.assertEquals(9, (int) boiler.getProperties().get(CreateProperties.BOILER_LEVEL));
+        Assertions.assertEquals(147456.0, boiler.getBaseEUt(), 0.001);
+
+        CreateProperties.setBoilerSize(boiler, 2);
+        Assertions.assertEquals(4, (int) boiler.getProperties().get(CreateProperties.BOILER_SIZE_BLOCKS));
+
+        boiler.getProperties().set(CreateProperties.BOILER_SIZE_BLOCKS, 2);
+        CreateProperties.recalculateAndApplyBoiler(boiler);
+        Assertions.assertEquals(CreateProperties.BoilerBottleneck.INACTIVE,
+                CreateProperties.getBottleneck(2, 0, 40));
+        Assertions.assertEquals(-1, CreateProperties.calculateEffectiveLevel(2, 0, 40));
+        Assertions.assertEquals(0, (int) boiler.getProperties().get(CreateProperties.BOILER_LEVEL));
+        Assertions.assertEquals(0.0, boiler.getBaseEUt(), 0.001);
+    }
+
+    @Test
+    public void testCreateBoilerAddonHeatSync() {
+        CreateModAdapter adapter = new CreateModAdapter();
+        RecipeNode boiler = CreateRecipeHandler.createCreateBoilerNode();
+
+        CreateProperties.setBoilerSize(boiler, 72);
+        CreateProperties.setBoilerWater(boiler, 180);
+
+        List<com.gtceu.calcboard.api.catalog.MachineAddon> collector = new java.util.ArrayList<>();
+        adapter.discoverAddons(collector, List.of());
+        com.gtceu.calcboard.compat.create.addon.CreateHeaterAddon heated =
+                (com.gtceu.calcboard.compat.create.addon.CreateHeaterAddon) collector.get(0);
+        com.gtceu.calcboard.compat.create.addon.CreateHeaterAddon superheated =
+                (com.gtceu.calcboard.compat.create.addon.CreateHeaterAddon) collector.get(1);
+
+        for (int i = 0; i < 9; i++) {
+            adapter.onAddonInstalled(boiler, heated.copy());
+        }
+
+        Assertions.assertEquals(72, (int) boiler.getProperties().get(CreateProperties.BOILER_SIZE_BLOCKS));
+        Assertions.assertEquals(180, (int) boiler.getProperties().get(CreateProperties.BOILER_WATER_MB_TICK));
+        Assertions.assertEquals(9, (int) boiler.getProperties().get(CreateProperties.BOILER_HEAT_LEVEL));
+        Assertions.assertEquals(9, (int) boiler.getProperties().get(CreateProperties.BOILER_LEVEL));
+        Assertions.assertEquals(147456.0, boiler.getBaseEUt(), 0.001);
+
+        com.gtceu.calcboard.api.catalog.MachineAddon removed = boiler.getAddons().remove(0);
+        adapter.onAddonRemoved(boiler, removed);
+        adapter.onAddonInstalled(boiler, superheated.copy());
+
+        Assertions.assertEquals(72, (int) boiler.getProperties().get(CreateProperties.BOILER_SIZE_BLOCKS));
+        Assertions.assertEquals(180, (int) boiler.getProperties().get(CreateProperties.BOILER_WATER_MB_TICK));
+        Assertions.assertEquals(10, (int) boiler.getProperties().get(CreateProperties.BOILER_HEAT_LEVEL));
+        Assertions.assertEquals(10, (int) boiler.getProperties().get(CreateProperties.BOILER_LEVEL));
+        Assertions.assertEquals(163840.0, boiler.getBaseEUt(), 0.001);
+    }
+
+    @Test
+    public void testCreateBoilerBOMReflectsTankSizeAndLevel() {
+        RecipeNode boiler = CreateRecipeHandler.createCreateBoilerNode();
+        com.gtceu.calcboard.compat.create.CreateProperties.setBoilerSize(boiler, 72);
+
+        com.gtceu.calcboard.api.bom.MultiblockBOMSummary summaryDefault =
+                com.gtceu.calcboard.api.bom.MultiblockBOMCalculator.calculateBOM(List.of(boiler), false);
+        Assertions.assertEquals(1, summaryDefault.totalMultiblockCount());
+
+        ResourceLocation tankId = ResourceLocation.tryParse("create:fluid_tank");
+        ResourceLocation engineId = ResourceLocation.tryParse("create:steam_engine");
+
+        var tankEntry = summaryDefault.aggregatedItems().stream()
+                .filter(e -> e.itemId().equals(tankId)).findFirst().orElse(null);
+        var engineEntry = summaryDefault.aggregatedItems().stream()
+                .filter(e -> e.itemId().equals(engineId)).findFirst().orElse(null);
+
+        Assertions.assertNotNull(tankEntry);
+        Assertions.assertEquals(72, tankEntry.totalAmount());
+        Assertions.assertEquals(com.gtceu.calcboard.api.bom.PartCategory.CASING, tankEntry.category());
+
+        Assertions.assertNotNull(engineEntry);
+        Assertions.assertEquals(1, engineEntry.totalAmount());
+        Assertions.assertEquals(com.gtceu.calcboard.api.bom.PartCategory.CONTROLLER, engineEntry.category());
+
+        com.gtceu.calcboard.compat.create.CreateProperties.setBoilerSize(boiler, 16);
+        com.gtceu.calcboard.compat.create.CreateProperties.setBoilerHeat(boiler, 4);
+        com.gtceu.calcboard.compat.create.CreateProperties.setBoilerWater(boiler, 40);
+
+        com.gtceu.calcboard.api.bom.MultiblockBOMSummary summaryLv4 =
+                com.gtceu.calcboard.api.bom.MultiblockBOMCalculator.calculateBOM(List.of(boiler), false);
+
+        var tankLv4 = summaryLv4.aggregatedItems().stream()
+                .filter(e -> e.itemId().equals(tankId)).findFirst().orElse(null);
+        var engineLv4 = summaryLv4.aggregatedItems().stream()
+                .filter(e -> e.itemId().equals(engineId)).findFirst().orElse(null);
+
+        Assertions.assertNotNull(tankLv4);
+        Assertions.assertEquals(16, tankLv4.totalAmount());
+        Assertions.assertNotNull(engineLv4);
+        Assertions.assertEquals(4, engineLv4.totalAmount());
+
+        boiler.setMachineCount(2.0);
+        com.gtceu.calcboard.api.bom.MultiblockBOMSummary summary2x =
+                com.gtceu.calcboard.api.bom.MultiblockBOMCalculator.calculateBOM(List.of(boiler), false);
+        Assertions.assertEquals(2, summary2x.totalMultiblockCount());
+
+        var tank2x = summary2x.aggregatedItems().stream()
+                .filter(e -> e.itemId().equals(tankId)).findFirst().orElse(null);
+        var engine2x = summary2x.aggregatedItems().stream()
+                .filter(e -> e.itemId().equals(engineId)).findFirst().orElse(null);
+
+        Assertions.assertNotNull(tank2x);
+        Assertions.assertEquals(32, tank2x.totalAmount());
+        Assertions.assertNotNull(engine2x);
+        Assertions.assertEquals(8, engine2x.totalAmount());
+
+        CreateModAdapter adapter = new CreateModAdapter();
+        Assertions.assertEquals(com.gtceu.calcboard.api.bom.PartCategory.CASING, adapter.classifyBOMPart(tankId));
+        Assertions.assertEquals(com.gtceu.calcboard.api.bom.PartCategory.CONTROLLER, adapter.classifyBOMPart(engineId));
+        Assertions.assertNull(adapter.classifyBOMPart(ResourceLocation.tryParse("minecraft:dirt")));
     }
 }
 

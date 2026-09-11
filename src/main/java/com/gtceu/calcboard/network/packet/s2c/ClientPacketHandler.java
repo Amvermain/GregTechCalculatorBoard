@@ -80,6 +80,16 @@ public class ClientPacketHandler {
 
     public static void handleError(S2CWorkspaceErrorPacket packet) {
         BoardToast.show("gui.gtcalcboard.toast.error", Component.translatable(packet.getMessageKey()).getString());
+        if (packet.getErrorCode() == 409) {
+            ClientWorkspaceState state = ClientWorkspaceState.getInstance();
+            String activePageId = state.getActiveTeamPageId();
+            state.clearPageDirty(activePageId);
+            UUID teamId = state.getCurrentTeamId();
+            if (teamId != null) {
+                com.gtceu.calcboard.network.NetworkHandler.sendToServer(new com.gtceu.calcboard.network.packet.c2s.C2SRequestWorkspacePacket(teamId, activePageId));
+                com.gtceu.calcboard.network.NetworkHandler.sendToServer(new com.gtceu.calcboard.network.packet.c2s.C2SRequestPageDataPacket(activePageId, 0));
+            }
+        }
     }
 
     public static void handleSyncWorkspaceMeta(S2CSyncWorkspaceMetaPacket packet) {

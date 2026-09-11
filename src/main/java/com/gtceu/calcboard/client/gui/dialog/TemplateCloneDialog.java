@@ -22,10 +22,13 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import org.lwjgl.glfw.GLFW;
 
+import com.gtceu.calcboard.client.gui.dialog.modal.IBoardModal;
+import com.gtceu.calcboard.client.gui.dialog.modal.ModalRenderContext;
+
 import java.util.ArrayList;
 import java.util.List;
 
-public class TemplateCloneDialog {
+public class TemplateCloneDialog implements IBoardModal {
     private final BoardScreen screen;
     private boolean visible = false;
 
@@ -115,6 +118,11 @@ public class TemplateCloneDialog {
         }
     }
 
+    @Override
+    public void renderModal(ModalRenderContext context) {
+        render(context.graphics(), context.mouseX(), context.mouseY(), context.partialTicks());
+    }
+
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         if (!visible) return;
 
@@ -129,7 +137,7 @@ public class TemplateCloneDialog {
         graphics.renderOutline(x, y, DIALOG_WIDTH, DIALOG_HEIGHT, 0xFF3D4B66);
         graphics.renderOutline(x + 1, y + 1, DIALOG_WIDTH - 2, DIALOG_HEIGHT - 2, 0xFF0F131C);
 
-        graphics.drawString(font, "§6📋 " + Component.translatable("gui.gtcalcboard.template_clone.title").getString(), x + 16, y + 10, 0xFFFFFFFF, false);
+        graphics.drawString(font, "§6» " + Component.translatable("gui.gtcalcboard.template_clone.title").getString(), x + 16, y + 10, 0xFFFFFFFF, false);
 
         renderHardwareSummary(graphics, font, x, y);
         renderSearchInputs(graphics, mouseX, mouseY, partialTick, x, y);

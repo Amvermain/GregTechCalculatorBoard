@@ -7,6 +7,7 @@ import net.minecraftforge.fml.ModList;
 
 import java.lang.reflect.Method;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Soft-dependency team provider for FTB Teams.
@@ -15,9 +16,10 @@ import java.util.*;
 public class FTBTeamsProvider implements ITeamProvider {
 
     private static final String FTB_TEAMS_MOD_ID = "ftbteams";
+    private static final Map<String, Optional<Method>> METHOD_CACHE = new ConcurrentHashMap<>();
+
     private boolean isInitialized = false;
     private boolean isFtbTeamsPresent = false;
-
     private Object apiInstance = null;
     private Method getManagerMethod = null;
 
@@ -30,33 +32,22 @@ public class FTBTeamsProvider implements ITeamProvider {
         isInitialized = true;
 
         try {
-            if (ModList.get() != null && ModList.get().isLoaded(FTB_TEAMS_MOD_ID)) {
-                Class<?> apiClass = Class.forName("dev.ftb.mods.ftbteams.api.FTBTeamsAPI");
-                Method apiGetter = null;
-                for (Method m : apiClass.getMethods()) {
-                    if (m.getParameterCount() == 0 && (m.getName().equals("api") || m.getName().equals("getAPI"))) {
-                        apiGetter = m;
-                        break;
-                    }
-                }
+            if (ModList.get() == null || !ModList.get().isLoaded(FTB_TEAMS_MOD_ID)) {
+                return;
+            }
 
-                if (apiGetter != null) {
-                    this.apiInstance = apiGetter.invoke(null);
-                }
+            Class<?> apiClass = Class.forName("dev.ftb.mods.ftbteams.api.FTBTeamsAPI");
+            Method apiGetter = findMethod(apiClass, new String[]{"api", "getAPI"}, 0);
+            if (apiGetter == null) return;
 
-                if (this.apiInstance != null) {
-                    for (Method m : apiInstance.getClass().getMethods()) {
-                        if (m.getParameterCount() == 0 && (m.getName().equals("getManager") || m.getName().equals("getTeamManager"))) {
-                            this.getManagerMethod = m;
-                            break;
-                        }
-                    }
+            this.apiInstance = apiGetter.invoke(null);
+            if (this.apiInstance == null) return;
 
-                    if (this.getManagerMethod != null) {
-                        this.isFtbTeamsPresent = true;
-                        GregTechCalcBoard.LOGGER.info("[GTCalcBoard] Successfully hooked into FTB Teams API for team workspace isolation.");
-                    }
-                }
+            this.getManagerMethod = findMethod(apiInstance.getClass(), new String[]{"getManager", "getTeamManager"}, 0);
+            if (this.getManagerMethod != null) {
+                this.isFtbTeamsPresent = true;
+                GregTechCalcBoard.LOGGER.info("[GTCalcBoard] Successfully hooked into FTB Teams API for team workspace isolation.");
+                registerEventListeners();
             }
         } catch (Throwable t) {
             GregTechCalcBoard.LOGGER.warn("[GTCalcBoard] Could not initialize FTB Teams API reflection: {}", t.getMessage());
@@ -75,158 +66,126 @@ public class FTBTeamsProvider implements ITeamProvider {
 
     private Object getTeamObjectForPlayer(Object manager, ServerPlayer player) {
         if (manager == null || player == null) return null;
-        try {
-            // 1. Try getTeamForPlayerID(UUID)
-            for (Method m : manager.getClass().getMethods()) {
-                if (m.getName().equals("getTeamForPlayerID") && m.getParameterCount() == 1 && m.getParameterTypes()[0] == UUID.class) {
-                    Object res = m.invoke(manager, player.getUUID());
-                    if (res instanceof Optional<?> opt) return opt.orElse(null);
-                    if (res != null) return res;
-                }
-            }
-            // 2. Try getTeamForPlayer(Player/ServerPlayer/Entity/UUID)
-            for (Method m : manager.getClass().getMethods()) {
-                if (m.getName().equals("getTeamForPlayer") && m.getParameterCount() == 1) {
-                    Class<?> paramType = m.getParameterTypes()[0];
-                    if (paramType.isAssignableFrom(player.getClass()) || paramType.isAssignableFrom(ServerPlayer.class)) {
-                        Object res = m.invoke(manager, player);
-                        if (res instanceof Optional<?> opt) return opt.orElse(null);
-                        if (res != null) return res;
-                    } else if (paramType == UUID.class) {
-                        Object res = m.invoke(manager, player.getUUID());
-                        if (res instanceof Optional<?> opt) return opt.orElse(null);
-                        if (res != null) return res;
-                    }
-                }
-            }
-            // 3. Try getTeamByID(UUID)
-            for (Method m : manager.getClass().getMethods()) {
-                if (m.getName().equals("getTeamByID") && m.getParameterCount() == 1 && m.getParameterTypes()[0] == UUID.class) {
-                    Object res = m.invoke(manager, player.getUUID());
-                    if (res instanceof Optional<?> opt) return opt.orElse(null);
-                    if (res != null) return res;
-                }
-            }
-        } catch (Throwable ignored) {}
-        return null;
+
+        Object byPlayerId = invokeLookup(manager, "getTeamForPlayerID", player.getUUID());
+        if (byPlayerId != null) return byPlayerId;
+
+        Object byPlayer = invokeLookup(manager, "getTeamForPlayer", player);
+        if (byPlayer != null) return byPlayer;
+
+        Object byPlayerUUID = invokeLookup(manager, "getTeamForPlayer", player.getUUID());
+        if (byPlayerUUID != null) return byPlayerUUID;
+
+        return invokeLookup(manager, "getTeamByID", player.getUUID());
     }
 
     private Object getTeamObjectById(Object manager, UUID teamId) {
         if (manager == null || teamId == null) return null;
-        try {
-            for (Method m : manager.getClass().getMethods()) {
-                if ((m.getName().equals("getTeamByID") || m.getName().equals("getTeamById") || m.getName().equals("getTeam")) && m.getParameterCount() == 1 && m.getParameterTypes()[0] == UUID.class) {
-                    Object res = m.invoke(manager, teamId);
-                    if (res instanceof Optional<?> opt) return opt.orElse(null);
-                    if (res != null) return res;
-                }
-            }
-        } catch (Throwable ignored) {}
+        for (String name : new String[]{"getTeamByID", "getTeamById", "getTeam"}) {
+            Object res = invokeLookup(manager, name, teamId);
+            if (res != null) return res;
+        }
         return null;
     }
 
     private UUID extractTeamId(Object team) {
         if (team == null) return null;
-        try {
-            for (Method m : team.getClass().getMethods()) {
-                if (m.getName().equals("getId") && m.getParameterCount() == 0 && m.getReturnType() == UUID.class) {
-                    return (UUID) m.invoke(team);
-                }
-            }
-        } catch (Throwable ignored) {}
+        Method m = getCachedMethod(team.getClass(), "getId", 0);
+        if (m != null && m.getReturnType() == UUID.class) {
+            try {
+                return (UUID) m.invoke(team);
+            } catch (Throwable ignored) {}
+        }
         return null;
     }
 
     private String extractTeamName(Object team) {
         if (team == null) return null;
-        try {
-            for (Method m : team.getClass().getMethods()) {
-                if ((m.getName().equals("getDisplayName") || m.getName().equals("getName") || m.getName().equals("getStringName")) && m.getParameterCount() == 0) {
-                    Object res = m.invoke(team);
-                    if (res instanceof Component c) {
-                        return c.getString();
-                    } else if (res != null) {
-                        return res.toString();
-                    }
-                }
-            }
-        } catch (Throwable ignored) {}
+        for (String name : new String[]{"getDisplayName", "getName", "getStringName"}) {
+            Method m = getCachedMethod(team.getClass(), name, 0);
+            if (m == null) continue;
+            try {
+                Object res = m.invoke(team);
+                if (res instanceof Component c) return c.getString();
+                if (res != null) return res.toString();
+            } catch (Throwable ignored) {}
+        }
         return null;
     }
 
     private Set<UUID> extractTeamMembers(Object team) {
         if (team == null) return Collections.emptySet();
-        try {
-            for (Method m : team.getClass().getMethods()) {
-                if ((m.getName().equals("getMembers") || m.getName().equals("getOnlineMembers") || m.getName().equals("getPlayers")) && m.getParameterCount() == 0) {
-                    Object res = m.invoke(team);
-                    if (res instanceof Collection<?> col) {
-                        Set<UUID> set = new HashSet<>();
-                        for (Object item : col) {
-                            if (item instanceof UUID u) set.add(u);
-                            else if (item instanceof net.minecraft.world.entity.player.Player p) set.add(p.getUUID());
-                        }
-                        return set;
-                    }
+        for (String name : new String[]{"getMembers", "getOnlineMembers", "getPlayers"}) {
+            Method m = getCachedMethod(team.getClass(), name, 0);
+            if (m == null) continue;
+            try {
+                Object res = m.invoke(team);
+                if (res instanceof Collection<?> col) {
+                    return collectMemberUUIDs(col);
                 }
-            }
-        } catch (Throwable ignored) {}
+            } catch (Throwable ignored) {}
+        }
         return Collections.emptySet();
+    }
+
+    private Set<UUID> collectMemberUUIDs(Collection<?> col) {
+        Set<UUID> set = new HashSet<>();
+        for (Object item : col) {
+            if (item instanceof UUID u) {
+                set.add(u);
+            } else if (item instanceof net.minecraft.world.entity.player.Player p) {
+                set.add(p.getUUID());
+            }
+        }
+        return set;
     }
 
     private boolean isActualPartyTeam(Object team) {
         if (team == null) return false;
+
+        Boolean partyFlag = checkBooleanMethod(team, new String[]{"isParty", "isPartyTeam"});
+        if (partyFlag != null) return partyFlag;
+
+        Boolean playerFlag = checkBooleanMethod(team, new String[]{"isPlayerTeam"});
+        if (playerFlag != null && playerFlag) return false;
+
+        Method getType = getCachedMethod(team.getClass(), "getType", 0);
+        if (getType == null) return false;
+
         try {
-            // 1. Check isParty() or isPartyTeam() method
-            for (Method m : team.getClass().getMethods()) {
-                if ((m.getName().equals("isParty") || m.getName().equals("isPartyTeam")) && m.getParameterCount() == 0 && m.getReturnType() == boolean.class) {
-                    return (boolean) m.invoke(team);
-                }
-            }
-            // 2. Check isPlayerTeam() method (if true -> NOT a shared party team)
-            for (Method m : team.getClass().getMethods()) {
-                if (m.getName().equals("isPlayerTeam") && m.getParameterCount() == 0 && m.getReturnType() == boolean.class) {
-                    boolean isPlayer = (boolean) m.invoke(team);
-                    if (isPlayer) return false;
-                }
-            }
-            // 3. Check getType() -> TeamType.isParty() or enum name
-            for (Method m : team.getClass().getMethods()) {
-                if (m.getName().equals("getType") && m.getParameterCount() == 0) {
-                    Object typeObj = m.invoke(team);
-                    if (typeObj != null) {
-                        String typeName = typeObj.toString().toUpperCase(Locale.ROOT);
-                        if (typeName.contains("PARTY") || typeName.contains("SERVER")) {
-                            return true;
-                        }
-                        if (typeName.contains("PLAYER")) {
-                            return false;
-                        }
-                    }
-                }
-            }
+            Object typeObj = getType.invoke(team);
+            if (typeObj == null) return false;
+            String typeName = typeObj.toString().toUpperCase(Locale.ROOT);
+            if (typeName.contains("PARTY") || typeName.contains("SERVER")) return true;
+            if (typeName.contains("PLAYER")) return false;
         } catch (Throwable ignored) {}
+
         return false;
+    }
+
+    private Boolean checkBooleanMethod(Object target, String[] names) {
+        for (String name : names) {
+            Method m = getCachedMethod(target.getClass(), name, 0);
+            if (m != null && m.getReturnType() == boolean.class) {
+                try {
+                    return (boolean) m.invoke(target);
+                } catch (Throwable ignored) {}
+            }
+        }
+        return null;
     }
 
     @Override
     public UUID getPlayerTeamId(ServerPlayer player) {
-        if (!isAvailable() || player == null) {
-            return null;
-        }
+        if (!isAvailable() || player == null) return null;
 
         Object manager = getTeamManager();
-        if (manager != null) {
-            Object team = getTeamObjectForPlayer(manager, player);
-            if (team != null && isActualPartyTeam(team)) {
-                UUID id = extractTeamId(team);
-                if (id != null) {
-                    return id;
-                }
-            }
-        }
+        if (manager == null) return null;
 
-        return null;
+        Object team = getTeamObjectForPlayer(manager, player);
+        if (team == null || !isActualPartyTeam(team)) return null;
+
+        return extractTeamId(team);
     }
 
     @Override
@@ -240,9 +199,7 @@ public class FTBTeamsProvider implements ITeamProvider {
             Object team = getTeamObjectById(manager, teamId);
             if (team != null) {
                 String name = extractTeamName(team);
-                if (name != null && !name.isEmpty()) {
-                    return name;
-                }
+                if (name != null && !name.isEmpty()) return name;
             }
         }
 
@@ -260,9 +217,7 @@ public class FTBTeamsProvider implements ITeamProvider {
             Object team = getTeamObjectById(manager, teamId);
             if (team != null) {
                 Set<UUID> members = extractTeamMembers(team);
-                if (!members.isEmpty()) {
-                    return members;
-                }
+                if (!members.isEmpty()) return members;
             }
         }
 
@@ -288,57 +243,122 @@ public class FTBTeamsProvider implements ITeamProvider {
             return true;
         }
 
-        if (!isAvailable()) {
-            return false;
-        }
+        if (!isAvailable()) return false;
 
         Object manager = getTeamManager();
-        if (manager != null) {
-            Object team = getTeamObjectById(manager, teamId);
-            if (team != null && isActualPartyTeam(team)) {
-                try {
-                    // 1. Direct Owner UUID check
-                    for (Method m : team.getClass().getMethods()) {
-                        if (m.getName().equals("getOwner") && m.getParameterCount() == 0) {
-                            Object owner = m.invoke(team);
-                            if (owner instanceof UUID ownerUUID && ownerUUID.equals(player.getUUID())) {
-                                return true;
-                            }
-                        }
-                    }
-                    // 2. FTB Teams getRankForPlayer check
-                    for (Method m : team.getClass().getMethods()) {
-                        if (m.getName().equals("getRankForPlayer") && m.getParameterCount() == 1) {
-                            Class<?> pClass = m.getParameterTypes()[0];
-                            Object target = pClass == UUID.class ? player.getUUID() : player;
-                            Object rank = m.invoke(team, target);
-                            if (rank != null) {
-                                String rankName = rank.toString().toUpperCase(java.util.Locale.ROOT);
-                                if (rankName.contains("OWNER") || rankName.contains("OFFICER") || rankName.contains("ADMIN")) {
-                                    return true;
-                                } else {
-                                    // Player is explicitly a regular MEMBER, ALLY, or NONE -> Deny delete!
-                                    return false;
-                                }
-                            }
-                        }
-                    }
-                    // 3. Fallback method checks
-                    for (Method m : team.getClass().getMethods()) {
-                        if ((m.getName().equals("isOfficer") || m.getName().equals("isOwner") || m.getName().equals("isAdmin")) && m.getParameterCount() == 1) {
-                            Class<?> pClass = m.getParameterTypes()[0];
-                            Object target = pClass == UUID.class ? player.getUUID() : player;
-                            Object res = m.invoke(team, target);
-                            if (Boolean.TRUE.equals(res)) {
-                                return true;
-                            }
-                        }
-                    }
-                } catch (Throwable ignored) {}
+        if (manager == null) return false;
+
+        Object team = getTeamObjectById(manager, teamId);
+        if (team == null || !isActualPartyTeam(team)) return false;
+
+        return checkTeamAdminPrivileges(team, player);
+    }
+
+    private boolean checkTeamAdminPrivileges(Object team, ServerPlayer player) {
+        try {
+            Method getOwner = getCachedMethod(team.getClass(), "getOwner", 0);
+            if (getOwner != null) {
+                Object owner = getOwner.invoke(team);
+                if (owner instanceof UUID ownerUUID && ownerUUID.equals(player.getUUID())) {
+                    return true;
+                }
             }
-        }
+
+            Boolean rankCheck = checkPlayerRank(team, player);
+            if (rankCheck != null) return rankCheck;
+
+            return checkFallbackRoleMethods(team, player);
+        } catch (Throwable ignored) {}
 
         return false;
+    }
+
+    private static final String[] ROLE_METHODS = {"isOfficer", "isOwner", "isAdmin"};
+
+    private Boolean checkPlayerRank(Object team, ServerPlayer player) {
+        Method m = getCachedMethod(team.getClass(), "getRankForPlayer", 1);
+        if (m == null) return null;
+        try {
+            Class<?> pClass = m.getParameterTypes()[0];
+            Object target = pClass == UUID.class ? player.getUUID() : player;
+            Object rank = m.invoke(team, target);
+            if (rank == null) return null;
+
+            String rankName = rank.toString().toUpperCase(Locale.ROOT);
+            return rankName.contains("OWNER") || rankName.contains("OFFICER") || rankName.contains("ADMIN");
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private boolean checkFallbackRoleMethods(Object team, ServerPlayer player) {
+        for (String roleMethod : ROLE_METHODS) {
+            Method m = getCachedMethod(team.getClass(), roleMethod, 1);
+            if (m == null) continue;
+            try {
+                Class<?> pClass = m.getParameterTypes()[0];
+                Object target = pClass == UUID.class ? player.getUUID() : player;
+                Object res = m.invoke(team, target);
+                if (Boolean.TRUE.equals(res)) return true;
+            } catch (Throwable ignored) {}
+        }
+        return false;
+    }
+
+    private Object invokeLookup(Object target, String methodName, Object arg) {
+        if (target == null || arg == null) return null;
+        Method m = getCachedLookupMethod(target.getClass(), methodName, arg.getClass());
+        if (m == null) return null;
+        try {
+            Object res = m.invoke(target, arg);
+            if (res instanceof Optional<?> opt) return opt.orElse(null);
+            return res;
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static Method getCachedLookupMethod(Class<?> clazz, String methodName, Class<?> argClass) {
+        String key = clazz.getName() + "#" + methodName + "(" + argClass.getName() + ")";
+        return METHOD_CACHE.computeIfAbsent(key, k -> Optional.ofNullable(findLookupMethod(clazz, methodName, argClass))).orElse(null);
+    }
+
+    private static Method findLookupMethod(Class<?> clazz, String methodName, Class<?> argClass) {
+        if (clazz == null || argClass == null) return null;
+        for (Method m : clazz.getMethods()) {
+            if (m.getName().equals(methodName) && m.getParameterCount() == 1) {
+                if (m.getParameterTypes()[0].isAssignableFrom(argClass)) {
+                    return m;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static Method getCachedMethod(Class<?> clazz, String methodName, int paramCount) {
+        String key = clazz.getName() + "#" + methodName + "(" + paramCount + ")";
+        return METHOD_CACHE.computeIfAbsent(key, k -> Optional.ofNullable(findMethod(clazz, methodName, paramCount))).orElse(null);
+    }
+
+    private static Method findMethod(Class<?> clazz, String name, int paramCount) {
+        if (clazz == null) return null;
+        for (Method m : clazz.getMethods()) {
+            if (m.getName().equals(name) && m.getParameterCount() == paramCount) {
+                return m;
+            }
+        }
+        return null;
+    }
+
+    private static Method findMethod(Class<?> clazz, String[] names, int paramCount) {
+        if (clazz == null) return null;
+        for (Method m : clazz.getMethods()) {
+            if (m.getParameterCount() != paramCount) continue;
+            for (String name : names) {
+                if (m.getName().equals(name)) return m;
+            }
+        }
+        return null;
     }
 
     @Override
@@ -350,5 +370,114 @@ public class FTBTeamsProvider implements ITeamProvider {
     public boolean isAvailable() {
         if (!isInitialized) initReflection();
         return isFtbTeamsPresent;
+    }
+
+    private void registerEventListeners() {
+        try {
+            Class<?> teamEventClass = Class.forName("dev.ftb.mods.ftbteams.api.event.TeamEvent");
+            Class<?> eventClass = Class.forName("dev.architectury.event.Event");
+            Method registerMethod = findMethod(eventClass, "register", 1);
+            if (registerMethod == null) return;
+
+            registerEvent(teamEventClass, registerMethod, "PLAYER_JOINED_PARTY", this::handlePlayerJoinedParty);
+            registerEvent(teamEventClass, registerMethod, "PLAYER_LEFT_PARTY", this::handlePlayerLeftParty);
+            registerEvent(teamEventClass, registerMethod, "PLAYER_CHANGED", this::handlePlayerChangedTeam);
+            registerEvent(teamEventClass, registerMethod, "CREATED", this::handleTeamCreated);
+            registerEvent(teamEventClass, registerMethod, "DELETED", this::handleTeamDeleted);
+            registerEvent(teamEventClass, registerMethod, "PROPERTIES_CHANGED", this::handleTeamPropertiesChanged);
+
+            GregTechCalcBoard.LOGGER.info("[GTCalcBoard] Registered FTB Teams realtime lifecycle event listeners.");
+        } catch (Throwable t) {
+            GregTechCalcBoard.LOGGER.warn("[GTCalcBoard] Could not register FTB Teams event listeners: {}", t.getMessage());
+        }
+    }
+
+    private void registerEvent(Class<?> containerClass, Method registerMethod, String fieldName, java.util.function.Consumer<Object> handler) {
+        try {
+            java.lang.reflect.Field field = containerClass.getField(fieldName);
+            Object eventInstance = field.get(null);
+            if (eventInstance != null) {
+                registerMethod.invoke(eventInstance, handler);
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    private void handlePlayerJoinedParty(Object event) {
+        ServerPlayer player = extractPlayer(event);
+        if (player != null) {
+            TeamSyncHelper.syncPlayer(player);
+        }
+        syncTeamOnlineMembers(extractTeam(event));
+    }
+
+    private void handlePlayerLeftParty(Object event) {
+        ServerPlayer player = extractPlayer(event);
+        if (player != null) {
+            TeamSyncHelper.syncPlayer(player);
+        }
+        syncTeamOnlineMembers(extractTeam(event));
+    }
+
+    private void handlePlayerChangedTeam(Object event) {
+        ServerPlayer player = extractPlayer(event);
+        if (player != null) {
+            TeamSyncHelper.syncPlayer(player);
+        }
+        syncTeamOnlineMembers(extractTeam(event));
+    }
+
+    private void handleTeamCreated(Object event) {
+        ServerPlayer player = extractPlayer(event);
+        if (player != null) {
+            TeamSyncHelper.syncPlayer(player);
+        }
+        syncTeamOnlineMembers(extractTeam(event));
+    }
+
+    private void handleTeamDeleted(Object event) {
+        syncTeamOnlineMembers(extractTeam(event));
+    }
+
+    private void handleTeamPropertiesChanged(Object event) {
+        syncTeamOnlineMembers(extractTeam(event));
+    }
+
+    private ServerPlayer extractPlayer(Object event) {
+        if (event == null) return null;
+        Method m = getCachedMethod(event.getClass(), "getPlayer", 0);
+        if (m != null) {
+            try {
+                Object res = m.invoke(event);
+                if (res instanceof ServerPlayer sp) return sp;
+            } catch (Throwable ignored) {}
+        }
+        return null;
+    }
+
+    private Object extractTeam(Object event) {
+        if (event == null) return null;
+        Method m = getCachedMethod(event.getClass(), "getTeam", 0);
+        if (m != null) {
+            try {
+                return m.invoke(event);
+            } catch (Throwable ignored) {}
+        }
+        return null;
+    }
+
+    private void syncTeamOnlineMembers(Object team) {
+        if (team == null) return;
+        Method m = getCachedMethod(team.getClass(), "getOnlineMembers", 0);
+        if (m == null) return;
+        try {
+            Object res = m.invoke(team);
+            if (res instanceof Collection<?> col) {
+                for (Object item : col) {
+                    if (item instanceof ServerPlayer sp) {
+                        TeamSyncHelper.syncPlayer(sp);
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
     }
 }

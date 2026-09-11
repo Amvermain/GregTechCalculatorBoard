@@ -10,8 +10,8 @@ import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.client.gui.BoardScreen;
 import com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog;
 import com.gtceu.calcboard.client.gui.util.BoardScissorHelper;
-import com.gtceu.calcboard.compat.IModAdapter;
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.IModAdapter;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 import com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -41,6 +41,14 @@ public class AddonCatalogView {
     private List<MachineAddon> cachedFilteredCatalog = null;
     private List<AddonCategory> cachedFilterCategories = null;
 
+    private List<AddonCatalogCardRenderer.CachedCardData> pageCardCache = null;
+    private int cachedPageScroll = -1;
+    private int cachedCols = -1;
+    private int cachedCardW = -1;
+    private boolean cachedIsListView = false;
+    private int cachedNodeAddonHash = 0;
+    private int cachedFilteredSize = 0;
+
     public AddonCatalogView(MachineConfigDialog dialog) {
         this.dialog = dialog;
     }
@@ -65,12 +73,10 @@ public class AddonCatalogView {
     public void invalidateCache() {
         this.cachedFilteredCatalog = null;
         this.cachedFilterCategories = null;
+        this.pageCardCache = null;
     }
 
-    public double getCategoryScrollX() {
-        return categoryScrollX;
-    }
-
+    public double getCategoryScrollX() { return categoryScrollX; }
     public void setCategoryScrollX(double categoryScrollX) {
         this.categoryScrollX = Math.max(0, Math.min(maxCategoryScrollX, categoryScrollX));
     }
@@ -78,202 +84,30 @@ public class AddonCatalogView {
     public void ensureCategoryVisible(RecipeNode node, AddonCategory targetCat, int dialogWidth) {
         if (node == null) return;
         List<AddonCategory> allCats = getAllCategoriesForFilter(node);
-        int targetIdx = (targetCat != null && targetCat.equals(AddonCategory.CUSTOM)) ? (allCats.size() - 1) : allCats.indexOf(targetCat);
-        if (targetIdx < 0) return;
-        Minecraft mc = Minecraft.getInstance();
-        if (mc == null || mc.font == null) return;
-        Font font = mc.font;
-        int chipLeft = 0;
-        for (int i = 0; i < targetIdx; i++) {
-            chipLeft += font.width(getCategoryLabel(allCats.get(i))) + 12 + 4;
-        }
-        int chipW = font.width(getCategoryLabel(allCats.get(targetIdx))) + 12;
-        int availW = dialogWidth - 20;
-        if (chipLeft < categoryScrollX) {
-            categoryScrollX = chipLeft;
-        } else if (chipLeft + chipW > categoryScrollX + availW) {
-            categoryScrollX = chipLeft + chipW - availW;
-        }
+        this.categoryScrollX = AddonCategoryChipRenderer.ensureCategoryVisible(node, targetCat, dialogWidth, this.categoryScrollX, allCats);
     }
 
     public List<AddonCategory> getAllCategoriesForFilter(RecipeNode node) {
-        if (this.cachedFilterCategories != null) {
-            return this.cachedFilterCategories;
+        if (this.cachedFilterCategories == null) {
+            this.cachedFilterCategories = AddonCategoryChipRenderer.getAllCategoriesForFilter(node);
         }
-
-        List<AddonCategory> list = new ArrayList<>();
-        list.add(null);
-        List<AddonCategory> relCats = MachineAddon.getRelevantCategories(node);
-        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
-        List<MachineAddon> allAddons = MachineAddonCatalog.getInstance().getAllAddons();
-
-        java.util.Set<AddonCategory> activeCategories = new java.util.HashSet<>();
-        if (adapter != null) {
-            for (MachineAddon r : adapter.getResetAddonCards(node)) {
-                if (r != null && adapter.isAddonCompatible(node, r)) {
-                    activeCategories.add(r.getCategory());
-                }
-            }
-        }
-
-        for (MachineAddon a : allAddons) {
-            if (a != null && a.isCompatibleWith(node)) {
-                activeCategories.add(a.getCategory());
-            }
-        }
-
-        for (AddonCategory cat : relCats) {
-            if (cat != null && !cat.equals(AddonCategory.CUSTOM) && !list.contains(cat)) {
-                if (cat.equals(AddonCategory.THREADING) || activeCategories.contains(cat)) {
-                    list.add(cat);
-                }
-            }
-        }
-        list.add(AddonCategory.CUSTOM);
-        this.cachedFilterCategories = list;
-        return list;
+        return this.cachedFilterCategories;
     }
 
-    public String getCategoryLabel(AddonCategory cat) {
-        if (cat == null) return Component.translatable("gui.gtcalcboard.addon_cat.all").getString();
-        return Component.translatable(cat.getTranslatableKey()).getString();
-    }
+    public String getCategoryLabel(AddonCategory cat) { return AddonCategoryChipRenderer.getCategoryLabel(cat); }
 
     public void renderCategoryFilterChips(GuiGraphics graphics, Font font, RecipeNode node, int startX, int startY, int dialogW, int mouseX, int mouseY) {
         List<AddonCategory> allCats = getAllCategoriesForFilter(node);
-        int totalCats = allCats.size();
-        int availW = dialogW - 20;
-
-        int totalWidth = 0;
-        List<Integer> chipWidths = new ArrayList<>();
-        for (AddonCategory cat : allCats) {
-            int w = font.width(getCategoryLabel(cat)) + 12;
-            chipWidths.add(w);
-            totalWidth += w + 4;
-        }
-        totalWidth = Math.max(0, totalWidth - 4);
-
-        boolean needsScroll = totalWidth > availW;
-        int leftArrowW = (needsScroll && categoryScrollX > 2) ? 10 : 0;
-        int rightArrowW = (needsScroll && categoryScrollX < (totalWidth - availW) - 2) ? 10 : 0;
-
-        int scrollAreaX = startX + (needsScroll ? 8 : 0);
-        int scrollAreaW = availW - (needsScroll ? 16 : 0);
-
-        maxCategoryScrollX = Math.max(0, totalWidth - scrollAreaW);
-        categoryScrollX = Math.max(0, Math.min(maxCategoryScrollX, categoryScrollX));
-
-        if (maxCategoryScrollX > 0 && categoryScrollX > 2) {
-            graphics.drawString(font, "◀", startX, startY + 4, 0xFFFFAA00, false);
-        }
-
-        dialog.enableScaledScissor(graphics, scrollAreaX, startY - 1, scrollAreaX + scrollAreaW, startY + 17);
-
-        int cx = scrollAreaX - (int) categoryScrollX;
-        for (int i = 0; i < totalCats; i++) {
-            AddonCategory cat = allCats.get(i);
-            int bw = chipWidths.get(i);
-            boolean active = dialog.isCustomBuilderActive() ? (cat != null && cat.equals(AddonCategory.CUSTOM))
-                    : ((dialog.getSelectedCategory() == null && cat == null) || (dialog.getSelectedCategory() != null && dialog.getSelectedCategory().equals(cat)));
-            if (cx + bw >= scrollAreaX && cx <= scrollAreaX + scrollAreaW) {
-                renderChip(graphics, font, getCategoryLabel(cat), active, cx, startY, bw, mouseX, mouseY, scrollAreaX, scrollAreaX + scrollAreaW);
-            }
-            cx += bw + 4;
-        }
-
-        BoardScissorHelper.disableScissor(graphics);
-
-        if (maxCategoryScrollX > 0 && categoryScrollX < maxCategoryScrollX - 2) {
-            graphics.drawString(font, "▶", startX + availW - 6, startY + 4, 0xFFFFAA00, false);
-        }
-    }
-
-    private void renderChip(GuiGraphics graphics, Font font, String label, boolean active, int bx, int by, int bw, int mouseX, int mouseY, int clipMinX, int clipMaxX) {
-        boolean hover = mouseX >= bx && mouseX <= bx + bw && mouseY >= by && mouseY <= by + 16 && mouseX >= clipMinX && mouseX <= clipMaxX;
-        graphics.fill(bx, by, bx + bw, by + 16, active ? 0xFF1B1E28 : (hover ? 0xFF2E3544 : 0xFF222733));
-        graphics.renderOutline(bx, by, bw, 16, active ? 0xFF58D3FF : 0xFF333A48);
-        graphics.drawCenteredString(font, label, bx + bw / 2, by + 4, active ? 0xFF58D3FF : 0xFF9CA5B8);
+        this.categoryScrollX = AddonCategoryChipRenderer.renderCategoryFilterChips(
+                graphics, font, node, startX, startY, dialogW, mouseX, mouseY, this.categoryScrollX, dialog, allCats);
     }
 
     public List<MachineAddon> getFilteredCatalog(RecipeNode node) {
-        if (this.cachedFilteredCatalog != null) {
-            return this.cachedFilteredCatalog;
+        if (this.cachedFilteredCatalog == null) {
+            String q = searchBox != null ? searchBox.getValue() : "";
+            this.cachedFilteredCatalog = AddonCatalogFilterHelper.filterCatalog(node, q, dialog);
         }
-
-        List<MachineAddon> list = MachineAddonCatalog.getInstance().getAllAddons();
-        String q = searchBox != null ? searchBox.getValue().toLowerCase().trim() : "";
-        String qClean = q.replace('_', ' ').trim();
-        String qUnder = q.replace(' ', '_').trim();
-
-        List<MachineAddon> filtered = new ArrayList<>();
-        List<AddonCategory> rel = (dialog.getSelectedCategory() == null) ? MachineAddon.getRelevantCategories(node) : null;
-
-        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
-        if (adapter != null) {
-            List<MachineAddon> resetCards = adapter.getResetAddonCards(node);
-            for (MachineAddon resetCard : resetCards) {
-                if (!adapter.isAddonCompatible(node, resetCard)) continue;
-                if (dialog.getSelectedCategory() != null && !resetCard.getCategory().equals(dialog.getSelectedCategory())) continue;
-                if (dialog.getSelectedCategory() == null && rel != null && !rel.contains(resetCard.getCategory())) continue;
-                String resetBtnText = Component.translatable("gui.gtcalcboard.rotor.reset_btn").getString().toLowerCase();
-                if (q.isEmpty() || resetCard.getName().toLowerCase().contains(q) || "reset".contains(q) || "standard".contains(q) || resetBtnText.contains(q) || "none".contains(q)) {
-                    filtered.add(resetCard);
-                }
-            }
-        }
-
-        for (MachineAddon addon : list) {
-            if (addon == null) continue;
-            if (dialog.getSelectedCategory() != null && !addon.getCategory().equals(dialog.getSelectedCategory())) continue;
-            if (dialog.getSelectedCategory() == null && rel != null && !rel.contains(addon.getCategory())) continue;
-            if (!addon.isCompatibleWith(node)) continue;
-            if (!q.isEmpty()) {
-                String n = addon.getName().toLowerCase();
-                String d = addon.getDescription() != null ? addon.getDescription().toLowerCase() : "";
-                String idStr = addon.getId() != null ? addon.getId().toString().toLowerCase() : "";
-                if (!n.contains(q) && !n.contains(qClean) && !n.contains(qUnder)
-                        && !d.contains(q) && !d.contains(qClean) && !d.contains(qUnder)
-                        && !idStr.contains(q) && !idStr.contains(qClean) && !idStr.contains(qUnder)) {
-                    continue;
-                }
-            }
-            filtered.add(addon);
-        }
-        filtered.sort((a, b) -> {
-            boolean aReset = "gtceu:rotor_standard".equals(a.getId()) || "gtceu:reflector_none".equals(a.getId());
-            boolean bReset = "gtceu:rotor_standard".equals(b.getId()) || "gtceu:reflector_none".equals(b.getId());
-            if (aReset != bReset) return aReset ? -1 : 1;
-
-            if (a.getCategory() == MachineAddon.Category.REFLECTOR && b.getCategory() == MachineAddon.Category.REFLECTOR) {
-                int tA = (a instanceof com.gtceu.calcboard.compat.gtceu.addon.GTReflectorAddon ra) ? ra.getReflectorTier() : 0;
-                int tB = (b instanceof com.gtceu.calcboard.compat.gtceu.addon.GTReflectorAddon rb) ? rb.getReflectorTier() : 0;
-                if (tA != tB) return Integer.compare(tA, tB);
-            }
-
-            if (a.getCategory() == MachineAddon.Category.COIL && b.getCategory() == MachineAddon.Category.COIL) {
-                int tempA = (a instanceof com.gtceu.calcboard.compat.gtceu.addon.GTCoilAddon ca) ? ca.getCoilTemperature() : 0;
-                int tempB = (b instanceof com.gtceu.calcboard.compat.gtceu.addon.GTCoilAddon cb) ? cb.getCoilTemperature() : 0;
-                if (tempA != tempB) return Integer.compare(tempA, tempB);
-            }
-
-            if (a.getParallelMultiplier() != b.getParallelMultiplier()) {
-                return Integer.compare(a.getParallelMultiplier(), b.getParallelMultiplier());
-            }
-
-            if (a instanceof com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon ha && b instanceof com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon hb) {
-                if (ha.getTier() != null && hb.getTier() != null && ha.getTier().ordinal() != hb.getTier().ordinal()) {
-                    return Integer.compare(ha.getTier().ordinal(), hb.getTier().ordinal());
-                }
-            } else if (a instanceof com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon ea && b instanceof com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon eb) {
-                if (ea.getTier() != null && eb.getTier() != null && ea.getTier().ordinal() != eb.getTier().ordinal()) {
-                    return Integer.compare(ea.getTier().ordinal(), eb.getTier().ordinal());
-                }
-            }
-
-            return a.getName().compareToIgnoreCase(b.getName());
-        });
-        this.cachedFilteredCatalog = filtered;
-        return filtered;
+        return this.cachedFilteredCatalog;
     }
 
     public void renderCatalogGrid(GuiGraphics graphics, Font font, RecipeNode node, int startX, int startY, int width, int height, int mouseX, int mouseY) {
@@ -365,7 +199,7 @@ public class AddonCatalogView {
             graphics.drawCenteredString(font, "▶", navX + 69, startY + 3, catalogScroll < maxScroll ? 0xFFFFFFFF : 0xFF666666);
         }
 
-        renderIndexerStatusPill(graphics, font, startX + width - 2, startY, mouseX, mouseY);
+        AddonCatalogCardRenderer.renderIndexerStatusPill(graphics, font, startX + width - 2, startY, mouseX, mouseY, dialog);
 
         int gridStartY = startY + 18;
 
@@ -409,18 +243,22 @@ public class AddonCatalogView {
                 graphics.fill(barX + 1, barY + 1, barX + fillW - 1, barY + barH - 1, 0xFF4A90E2);
                 return;
             } else {
-                String msg = "§8" + Component.translatable("gui.gtcalcboard.search.no_results").getString();
+                String msg = (searchBox != null && !searchBox.getValue().isEmpty())
+                        ? "§8" + Component.translatable("gui.gtcalcboard.search.no_results").getString()
+                        : (!node.isMultiblock()
+                                ? Component.translatable("gui.gtcalcboard.config.singleblock_no_addons").getString()
+                                : "§8" + Component.translatable("gui.gtcalcboard.search.no_results").getString());
                 graphics.drawCenteredString(font, msg, startX + width / 2, gridStartY + 24, 0xFF888888);
                 return;
             }
         }
 
+        updatePageCardCache(font, node, filtered, catalogScroll * cols, cardsPerPage, catalogScroll, cols, cardW, isListView);
+
         MachineAddon hoveredAddon = null;
 
-        for (int i = 0; i < cardsPerPage; i++) {
-            int cardIndex = (catalogScroll * cols) + i;
-            if (cardIndex >= totalCards) break;
-
+        for (int i = 0; i < pageCardCache.size(); i++) {
+            AddonCatalogCardRenderer.CachedCardData card = pageCardCache.get(i);
             int col = i % cols;
             int row = i / cols;
             int rowSpacing = isListView ? (cardH + 2) : (cardH + 4);
@@ -428,26 +266,11 @@ public class AddonCatalogView {
             int by = gridStartY + row * rowSpacing;
 
             boolean hover = mouseX >= bx && mouseX <= bx + cardW && mouseY >= by && mouseY <= by + cardH;
-            MachineAddon addon = filtered.get(cardIndex);
-            boolean isResetCard = "gtceu:rotor_standard".equals(addon.getId()) || "gtceu:reflector_none".equals(addon.getId());
-            int installedCount = (int) node.getAddons().stream().filter(a -> a.getId().equals(addon.getId())).count();
-            boolean isInstalled = !isResetCard && installedCount > 0;
-            if (isResetCard) {
-                if ("gtceu:rotor_standard".equals(addon.getId()) && node.getAddons().stream().noneMatch(a -> a.getCategory() == MachineAddon.Category.ROTOR)) {
-                    isInstalled = true;
-                } else if ("gtceu:reflector_none".equals(addon.getId()) && node.getAddons().stream().noneMatch(a -> a.getCategory() == MachineAddon.Category.REFLECTOR)) {
-                    isInstalled = true;
-                }
-            }
+            MachineAddon addon = card.addon();
 
-            boolean isThermal = addon.getCategory() == MachineAddon.Category.THERMAL_AUGMENT;
-            boolean isUpgradeKit = addon.isThermalUpgradeKit();
-            long totalThermalReg = node.getAddons().stream().filter(a -> a.getCategory() == MachineAddon.Category.THERMAL_AUGMENT && !a.isThermalUpgradeKit()).count();
-            boolean isThermalFull = isThermal && !isUpgradeKit && totalThermalReg >= 3;
-
-            int fillCol = isInstalled ? (hover ? 0xFF2A2026 : 0xFF1C3247) : (hover ? 0xFF273142 : 0xFF202430);
-            int borderCol = isInstalled ? (hover ? 0xFFFF6B6B : 0xFF58D3FF) : (hover ? 0xFF58D3FF : 0xFF363E50);
-            if (!isInstalled && isThermalFull) {
+            int fillCol = card.isInstalled() ? (hover ? 0xFF2A2026 : 0xFF1C3247) : (hover ? 0xFF273142 : 0xFF202430);
+            int borderCol = card.isInstalled() ? (hover ? 0xFFFF6B6B : 0xFF58D3FF) : (hover ? 0xFF58D3FF : 0xFF363E50);
+            if (!card.isInstalled() && card.isThermalFull()) {
                 fillCol = hover ? 0xFF22242C : 0xFF191B22;
                 borderCol = 0xFF2B303C;
             }
@@ -455,76 +278,11 @@ public class AddonCatalogView {
             graphics.fill(bx, by, bx + cardW, by + cardH, fillCol);
             graphics.renderOutline(bx, by, cardW, cardH, borderCol);
 
-            ItemStack sample = addon.getRenderItemStack();
+            ItemStack sample = card.sample();
             if (isListView) {
-                // Compact 1-Row Renderer
-                if (sample != null && !sample.isEmpty()) {
-                    graphics.renderItem(sample, bx + 2, by + 2);
-                }
-                String nameStr = font.plainSubstrByWidth(addon.getName(), cardW - 100);
-                graphics.drawString(font, nameStr, bx + 22, by + 6, isInstalled ? 0xFF55FF88 : 0xFFE0E0E0, false);
-
-                String badge = dialog.formatAddonBadge(addon);
-                if (!badge.isEmpty()) {
-                    graphics.drawString(font, badge, bx + cardW - 65, by + 6, 0xFFFFFFFF, false);
-                }
-
-                if (isInstalled) {
-                    graphics.drawString(font, hover ? "§c✖" : (installedCount > 1 ? "§a✔x" + installedCount : "§a✔"), bx + cardW - 16, by + 6, 0xFFFFFFFF, false);
-                } else {
-                    graphics.drawString(font, hover ? "§a+" : "§7+", bx + cardW - 14, by + 6, 0xFFFFFFFF, false);
-                }
+                AddonCatalogCardRenderer.renderListViewCard(graphics, font, card, sample, bx, by, cardW, hover);
             } else {
-                // Standard Grid Card Renderer
-                if (sample != null && !sample.isEmpty()) {
-                    graphics.renderItem(sample, bx + 4, by + (cardH - 16) / 2);
-                }
-
-                if (addon.getCategory() == MachineAddon.Category.ENERGY_HATCH) {
-                    if (installedCount > 1) {
-                        graphics.drawString(font, "§a✔x" + installedCount, bx + cardW - 28, by + 4, 0xFFFFFFFF, false);
-                    } else if (installedCount == 1) {
-                        graphics.drawString(font, hover ? "§a+§7/§c-" : "§a✔", bx + cardW - (hover ? 18 : 11), by + 4, 0xFFFFFFFF, false);
-                    }
-                } else if (addon.getCategory() == MachineAddon.Category.HATCH_BUS) {
-                    int maxSlots = getMaxHatchSlotsAllowed(node, addon);
-                    int sameTypeTotal = getTotalInstalledHatchesOfSameType(node, addon);
-                    if (installedCount > 1) {
-                        graphics.drawString(font, "§a✔x" + installedCount, bx + cardW - (installedCount >= 10 ? 36 : 28), by + 4, 0xFFFFFFFF, false);
-                    } else if (installedCount == 1) {
-                        graphics.drawString(font, hover ? "§a+§7/§c-" : "§a✔", bx + cardW - (hover ? 18 : 11), by + 4, 0xFFFFFFFF, false);
-                    } else if (sameTypeTotal >= maxSlots) {
-                        graphics.drawString(font, "§8" + sameTypeTotal + "/" + maxSlots, bx + cardW - 24, by + 4, 0xFF888888, false);
-                    }
-                } else if (isThermal && !isUpgradeKit) {
-                    if (installedCount > 1) {
-                        graphics.drawString(font, "§a✔x" + installedCount, bx + cardW - 28, by + 4, 0xFFFFFFFF, false);
-                    } else if (installedCount == 1) {
-                        graphics.drawString(font, hover ? "§a+§7/§c-" : "§a✔", bx + cardW - (hover ? 18 : 11), by + 4, 0xFFFFFFFF, false);
-                    } else if (isThermalFull) {
-                        graphics.drawString(font, "§83/3", bx + cardW - 18, by + 4, 0xFF888888, false);
-                    }
-                } else if (isInstalled) {
-                    graphics.drawString(font, hover ? "§c✖" : "§a✔", bx + cardW - 11, by + 4, 0xFFFFFFFF, false);
-                }
-
-                String aName = addon.getName();
-                aName = aName.replace("Turbine Rotor", "Rotor")
-                        .replace("Reflector", "Refl.")
-                        .replace("Maintenance", "Maint.")
-                        .replace("Advanced", "Adv.")
-                        .replace("Borealic", "Boreal.")
-                        .replace("Complex", "Compl.");
-                if (font.width(aName) > cardW - 36) {
-                    aName = font.plainSubstrByWidth(aName, Math.max(16, cardW - 36 - font.width("..."))) + "...";
-                }
-                graphics.drawString(font, "§f" + aName, bx + 24, by + 5, 0xFFFFFFFF, false);
-
-                String statsStr = dialog.formatAddonBadge(addon);
-                graphics.drawString(font, statsStr, bx + 24, by + 19, 0xFFCCCCCC, false);
-
-                String subTitle = font.plainSubstrByWidth(MachineConfigDialog.getAddonSubtitle(addon, node), cardW - 28);
-                graphics.drawString(font, subTitle, bx + 24, by + 33, 0xFF888888, false);
+                AddonCatalogCardRenderer.renderGridViewCard(graphics, font, card, sample, bx, by, cardW, cardH, hover);
             }
 
             if (hover) {
@@ -533,67 +291,41 @@ public class AddonCatalogView {
         }
 
         if (hoveredAddon != null) {
-            List<Component> tooltip = new ArrayList<>();
-            tooltip.add(Component.literal("§f" + hoveredAddon.getName()));
-            IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
-            adapter.buildAddonTooltip(node, hoveredAddon, false, tooltip);
-
-            boolean isReset = "gtceu:rotor_standard".equals(hoveredAddon.getId()) || "gtceu:reflector_none".equals(hoveredAddon.getId());
-            boolean isInst = !isReset && adapter.isAddonInstalled(node, hoveredAddon);
-            if (hoveredAddon.getCategory() == MachineAddon.Category.HATCH_BUS) {
-                int maxSlots = getMaxHatchSlotsAllowed(node, hoveredAddon);
-                int sameTypeTotal = getTotalInstalledHatchesOfSameType(node, hoveredAddon);
-                tooltip.add(Component.literal(String.format(Locale.ROOT, "§7[Slots: §a%d §7/ §e%d§7]", sameTypeTotal, maxSlots)));
-                tooltip.add(Component.literal("§eLeft-Click: §aAdd 1 Hatch"));
-                tooltip.add(Component.literal("§eShift + Left-Click: §aFill All (" + maxSlots + "x)"));
-                tooltip.add(Component.literal("§eRight-Click: §cRemove 1 Hatch"));
-            } else if (tooltip.stream().noneMatch(c -> c.getString().contains("[") || c.getString().contains("Install") || c.getString().contains("Remove") || c.getString().contains(Component.translatable("gui.gtcalcboard.config.install").getString()) || c.getString().contains(Component.translatable("gui.gtcalcboard.config.remove").getString()))) {
-                if (isInst) {
-                    tooltip.add(Component.literal("§c").append(Component.translatable("gui.gtcalcboard.config.remove")));
-                } else {
-                    tooltip.add(Component.literal("§a").append(Component.translatable("gui.gtcalcboard.config.install")));
-                }
-            }
-
-            MachineConfigDialog.appendAdvancedTooltipDebugInfo(tooltip, hoveredAddon);
-            dialog.setDeferredTooltip(tooltip);
+            AddonCatalogCardRenderer.renderAddonHoverTooltip(node, hoveredAddon, dialog);
         }
     }
 
-    private void renderIndexerStatusPill(GuiGraphics graphics, Font font, int rightX, int y, int mouseX, int mouseY) {
-        var catalog = MachineAddonCatalog.getInstance();
-        boolean running = catalog.isExhaustiveScanRunning();
-        boolean complete = catalog.isExhaustiveScanComplete();
+    private boolean isPageCardCacheValid(RecipeNode node, int scroll, int cols, int cardW, boolean isListView, int filteredSize) {
+        if (pageCardCache == null) return false;
+        if (cachedPageScroll != scroll) return false;
+        if (cachedCols != cols) return false;
+        if (cachedCardW != cardW) return false;
+        if (cachedIsListView != isListView) return false;
+        if (cachedFilteredSize != filteredSize) return false;
+        int currentAddonHash = node != null ? node.getAddons().hashCode() : 0;
+        return cachedNodeAddonHash == currentAddonHash;
+    }
 
-        if (!running && !complete) return;
-
-        int pct = (int) Math.round(catalog.getExhaustiveProgress() * 100.0);
-        String pillText = running
-                ? "§e🔍 " + Component.translatable("gui.gtcalcboard.catalog.deep_scan_running", String.valueOf(pct)).getString()
-                : "§a✔ " + Component.translatable("gui.gtcalcboard.catalog.deep_scan_complete").getString();
-
-        int pillW = font.width(font.plainSubstrByWidth(pillText, 200)) + 12;
-        int pillX = rightX - pillW;
-        boolean hover = mouseX >= pillX && mouseX <= rightX && mouseY >= y && mouseY <= y + 14;
-
-        int bg = running ? (hover ? 0xFF2E2818 : 0xFF221E14) : (hover ? 0xFF182A1E : 0xFF142018);
-        int border = running ? (hover ? 0xFFE0C040 : 0xFF8A7320) : (hover ? 0xFF45B074 : 0xFF2D6E49);
-
-        graphics.fill(pillX, y, rightX, y + 14, bg);
-        graphics.renderOutline(pillX, y, pillW, 14, border);
-        graphics.drawCenteredString(font, pillText, pillX + pillW / 2, y + 3, 0xFFFFFFFF);
-
-        if (hover) {
-            List<Component> tooltip = new ArrayList<>();
-            tooltip.add(Component.literal("§e🔍 " + Component.translatable("gui.gtcalcboard.catalog.deep_scan_tooltip_title").getString()));
-            tooltip.add(Component.literal(Component.translatable("gui.gtcalcboard.catalog.deep_scan_tooltip_track1").getString()));
-            if (running) {
-                tooltip.add(Component.literal(Component.translatable("gui.gtcalcboard.catalog.deep_scan_tooltip_track2_running", String.valueOf(pct)).getString()));
-            } else {
-                tooltip.add(Component.literal(Component.translatable("gui.gtcalcboard.catalog.deep_scan_tooltip_track2_complete").getString()));
-            }
-            dialog.setDeferredTooltip(tooltip);
+    private void updatePageCardCache(Font font, RecipeNode node, List<MachineAddon> filtered, int startIndex, int count, int scroll, int cols, int cardW, boolean isListView) {
+        if (isPageCardCacheValid(node, scroll, cols, cardW, isListView, filtered.size())) {
+            return;
         }
+
+        List<AddonCatalogCardRenderer.CachedCardData> list = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            int cardIndex = startIndex + i;
+            if (cardIndex >= filtered.size()) break;
+            MachineAddon addon = filtered.get(cardIndex);
+            list.add(AddonCatalogCardRenderer.buildCardData(font, node, addon, cardW, isListView, dialog));
+        }
+
+        this.pageCardCache = list;
+        this.cachedPageScroll = scroll;
+        this.cachedCols = cols;
+        this.cachedCardW = cardW;
+        this.cachedIsListView = isListView;
+        this.cachedFilteredSize = filtered.size();
+        this.cachedNodeAddonHash = node != null ? node.getAddons().hashCode() : 0;
     }
 
     public boolean mouseClicked(double mX, double mY, int button, RecipeNode node, int startX, int startY, int width, int height, BoardScreen parent) {
@@ -708,51 +440,7 @@ public class AddonCatalogView {
 
             if (mX >= bx && mX <= bx + cardW && mY >= by && mY <= by + cardH) {
                 MachineAddon addon = filtered.get(cardIndex);
-                if (addon.getCategory() == MachineAddon.Category.ENERGY_HATCH) {
-                    int installedCount = adapter.getAddonInstalledCount(node, addon);
-                    int totalEnergyHatches = (int) node.getAddons().stream().filter(a -> a.getCategory() == MachineAddon.Category.ENERGY_HATCH).count();
-                    if (button == 1) {
-                        adapter.handleUninstallAddon(node, addon);
-                    } else {
-                        if (installedCount == 0 || (installedCount == 1 && totalEnergyHatches < 2)) {
-                            adapter.handleInstallAddon(node, addon, false);
-                        } else {
-                            adapter.handleUninstallAddon(node, addon);
-                        }
-                    }
-                } else if (addon.getCategory() == MachineAddon.Category.HATCH_BUS) {
-                    int maxSlots = getMaxHatchSlotsAllowed(node, addon);
-                    int sameTypeTotal = getTotalInstalledHatchesOfSameType(node, addon);
-                    if (button == 1) {
-                        adapter.handleUninstallAddon(node, addon);
-                    } else {
-                        if (Screen.hasShiftDown()) {
-                            int toAdd = Math.max(1, maxSlots - sameTypeTotal);
-                            for (int k = 0; k < toAdd; k++) {
-                                if (!adapter.canInstallAddon(node, addon)) break;
-                                adapter.handleInstallAddon(node, addon, false);
-                            }
-                        } else if (sameTypeTotal < maxSlots) {
-                            adapter.handleInstallAddon(node, addon, false);
-                        } else {
-                            adapter.handleUninstallAddon(node, addon);
-                        }
-                    }
-                } else if (addon.getCategory().equals(AddonCategory.MAGNET) || addon.getCategory().equals(AddonCategory.THREADING) || addon.getCategory().equals(AddonCategory.THERMAL_AUGMENT)) {
-                    if (button == 1) {
-                        adapter.handleUninstallAddon(node, addon);
-                    } else {
-                        adapter.handleInstallAddon(node, addon, Screen.hasShiftDown());
-                    }
-                } else if (button == 1) {
-                    adapter.handleUninstallAddon(node, addon);
-                } else {
-                    if (adapter.isAddonInstalled(node, addon)) {
-                        adapter.handleUninstallAddon(node, addon);
-                    } else {
-                        adapter.handleInstallAddon(node, addon, Screen.hasShiftDown());
-                    }
-                }
+                AddonCatalogCardRenderer.handleCardClick(node, addon, button, adapter);
                 invalidateCache();
                 if (parent != null) parent.markSummaryDirty();
                 return true;
@@ -803,77 +491,7 @@ public class AddonCatalogView {
         return false;
     }
 
-    public static int getMaxHatchSlotsAllowed(RecipeNode node, MachineAddon addon) {
-        if (node == null || addon == null) return 1;
-        GTHatchAddon.HatchType type = getHatchType(addon);
-
-        int reqCount = switch (type) {
-            case FLUID_OUTPUT -> (int) node.getOutputs().stream().filter(IngredientStack::isFluid).count();
-            case FLUID_INPUT -> (int) node.getInputs().stream().filter(IngredientStack::isFluid).count();
-            case ITEM_OUTPUT -> (int) node.getOutputs().stream().filter(IngredientStack::isItem).count();
-            case ITEM_INPUT -> (int) node.getInputs().stream().filter(IngredientStack::isItem).count();
-            case DUAL_INPUT -> Math.max(
-                    (int) node.getInputs().stream().filter(IngredientStack::isFluid).count(),
-                    (int) node.getInputs().stream().filter(IngredientStack::isItem).count()
-            );
-            case DUAL_OUTPUT -> Math.max(
-                    (int) node.getOutputs().stream().filter(IngredientStack::isFluid).count(),
-                    (int) node.getOutputs().stream().filter(IngredientStack::isItem).count()
-            );
-            default -> 1;
-        };
-
-        ResourceLocation mbId = node.getMachineIcon();
-        if (mbId == null || !MultiblockDetector.isMultiblock(mbId)) {
-            mbId = node.getMultiblockWorkstation();
-        }
-
-        if (mbId != null) {
-            int rFluidOut = (int) node.getOutputs().stream().filter(IngredientStack::isFluid).count();
-            int rItemOut = (int) node.getOutputs().stream().filter(IngredientStack::isItem).count();
-            int rFluidIn = (int) node.getInputs().stream().filter(IngredientStack::isFluid).count();
-            int rItemIn = (int) node.getInputs().stream().filter(IngredientStack::isItem).count();
-            var def = com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.getMatchingStructure(mbId, rFluidOut, rItemOut, rFluidIn, rItemIn);
-            if (def == null) {
-                def = com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.getStructure(mbId);
-            }
-            if (def != null) {
-                int defSlots = switch (type) {
-                    case FLUID_OUTPUT -> def.outputHatchSlotCount();
-                    case FLUID_INPUT -> def.inputHatchSlotCount();
-                    case ITEM_OUTPUT -> def.outputBusSlotCount();
-                    case ITEM_INPUT -> def.inputBusSlotCount();
-                    default -> 1;
-                };
-                reqCount = Math.max(reqCount, defSlots);
-            }
-        }
-
-        return Math.max(1, reqCount);
-    }
-
-    public static int getTotalInstalledHatchesOfSameType(RecipeNode node, MachineAddon addon) {
-        if (node == null || addon == null) return 0;
-        GTHatchAddon.HatchType type = getHatchType(addon);
-        int total = 0;
-        for (MachineAddon a : node.getAddons()) {
-            if (a.getCategory() == MachineAddon.Category.HATCH_BUS) {
-                if (getHatchType(a) == type) {
-                    total++;
-                }
-            }
-        }
-        return total;
-    }
-
-    public static GTHatchAddon.HatchType getHatchType(MachineAddon addon) {
-        if (addon instanceof GTHatchAddon gh) return gh.getHatchType();
-        var stats = com.gtceu.calcboard.compat.gtceu.helper.GTHatchHelper.extractStatsFromMachineDef(null, addon.getItemIcon());
-        if (stats != null) return stats.hatchType();
-        String path = addon.getId().toLowerCase(Locale.ROOT);
-        if (path.contains("input_hatch") || path.contains("fluid_import")) return GTHatchAddon.HatchType.FLUID_INPUT;
-        if (path.contains("output_bus") || path.contains("export_bus")) return GTHatchAddon.HatchType.ITEM_OUTPUT;
-        if (path.contains("input_bus") || path.contains("import_bus")) return GTHatchAddon.HatchType.ITEM_INPUT;
-        return GTHatchAddon.HatchType.FLUID_OUTPUT;
-    }
+    public static int getMaxHatchSlotsAllowed(RecipeNode node, MachineAddon addon) { return AddonHatchSlotHelper.getMaxHatchSlotsAllowed(node, addon); }
+    public static int getTotalInstalledHatchesOfSameType(RecipeNode node, MachineAddon addon) { return AddonHatchSlotHelper.getTotalInstalledHatchesOfSameType(node, addon); }
+    public static GTHatchAddon.HatchType getHatchType(MachineAddon addon) { return AddonHatchSlotHelper.getHatchType(addon); }
 }

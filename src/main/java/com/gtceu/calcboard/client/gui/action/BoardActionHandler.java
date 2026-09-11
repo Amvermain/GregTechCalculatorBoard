@@ -7,10 +7,12 @@ import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.api.storage.BoardPage;
+import com.gtceu.calcboard.api.solver.FixedPointEfficiencySolver;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.type.SteamMode;
 import com.gtceu.calcboard.client.gui.BoardScreen;
 import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
+import com.gtceu.calcboard.client.gui.util.FormatUtil;
 import com.gtceu.calcboard.client.gui.widget.BoardToast;
 import com.gtceu.calcboard.client.gui.widget.NodeWidget;
 import net.minecraft.client.Minecraft;
@@ -49,6 +51,11 @@ public class BoardActionHandler {
         List<FlowGraph.ConnectionEdge> removedEdges = collectRemovedEdges(targetNodeIds);
 
         screen.getGraph().removeNode(targetNode);
+        for (RecipeNode rn : removedNodes) {
+            if (rn.isModule() && rn.getSubPageId() != null) {
+                BoardManager.getInstance().removePage(rn.getSubPageId());
+            }
+        }
         recordRemovalCommands(targetNode, removedNodes, removedFrames, removedEdges);
 
         screen.getSelectedNodeIds().removeAll(targetNodeIds);
@@ -163,6 +170,10 @@ public class BoardActionHandler {
     }
 
     public void switchMachineWorkstation(RecipeNode node, ResourceLocation newWs) {
+        switchMachineWorkstation(node, newWs, null);
+    }
+
+    public void switchMachineWorkstation(RecipeNode node, ResourceLocation newWs, String newMachineDisplayName) {
         if (!screen.ensureEditPermission() || node == null || newWs == null) return;
         if (Objects.equals(node.getMachineIcon(), newWs)) return;
 
@@ -171,16 +182,43 @@ public class BoardActionHandler {
         int oldPar = node.getParallel();
         SteamMode oldSteam = node.getSteamMode();
         GTVoltageTier oldTier = node.getTargetTier();
+        String oldName = node.getName();
 
         node.setMachineIcon(newWs);
         TutorialManager.getInstance().onMachineSwitched(node, newWs);
 
-        screen.recordCommand(new BoardCommand.SetMachineIconCommand(node, oldIcon, newWs, oldMb, oldPar, oldSteam, oldTier));
+        String machineDisplayName = (newMachineDisplayName != null && !newMachineDisplayName.isBlank())
+                ? newMachineDisplayName
+                : com.gtceu.calcboard.api.model.NodeWorkstationResolver.getWorkstationDisplayName(newWs);
+
+        String newName = oldName;
+        if (!node.hasCustomName()) {
+            newName = computeSwitchedNodeName(oldName, machineDisplayName);
+            node.setName(newName);
+        }
+
+        screen.recordCommand(new BoardCommand.SetMachineIconCommand(
+                node, oldIcon, newWs, oldMb, oldPar, oldSteam, oldTier, oldName, newName
+        ));
         screen.markSummaryDirty();
         screen.rebuildWidgets();
 
-        String machineName = node.getMachineDisplayName();
-        BoardToast.show(Component.literal("§b🏛 ").append(Component.translatable("message.gtcalcboard.machine_switched", machineName)));
+        BoardToast.show(Component.literal("§b▦ ").append(Component.translatable("message.gtcalcboard.machine_switched", machineDisplayName)));
+    }
+
+    public static String computeSwitchedNodeName(String oldName, String newMachineName) {
+        if (newMachineName == null || newMachineName.isBlank()) {
+            return oldName != null ? oldName : "";
+        }
+        if (oldName == null || oldName.isBlank()) {
+            return newMachineName;
+        }
+        int parenIdx = oldName.indexOf(" (");
+        if (parenIdx >= 0 && oldName.endsWith(")")) {
+            String suffix = oldName.substring(parenIdx);
+            return newMachineName + suffix;
+        }
+        return newMachineName;
     }
 
     public void switchNodeRecipe(RecipeNode targetNode, RecipeNode newRecipeTemplate) {
@@ -196,7 +234,7 @@ public class BoardActionHandler {
                 widget.invalidateCache();
             }
         }
-        BoardToast.show(Component.literal("§e🔄 ").append(Component.translatable("message.gtcalcboard.recipe_switched", targetNode.getName())));
+        BoardToast.show(Component.literal("§e⟲ ").append(Component.translatable("message.gtcalcboard.recipe_switched", targetNode.getName())));
     }
 
     public void createFrameFromSelection() {
@@ -216,6 +254,7 @@ public class BoardActionHandler {
         }
 
         graph.addFrame(frame);
+        screen.recordCommand(new BoardCommand.AddFramesCommand(frame, "Create Group Frame"));
         screen.clearSelection();
         screen.rebuildWidgets();
         screen.markSummaryDirty();
@@ -241,11 +280,12 @@ public class BoardActionHandler {
         }
         frame.setSharedMachineFrame(true);
         graph.addFrame(frame);
+        screen.recordCommand(new BoardCommand.AddFramesCommand(frame, "Create Shared Machine Frame"));
         screen.clearSelection();
         screen.rebuildWidgets();
         screen.markSummaryDirty();
         TutorialManager.getInstance().onSharedMachineFramed();
-        BoardToast.show(Component.literal("§a🔗 ").append(Component.translatable("message.gtcalcboard.shared_frame_created")));
+        BoardToast.show(Component.literal("§a↔ ").append(Component.translatable("message.gtcalcboard.shared_frame_created")));
         Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.2F));
     }
 
@@ -259,6 +299,7 @@ public class BoardActionHandler {
         String defaultTitle = Component.translatable("gui.gtcalcboard.default_frame_name").getString();
         CanvasGroupFrame frame = new CanvasGroupFrame(UUID.randomUUID().toString(), defaultTitle, CanvasGroupFrame.COLOR_BLUE, canvasX - 100, canvasY - 60, 200, 120);
         screen.getGraph().addFrame(frame);
+        screen.recordCommand(new BoardCommand.AddFramesCommand(frame, "Create Group Frame"));
         screen.clearSelection();
         screen.rebuildWidgets();
         screen.markSummaryDirty();
@@ -277,6 +318,7 @@ public class BoardActionHandler {
                 canvasX - 80, canvasY - 50
         );
         screen.getGraph().addStickyNote(note);
+        screen.recordCommand(new BoardCommand.AddStickyNotesCommand(note, "Create Sticky Note"));
         screen.clearSelection();
         screen.rebuildWidgets();
         screen.markSummaryDirty();
@@ -319,7 +361,7 @@ public class BoardActionHandler {
             screen.markSummaryDirty();
             TutorialManager.getInstance().onModuleGrouped();
 
-            BoardToast.show(Component.literal("§d📦 ").append(Component.translatable("message.gtcalcboard.group_success", String.valueOf(moduleNode.getContainedMachineCount()))));
+            BoardToast.show(Component.literal("§d▦ ").append(Component.translatable("message.gtcalcboard.group_success", String.valueOf(moduleNode.getContainedMachineCount()))));
             Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_STONECUTTER_TAKE_RESULT, 1.2F));
         }
     }
@@ -409,7 +451,7 @@ public class BoardActionHandler {
             active.setPanY(40.0);
             active.setZoom(1.0);
         }
-        BoardToast.show(Component.literal("§e🎯 ").append(Component.translatable("gui.gtcalcboard.toast.fit_view_empty")));
+        BoardToast.show(Component.literal("§e⌖ ").append(Component.translatable("gui.gtcalcboard.toast.fit_view_empty")));
         Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F));
     }
 
@@ -486,7 +528,7 @@ public class BoardActionHandler {
             active.setZoom(targetZoom);
         }
 
-        BoardToast.show(Component.literal("§b🎯 ").append(Component.translatable("gui.gtcalcboard.toast.fit_view")));
+        BoardToast.show(Component.literal("§b⌖ ").append(Component.translatable("gui.gtcalcboard.toast.fit_view")));
         Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.2F));
     }
 
@@ -508,5 +550,44 @@ public class BoardActionHandler {
             if (ids.contains(note.getId())) result.add(note);
         }
         return result;
+    }
+
+    public boolean scaleLoopToSteadyState(String targetNodeId) {
+        if (!screen.ensureEditPermission() || screen.getGraph() == null || targetNodeId == null) return false;
+        RecipeNode targetNode = screen.getGraph().findNodeById(targetNodeId);
+        if (targetNode == null) return false;
+
+        FixedPointEfficiencySolver.PrecomputedDampedLoopMeta meta = FixedPointEfficiencySolver.findDampedLoopMetaForNode(screen.getGraph(), targetNode);
+        if (meta == null) return false;
+
+        double targetEfficiency = meta.computeSteadyStateEfficiency(screen.getGraph(), null, null);
+        if (targetEfficiency <= 0.0001 || targetEfficiency >= 0.9999) return false;
+
+        List<BoardCommand> subCmds = new ArrayList<>();
+        int changedCount = 0;
+
+        for (String nodeId : meta.scc()) {
+            RecipeNode n = screen.getGraph().findNodeById(nodeId);
+            if (n == null || n.isReroute()) continue;
+            double oldCount = n.getMachineCount();
+            double newCount = Math.max(0.001, oldCount * targetEfficiency);
+            if (Math.abs(oldCount - newCount) > 0.0001) {
+                n.setMachineCount(newCount);
+                subCmds.add(BoardCommand.ModifyPropertyCommand.machineCount(nodeId, oldCount, newCount));
+                changedCount++;
+            }
+        }
+
+        if (changedCount > 0) {
+            screen.recordCommand(new BoardCommand.CompoundCommand(subCmds, "Scale loop to steady state"));
+            screen.rebuildWidgets();
+            screen.markSummaryDirty();
+            double sampleCount = Math.max(0.001, Math.round(targetNode.getMachineCount() * 1000.0) / 1000.0);
+            String countStr = FormatUtil.formatCompactNumber(sampleCount);
+            BoardToast.show(Component.literal("§b🔄 ").append(Component.translatable("message.gtcalcboard.steady_state_scaled", String.valueOf(changedCount), countStr)));
+            Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.2F));
+            return true;
+        }
+        return false;
     }
 }

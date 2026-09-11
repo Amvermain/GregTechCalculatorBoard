@@ -26,6 +26,8 @@ import net.minecraft.world.item.Items;
 import net.minecraftforge.fluids.FluidStack;
 import net.minecraftforge.registries.ForgeRegistries;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -35,6 +37,26 @@ public class JeiRecipeViewerAdapter implements IRecipeViewerAdapter {
 
     private static volatile IJeiRuntime jeiRuntime = null;
     private static final List<Runnable> READY_CALLBACKS = new ArrayList<>();
+    private static final Class<?> RECIPES_GUI_CLASS;
+    private static final java.lang.reflect.Field LAYOUTS_FIELD;
+    private static volatile java.lang.reflect.Field recipeLayoutsWithButtonsField = null;
+    private static volatile Method recipeLayoutMethod = null;
+    private static volatile Method ingredientHasKeyboardFocusMethod = null;
+    private static volatile Method ingredientIsFilterFocusedMethod = null;
+    private static volatile Method bookmarkHasKeyboardFocusMethod = null;
+    private static volatile boolean focusMethodsResolved = false;
+
+    static {
+        Class<?> clazz = null;
+        java.lang.reflect.Field layoutsF = null;
+        try {
+            clazz = Class.forName("mezz.jei.gui.recipes.RecipesGui");
+            layoutsF = clazz.getDeclaredField("layouts");
+            layoutsF.setAccessible(true);
+        } catch (Throwable ignored) {}
+        RECIPES_GUI_CLASS = clazz;
+        LAYOUTS_FIELD = layoutsF;
+    }
 
     public static synchronized void setJeiRuntime(IJeiRuntime runtime) {
         jeiRuntime = runtime;
@@ -339,113 +361,138 @@ public class JeiRecipeViewerAdapter implements IRecipeViewerAdapter {
     @Override
     public boolean isSearchFieldFocused() {
         if (!isAvailable() || jeiRuntime == null) return false;
+        ensureFocusMethodsResolved();
         try {
             var overlay = jeiRuntime.getIngredientListOverlay();
             if (overlay != null) {
-                try {
-                    var m = overlay.getClass().getMethod("hasKeyboardFocus");
-                    if (Boolean.TRUE.equals(m.invoke(overlay))) return true;
-                } catch (NoSuchMethodException ignored) {}
-                try {
-                    var m = overlay.getClass().getMethod("isFilterFocused");
-                    if (Boolean.TRUE.equals(m.invoke(overlay))) return true;
-                } catch (NoSuchMethodException ignored) {}
+                if (ingredientHasKeyboardFocusMethod != null && Boolean.TRUE.equals(ingredientHasKeyboardFocusMethod.invoke(overlay))) return true;
+                if (ingredientIsFilterFocusedMethod != null && Boolean.TRUE.equals(ingredientIsFilterFocusedMethod.invoke(overlay))) return true;
             }
             var bookmarkOverlay = jeiRuntime.getBookmarkOverlay();
-            if (bookmarkOverlay != null) {
-                try {
-                    var m = bookmarkOverlay.getClass().getMethod("hasKeyboardFocus");
-                    if (Boolean.TRUE.equals(m.invoke(bookmarkOverlay))) return true;
-                } catch (NoSuchMethodException ignored) {}
+            if (bookmarkOverlay != null && bookmarkHasKeyboardFocusMethod != null) {
+                if (Boolean.TRUE.equals(bookmarkHasKeyboardFocusMethod.invoke(bookmarkOverlay))) return true;
             }
         } catch (Throwable ignored) {}
         return false;
     }
 
+    private void ensureFocusMethodsResolved() {
+        if (focusMethodsResolved) return;
+        synchronized (JeiRecipeViewerAdapter.class) {
+            if (focusMethodsResolved) return;
+            var overlay = jeiRuntime != null ? jeiRuntime.getIngredientListOverlay() : null;
+            if (overlay != null) {
+                ingredientHasKeyboardFocusMethod = findMethodSilently(overlay.getClass(), "hasKeyboardFocus");
+                ingredientIsFilterFocusedMethod = findMethodSilently(overlay.getClass(), "isFilterFocused");
+            }
+            var bookmarkOverlay = jeiRuntime != null ? jeiRuntime.getBookmarkOverlay() : null;
+            if (bookmarkOverlay != null) {
+                bookmarkHasKeyboardFocusMethod = findMethodSilently(bookmarkOverlay.getClass(), "hasKeyboardFocus");
+            }
+            focusMethodsResolved = true;
+        }
+    }
+
+    private static Method findMethodSilently(Class<?> clazz, String name) {
+        if (clazz == null) return null;
+        try {
+            return clazz.getMethod(name);
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
     @Override
     public boolean tryAddHoveredRecipeToBoard(net.minecraft.client.gui.screens.Screen screen, double mouseX, double mouseY) {
-        if (!isAvailable() || jeiRuntime == null || screen == null) return false;
+        if (!isAvailable() || jeiRuntime == null || screen == null || LAYOUTS_FIELD == null) return false;
         try {
-            if (screen.getClass().getName().contains("RecipesGui")) {
-                var layoutsField = screen.getClass().getDeclaredField("layouts");
-                layoutsField.setAccessible(true);
-                Object recipeGuiLayouts = layoutsField.get(screen);
-                if (recipeGuiLayouts != null) {
-                    var listField = recipeGuiLayouts.getClass().getDeclaredField("recipeLayoutsWithButtons");
-                    listField.setAccessible(true);
-                    @SuppressWarnings("unchecked")
-                    List<?> layoutsWithButtons = (List<?>) listField.get(recipeGuiLayouts);
-                    if (layoutsWithButtons != null && !layoutsWithButtons.isEmpty()) {
-                        mezz.jei.api.gui.IRecipeLayoutDrawable targetLayout = null;
-                        for (Object lwb : layoutsWithButtons) {
-                            if (lwb != null) {
-                                try {
-                                    var layoutMethod = lwb.getClass().getMethod("recipeLayout");
-                                    Object res = layoutMethod.invoke(lwb);
-                                    if (res instanceof mezz.jei.api.gui.IRecipeLayoutDrawable layoutDrawable) {
-                                        if (layoutDrawable.isMouseOver(mouseX, mouseY)) {
-                                            targetLayout = layoutDrawable;
-                                            break;
-                                        }
-                                    }
-                                } catch (Throwable ignored) {}
-                            }
-                        }
-                        if (targetLayout == null) {
-                            for (Object lwb : layoutsWithButtons) {
-                                if (lwb != null) {
-                                    try {
-                                        var layoutMethod = lwb.getClass().getMethod("recipeLayout");
-                                        Object res = layoutMethod.invoke(lwb);
-                                        if (res instanceof mezz.jei.api.gui.IRecipeLayoutDrawable layoutDrawable) {
-                                            targetLayout = layoutDrawable;
-                                            break;
-                                        }
-                                    } catch (Throwable ignored) {}
-                                }
-                            }
-                        }
-                        if (targetLayout != null) {
-                            var category = targetLayout.getRecipeCategory();
-                            var recipeObj = targetLayout.getRecipe();
-                            if (category != null && recipeObj != null) {
-                                @SuppressWarnings({"rawtypes", "unchecked"})
-                                JeiRecipeWrapper<?> wrapper = new JeiRecipeWrapper(category, recipeObj);
-                                RecipeNode node = JeiRecipeConverter.convert(wrapper);
-                                if (node != null) {
-                                    Minecraft mc = Minecraft.getInstance();
-                                    double[] pos = com.gtceu.calcboard.client.gui.BoardScreen.getNextNodeCenterPosition();
-                                    node.setPosX(pos[0]);
-                                    node.setPosY(pos[1]);
-                                    com.gtceu.calcboard.api.storage.BoardManager.getInstance().getActiveGraph().addNode(node);
+            if (!isViewerScreen(screen)) return false;
+            Object recipeGuiLayouts = LAYOUTS_FIELD.get(screen);
+            if (recipeGuiLayouts == null) return false;
 
-                                    String name = node.getName();
-                                    if (name == null || name.isEmpty()) {
-                                        name = category.getTitle().getString();
-                                    }
-                                    com.gtceu.calcboard.client.gui.widget.BoardToast.show(
-                                        Component.literal("§a✔ ").append(Component.translatable("message.gtcalcboard.recipe_added", name))
-                                    );
-                                    mc.getSoundManager().play(
-                                        net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
-                                            net.minecraft.sounds.SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F
-                                        )
-                                    );
-                                    if (mc.screen instanceof com.gtceu.calcboard.client.gui.BoardScreen boardScreen) {
-                                        boardScreen.rebuildWidgets();
-                                        boardScreen.markSummaryDirty();
-                                    }
-                                    return true;
-                                }
-                            }
-                        }
+            if (recipeLayoutsWithButtonsField == null) {
+                var f = recipeGuiLayouts.getClass().getDeclaredField("recipeLayoutsWithButtons");
+                f.setAccessible(true);
+                recipeLayoutsWithButtonsField = f;
+            }
+            @SuppressWarnings("unchecked")
+            List<?> layoutsWithButtons = (List<?>) recipeLayoutsWithButtonsField.get(recipeGuiLayouts);
+            if (layoutsWithButtons == null || layoutsWithButtons.isEmpty()) return false;
+
+            mezz.jei.api.gui.IRecipeLayoutDrawable targetLayout = resolveHoveredOrFirstLayout(layoutsWithButtons, mouseX, mouseY);
+            if (targetLayout != null) {
+                var category = targetLayout.getRecipeCategory();
+                var recipeObj = targetLayout.getRecipe();
+                if (category != null && recipeObj != null) {
+                    @SuppressWarnings({"rawtypes", "unchecked"})
+                    JeiRecipeWrapper<?> wrapper = new JeiRecipeWrapper(category, recipeObj);
+                    RecipeNode node = JeiRecipeConverter.convert(wrapper);
+                    if (node != null) {
+                        applyConvertedNodeToBoard(node, category.getTitle().getString());
+                        return true;
                     }
                 }
             }
-        } catch (Throwable t) {
-            com.gtceu.calcboard.GregTechCalcBoard.LOGGER.warn("[GTCalcBoard] Failed to capture JEI recipe under mouse: {}", t.getMessage());
-        }
+        } catch (Throwable ignored) {}
         return false;
+    }
+
+    private mezz.jei.api.gui.IRecipeLayoutDrawable resolveHoveredOrFirstLayout(List<?> layoutsWithButtons, double mouseX, double mouseY) {
+        mezz.jei.api.gui.IRecipeLayoutDrawable targetLayout = null;
+        for (Object lwb : layoutsWithButtons) {
+            if (lwb == null) continue;
+            mezz.jei.api.gui.IRecipeLayoutDrawable layoutDrawable = extractLayoutDrawable(lwb);
+            if (layoutDrawable != null && layoutDrawable.isMouseOver(mouseX, mouseY)) {
+                return layoutDrawable;
+            }
+            if (targetLayout == null && layoutDrawable != null) {
+                targetLayout = layoutDrawable;
+            }
+        }
+        return targetLayout;
+    }
+
+    private mezz.jei.api.gui.IRecipeLayoutDrawable extractLayoutDrawable(Object lwb) {
+        try {
+            if (recipeLayoutMethod == null) {
+                recipeLayoutMethod = lwb.getClass().getMethod("recipeLayout");
+            }
+            Object res = recipeLayoutMethod.invoke(lwb);
+            return res instanceof mezz.jei.api.gui.IRecipeLayoutDrawable layout ? layout : null;
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private void applyConvertedNodeToBoard(RecipeNode node, String defaultCategoryName) {
+        Minecraft mc = Minecraft.getInstance();
+        double[] pos = com.gtceu.calcboard.client.gui.BoardScreen.getNextNodeCenterPosition();
+        node.setPosX(pos[0]);
+        node.setPosY(pos[1]);
+        com.gtceu.calcboard.api.storage.BoardManager.getInstance().getActiveGraph().addNode(node);
+
+        String name = node.getName();
+        if (name == null || name.isEmpty()) {
+            name = defaultCategoryName;
+        }
+        com.gtceu.calcboard.client.gui.widget.BoardToast.show(
+            Component.literal("§a✔ ").append(Component.translatable("message.gtcalcboard.recipe_added", name))
+        );
+        mc.getSoundManager().play(
+            net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
+                net.minecraft.sounds.SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F
+            )
+        );
+        if (mc.screen instanceof com.gtceu.calcboard.client.gui.BoardScreen boardScreen) {
+            boardScreen.rebuildWidgets();
+            boardScreen.markSummaryDirty();
+        }
+    }
+
+    @Override
+    public boolean isViewerScreen(net.minecraft.client.gui.screens.Screen screen) {
+        if (screen == null || RECIPES_GUI_CLASS == null) return false;
+        return RECIPES_GUI_CLASS.isInstance(screen);
     }
 }
 

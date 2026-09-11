@@ -1,8 +1,8 @@
 package com.gtceu.calcboard.integration.emi;
 
 import com.gtceu.calcboard.api.model.CompoundRecipeBuilder;
-import com.gtceu.calcboard.compat.IModAdapter;
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.IModAdapter;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 import dev.emi.emi.api.recipe.EmiRecipe;
 import net.minecraft.resources.ResourceLocation;
 

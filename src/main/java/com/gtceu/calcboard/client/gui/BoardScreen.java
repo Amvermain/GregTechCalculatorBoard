@@ -3,7 +3,6 @@ package com.gtceu.calcboard.client.gui;
 import com.gtceu.calcboard.GregTechCalcBoard;
 import com.gtceu.calcboard.api.catalog.AddonCategory;
 import com.gtceu.calcboard.api.history.BoardCommand;
-import com.gtceu.calcboard.api.type.BoardGuiScale;
 import com.gtceu.calcboard.api.model.CanvasGroupFrame;
 import com.gtceu.calcboard.api.model.CanvasStickyNote;
 import com.gtceu.calcboard.api.model.FlowGraph;
@@ -14,39 +13,30 @@ import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.api.storage.BoardPage;
 import com.gtceu.calcboard.api.storage.FolderBlueprintPackage;
 import com.gtceu.calcboard.client.gui.action.BoardActionHandler;
+import com.gtceu.calcboard.client.gui.api.IBoardScreenContext;
 import com.gtceu.calcboard.client.gui.canvas.BoardHudRenderer;
 import com.gtceu.calcboard.client.gui.canvas.BoardKeybindDispatcher;
 import com.gtceu.calcboard.client.gui.canvas.CanvasWireRenderer;
 import com.gtceu.calcboard.client.gui.dialog.*;
 import com.gtceu.calcboard.client.gui.compat.InventoryProfilesNextCompat;
+import com.gtceu.calcboard.client.gui.interaction.CanvasContextMenuManager;
 import com.gtceu.calcboard.client.gui.model.PortRef;
 import com.gtceu.calcboard.client.gui.render.BoardCanvasRenderer;
-import com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer;
 import com.gtceu.calcboard.client.gui.render.WireSpatialIndex;
 import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
-import com.gtceu.calcboard.client.gui.tutorial.TutorialOverlay;
 import com.gtceu.calcboard.client.gui.tutorial.WelcomeTutorialDialog;
 import com.gtceu.calcboard.client.gui.util.BoardViewportTransform;
 import com.gtceu.calcboard.client.gui.widget.*;
 import com.gtceu.calcboard.client.team.ClientWorkspaceState;
 import com.gtceu.calcboard.integration.emi.BoardMenu;
-import com.gtceu.calcboard.network.NetworkHandler;
-import com.gtceu.calcboard.network.packet.c2s.C2SAcquireLockPacket;
-import com.gtceu.calcboard.network.packet.c2s.C2SPingPresencePacket;
-import com.gtceu.calcboard.network.packet.c2s.C2SRequestWorkspacePacket;
-import com.gtceu.calcboard.server.storage.TeamWorkspacePage;
-import com.mojang.blaze3d.systems.RenderSystem;
+import com.gtceu.calcboard.integration.spi.RecipeViewerRegistry;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.AbstractWidget;
-import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
-import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.entity.player.Inventory;
-import org.lwjgl.opengl.GL11;
 
 import java.util.*;
 
@@ -54,7 +44,7 @@ import java.util.*;
  * Main GUI Screen for GregTech Calculator Board.
  * Acts as the master orchestrator coordinating canvas rendering, dialog management, and editor actions.
  */
-public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
+public class BoardScreen extends AbstractContainerScreen<BoardMenu> implements IBoardScreenContext {
     public static final int LEFT_MARGIN = 48;
     private static long lastBoardScreenActiveTime = 0;
 
@@ -62,7 +52,7 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
         Minecraft mc = Minecraft.getInstance();
         if (mc == null || mc.screen == null) return false;
         if (mc.screen instanceof BoardScreen) return true;
-        if (mc.screen.getClass().getName().contains("RecipeScreen") || mc.screen.getClass().getName().contains("Emi")) {
+        if (RecipeViewerRegistry.isAnyViewerScreen(mc.screen)) {
             return (System.currentTimeMillis() - lastBoardScreenActiveTime) < 30000;
         }
         return false;
@@ -83,23 +73,30 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
     private final BoardViewportTransform viewportTransform = new BoardViewportTransform();
     private final WorkspaceTabBarWidget workspaceTabBar = new WorkspaceTabBarWidget(this);
     private final PageTabBarWidget pageTabBar = new PageTabBarWidget(this);
-    private final SummaryOverlay summaryOverlay = new SummaryOverlay();
+    private final SummaryOverlay summaryOverlay = new SummaryOverlay(this);
     private final ToolbarWidget toolbarWidget = new ToolbarWidget(this);
     private final HotkeyHudWidget hotkeyHudWidget = new HotkeyHudWidget(this);
     private final FavoritesDockWidget favoritesDockWidget = new FavoritesDockWidget(this);
     private final PageBrowserDrawer pageBrowserDrawer = new PageBrowserDrawer(this);
     private final CanvasInteractionHandler canvasHandler = new CanvasInteractionHandler(this);
     private final CanvasWireRenderer wireRenderer = new CanvasWireRenderer();
+    private final NodeInspectorPanel nodeInspectorPanel = new NodeInspectorPanel(this);
+    private final AdaptiveStatusBar statusBar = new AdaptiveStatusBar(this);
+    private final LeftActivityBarWidget leftActivityBar = new LeftActivityBarWidget(this);
+    private final SelectionFloatingToolbarWidget selectionToolbarWidget = new SelectionFloatingToolbarWidget(this);
 
     private final BoardDialogManager dialogManager = new BoardDialogManager(this);
     private final BoardCanvasRenderer canvasRenderer = new BoardCanvasRenderer();
     private final BoardActionHandler actionHandler = new BoardActionHandler(this);
+    private final BoardNavigationHandler navigationHandler = new BoardNavigationHandler(this);
+    private final BoardInputRouter inputRouter = new BoardInputRouter(this);
+    private final BoardWidgetLayerRenderer widgetLayerRenderer = new BoardWidgetLayerRenderer(this);
+    private final BoardTeamSyncCoordinator teamSyncCoordinator = new BoardTeamSyncCoordinator(this);
 
     private BalanceSummary cachedSummary = null;
     private boolean summaryDirty = true;
     private double lastMouseX, lastMouseY;
-    private long lastEditTimestamp = 0;
-    private int presencePingTicks = 0;
+    private boolean summaryAutoCollapsedForInspector = false;
 
     public BoardScreen() {
         this(new BoardMenu(0, Minecraft.getInstance() != null && Minecraft.getInstance().player != null ? Minecraft.getInstance().player.getInventory() : null));
@@ -153,7 +150,7 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
         });
         rebuildWidgets();
 
-        initNetworkPresence();
+        teamSyncCoordinator.initNetworkPresence();
         RecipeSearchDialog.ensureGlobalRecipesCachedAsync(null);
 
         this.summaryOverlay.setCollapsed(BoardManager.getInstance().isSummaryOverlayCollapsed() || this.width < 640);
@@ -168,18 +165,17 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
                 getGraph().getNodes().size(), getGraph().getConnections().size(), ClientWorkspaceState.getInstance().isTeamMode());
     }
 
-    public void clearForeignWidgets() {
-        this.clearWidgets();
+    @Override
+    public void removed() {
+        super.removed();
+        if (this.dialogManager != null) {
+            this.dialogManager.destroy();
+        }
+        teamSyncCoordinator.onScreenRemoved();
     }
 
-    private void initNetworkPresence() {
-        if (minecraft == null || minecraft.getConnection() == null) return;
-        ClientWorkspaceState state = ClientWorkspaceState.getInstance();
-        UUID teamId = state.getCurrentTeamId();
-        String pageId = state.getActiveTeamPageId();
-        boolean isTeamMode = state.isTeamMode();
-        NetworkHandler.sendToServer(new C2SPingPresencePacket(teamId, pageId, isTeamMode));
-        NetworkHandler.sendToServer(new C2SRequestWorkspacePacket(teamId, pageId != null ? pageId : "page_main"));
+    public void clearForeignWidgets() {
+        this.clearWidgets();
     }
 
     private void checkWelcomePrompt() {
@@ -201,10 +197,22 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
             widgetByNode.put(node, nw);
             widgetByNodeId.put(node.getId(), nw);
         }
+        if (nodeInspectorPanel != null && nodeInspectorPanel.isVisible()) {
+            NodeWidget oldTarget = nodeInspectorPanel.getTargetWidget();
+            if (oldTarget != null) {
+                NodeWidget newTarget = widgetByNodeId.get(oldTarget.getNode().getId());
+                nodeInspectorPanel.setTargetWidget(newTarget);
+            }
+        }
         if (wireRenderer != null) {
             wireRenderer.markDirty();
         }
         markSummaryDirty();
+    }
+
+    @Override
+    public void rebuildBoardWidgets() {
+        rebuildWidgets();
     }
 
     public void markSummaryDirty() {
@@ -226,36 +234,11 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
     }
 
     public void markTeamDirty() {
-        ClientWorkspaceState state = ClientWorkspaceState.getInstance();
-        if (state.isTeamMode()) {
-            state.markPageDirty(state.getActiveTeamPageId());
-            this.lastEditTimestamp = System.currentTimeMillis();
-        }
+        teamSyncCoordinator.markTeamDirty();
     }
 
     public boolean ensureEditPermission() {
-        ClientWorkspaceState state = ClientWorkspaceState.getInstance();
-        if (!state.isTeamMode()) return true;
-
-        String activePageId = state.getActiveTeamPageId();
-        state.markPageDirty(activePageId);
-        this.lastEditTimestamp = System.currentTimeMillis();
-
-        if (state.doesHoldLock(activePageId)) return true;
-
-        TeamWorkspacePage page = state.getRemotePage(activePageId);
-        if (page != null && page.isLocked() && !state.doesHoldLock(activePageId)) {
-            String lockHolder = page.getLockHolderName() != null && !page.getLockHolderName().isEmpty()
-                    ? page.getLockHolderName() : state.resolvePlayerName(page.getLockHolderUUID());
-            BoardToast.show(Component.literal("§c🔒 ").append(Component.translatable("gui.gtcalcboard.lock.locked_by", lockHolder)));
-            Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.VILLAGER_NO, 1.0F));
-            return false;
-        }
-
-        UUID teamId = state.getCurrentTeamId();
-        NetworkHandler.sendToServer(new C2SAcquireLockPacket(teamId, activePageId));
-        state.setLockHeld(activePageId, true);
-        return true;
+        return teamSyncCoordinator.ensureEditPermission();
     }
 
     @Override
@@ -269,27 +252,19 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
             return;
         }
         super.containerTick();
-
-        ClientWorkspaceState state = ClientWorkspaceState.getInstance();
-        if (state.isCollaborationEnabled() && state.isTeamMode()) {
-            presencePingTicks++;
-            if (presencePingTicks >= 40) {
-                presencePingTicks = 0;
-                NetworkHandler.sendToServer(new C2SPingPresencePacket(state.getCurrentTeamId(), state.getActiveTeamPageId(), true));
-            }
-        }
-        if (state.isTeamMode()) {
-            String activePageId = state.getActiveTeamPageId();
-            if (state.isPageDirty(activePageId) && lastEditTimestamp > 0 && (System.currentTimeMillis() - lastEditTimestamp > 3000)) {
-                state.autoCommitAndRelease(this, activePageId);
-                rebuildWidgets();
-                markSummaryDirty();
-            }
-        }
+        teamSyncCoordinator.tick();
     }
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
+        boolean showDebug = BoardManager.getInstance().isShowDebugInfo();
+        com.gtceu.calcboard.client.gui.util.RenderProfiler profiler = com.gtceu.calcboard.client.gui.util.RenderProfiler.getInstance();
+        if (showDebug) {
+            profiler.startFrame();
+            profiler.startSection("Pan / Viewport");
+        }
+
+        navigationHandler.updateSmoothPan();
         if (this.minecraft != null) {
             viewportTransform.update(this.minecraft);
             if (viewportTransform.isScaled()) {
@@ -305,24 +280,36 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
         this.lastMouseX = localMouseX;
         this.lastMouseY = localMouseY;
 
+        if (showDebug) profiler.startSection("Summary Solver");
         updateGraphSummaryIfDirty();
 
         graphics.pose().pushPose();
         viewportTransform.applyPose(graphics.pose());
 
+        if (showDebug) profiler.startSection("Background");
         renderBackground(graphics);
         BoardHudRenderer.renderGridBackground(graphics, width, height, panX, panY, zoom);
+        BoardHudRenderer.renderEmptyCanvasWatermark(graphics, font, width, height, getGraph().getNodes().size());
 
         canvasRenderer.renderCanvasScene(graphics, this, getGraph(), nodeWidgets, wireRenderer, canvasHandler, panX, panY, zoom, width, height, localMouseX, localMouseY, partialTicks);
 
-        renderScreenWidgets(graphics, localMouseX, localMouseY, partialTicks);
+        if (showDebug) profiler.startSection("UI Widgets");
+        widgetLayerRenderer.renderWidgets(graphics, localMouseX, localMouseY, partialTicks);
         clearForeignWidgets();
-        renderTopOverlays(graphics, localMouseX, localMouseY, partialTicks);
+
+        if (showDebug) profiler.startSection("Overlays / Modals");
+        widgetLayerRenderer.renderTopOverlays(graphics, localMouseX, localMouseY, partialTicks);
+
+        if (showDebug) {
+            profiler.endSection();
+            profiler.render(graphics, font, width, height, AdaptiveStatusBar.BAR_HEIGHT);
+            profiler.endFrame();
+        }
 
         graphics.pose().popPose();
     }
 
-    private void updateGraphSummaryIfDirty() {
+    public void updateGraphSummaryIfDirty() {
         if (summaryDirty || cachedSummary == null) {
             getGraph().cleanupInvalidConnections();
             cachedSummary = FlowGraphSolver.computeSummary(getGraph());
@@ -330,48 +317,21 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
         }
     }
 
-    private void renderScreenWidgets(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
-        workspaceTabBar.render(graphics, mouseX, mouseY, partialTicks);
-        pageTabBar.render(graphics, mouseX, mouseY, partialTicks);
-        toolbarWidget.render(graphics, mouseX, mouseY);
-        if (BoardManager.getInstance().isShowHotkeyHud()) {
-            hotkeyHudWidget.render(graphics, mouseX, mouseY, partialTicks);
-        }
-        favoritesDockWidget.render(graphics, mouseX, mouseY, partialTicks);
-        pageBrowserDrawer.render(graphics, mouseX, mouseY, partialTicks);
-
-        if (summaryDirty || cachedSummary == null) {
-            cachedSummary = FlowGraphSolver.computeSummary(getGraph());
-            summaryDirty = false;
-        }
-        summaryOverlay.render(graphics, width, height, cachedSummary, mouseX, mouseY);
-        BoardHudRenderer.renderCentralLoadingCard(graphics, font, width, height, isAnyModalOpen(), favoritesDockWidget);
-
-        if (!isAnyModalOpen() && !pageBrowserDrawer.isOpen()) {
-            graphics.flush();
-            com.mojang.blaze3d.systems.RenderSystem.clear(org.lwjgl.opengl.GL11.GL_DEPTH_BUFFER_BIT, Minecraft.ON_OSX);
-            com.mojang.blaze3d.systems.RenderSystem.disableDepthTest();
-            BoardTooltipRenderer.renderTooltips(this, graphics, font, mouseX, mouseY);
-            favoritesDockWidget.renderTooltips(graphics, font, mouseX, mouseY);
-            workspaceTabBar.renderTooltips(graphics, font, mouseX, mouseY);
-        }
-    }
-
-    private void renderTopOverlays(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
-        if (isAnyModalOpen()) {
-            graphics.flush();
-            RenderSystem.clear(GL11.GL_DEPTH_BUFFER_BIT, Minecraft.ON_OSX);
-            RenderSystem.disableDepthTest();
-            dialogManager.renderModals(graphics, width, height, mouseX, mouseY, partialTicks);
-        }
-        TutorialOverlay.render(graphics, font, this, width, height, mouseX, mouseY);
-        BoardToast.render(graphics, font, width, height);
-    }
-
     public boolean isAnyModalOpen() {
         return dialogManager.isAnyModalOpen();
     }
 
+    @Override
+    public int getScreenWidth() {
+        return this.width;
+    }
+
+    @Override
+    public int getScreenHeight() {
+        return this.height;
+    }
+
+    @Override
     public BoardViewportTransform getViewportTransform() {
         return viewportTransform;
     }
@@ -396,70 +356,25 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        double vx = viewportTransform.toVirtualX(mouseX);
-        double vy = viewportTransform.toVirtualY(mouseY);
-        if (dialogManager.handleMouseClicked(vx, vy, button, width, height)) return true;
-        if (TutorialOverlay.mouseClicked(this, width, height, vx, vy, button)) return true;
-        if (pageBrowserDrawer != null && pageBrowserDrawer.isOpen() && pageBrowserDrawer.mouseClicked(vx, vy, button)) return true;
-        if (workspaceTabBar.mouseClicked(vx, vy, button)) return true;
-        if (pageTabBar.mouseClicked(vx, vy, button)) return true;
-        if (favoritesDockWidget.mouseClicked(vx, vy, button)) return true;
-        if (BoardManager.getInstance().isShowHotkeyHud() && hotkeyHudWidget.mouseClicked(vx, vy, button)) return true;
-        if (summaryOverlay.mouseClicked(vx, vy, button, width, height)) return true;
-        if (toolbarWidget.mouseClicked(vx, vy, button)) return true;
-        if (canvasHandler.mouseClicked(vx, vy, button)) return true;
+        if (inputRouter.handleMouseClicked(mouseX, mouseY, button)) return true;
         return super.mouseClicked(mouseX, mouseY, button);
     }
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
-        double vx = viewportTransform.toVirtualX(mouseX);
-        double vy = viewportTransform.toVirtualY(mouseY);
-        if (dialogManager.handleMouseReleased(vx, vy, button)) return true;
-        if (pageBrowserDrawer != null && pageBrowserDrawer.isOpen() && pageBrowserDrawer.mouseReleased(vx, vy, button)) return true;
-        if (favoritesDockWidget.mouseReleased(vx, vy, button)) return true;
-        if (pageTabBar.mouseReleased(vx, vy, button)) return true;
-        if (toolbarWidget.mouseReleased(vx, vy, button)) return true;
-        if (canvasHandler.mouseReleased(vx, vy, button)) return true;
+        if (inputRouter.handleMouseReleased(mouseX, mouseY, button)) return true;
         return super.mouseReleased(mouseX, mouseY, button);
     }
 
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
-        double vx = viewportTransform.toVirtualX(mouseX);
-        double vy = viewportTransform.toVirtualY(mouseY);
-        double vdx = viewportTransform.toVirtualX(dragX);
-        double vdy = viewportTransform.toVirtualY(dragY);
-        if (dialogManager.handleMouseDragged(vx, vy, button, vdx, vdy, width, height)) return true;
-        if (pageBrowserDrawer != null && pageBrowserDrawer.isOpen() && pageBrowserDrawer.mouseDragged(vx, vy, button, vdx, vdy)) return true;
-        if (favoritesDockWidget.mouseDragged(vx, vy, button, vdx, vdy)) return true;
-        if (pageTabBar.mouseDragged(vx, vy, button, vdx, vdy)) return true;
-        if (toolbarWidget.mouseDragged(vx, vy, button, vdx, vdy)) return true;
-        if (canvasHandler.mouseDragged(vx, vy, button, vdx, vdy)) {
-            if (wireRenderer != null) wireRenderer.markDirty();
-            return true;
-        }
+        if (inputRouter.handleMouseDragged(mouseX, mouseY, button, dragX, dragY)) return true;
         return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
     }
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
-        double vx = viewportTransform.toVirtualX(mouseX);
-        double vy = viewportTransform.toVirtualY(mouseY);
-        if (dialogManager.handleMouseScrolled(vx, vy, delta)) return true;
-        if (pageBrowserDrawer != null && pageBrowserDrawer.isOpen() && pageBrowserDrawer.mouseScrolled(vx, vy, delta)) return true;
-        if (favoritesDockWidget.mouseScrolled(vx, vy, delta)) return true;
-        if (pageTabBar.mouseScrolled(vx, vy, delta)) return true;
-        if (summaryOverlay.mouseScrolled(vx, vy, delta, width, height)) return true;
-        if (toolbarWidget.mouseScrolled(vx, vy, delta)) return true;
-        if (BoardManager.getInstance().isShowHotkeyHud() && hotkeyHudWidget.mouseScrolled(vx, vy, delta)) return true;
-
-        double canvasMouseX = toCanvasX(vx);
-        double canvasMouseY = toCanvasY(vy);
-        for (int i = nodeWidgets.size() - 1; i >= 0; i--) {
-            if (nodeWidgets.get(i).mouseScrolled(canvasMouseX, canvasMouseY, delta)) return true;
-        }
-        if (canvasHandler.mouseScrolled(vx, vy, delta)) return true;
+        if (inputRouter.handleMouseScrolled(mouseX, mouseY, delta)) return true;
         return super.mouseScrolled(mouseX, mouseY, delta);
     }
 
@@ -475,91 +390,38 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
-    public double toCanvasX(double screenX) { return (screenX - panX) / zoom; }
-    public double toCanvasY(double screenY) { return (screenY - panY) / zoom; }
-    public double toScreenX(double canvasX) { return canvasX * zoom + panX; }
-    public double toScreenY(double canvasY) { return canvasY * zoom + panY; }
+    public double toCanvasX(double screenX) { return navigationHandler.toCanvasX(screenX); }
+    public double toCanvasY(double screenY) { return navigationHandler.toCanvasY(screenY); }
+    public double toScreenX(double canvasX) { return navigationHandler.toScreenX(canvasX); }
+    public double toScreenY(double canvasY) { return navigationHandler.toScreenY(canvasY); }
+    public boolean isSmoothPanBlocked() { return navigationHandler.isSmoothPanBlocked(); }
 
     public double getLastMouseX() { return lastMouseX; }
     public double getLastMouseY() { return lastMouseY; }
 
-    public static double[] getNextNodeCenterPosition() {
-        BoardViewportTransform transform = getCurrentTransform();
-        if (transform != null && transform.isScaled()) {
-            return getNextNodeCenterPosition(transform.getVirtualWidth(), transform.getVirtualHeight());
-        }
-        Minecraft mc = Minecraft.getInstance();
-        if (mc != null && mc.screen instanceof BoardScreen bs) {
-            return getNextNodeCenterPosition(bs.width, bs.height);
-        }
-        if (mc != null && mc.getWindow() != null) {
-            BoardGuiScale pref = BoardManager.getInstance().getBoardGuiScale();
-            int gameGuiScale = Math.max(1, (int) Math.round(mc.getWindow().getGuiScale()));
-            int eff = pref.resolveEffectiveScale(gameGuiScale, mc.getWindow().getWidth(), mc.getWindow().getHeight());
-            int sw = Math.max(320, (int) Math.floor((double) mc.getWindow().getWidth() / eff));
-            int sh = Math.max(240, (int) Math.floor((double) mc.getWindow().getHeight() / eff));
-            return getNextNodeCenterPosition(sw, sh);
-        }
-        return getNextNodeCenterPosition(800, 600);
-    }
+    public static double[] getNextNodeCenterPosition() { return BoardNavigationHandler.getNextNodeCenterPosition(); }
+    public static double[] getNextNodeCenterPosition(int screenW, int screenH) { return BoardNavigationHandler.getNextNodeCenterPosition(screenW, screenH); }
+    public double[] getScreenCenterCanvasPosition() { return navigationHandler.getScreenCenterCanvasPosition(); }
 
-    public static double[] getNextNodeCenterPosition(int screenW, int screenH) {
-        double canvasCenterX = (screenW / 2.0 - lastPanX) / lastZoom - 100.0;
-        double canvasCenterY = (screenH / 2.0 - lastPanY) / lastZoom - 40.0;
-        FlowGraph graph = BoardManager.getInstance().getActiveGraph();
-        double candX = canvasCenterX, candY = canvasCenterY;
-        while (isNodeAt(graph, candX, candY)) { candX += 24.0; candY += 24.0; }
-        return new double[]{candX, candY};
-    }
-
-    public double[] getScreenCenterCanvasPosition() {
-        double canvasCenterX = (this.width / 2.0 - this.panX) / this.zoom - 100.0;
-        double canvasCenterY = (this.height / 2.0 - this.panY) / this.zoom - 40.0;
-        FlowGraph graph = getGraph();
-        double candX = canvasCenterX, candY = canvasCenterY;
-        while (isNodeAt(graph, candX, candY)) { candX += 24.0; candY += 24.0; }
-        return new double[]{candX, candY};
-    }
-
-    private static boolean isNodeAt(FlowGraph graph, double x, double y) {
-        if (graph == null) return false;
-        for (RecipeNode n : graph.getNodes()) {
-            if (Math.abs(n.getPosX() - x) < 20.0 && Math.abs(n.getPosY() - y) < 20.0) return true;
-        }
-        return false;
-    }
-
-    public int getDynamicLeftMargin() {
-        int maxRight = 8;
-        for (var child : this.children()) {
-            if (child instanceof AbstractWidget widget && !(widget instanceof EditBox)) {
-                if (widget.visible && widget.getY() < 60 && widget.getX() >= 0 && widget.getX() < this.width / 3) {
-                    maxRight = Math.max(maxRight, widget.getX() + widget.getWidth());
-                }
-            }
-        }
-        return maxRight > 8 ? (maxRight + 6) : 8;
-    }
-
-    public int getPageTabY() { return ClientWorkspaceState.getInstance().isCollaborationEnabled() ? 22 : 2; }
-    public int getToolbarY() { return ClientWorkspaceState.getInstance().isCollaborationEnabled() ? 42 : 22; }
-    public int getHeaderBottomY() { return ClientWorkspaceState.getInstance().isCollaborationEnabled() ? 64 : 44; }
-
-    public int getFavoritesDockY() {
-        int maxBottom = getHeaderBottomY() + 6;
-        for (var child : this.children()) {
-            if (child instanceof AbstractWidget widget && !(widget instanceof EditBox)) {
-                if (widget.visible && widget.getX() < 160 && widget.getY() < 120) {
-                    maxBottom = Math.max(maxBottom, widget.getY() + widget.getHeight());
-                }
-            }
-        }
-        return maxBottom;
-    }
+    public int getDynamicLeftMargin() { return BoardScreenLayoutHelper.getDynamicLeftMargin(this); }
+    public int getPageTabY() { return BoardScreenLayoutHelper.getPageTabY(); }
+    public int getToolbarY() { return BoardScreenLayoutHelper.getToolbarY(); }
+    public int getHeaderBottomY() { return BoardScreenLayoutHelper.getHeaderBottomY(); }
+    public int getFavoritesDockY() { return BoardScreenLayoutHelper.getFavoritesDockY(this); }
+    public int getSummaryRightOffset() { return BoardScreenLayoutHelper.getSummaryRightOffset(this); }
 
     public void recordCommand(BoardCommand cmd) {
         BoardPage page = BoardManager.getInstance().getActivePage();
         if (page != null) page.getHistoryManager().record(cmd);
+    }
+
+    @Override
+    public void showToast(Component message) {
+        BoardToast.show(message);
+    }
+
+    public boolean scaleLoopToSteadyState(String targetNodeId) {
+        return actionHandler.scaleLoopToSteadyState(targetNodeId);
     }
 
     public FlowGraph.ConnectionEdge findHoveredWire(double canvasMouseX, double canvasMouseY, double maxDist) {
@@ -568,6 +430,7 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
 
     public WireSpatialIndex getWireSpatialIndex() { return wireRenderer.getWireSpatialIndex(); }
     public CanvasWireRenderer getWireRenderer() { return wireRenderer; }
+    public CanvasContextMenuManager getContextMenuManager() { return canvasHandler != null ? canvasHandler.getContextMenuManager() : null; }
     public List<NodeWidget> getNodeWidgets() { return nodeWidgets; }
     public NodeWidget findWidgetForNode(RecipeNode node) {
         if (node == null) return null;
@@ -583,7 +446,40 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
     public boolean isNodeSelected(String id) { return selectionModel.isSelected(id); }
     public boolean isNoteSelected(String id) { return selectionModel.isNoteSelected(id); }
     public boolean isFrameSelected(String id) { return selectionModel.isFrameSelected(id); }
-    public void selectNode(String id, boolean multi) { selectionModel.select(id, multi); }
+    public void selectNode(String id, boolean multi) {
+        selectionModel.select(id, multi);
+        if (!multi && id != null) {
+            nodeInspectorPanel.setTargetWidget(widgetByNodeId.get(id));
+        }
+    }
+    public void deselectNode(String id) {
+        selectionModel.deselectNode(id);
+        if (nodeInspectorPanel.isVisible() && nodeInspectorPanel.getTargetWidget() != null && id.equals(nodeInspectorPanel.getTargetWidget().getNode().getId())) {
+            nodeInspectorPanel.close();
+        }
+    }
+    public void openNodeInspector(NodeWidget widget) { nodeInspectorPanel.setTargetWidget(widget); }
+    public NodeInspectorPanel getNodeInspectorPanel() { return nodeInspectorPanel; }
+
+    public void onNodeInspectorOpened() {
+        if (this.width < 760 && !summaryOverlay.isCollapsed()) {
+            summaryOverlay.setCollapsed(true);
+            summaryAutoCollapsedForInspector = true;
+        }
+    }
+
+    public void onNodeInspectorClosed() {
+        if (summaryAutoCollapsedForInspector) {
+            summaryOverlay.setCollapsed(false);
+            summaryAutoCollapsedForInspector = false;
+        }
+    }
+
+    public void onSummaryOverlayToggled() {
+        summaryAutoCollapsedForInspector = false;
+    }
+    public AdaptiveStatusBar getStatusBar() { return statusBar; }
+    public SelectionFloatingToolbarWidget getSelectionToolbarWidget() { return selectionToolbarWidget; }
     public void selectNote(String id, boolean multi) { selectionModel.selectNote(id, multi); }
     public void selectFrame(String id, boolean multi) { selectionModel.selectFrame(id, multi); }
     public void toggleSelectNode(String id) { selectionModel.toggle(id); }
@@ -598,18 +494,26 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
     public void toggleSelectPort(String nodeId, boolean isInput, int portIndex) { selectionModel.togglePort(nodeId, isInput, portIndex); }
     public void selectPortRange(String nodeId, boolean isInput, int targetPortIndex) { selectionModel.selectPortRange(nodeId, isInput, targetPortIndex); }
     public void clearPortSelection() { selectionModel.clearPorts(); }
-    public void clearSelection() { selectionModel.clear(); }
+    public void clearSelection() {
+        selectionModel.clear();
+        nodeInspectorPanel.close();
+    }
     public void selectAll() { selectionModel.selectAll(this); }
     public void deleteSelection() { selectionModel.deleteSelection(this); }
     public void copySelection() { selectionModel.copySelection(this); }
     public void pasteSelection(double canvasX, double canvasY) { selectionModel.pasteSelection(this, canvasX, canvasY); }
     public void cutSelection() { selectionModel.cutSelection(this); }
     public void duplicateSelection() { selectionModel.duplicateSelection(this, lastMouseX, lastMouseY); }
+    @Override
+    public boolean isBoxSelecting() {
+        return canvasHandler != null && canvasHandler.getSelectionHandler().isBoxSelecting();
+    }
 
     public void addNode(RecipeNode node) { actionHandler.addNode(node); }
     public void removeNode(NodeWidget widget) { actionHandler.removeNode(widget); }
     public void flipSelectedNodes() { actionHandler.flipSelectedNodes(lastMouseX, lastMouseY); }
     public void switchMachineWorkstation(RecipeNode node, ResourceLocation newWs) { actionHandler.switchMachineWorkstation(node, newWs); }
+    public void switchMachineWorkstation(RecipeNode node, ResourceLocation newWs, String newMachineDisplayName) { actionHandler.switchMachineWorkstation(node, newWs, newMachineDisplayName); }
     public void switchNodeRecipe(RecipeNode targetNode, RecipeNode newRecipeTemplate) { actionHandler.switchNodeRecipe(targetNode, newRecipeTemplate); }
     public void createFrameFromSelection() { actionHandler.createFrameFromSelection(); }
     public void createSharedMachineFrameFromSelection() { actionHandler.createSharedMachineFrameFromSelection(); }
@@ -627,6 +531,10 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
     public BoardDialogManager getDialogManager() { return dialogManager; }
     public BoardCanvasRenderer getCanvasRenderer() { return canvasRenderer; }
     public BoardActionHandler getActionHandler() { return actionHandler; }
+    public BoardNavigationHandler getNavigationHandler() { return navigationHandler; }
+    public BoardInputRouter getInputRouter() { return inputRouter; }
+    public BoardWidgetLayerRenderer getWidgetLayerRenderer() { return widgetLayerRenderer; }
+    public BoardTeamSyncCoordinator getTeamSyncCoordinator() { return teamSyncCoordinator; }
     public CanvasInteractionHandler getCanvasHandler() { return canvasHandler; }
     public WorkspaceTabBarWidget getWorkspaceTabBar() { return workspaceTabBar; }
     public PageTabBarWidget getPageTabBar() { return pageTabBar; }
@@ -635,6 +543,10 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
     public HotkeyHudWidget getHotkeyHudWidget() { return hotkeyHudWidget; }
     public FavoritesDockWidget getFavoritesDockWidget() { return favoritesDockWidget; }
     public PageBrowserDrawer getPageBrowserDrawer() { return pageBrowserDrawer; }
+    public LeftActivityBarWidget getLeftActivityBar() { return leftActivityBar; }
+    public Font getMinecraftFont() { return this.font; }
+    public BalanceSummary getCachedSummary() { return cachedSummary; }
+
     public void performAutoRatio() { toolbarWidget.performAutoRatio(); }
     public void performGroupIntoModule() { toolbarWidget.performGroupIntoModule(); }
 
@@ -686,6 +598,10 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
     public void openSharedFrameConfigDialog(CanvasGroupFrame frame) { dialogManager.openSharedFrameConfigDialog(frame); }
     public void openFrameEditDialog(CanvasGroupFrame frame) { dialogManager.openFrameEditDialog(frame); }
     public void openNoteEditDialog(CanvasStickyNote note) { dialogManager.openNoteEditDialog(note); }
+    public void openTargetOutputRateDialog(RecipeNode node, int outputIndex) { dialogManager.openTargetOutputRateDialog(node, outputIndex); }
+
+    public void openModuleSubPage(RecipeNode moduleNode) { navigationHandler.openModuleSubPage(moduleNode); }
+    public void returnToParentPage() { navigationHandler.returnToParentPage(); }
 
     public double getPanX() { return panX; }
     public void setPanX(double panX) {
@@ -711,13 +627,7 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
 
     @Override
     public void onClose() {
-        ClientWorkspaceState state = ClientWorkspaceState.getInstance();
-        if (state.isCollaborationEnabled() && state.isTeamMode()) {
-            NetworkHandler.sendToServer(new C2SPingPresencePacket(state.getCurrentTeamId(), state.getActiveTeamPageId(), false));
-        }
-        if (state.isTeamMode()) {
-            state.autoCommitAndRelease(this, state.getActiveTeamPageId());
-        }
+        teamSyncCoordinator.onScreenClosed();
         lastPanX = this.panX;
         lastPanY = this.panY;
         lastZoom = this.zoom;

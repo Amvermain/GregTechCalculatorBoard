@@ -16,6 +16,7 @@ public final class AddonCategory {
     public static final AddonCategory HATCH_BUS = register("hatch_bus", "Hatches & Buses", "gui.gtcalcboard.addon_cat.hatch_bus", 96);
     public static final AddonCategory MAINTENANCE = register("maintenance", "Maintenance & Hatches", "gui.gtcalcboard.addon_cat.maintenance", 95);
     public static final AddonCategory COIL = register("coil", "Heating Coils", "gui.gtcalcboard.addon_cat.coil", 90);
+    public static final AddonCategory HEATER = register("heater", "Heaters & Burners", "gui.gtcalcboard.addon_cat.heater", 85);
     public static final AddonCategory ROTOR = register("rotor", "Turbine Rotors", "gui.gtcalcboard.addon_cat.rotor", 80);
     public static final AddonCategory REFLECTOR = register("reflector", "Fusion Reflectors", "gui.gtcalcboard.addon_cat.reflector", 70);
     public static final AddonCategory THREADING = register("threading", "Threading Helixes", "gui.gtcalcboard.addon_cat.threading", 68);

@@ -69,6 +69,9 @@ This document is the official QA verification checklist for `GregTechCalculatorB
   - [ ] `Ctrl + Left/Right` jumps across word boundaries; `Ctrl + Backspace/Delete` deletes words.
   - [ ] `Ctrl + A` selects all text; `Ctrl + C / X / V` copies, cuts, and pastes clipboard text.
   - [ ] Global hotkeys are not triggered while typing in inline text editors.
+- [ ] **Alternative Input Cycling & Slim Card Mode Port Isolation**:
+  - [ ] Scrolling over an input port with alternative ingredients cycles alternative items without altering the machine voltage tier (`SlimCardInteractionTest`).
+  - [ ] In Slim Card Mode, hidden card controls (tier buttons, overclock badges, etc.) do not intercept port hover, scroll, or mouse clicks.
 - [ ] **ArchUnit Architectural Boundary Enforcement**:
   - [ ] `ArchitectureTest` automated JUnit suite passes 100% without architectural violations.
 
@@ -88,6 +91,12 @@ This document is the official QA verification checklist for `GregTechCalculatorB
   - [ ] Verify exact cycles per second: $\text{CPS} = 20.0 \times \text{BatchesPerTick} \times \text{Parallel} \times \text{MachineCount}$.
 - [ ] **Tier Chance Boost for Probabilistic Outputs**:
   - [ ] Verify boosted output chance on tier increase: $\text{Effective Chance} = \min(1.0, \text{BaseChance} + (\Delta\text{Tier} \times \text{TierChanceBoost}))$.
+- [ ] **Input Consumption Chance & Tier Chance Boost (Including Reductions)**:
+  - [ ] Verify probabilistic input flow calculation: $\text{Rate} = \text{Amount} \times \text{EffectiveChance} \times \text{CPS}$.
+  - [ ] Verify signed tier chance boost: $\text{Effective Chance} = \text{clamp}(0.0, 1.0, \text{BaseChance} + (\Delta\text{Tier} \times \text{TierChanceBoost}))$.
+  - [ ] Verify Star Technology Cyclonic Sifter Netherite Mesh consumption rate at base ZPM ($3\% \rightarrow 0.0025\text{/s}$) and UV overclock ($2.8\% \rightarrow 0.00467\text{/s}$).
+  - [ ] Verify input port tooltip rendering of dynamic consumption chance and signed boost ($\%+.1f\%/\text{Tier}$).
+  - [ ] `InputConsumptionChanceTest` automated JUnit regression suite passes 100%.
 
 ### 2.2 Gauss-Jordan Mass Conservation Solver (`MassBalanceSolver`)
 - [ ] **Closed-Loop Linear Formulation ($A\mathbf{x} = \mathbf{b}$)**:
@@ -97,6 +106,24 @@ This document is the official QA verification checklist for `GregTechCalculatorB
   - [ ] Validate complex closed loops (e.g. ethylbenzene recycling, platinum group refinement) traversing reroute junctions.
 - [ ] **10-Pass Fixed-Point Bottleneck Relaxation**:
   - [ ] In supply-deficient DAGs, converge downstream machine efficiencies ($\eta_v \in [0.0, 1.0]$) within 10 iterations ($\Delta\eta < 10^{-4}$).
+- [ ] **Auto-Ratio Bottleneck Resolution & Recirculation Guard (`AutoRatioBottleneckTest`)**:
+  - [ ] Resolve single-slot limiting reagent and chance bottlenecks by scaling upstream producers.
+  - [ ] Cyclic loop detection excludes strongly connected components (SCCs) and directed feedback cycles from bottleneck amplification, preventing runaway scaling in closed recirculation loops.
+  - [ ] `AutoRatioBottleneckTest` automated JUnit regression suite passes 100%.
+  - [ ] **Multi-Step Recirculation Single-Pass Convergence (`testDrainJunctionWithUpstreamRecirculationConvergesInSinglePass`)**: Validate that AutoRatio from a drain junction or downstream product anchor converges to the balanced machine ratio in a single execution without requiring repeated clicks, and does not emit false loop warnings on balanced cycles.
+- [ ] **Auto-Ratio Recirculation Divergence Detection & Guidance (`AutoRatioDivergenceTest`, ADR-032)**:
+  - [ ] Suppress runaway machine scaling on closed recirculation loops lacking external supplies and return `AutoRatioResult(hasDivergence = true)`.
+  - [ ] Flag affected nodes with `NodeProperties.DIVERGENCE_WARNING` and display amber warning badge `[⚠ Loop]` / `[⚠ 루프]` on node card headers.
+  - [ ] Render 5-line actionable guidance tooltip on hover explaining root cause and recommended actions.
+  - [ ] Clicking the warning badge promotes the node to an Anchor (`node.setBaseNode(true)`) and clears the warning.
+  - [ ] Self-healing lifecycle automatically clears divergence warning when balanced external supply is connected.
+  - [ ] `AutoRatioDivergenceTest` automated JUnit regression suite passes 100%.
+- [ ] **Comprehensive Process Divergence Defense Matrix (`ComprehensiveDivergenceMatrixTest`, ADR-033)**:
+  - [ ] Detect positive feedback growth loops ($\rho > 1.0$) lacking external sinks, clamp machine counts to 1 cycle, and display `[⚠ Growth]` / `[⚠ 증식]` cyan warning badge.
+  - [ ] Detect catalyst/solvent decay loops ($0.95 \le \rho < 1.0$) lacking external makeup, and display `[⚠ Catalyst]` / `[⚠ 촉매]` warning badge.
+  - [ ] Detect conflicting multiple anchors with stoichiometric mismatches, display `[⚠ Conflict]` / `[⚠ 충돌]` red badge, and permit one-click unpin.
+  - [ ] Differentiate extreme micro-yield recipes ($< 10^{-4}$) from cascade runaway and display `[⚠ Yield]` / `[⚠ 극소]` warning badge.
+  - [ ] `ComprehensiveDivergenceMatrixTest` automated JUnit regression suite passes 100%.
 - [ ] **Target Batch ETA & Total Resource Integration (`ProductionETACalculator`)**:
   - [ ] Compute batch duration $T_{\text{ET}} = \frac{A_{\text{target}}}{\text{Rate}_{\text{in}}}$.
   - [ ] Compute total cumulative energy $E_{\text{total}} = \sum (n.\text{getTotalEUt}() \times 20 \times T_{\text{ET}})\text{ [EU]}$ and raw material totals.
@@ -203,6 +230,29 @@ This document is the official QA verification checklist for `GregTechCalculatorB
   - [ ] **Aggregated Metrics**: Top badge displays total power consumption/generation and machine counts.
 - [ ] **Module Expansion (`⤢`)**:
   - [ ] Expanding the module restores original node positions, configurations, and wiring with **100% layout fidelity**.
+- [ ] **Unconnected Port Preservation & Self-Balancing Loop Isolation (`GroupCollapsePortBugTest`)**:
+  - [ ] When collapsing a group into a module, unconnected input/output ports sharing the same ingredient (e.g., catalyst or heating fluids like Hot Brine) are preserved on module boundaries and not inadvertently cancelled out by global balance summary.
+- [ ] **Junction Node Encapsulation & Net Worth Conservation (`JunctionModuleCompressRegressionTest`)**:
+  - [ ] When grouping/compressing nodes containing intermediate reroute/buffer junctions into a module, junction nodes are correctly recognized as pass-through routing elements rather than physical machines.
+  - [ ] Pseudo-demand/pseudo-supply rates from reroute slots are suppressed, ensuring that balanced internal circulation (e.g., Hot Brine) does not spawn phantom module I/O ports or distort the process summary net worth.
+  - [ ] When compressing machines connected to an external junction/supply into a module, ensure only the net remaining demand (subtracting internal supply) is allocated to the boundary input port, preventing operating efficiency drops and ghost surplus output ports.
+  - [ ] `JunctionModuleCompressRegressionTest` automated JUnit regression suite passes 100%.
+
+### 4.3 Shared Machine Pool In-Place Folding (ADR-042)
+- [ ] **In-Place Folding & Expansion (`⤡` / `⤢`)**:
+  - [ ] Collapsing a shared machine pool compacts the frame into a single virtual machine card without removing internal nodes.
+  - [ ] Header accurately displays shared machine icon, name, tier, overclock mode, and total simulated duty count.
+  - [ ] Machine icon is resolved through item/block registries (`SharedPoolFoldedTest`) rather than raw texture paths, preventing missing texture anomalies.
+  - [ ] Internal recipes preserve proportional ratios upon machine count adjustment.
+  - [ ] Group frame edit dialog focus management, Tab key toggle, and target capacity input layout separation (`FrameEditDialogTest`).
+### 4.4 Dedicated Sub-Page Composite Modules & Boundary I/O Pins (ADR-043)
+- [ ] **1:1 Dedicated Sub-Page Navigation**:
+  - [ ] Double-clicking a compound module card smoothly navigates into its isolated sub-page (`PageType.MODULE`).
+  - [ ] Breadcrumb toolbar and Escape key return cleanly to the parent board page without state corruption.
+  - [ ] Undo/Redo cycles across module creation and deletion cleanly restore and garbage-collect module sub-pages (`SubPageModuleUndoRedoBugTest`).
+- [ ] **Boundary I/O Pin Interaction**:
+  - [ ] Boundary pins render as compact 32x32 ingredient cards displaying live flow rates, direction badges, and origin metadata (`DedicatedSubPageModuleTest`).
+  - [ ] Hover quick-deletion (`[x]`), inline pin renaming, right-click context menu, and pin inspector panel function correctly without affecting parent page topology.
 
 ---
 

@@ -27,7 +27,7 @@ public final class BoardToast {
         showTimestamp = System.currentTimeMillis();
 
         Minecraft mc = Minecraft.getInstance();
-        if (mc.player != null && mc.screen == null) {
+        if (mc != null && mc.player != null && mc.screen == null) {
             mc.player.displayClientMessage(message, true);
         }
     }

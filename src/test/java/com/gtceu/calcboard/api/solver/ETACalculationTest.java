@@ -235,6 +235,7 @@ public class ETACalculationTest {
     public void testDiscreteMachineCycleMismatchETAndDT() {
         FlowGraph graph = new FlowGraph();
         RecipeNode ebf = RecipeNode.create("Electric Blast Furnace", 600.0, 120.0, GTVoltageTier.UXV);
+        ebf.addAddon(new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon("gtceu:uxv_energy_hatch", "UXV Energy Hatch", "", ResourceLocation.tryParse("gtceu:uxv_energy_hatch"), GTVoltageTier.UXV, 1, false, false, false));
         IngredientStack inPowder = IngredientStack.item(ResourceLocation.tryParse("gtceu:purple_powder"), "Purple Powder", 1.0);
         IngredientStack outIngot = IngredientStack.item(ResourceLocation.tryParse("gtceu:hot_ingot"), "Hot Ingot", 1.0);
         ebf.getInputs().add(inPowder);
@@ -273,6 +274,7 @@ public class ETACalculationTest {
     public void testDiscreteMachineCycleMatchETAndDT() {
         FlowGraph graph = new FlowGraph();
         RecipeNode ebf = RecipeNode.create("Electric Blast Furnace", 600.0, 120.0, GTVoltageTier.UXV);
+        ebf.addAddon(new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon("gtceu:uxv_energy_hatch", "UXV Energy Hatch", "", ResourceLocation.tryParse("gtceu:uxv_energy_hatch"), GTVoltageTier.UXV, 1, false, false, false));
         IngredientStack inPowder = IngredientStack.item(ResourceLocation.tryParse("gtceu:purple_powder"), "Purple Powder", 1.0);
         IngredientStack outIngot = IngredientStack.item(ResourceLocation.tryParse("gtceu:hot_ingot"), "Hot Ingot", 1.0);
         ebf.getInputs().add(inPowder);
@@ -385,6 +387,7 @@ public class ETACalculationTest {
 
         // 16.20s duration (324 ticks), 960 EU/t, producing 1000 mB
         RecipeNode lcr = RecipeNode.create("Large Chemical Reactor", 324.0, 960.0, GTVoltageTier.EV);
+        lcr.addAddon(new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon("gtceu:ev_energy_hatch", "EV Energy Hatch", "", ResourceLocation.tryParse("gtceu:ev_energy_hatch"), GTVoltageTier.EV, 1, false, false, false));
         IngredientStack dibromoethane = IngredientStack.fluid(ResourceLocation.tryParse("gtceu:dibromoethane"), "1,2-Dibromoethane", 1000.0);
         lcr.getOutputs().add(dibromoethane);
         lcr.setMachineCount(1.0);

@@ -202,4 +202,4 @@ Injects pre-configured hardware configuration templates (`MachineHardwareTemplat
 
 ---
 
-> ➡️ **Proceed to next section**: [[03-03] Page Summary and Global Balance Dashboard](03_03_PAGE_SUMMARY_AND_DASHBOARD.md)
+> ➡ **Proceed to next section**: [[03-03] Page Summary and Global Balance Dashboard](03_03_PAGE_SUMMARY_AND_DASHBOARD.md)

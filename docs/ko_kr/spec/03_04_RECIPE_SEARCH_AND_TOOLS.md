@@ -41,7 +41,7 @@
       <!-- Result 1 -->
       <div style="background: #14171e; border: 1px solid #334155; border-radius: 4px; padding: 6px 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
         <div style="display: flex; align-items: center; gap: 8px;">
-          <span>⚗️</span>
+          <span>⚗</span>
           <div>
             <div style="color: #f8fafc; font-weight: bold; font-size: 12px;">벤젠 크래킹 ➔ 에틸렌 & 가솔린</div>
             <div style="color: #64748b; font-size: 10px;">대형 화학 반응기 | 소요 시간: 1.25s | 소모 전력: 480 EU/t (LV)</div>
@@ -220,6 +220,9 @@
 * **원클릭 & 드래그 앤 드롭 스폰**:
   - 아이템/레시피 클릭: 캔버스의 다음 적절한 위치에 노드 자동 생성.
   - 마우스 드래그: 원하는 레시피를 마우스로 끌어 캔버스 원하는 좌표에 드롭하여 즉시 배치.
+* **드래그블 스크롤바 인터랙션**:
+  - 등록된 즐겨찾기 항목 수가 패널 높이를 초과할 경우 우측에 미니멀 스크롤바가 자동 활성화됩니다.
+  - 마우스 휠 스크롤뿐만 아니라 스크롤바 썸(Thumb) 드래그 및 트랙 클릭 점프를 지원하여 긴 목록을 신속하게 탐색할 수 있습니다.
 
 #### `FavoritesDockWidget` UI 와이어프레임
 
@@ -250,7 +253,7 @@
         </div>
         <div style="background: #141b2a; border: 1px solid #232d3d; border-radius: 3px; padding: 3px 5px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
           <div style="display: flex; align-items: center; gap: 6px;">
-            <span>⚗️</span>
+            <span>⚗</span>
             <span style="color: #cbd5e1; font-size: 11px;">황산 제조</span>
           </div>
           <span style="color: #64748b; font-size: 10px;">1</span>
@@ -408,4 +411,34 @@
 
 ---
 
-> ➡️ **다음 장으로 이동**: [[04] 멀티플레이어 동시성 제어 및 네트워크 프로토콜](04_MULTIPLAYER_AND_NETWORK_PROTOCOL.md)
+## 9. 실시간 렌더링/연산 성능 프로파일러 HUD (`RenderProfiler`, F3) (ADR-031)
+
+대규모 공정 캔버스 렌더링 및 유량 솔버 연산 부하를 실시간으로 진단하기 위한 인게임 성능 프로파일러 오버레이입니다:
+
+* **토글 단축키**: `F3` 키로 프로파일러 HUD를 실시간 켜고 끌 수 있습니다.
+* **측정 메트릭 및 샘플링**:
+  - `Layout Time`: 노드/와이어 바운즈 계산 소요 시간 ($\mu\text{s}$).
+  - `Render Time`: 노드 카드, 베지어 와이어, 텍스트 배지 렌더링 소요 시간 ($\mu\text{s}$).
+  - `Solve Time`: 2단계 선형 유량 솔버 및 폐순환 루프 해석 소요 시간 ($\mu\text{s}$).
+  - `FPS & Frame Time`: 현재 화면 주사율 및 프레임 렌더링 주기 ($\text{ms}$).
+* **시각적 그래프 및 색상 임계치**:
+  - 최근 60프레임의 소요 시간 히스토그램을 우측 상단에 미니 차트로 표시합니다.
+  - 목표 프레임 예산($16.6\text{ms}$, 60 FPS 기준) 대비 여유 구간은 녹색, 경고 구간은 주황색, 초과 구간은 적색으로 시각화합니다.
+
+---
+
+## 10. 인게임 모드 버전 업데이트 알림 및 원격 릴리즈 확인 (`ClientUpdateNotifier`) (ADR-035)
+
+사용자가 최신 기능과 버그 수정을 놓치지 않도록 안전한 백그라운드 비동기 버전 확인을 수행합니다:
+
+* **비동기 릴리즈 확인 (`ClientUpdateNotifier`)**:
+  - 백그라운드 데몬 스레드에서 지정된 원격 매니페스트(`update.json`)를 비동기 폴링하여, 최신 버전 태그와 릴리즈 노트를 조회합니다.
+  - 네트워크 지연이나 타임아웃 발생 시 메인 스레드 프레임 드랍이나 멈춤 현상 없이 안전하게 기본 상태를 유지합니다.
+* **인게임 알림 배지 및 설정 탭 연동**:
+  - 상단 툴바 환경설정 아이콘 및 설정 대화상자에 업데이트 알림 뱃지(`[NEW vX.Y.Z]`)를 표시합니다.
+  - 클릭 시 릴리즈 노트 요약 팝업을 제공하며 모드 다운로드 페이지 링크를 지원합니다.
+  - 환경설정(`SettingsTab`)에서 자동 업데이트 확인 활성화/비활성화 토글을 제공합니다.
+
+---
+
+> ➡ **다음 장으로 이동**: [[04] 멀티플레이어 동시성 제어 및 네트워크 프로토콜](04_MULTIPLAYER_AND_NETWORK_PROTOCOL.md)

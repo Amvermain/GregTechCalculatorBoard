@@ -138,7 +138,7 @@ public class ItemContributionPopup {
         if (font.width(pageName) > 110) {
             pageName = font.plainSubstrByWidth(pageName, 105) + "..";
         }
-        graphics.drawString(font, "§6📄 " + pageName, px + 10, y + 6, 0xFFFFFFFF, false);
+        graphics.drawString(font, "§6▪ " + pageName, px + 10, y + 6, 0xFFFFFFFF, false);
 
         // Produced / Consumed details
         StringBuilder sb = new StringBuilder();

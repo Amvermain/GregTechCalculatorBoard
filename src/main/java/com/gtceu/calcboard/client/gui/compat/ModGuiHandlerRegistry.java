@@ -2,12 +2,14 @@ package com.gtceu.calcboard.client.gui.compat;
 
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.client.gui.compat.create.CreateModGuiHandler;
+import com.gtceu.calcboard.client.gui.compat.createdieselgenerators.CreateDieselGeneratorsModGuiHandler;
 import com.gtceu.calcboard.client.gui.compat.createnewage.CreateNewAgeModGuiHandler;
+import com.gtceu.calcboard.client.gui.compat.greate.GreateModGuiHandler;
 import com.gtceu.calcboard.client.gui.compat.gtceu.GTCEuModGuiHandler;
 import com.gtceu.calcboard.client.gui.compat.systeams.SysteamsModGuiHandler;
 import com.gtceu.calcboard.client.gui.compat.thermal.ThermalModGuiHandler;
 import com.gtceu.calcboard.client.gui.compat.vanilla.VanillaModGuiHandler;
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 
@@ -26,7 +28,9 @@ public final class ModGuiHandlerRegistry {
     static {
         register(new GTCEuModGuiHandler());
         register(new CreateModGuiHandler());
+        register(new CreateDieselGeneratorsModGuiHandler());
         register(new CreateNewAgeModGuiHandler());
+        register(new GreateModGuiHandler());
         register(new SysteamsModGuiHandler());
         register(new ThermalModGuiHandler());
         register(new VanillaModGuiHandler());

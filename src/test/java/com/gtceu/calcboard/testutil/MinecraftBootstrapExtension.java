@@ -24,6 +24,10 @@ public class MinecraftBootstrapExtension implements BeforeAllCallback {
                 }
             } catch (Throwable ignored) {
             }
+            try {
+                net.minecraftforge.common.MinecraftForge.EVENT_BUS.start();
+            } catch (Throwable ignored) {
+            }
             TestMultiblockFixtures.initTestEnvironmentDefaults();
         }
     }

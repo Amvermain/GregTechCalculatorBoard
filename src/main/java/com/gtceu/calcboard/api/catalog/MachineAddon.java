@@ -2,8 +2,8 @@ package com.gtceu.calcboard.api.catalog;
 
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
-import com.gtceu.calcboard.compat.IModAdapter;
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.IModAdapter;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -31,6 +31,7 @@ public class MachineAddon {
         public static final AddonCategory HATCH_BUS = AddonCategory.HATCH_BUS;
         public static final AddonCategory MAINTENANCE = AddonCategory.MAINTENANCE;
         public static final AddonCategory COIL = AddonCategory.COIL;
+        public static final AddonCategory HEATER = AddonCategory.HEATER;
         public static final AddonCategory ROTOR = AddonCategory.ROTOR;
         public static final AddonCategory REFLECTOR = AddonCategory.REFLECTOR;
         public static final AddonCategory THREADING = AddonCategory.THREADING;
@@ -63,6 +64,8 @@ public class MachineAddon {
     private boolean upgradeTierKit = false;
     private int magneticForce = 0;
     private String discoverySource;
+    private transient String cachedResolvedName;
+    private transient String cachedResolvedDescription;
 
     public MachineAddon(String id, String name, AddonCategory category, String description, ResourceLocation itemIcon) {
         this.id = id;
@@ -94,6 +97,14 @@ public class MachineAddon {
     }
 
     public String getName() {
+        if (cachedResolvedName != null) {
+            return cachedResolvedName;
+        }
+        cachedResolvedName = resolveName();
+        return cachedResolvedName;
+    }
+
+    private String resolveName() {
         if ("gtceu:rotor_standard".equals(id) || "gtceu:reflector_none".equals(id)) {
             if (name != null && !name.isEmpty()) {
                 if (name.startsWith("gui.gtcalcboard.") || name.contains(".")) {
@@ -145,6 +156,7 @@ public class MachineAddon {
 
     public void setName(String name) {
         this.name = name;
+        this.cachedResolvedName = null;
     }
 
     public AddonCategory getCategory() {
@@ -156,6 +168,14 @@ public class MachineAddon {
     }
 
     public String getDescription() {
+        if (cachedResolvedDescription != null) {
+            return cachedResolvedDescription;
+        }
+        cachedResolvedDescription = resolveDescription();
+        return cachedResolvedDescription;
+    }
+
+    private String resolveDescription() {
         if (description != null && !description.trim().isEmpty()) {
             if (description.startsWith("gui.gtcalcboard.") || description.startsWith("item.") || description.startsWith("block.")) {
                 try {
@@ -209,6 +229,7 @@ public class MachineAddon {
 
     public void setDescription(String description) {
         this.description = description;
+        this.cachedResolvedDescription = null;
     }
 
     public ResourceLocation getItemIcon() {
@@ -217,6 +238,8 @@ public class MachineAddon {
 
     public void setItemIcon(ResourceLocation itemIcon) {
         this.itemIcon = itemIcon;
+        this.cachedResolvedName = null;
+        this.cachedResolvedDescription = null;
     }
 
     public ItemStack getItemStackSample() {
@@ -231,7 +254,8 @@ public class MachineAddon {
             if (itemIcon != null) {
                 Item item = ForgeRegistries.ITEMS.getValue(itemIcon);
                 if (item != null && item != Items.AIR) {
-                    return new ItemStack(item);
+                    this.itemStackSample = new ItemStack(item);
+                    return this.itemStackSample;
                 }
             }
             return ItemStack.EMPTY;
@@ -242,6 +266,8 @@ public class MachineAddon {
 
     public void setItemStackSample(ItemStack itemStackSample) {
         this.itemStackSample = itemStackSample;
+        this.cachedResolvedName = null;
+        this.cachedResolvedDescription = null;
     }
 
     public double getDurationMultiplier() {
@@ -304,8 +330,16 @@ public class MachineAddon {
         return node != null && node.isTurbine();
     }
 
+    public static boolean isCombustionMachine(RecipeNode node) {
+        if (node == null) return false;
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
+        return adapter != null && adapter.isCombustionMachine(node);
+    }
+
     public static boolean isThermalMachine(RecipeNode node) {
-        return com.gtceu.calcboard.compat.thermal.helper.ThermalAugmentHelper.isThermalMachine(node);
+        if (node == null) return false;
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
+        return adapter != null && adapter.isThermalMachine(node);
     }
 
     // Machine-specific coil bonus metrics
@@ -406,7 +440,7 @@ public class MachineAddon {
 
     public MachineAddon forMachine(RecipeNode node) {
         if (node == null) return this;
-        com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
         return adapter.tailorAddon(this, node);
     }
 
@@ -425,7 +459,7 @@ public class MachineAddon {
     public boolean isCompatibleWith(RecipeNode node) {
         if (node == null) return true;
         if (category == null || category.equals(Category.CUSTOM)) return true;
-        com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
         return adapter.isAddonCompatible(node, this);
     }
 
@@ -433,7 +467,7 @@ public class MachineAddon {
         if (node == null) {
             return new ArrayList<>(AddonCategory.values());
         }
-        com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
         return adapter.getApplicableAddonCategories(node);
     }
 

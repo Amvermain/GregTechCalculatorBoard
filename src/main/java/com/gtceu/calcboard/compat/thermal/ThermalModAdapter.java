@@ -12,22 +12,40 @@ import com.gtceu.calcboard.api.type.OverclockMode;
 import com.gtceu.calcboard.api.type.PowerDisplayMode;
 import com.gtceu.calcboard.api.util.ModCompatHelper;
 
-import com.gtceu.calcboard.compat.IModAdapter;
+import com.gtceu.calcboard.api.spi.IModAdapter;
+import com.gtceu.calcboard.api.spi.extension.ICapabilityMatrixProvider;
+import com.gtceu.calcboard.api.spi.extension.ICompoundRecipeProvider;
+import com.gtceu.calcboard.api.spi.extension.IEnergySimulationProvider;
+import com.gtceu.calcboard.api.spi.extension.IHardwareAddonProvider;
+import com.gtceu.calcboard.api.spi.extension.IModExtension;
 import com.gtceu.calcboard.compat.thermal.addon.ThermalAugmentAddon;
 import com.gtceu.calcboard.compat.thermal.helper.ThermalAugmentHelper;
-import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
+import com.gtceu.calcboard.api.model.RecipeDetails;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.fml.ModList;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * Mod Adapter facade for Thermal Series (Thermal Expansion, Foundation, Innovation).
  * Manages Thermal augments, upgrade kit discovery, slot validation, and recipe scaling.
  */
 public class ThermalModAdapter implements IModAdapter {
+
+    private static final Set<Class<? extends IModExtension>> SUPPORTED_EXTENSIONS = Set.of(
+            IHardwareAddonProvider.class,
+            IEnergySimulationProvider.class,
+            ICompoundRecipeProvider.class,
+            ICapabilityMatrixProvider.class
+    );
+
+    @Override
+    public Set<Class<? extends IModExtension>> getSupportedExtensions() {
+        return SUPPORTED_EXTENSIONS;
+    }
 
     static {
         ThermalProperties.init();
@@ -138,7 +156,7 @@ public class ThermalModAdapter implements IModAdapter {
             return String.format("§d⚡%dx", addon.getParallelMultiplier());
         }
         if (addon.getDurationMultiplier() != 1.0 && addon.getEutMultiplier() != 1.0) {
-            return String.format("§e⚡%.1f ⏱%.1f", addon.getEutMultiplier(), addon.getDurationMultiplier());
+            return String.format("§e⚡%.1fx ⏱%.1fx", addon.getEutMultiplier(), addon.getDurationMultiplier());
         }
         if (addon.getEutMultiplier() != 1.0) {
             return String.format("§e⚡%.1fx", addon.getEutMultiplier());
@@ -160,8 +178,13 @@ public class ThermalModAdapter implements IModAdapter {
     }
 
     @Override
-    public boolean adaptRecipeDetails(Object emiRecipeObj, Object backing, EmiRecipeConverter.RecipeDetails details) {
+    public boolean adaptRecipeDetails(Object emiRecipeObj, Object backing, RecipeDetails details) {
         return ThermalRecipeHandler.adaptRecipeDetails(emiRecipeObj, backing, details);
+    }
+
+    @Override
+    public boolean isThermalMachine(RecipeNode node) {
+        return ThermalAugmentHelper.isThermalMachine(node);
     }
 
     public static long extractEnergyRF(Object backing) {
@@ -191,8 +214,19 @@ public class ThermalModAdapter implements IModAdapter {
     }
 
     @Override
+    public String formatAddonSubtitle(RecipeNode node, MachineAddon addon) {
+        return "";
+    }
+
+    @Override
     public int computeEffectiveParallel(RecipeNode node) {
         return Math.max(1, node.getParallel());
+    }
+
+    @Override
+    public double computeSingleMachinePower(RecipeNode node) {
+        if (node == null) return 0.0;
+        return node.getOverclockResult().eut();
     }
 
     @Override

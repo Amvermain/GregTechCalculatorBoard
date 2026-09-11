@@ -9,13 +9,12 @@ import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 
-import com.gtceu.calcboard.compat.IModAdapter;
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.IModAdapter;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 import com.gtceu.calcboard.compat.createnewage.CreateNewAgeAddonCrawler;
 import com.gtceu.calcboard.compat.createnewage.CreateNewAgeModAdapter;
 import com.gtceu.calcboard.compat.createnewage.CreateNewAgeRecipeHandler;
 import com.gtceu.calcboard.compat.createnewage.addon.CreateMagnetAddon;
-import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import org.junit.jupiter.api.Assertions;
@@ -155,9 +154,11 @@ public class CreateNewAgeTest {
 
         // Test custom modpack suToEnergy config (e.g. Star Technology: 0.05 -> 3686.4 FE/t = 3.7K ⚡/t)
         CreateNewAgeModAdapter.testSuToEnergyOverride = 0.05;
+        coilNode.markOverclockDirty();
         double customFE = coilNode.getSingleMachineEUt();
         Assertions.assertEquals(3686.4, customFE, 0.001);
         CreateNewAgeModAdapter.testSuToEnergyOverride = null;
+        coilNode.markOverclockDirty();
     }
 
     @Test
@@ -293,6 +294,38 @@ public class CreateNewAgeTest {
 
         Assertions.assertNotNull(magnetEntry, "BOM must include installed Fluxuated Magnetite");
         Assertions.assertEquals(48, magnetEntry.totalAmount());
+    }
+
+    @Test
+    public void testGeneratorCoilAndMotorMachineCountScaling() {
+        RecipeNode coil = CreateNewAgeRecipeHandler.createKineticGeneratorNode(
+                ResourceLocation.tryParse("create_new_age:generator_coil"), "Generator Coil"
+        );
+        Assertions.assertNotNull(coil);
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(coil);
+        CreateMagnetAddon netherite = new CreateMagnetAddon("create_new_age:netherite_magnet", "Netherite Magnet", "", null, 24);
+        adapter.handleInstallAddon(coil, netherite, true);
+        coil.setRpm(256);
+
+        coil.setMachineCount(9.0);
+        Assertions.assertEquals(79872.0 * 9.0, coil.getInputSlotRate(0, true), 0.001);
+        Assertions.assertEquals(79872.0 * 9.0, coil.getInputSlotRate(0, false), 0.001);
+        Assertions.assertEquals(79872.0 * 9.0, coil.calculateInputRates().get(coil.getInputs().get(0)), 0.001);
+
+        coil.setMachineCount(1.0);
+        Assertions.assertEquals(79872.0, coil.getInputSlotRate(0, true), 0.001);
+        Assertions.assertEquals(79872.0, coil.getInputSlotRate(0, false), 0.001);
+        Assertions.assertEquals(79872.0, coil.calculateInputRates().get(coil.getInputs().get(0)), 0.001);
+
+        RecipeNode motor = CreateNewAgeRecipeHandler.createKineticGeneratorNode(
+                ResourceLocation.tryParse("create_new_age:basic_motor"), "Basic Motor"
+        );
+        Assertions.assertNotNull(motor);
+        motor.setMachineCount(1.0);
+        Assertions.assertEquals(512.0, motor.getOutputSlotRate(0, true), 0.001);
+
+        motor.setMachineCount(5.0);
+        Assertions.assertEquals(2560.0, motor.getOutputSlotRate(0, true), 0.001);
     }
 }
 

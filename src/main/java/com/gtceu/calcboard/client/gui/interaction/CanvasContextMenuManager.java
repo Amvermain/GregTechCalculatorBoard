@@ -1,0 +1,498 @@
+package com.gtceu.calcboard.client.gui.interaction;
+
+import com.gtceu.calcboard.api.history.BoardCommand;
+import com.gtceu.calcboard.api.model.FlowGraph;
+import com.gtceu.calcboard.api.model.IngredientStack;
+import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.solver.FlowGraphSolver;
+import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.widget.BoardToast;
+import com.gtceu.calcboard.client.gui.widget.NodeWidget;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.resources.sounds.SimpleSoundInstance;
+import net.minecraft.network.chat.Component;
+import net.minecraft.sounds.SoundEvents;
+import org.lwjgl.glfw.GLFW;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class CanvasContextMenuManager {
+
+    private final BoardScreen screen;
+    private boolean open = false;
+    private int menuX = 0;
+    private int menuY = 0;
+    private int menuW = 160;
+    private final List<ContextMenuItem> items = new ArrayList<>();
+
+    public CanvasContextMenuManager(BoardScreen screen) {
+        this.screen = screen;
+    }
+
+    public record ContextMenuItem(
+            String labelKey,
+            String icon,
+            String shortcut,
+            Runnable action,
+            boolean isSeparator,
+            boolean isDanger
+    ) {
+        public static ContextMenuItem item(String labelKey, String icon, String shortcut, Runnable action) {
+            return new ContextMenuItem(labelKey, icon, shortcut, action, false, false);
+        }
+
+        public static ContextMenuItem danger(String labelKey, String icon, String shortcut, Runnable action) {
+            return new ContextMenuItem(labelKey, icon, shortcut, action, false, true);
+        }
+
+        public static ContextMenuItem separator() {
+            return new ContextMenuItem(null, null, null, null, true, false);
+        }
+    }
+
+    public boolean isOpen() {
+        return open;
+    }
+
+    public List<ContextMenuItem> getItems() {
+        return java.util.Collections.unmodifiableList(items);
+    }
+
+    public void close() {
+        this.open = false;
+        this.items.clear();
+    }
+
+    public void openForCanvas(double screenX, double screenY, double canvasX, double canvasY) {
+        this.items.clear();
+        this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.add_recipe", "+", "Space", () -> {
+            if (screen != null && screen.getSearchDialog() != null) {
+                screen.getSearchDialog().openAt(canvasX, canvasY);
+            }
+        }));
+        this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.add_junction", "J", "J", () -> {
+            if (screen != null) screen.addRerouteNodeAt(canvasX, canvasY);
+        }));
+        this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.add_sticky_note", "📝", "N", () -> {
+            if (screen != null) screen.createNoteAt(canvasX, canvasY);
+        }));
+        this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.paste", "📋", "Ctrl+V", () -> {
+            if (screen != null) screen.pasteSelection(canvasX, canvasY);
+        }));
+        this.items.add(ContextMenuItem.separator());
+        this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.fit_view", "⌖", "Home", () -> {
+            if (screen != null) screen.fitToView();
+        }));
+        this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.auto_connect", "↔", "Shift+C", () -> {
+            if (screen != null && screen.getToolbarWidget() != null) screen.getToolbarWidget().performAutoConnect();
+        }));
+        this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.auto_ratio", "⚖", "Alt+R", () -> {
+            if (screen != null && screen.getToolbarWidget() != null) screen.getToolbarWidget().performAutoRatio(false, false);
+        }));
+
+        this.menuX = (int) screenX;
+        this.menuY = (int) screenY;
+        this.open = true;
+    }
+
+    public void openForNode(double screenX, double screenY, NodeWidget widget) {
+        if (widget != null && widget.getNode() != null && widget.getNode().isReroute()) {
+            openForJunctionNode(screenX, screenY, widget);
+            return;
+        }
+        if (widget != null && widget.getNode() != null && widget.getNode().isBoundaryPin()) {
+            openForBoundaryPinNode(screenX, screenY, widget);
+            return;
+        }
+
+        this.items.clear();
+        if (widget != null && widget.getNode() != null && widget.getNode().isModule()) {
+            this.items.add(ContextMenuItem.item("gui.gtcalcboard.subpage.open_canvas", "📦", "Enter", () -> {
+                if (screen != null) {
+                    screen.openModuleSubPage(widget.getNode());
+                }
+            }));
+        }
+        this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.inspect_node", "⚙", null, () -> {
+            if (screen != null) {
+                screen.selectNode(widget.getNode().getId(), false);
+                screen.openNodeInspector(widget);
+            }
+        }));
+        this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.switch_recipe", "⟲", null, () -> {
+            if (screen != null) {
+                screen.openRecipeSwitchDialog(widget.getNode());
+            }
+        }));
+        this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.flip_node", "➔", "F", () -> {
+            boolean oldFlipped = widget.getNode().isFlipped();
+            boolean newFlipped = !oldFlipped;
+            widget.getNode().setFlipped(newFlipped);
+            if (screen != null) {
+                screen.recordCommand(new BoardCommand.FlipNodesCommand(widget.getNode(), oldFlipped, newFlipped));
+                if (screen.getGraph() != null) {
+                    screen.getGraph().cleanupInvalidConnections();
+                }
+                screen.markSummaryDirty();
+            }
+            widget.invalidateCache();
+        }));
+        this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.toggle_base_anchor", "⌖", null, () -> {
+            boolean nowBase = !widget.getNode().isBaseNode();
+            if (screen != null) {
+                screen.getGraph().setBaseNode(nowBase ? widget.getNode() : null);
+                screen.rebuildWidgets();
+                screen.markSummaryDirty();
+            }
+        }));
+        this.items.add(ContextMenuItem.separator());
+        if (screen != null && screen.getGraph() != null && widget != null && com.gtceu.calcboard.api.solver.FlowBalanceMatrixSolver.findDampedLoopMetaForNode(screen.getGraph(), widget.getNode()) != null) {
+            this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.scale_steady_state", "🔄", "Shift+R-Click", () -> {
+                screen.scaleLoopToSteadyState(widget.getNode().getId());
+            }));
+            this.items.add(ContextMenuItem.separator());
+        }
+        this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.duplicate_node", "⎘", "Ctrl+D", () -> {
+            if (screen != null) {
+                screen.selectNode(widget.getNode().getId(), false);
+                screen.duplicateSelection();
+            }
+        }));
+        this.items.add(ContextMenuItem.danger("gui.gtcalcboard.menu.delete_node", "✕", "Del", () -> {
+            if (screen != null) {
+                screen.removeNode(widget);
+            }
+        }));
+
+        this.menuX = (int) screenX;
+        this.menuY = (int) screenY;
+        this.open = true;
+    }
+
+    public void openForJunctionNode(double screenX, double screenY, NodeWidget widget) {
+        this.items.clear();
+        this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.configure_junction", "⚙", null, () -> {
+            if (screen != null) {
+                screen.openJunctionSupplyDialog(widget.getNode());
+            }
+        }));
+        this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.inspect_node", "ℹ", null, () -> {
+            if (screen != null) {
+                screen.selectNode(widget.getNode().getId(), false);
+                screen.openNodeInspector(widget);
+            }
+        }));
+        this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.flip_node", "➔", "F", () -> {
+            boolean oldFlipped = widget.getNode().isFlipped();
+            boolean newFlipped = !oldFlipped;
+            widget.getNode().setFlipped(newFlipped);
+            if (screen != null) {
+                screen.recordCommand(new BoardCommand.FlipNodesCommand(widget.getNode(), oldFlipped, newFlipped));
+                if (screen.getGraph() != null) {
+                    screen.getGraph().cleanupInvalidConnections();
+                }
+                screen.markSummaryDirty();
+            }
+            widget.invalidateCache();
+        }));
+        if (widget.getNode().hasTargetBatch()) {
+            this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.reset_target_batch", "↺", null, () -> {
+                widget.getNode().setTargetBatchAmount(0.0);
+                widget.getTargetBatchEditor().updateBuffer();
+                widget.invalidateCache();
+                if (screen != null) {
+                    screen.markSummaryDirty();
+                }
+            }));
+        }
+        if (widget.getNode().isExternalSupply() || widget.getNode().isFixedDrain()) {
+            this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.toggle_base_anchor", "⌖", null, () -> {
+                boolean nowBase = !widget.getNode().isBaseNode();
+                if (screen != null) {
+                    screen.getGraph().setBaseNode(nowBase ? widget.getNode() : null);
+                    screen.rebuildWidgets();
+                    screen.markSummaryDirty();
+                }
+                Minecraft mc = Minecraft.getInstance();
+                if (nowBase) {
+                    IngredientStack rStack = widget.getNode().getRerouteIngredient();
+                    String name = rStack != null ? rStack.getDisplayName() : "Junction";
+                    BoardToast.show(Component.literal("§6⌖ ").append(Component.translatable("message.gtcalcboard.base_set", name)));
+                    if (mc != null && mc.getSoundManager() != null) {
+                        mc.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.2F));
+                    }
+                } else {
+                    BoardToast.show(Component.literal("§7").append(Component.translatable("message.gtcalcboard.base_cleared")));
+                }
+            }));
+        }
+        this.items.add(ContextMenuItem.separator());
+        this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.duplicate_node", "⎘", "Ctrl+D", () -> {
+            if (screen != null) {
+                screen.selectNode(widget.getNode().getId(), false);
+                screen.duplicateSelection();
+            }
+        }));
+        this.items.add(ContextMenuItem.danger("gui.gtcalcboard.menu.delete_node", "✕", "Del", () -> {
+            if (screen != null) {
+                screen.removeNode(widget);
+            }
+        }));
+
+        this.menuX = (int) screenX;
+        this.menuY = (int) screenY;
+        this.open = true;
+    }
+
+    public void openForBoundaryPinNode(double screenX, double screenY, NodeWidget widget) {
+        this.items.clear();
+        this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.rename_pin", "✎", null, () -> {
+            widget.getNameEditor().startEditing();
+        }));
+        this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.inspect_node", "⚙", null, () -> {
+            if (screen != null) {
+                screen.selectNode(widget.getNode().getId(), false);
+                screen.openNodeInspector(widget);
+            }
+        }));
+        this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.flip_node", "➔", "F", () -> {
+            boolean oldFlipped = widget.getNode().isFlipped();
+            boolean newFlipped = !oldFlipped;
+            widget.getNode().setFlipped(newFlipped);
+            if (screen != null) {
+                screen.recordCommand(new BoardCommand.FlipNodesCommand(widget.getNode(), oldFlipped, newFlipped));
+                if (screen.getGraph() != null) {
+                    screen.getGraph().cleanupInvalidConnections();
+                }
+                screen.markSummaryDirty();
+            }
+            widget.invalidateCache();
+        }));
+        this.items.add(ContextMenuItem.separator());
+        this.items.add(ContextMenuItem.danger("gui.gtcalcboard.menu.delete_node", "✕", "Del", () -> {
+            if (screen != null) {
+                screen.removeNode(widget);
+            }
+        }));
+
+        this.menuX = (int) screenX;
+        this.menuY = (int) screenY;
+        this.open = true;
+    }
+
+    public void openForSelection(double screenX, double screenY) {
+        this.items.clear();
+        this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.create_frame", "▤", "Ctrl+G", screen::createFrameFromSelection));
+        this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.group_module", "📦", "Ctrl+Shift+G", screen::performGroupIntoModule));
+        this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.shared_frame", "⧉", "Ctrl+Shift+S", screen::createSharedMachineFrameFromSelection));
+        this.items.add(ContextMenuItem.separator());
+        this.items.add(ContextMenuItem.item("gui.gtcalcboard.auto_ratio", "⚖", "Alt+R", screen::performAutoRatio));
+        this.items.add(ContextMenuItem.separator());
+        this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.copy_selection", "📋", "Ctrl+C", screen::copySelection));
+        this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.duplicate_selection", "⎘", "Ctrl+D", screen::duplicateSelection));
+        this.items.add(ContextMenuItem.danger("gui.gtcalcboard.menu.delete_selection", "✕", "Del", screen::deleteSelection));
+
+        this.menuX = (int) screenX;
+        this.menuY = (int) screenY;
+        this.open = true;
+    }
+
+    public void openForPort(double screenX, double screenY, NodeWidget widget, boolean isInput, int portIndex) {
+        this.items.clear();
+        FlowGraphSolver.PortFlowStats portStats = isInput && screen != null && screen.getGraph() != null && widget != null
+                ? screen.getGraph().getInputPortStats(widget.getNode(), portIndex)
+                : null;
+        if (portStats != null && portStats.isSteadyStateRecirculating()) {
+            this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.scale_steady_state", "🔄", "Shift+R-Click", () -> {
+                screen.scaleLoopToSteadyState(widget.getNode().getId());
+            }));
+            this.items.add(ContextMenuItem.separator());
+        }
+        this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.hide_port", "👁", "R-Click", () -> {
+            widget.hidePortAndDisconnectWires(isInput, portIndex);
+        }));
+        if (!isInput) {
+            boolean isVoided = widget.getNode().isOutputPortVoided(portIndex);
+            String voidLabelKey = isVoided ? "gui.gtcalcboard.menu.unvoid_port" : "gui.gtcalcboard.menu.void_port";
+            this.items.add(ContextMenuItem.item(voidLabelKey, "🗑", "Shift+R-Click", () -> {
+                widget.toggleOutputPortVoid(portIndex);
+            }));
+            this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.target_rate", "⚡", "Ctrl+L-Click", () -> {
+                screen.openTargetOutputRateDialog(widget.getNode(), portIndex);
+            }));
+        }
+        this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.cycle_alternative", "🔄", "Wheel", () -> {
+            if (isInput && portIndex >= 0 && portIndex < widget.getNode().getInputs().size()) {
+                var in = widget.getNode().getInputs().get(portIndex);
+                if (in.hasAlternatives()) {
+                    in.cycleAlternative(1);
+                    widget.invalidateCache();
+                    screen.markSummaryDirty();
+                }
+            }
+        }));
+
+        this.menuX = (int) screenX;
+        this.menuY = (int) screenY;
+        this.open = true;
+    }
+
+    public void openForFrame(double screenX, double screenY, com.gtceu.calcboard.api.model.CanvasGroupFrame frame) {
+        this.items.clear();
+        if (screen != null && screen.getGraph() != null && frame != null) {
+            String dampedNodeId = findDampedLoopNodeInFrame(screen.getGraph(), frame);
+            if (dampedNodeId != null) {
+                this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.scale_steady_state", "🔄", "Shift+R-Click", () -> {
+                    screen.scaleLoopToSteadyState(dampedNodeId);
+                }));
+                this.items.add(ContextMenuItem.separator());
+            }
+        }
+        this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.configure_frame", "⚙", null, () -> {
+            if (screen != null) screen.openFrameEditDialog(frame);
+        }));
+        this.items.add(ContextMenuItem.danger("gui.gtcalcboard.menu.delete_frame", "✕", "Del", () -> {
+            if (screen != null && screen.getGraph() != null && frame != null) {
+                screen.getGraph().removeFrame(frame);
+                screen.recordCommand(new BoardCommand.RemoveFramesCommand(List.of(frame), "Delete frame " + frame.getTitle()));
+                screen.markSummaryDirty();
+            }
+        }));
+
+        this.menuX = (int) screenX;
+        this.menuY = (int) screenY;
+        this.open = true;
+    }
+
+    private String findDampedLoopNodeInFrame(FlowGraph graph, com.gtceu.calcboard.api.model.CanvasGroupFrame frame) {
+        for (RecipeNode n : frame.getEnclosedNodes(graph)) {
+            if (n != null && !n.isReroute() && com.gtceu.calcboard.api.solver.FlowBalanceMatrixSolver.findDampedLoopMetaForNode(graph, n) != null) {
+                return n.getId();
+            }
+        }
+        return null;
+    }
+
+    public void render(GuiGraphics graphics, Font font, int mouseX, int mouseY) {
+        if (!open || items.isEmpty()) return;
+
+        this.menuW = calculateMenuWidth(font);
+        int menuH = calculateMenuHeight();
+
+        int mx = Math.min(menuX, screen.width - menuW - 8);
+        int my = Math.min(menuY, screen.height - menuH - 8);
+
+        graphics.pose().pushPose();
+        graphics.pose().translate(0, 0, 450.0f);
+
+        graphics.fill(mx, my, mx + menuW, my + menuH, 0xF5111827);
+        graphics.renderOutline(mx, my, menuW, menuH, 0xFF374151);
+
+        int curY = my + 3;
+        for (ContextMenuItem it : items) {
+            if (it.isSeparator) {
+                graphics.fill(mx + 4, curY + 2, mx + menuW - 4, curY + 3, 0xFF1F2937);
+                curY += 5;
+                continue;
+            }
+
+            boolean hovered = mouseX >= mx + 2 && mouseX <= mx + menuW - 2 && mouseY >= curY && mouseY <= curY + 16;
+            if (hovered) {
+                int hoverBg = it.isDanger ? 0xFF5A1C1C : 0xFF1E293B;
+                graphics.fill(mx + 2, curY, mx + menuW - 2, curY + 16, hoverBg);
+            }
+
+            int iconCol = it.isDanger ? 0xFFEF4444 : 0xFF38BDF8;
+            graphics.drawString(font, it.icon, mx + 6, curY + 4, iconCol, false);
+
+            String label = Component.translatable(it.labelKey).getString();
+            int labelCol = hovered ? 0xFFFFFFFF : (it.isDanger ? 0xFFFCA5A5 : 0xFFE2E8F0);
+            graphics.drawString(font, label, mx + 18, curY + 4, labelCol, false);
+
+            if (it.shortcut != null) {
+                int scW = font.width(it.shortcut);
+                graphics.drawString(font, it.shortcut, mx + menuW - scW - 6, curY + 4, 0xFF64748B, false);
+            }
+
+            curY += 18;
+        }
+
+        graphics.pose().popPose();
+    }
+
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (!open) return false;
+
+        int menuH = calculateMenuHeight();
+        int mx = Math.min(menuX, screen.width - menuW - 8);
+        int my = Math.min(menuY, screen.height - menuH - 8);
+
+        if (mouseX < mx || mouseX > mx + menuW || mouseY < my || mouseY > my + menuH) {
+            close();
+            return false;
+        }
+
+        if (button != 0) {
+            return true;
+        }
+
+        return handleItemClick(mouseY, my);
+    }
+
+    private int calculateMenuWidth(Font font) {
+        int maxW = 160;
+        if (font == null) return maxW;
+        for (ContextMenuItem it : items) {
+            if (it.isSeparator || it.labelKey == null) continue;
+            String label = Component.translatable(it.labelKey).getString();
+            int itemW = 18 + font.width(label) + 8;
+            if (it.shortcut != null && !it.shortcut.isEmpty()) {
+                itemW += 16 + font.width(it.shortcut);
+            }
+            if (itemW > maxW) {
+                maxW = itemW;
+            }
+        }
+        return maxW;
+    }
+
+    private int calculateMenuHeight() {
+        int menuH = 6;
+        for (ContextMenuItem it : items) {
+            menuH += it.isSeparator ? 5 : 18;
+        }
+        return menuH;
+    }
+
+    private boolean handleItemClick(double mouseY, int my) {
+        int curY = my + 3;
+        for (ContextMenuItem it : items) {
+            if (it.isSeparator) {
+                curY += 5;
+                continue;
+            }
+            if (mouseY >= curY && mouseY <= curY + 16) {
+                Runnable act = it.action;
+                close();
+                if (act != null) {
+                    act.run();
+                }
+                return true;
+            }
+            curY += 18;
+        }
+        return true;
+    }
+
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (!open) return false;
+        if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
+            close();
+            return true;
+        }
+        return false;
+    }
+}

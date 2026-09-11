@@ -311,4 +311,63 @@ AE2 패턴과 바인딩된 다중 서브페이지 공정망에 대해, $O(K)$ �
 
 ---
 
-> ➡️ **다음 장으로 이동**: [[03] UI 및 캔버스 렌더링 파이프라인](03_UI_AND_RENDERING_PIPELINE.md)
+### [알고리즘 10] 공유 기계 풀 용량 기반 자동 비율 맞춤 (`CanvasGroupFrame`, `HarmonizedRatioOptimizer`) (ADR-031)
+
+동일한 물리적 단일 기계에서 여러 공정을 순차 또는 시분할 가동하는 공유 기계 풀(Shared Machine Pool) 프레임에 대해, 목표 기계 대수에 맞춘 공정 비례 스케일링을 수행합니다:
+
+1. **현재 가동 듀티 사이클 합산**:
+   프레임 내부 노드 집합 $N = \{n_1, n_2, \dots, n_k\}$에 대해:
+   $$D_{\text{current}} = \sum_{i=1}^{k} n_i.\text{getMachineCount}()$$
+2. **비례 스케일링 계수 ($S$) 산출**:
+   프레임에 설정된 목표 기계 용량 $M_{\text{target}}$ (기본값: $1.0$)에 대해:
+   $$S = \frac{M_{\text{target}}}{D_{\text{current}}}$$
+3. **기계 대수 갱신 모드**:
+   - **연속 모드 (기본 클릭)**: 정밀 소수점을 보존하여 $n_i.\text{setMachineCount}(n_i.\text{getMachineCount}() \times S)$ 적용.
+   - **정수 올림 모드 (Alt+클릭)**: 물리적 기계 1대 단위 완결을 위해 $\lceil n_i.\text{getMachineCount}() \times S \rceil$ 올림 적용.
+
+---
+
+### [알고리즘 11] 공정 발산 감지 및 포괄적 안정성 방어 매트릭스 (`ProcessStabilityAnalyzer`) (ADR-032, ADR-033)
+
+재순환 루프 및 외부 피드 제약 조건 하에서 발생할 수 있는 7대 공정 발산 시나리오를 감지하여 연산 폭주를 차단하고 진단 메타데이터를 등록합니다:
+
+1. **미충족 결손 폐순환 루프 (Deficit Recirculation Loop)**:
+   외부 공급원 없이 자체 순환율 $\rho_{\text{cycle}} < 1.0$인 폐쇄 루프에서 Auto-Ratio 실행 시, 기계 대수가 무한히 발산하는 대신 상류 외부 원료 결손을 판별하고 스케일링을 안전하게 동결하며 `[⚠ Loop]` 경고 뱃지를 활성화합니다.
+2. **양의 피드백 증식 루프 (Positive Feedback Loop)**:
+   공정 사이클 순환 시 부산물 생산율이 소비율을 초과($\rho_{\text{cycle}} > 1.0$)하여 내부 유량이 점증하는 구조를 감지하고 `[⚠ Growth]` 경고 뱃지를 통해 잉여 배출 정션 연결을 권장합니다.
+3. **촉매 감쇠 루프 (Catalyst Decay Loop)**:
+   미세한 확률적 촉매 손실이나 정량 감쇠 공정에서 보충 공급선 누락을 식별하고 `[⚠ Catalyst]` 뱃지를 표시합니다.
+4. **다중 앵커 모순 (Anchor Conflict)**:
+   상호 독립적인 기준 앵커가 동일 선상에 복수 지정되어 수학적으로 충돌할 경우, 최초 앵커를 우선 보존하고 `[⚠ Conflict]` 뱃지를 표시하여 충돌 앵커를 원클릭 해제하도록 안내합니다.
+5. **극미세 수율 레시피 (Micro-Yield Defense)**:
+   레시피 당 생산량이 $10^{-5}$ 미만인 극소 수율에서 부동소수점 오버플로우를 방지하고 `[⚠ Yield]` 뱃지를 활성화합니다.
+
+---
+
+### [알고리즘 12] 정션 완충 배선 2단계 스필웨이 할당 & 유량 앵커 역산 (`FlowEdgeAllocator`, `CanvasContextMenuManager`) (ADR-034)
+
+정션 노드를 통한 동적 유량 완충 배선 및 앵커 기반 역산 알고리즘을 지원합니다:
+
+1. **포트 드래그 퀵 완충 배선 (Contextual Buffer Creation)**:
+   출력 포트에서 빈 캔버스로 전선을 드래그할 때 넘치는 잉여 유량($\text{Surplus} = \max(0, P - \sum D)$)을 배출하는 정션(`SupplyMode.SURPLUS_DRAIN`), 부족한 결핍분($\text{Deficit} = \max(0, \sum D - P)$)을 보충하는 공급 정션(`SupplyMode.DEFICIT_SUPPLY`), 보이드 싱크(`SupplyMode.VOID_SINK`)를 1클릭으로 생성합니다.
+2. **2단계 스필웨이(Spillway) 유량 배분**:
+   1:N 분기 배선에서 실수요 기계 소비자들에게 유량을 1순위로 우선 공급한 후, 남은 잔여분만을 연속 배출(Continuous Drain) 정션 노드로 배분하여 실수요 공급 결손을 방지합니다.
+3. **정션 유량 앵커 역산**:
+   고정 유량 정션 노드를 기준 앵커로 지정 시, 정션의 설정 유량 $R_{\text{fixed}}$를 기준으로 연결된 상류 생산자 또는 하류 소비자의 필요 가동률($\eta$) 및 기계 대수를 역산 스케일링합니다.
+
+---
+
+### [알고리즘 13] 2단계 선형 연립방정식 유량 솔버 및 정수 양자화 (`TwoStageLinearFlowSolver`, `GaussJordanEliminator`) (ADR-035)
+
+복합 재순환 루프, 정션 앵커, 및 공유 기계 풀 제약이 혼재된 다중 결합 그래프에서 단 1회의 연산으로 결정론적 질량 보존 수렴을 보장합니다:
+
+1. **1단계: 연속 유량 균형 선형 연립방정식 연산 ($A\mathbf{x} = \mathbf{b}$)**:
+   - 각 기계 노드 $i$의 가동 배율 $x_i$를 미지수로 두고, 각 중간 생산물 $j$에 대한 질량 보존 제약식 $\sum_i C_{ji} x_i = 0$ 및 앵커 제약식 $x_{\text{anchor}} = S_{\text{fixed}}$로 증강 행렬 $[A | \mathbf{b}]$를 구축합니다.
+   - 부분 피보팅(Partial Pivoting) 가우스-요르단 소거법을 적용하여 수치적 안정성을 확보하면서 연속 가동 배율 벡터 $\mathbf{x}^*$를 $O(N^3)$ 시간 내에 결정론적으로 도출합니다.
+2. **2단계: 정수 양자화 (Integer Quantization)**:
+   - 정수 기계 대수 연산 요구 시, 각 미지수 해에 천장 함수를 적용($\lceil x_i^* \rceil$)하고 공정 병목 비율을 보존하는 스케일링을 거쳐 정수 대수 벡터를 확정합니다.
+   - 이를 통해 긴 순환 루프에서도 여러 번 클릭할 필요 없이 1클릭만으로 루프 내부 및 외부 공급선이 정확히 균형을 이루도록 보장합니다.
+
+---
+
+> ➡ **다음 장으로 이동**: [[03] UI 및 캔버스 렌더링 파이프라인](03_UI_AND_RENDERING_PIPELINE.md)

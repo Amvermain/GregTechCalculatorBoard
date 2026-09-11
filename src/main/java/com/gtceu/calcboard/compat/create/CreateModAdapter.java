@@ -1,17 +1,21 @@
 package com.gtceu.calcboard.compat.create;
 
-import com.gtceu.calcboard.api.catalog.AddonCategory;
 import com.gtceu.calcboard.api.catalog.CategoryCapabilityMatrix;
-import com.gtceu.calcboard.api.catalog.MachineAddon;
 import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.model.SearchableRecipe;
 import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.type.OverclockMode;
-import com.gtceu.calcboard.api.type.PowerDisplayMode;
-
-import com.gtceu.calcboard.api.model.SearchableRecipe;
-import com.gtceu.calcboard.compat.IModAdapter;
-import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
+import com.gtceu.calcboard.api.spi.IModAdapter;
+import com.gtceu.calcboard.api.model.RecipeDetails;
+import com.gtceu.calcboard.api.util.RecipeConversionHelper;
+import com.gtceu.calcboard.compat.create.extractor.CreateKineticRpmExtractor;
+import com.gtceu.calcboard.api.spi.extension.ICapabilityMatrixProvider;
+import com.gtceu.calcboard.api.spi.extension.ICompoundRecipeProvider;
+import com.gtceu.calcboard.api.spi.extension.IEnergySimulationProvider;
+import com.gtceu.calcboard.api.spi.extension.IHardwareAddonProvider;
+import com.gtceu.calcboard.api.spi.extension.IModExtension;
+import com.gtceu.calcboard.api.spi.extension.IMultiblockBOMProvider;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
@@ -21,17 +25,46 @@ import net.minecraftforge.fml.loading.FMLLoader;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
+import java.util.Set;
 
 /**
  * Mod Adapter facade for Create kinetic generators and processing machinery.
  */
-public class CreateModAdapter implements IModAdapter {
+public class CreateModAdapter extends AbstractKineticModAdapter implements IHardwareAddonProvider, IMultiblockBOMProvider {
+
+    private static final Set<Class<? extends IModExtension>> SUPPORTED_EXTENSIONS = Set.of(
+            IEnergySimulationProvider.class,
+            ICompoundRecipeProvider.class,
+            ICapabilityMatrixProvider.class,
+            IHardwareAddonProvider.class,
+            IMultiblockBOMProvider.class
+    );
+
+    @Override
+    public Set<Class<? extends IModExtension>> getSupportedExtensions() {
+        return SUPPORTED_EXTENSIONS;
+    }
 
     public static final String MOD_ID = "create";
     public static final String MOD_ID_ADDITION = "createaddition";
 
     static {
         CreateProperties.init();
+        com.gtceu.calcboard.api.catalog.AddonFactoryRegistry.register(
+                com.gtceu.calcboard.api.catalog.AddonCategory.HEATER,
+                (id, name, desc, icon, tag) -> {
+                    int heat = 1;
+                    if (tag != null && tag.contains("heatLevel")) {
+                        heat = tag.getInt("heatLevel");
+                    } else if ("create:blaze_burner_superheated".equals(id)) {
+                        heat = 2;
+                    }
+                    return new com.gtceu.calcboard.compat.create.addon.CreateHeaterAddon(
+                            id, name, desc, icon, heat
+                    );
+                }
+        );
     }
 
     @Override
@@ -63,38 +96,29 @@ public class CreateModAdapter implements IModAdapter {
         if (categoryId == null) return false;
         String ns = categoryId.getNamespace();
         if (ns.equals("create_new_age")) return false; // Dedicated CreateNewAgeModAdapter handles this
+        if (ns.equals("greate")) return false; // Dedicated GreateModAdapter handles this
+        if (ns.equals("createdieselgenerators")) return false; // Dedicated CreateDieselGeneratorsModAdapter handles this
         if (com.gtceu.calcboard.api.util.ModCompatHelper.isCreateFamilyNamespace(ns)) return true;
         return "gtcalcboard".equals(ns) && "kinetic_generation".equals(categoryId.getPath());
     }
 
     @Override
+    public void initialize() {
+        com.gtceu.calcboard.api.property.RecipePropertyExtractorPipeline.register(new CreateKineticRpmExtractor());
+    }
+
+    @Override
     public boolean handlesNode(RecipeNode node) {
         if (node == null) return false;
+        if (node.getMachineIcon() != null && "greate".equals(node.getMachineIcon().getNamespace())) return false;
+        if (node.getRecipeCategoryId() != null && "greate".equals(node.getRecipeCategoryId().getNamespace())) return false;
+        if (node.getMachineIcon() != null && "createdieselgenerators".equals(node.getMachineIcon().getNamespace())) return false;
+        if (node.getRecipeCategoryId() != null && "createdieselgenerators".equals(node.getRecipeCategoryId().getNamespace())) return false;
         return com.gtceu.calcboard.api.util.ModCompatHelper.isCreateMachine(node);
     }
 
     @Override
-    public boolean supportsAddons(RecipeNode node) {
-        return false;
-    }
-
-    @Override
-    public List<AddonCategory> getApplicableAddonCategories(RecipeNode node) {
-        return List.of();
-    }
-
-    @Override
-    public boolean isAddonCompatible(RecipeNode node, MachineAddon addon) {
-        return false;
-    }
-
-    @Override
-    public void discoverAddons(List<MachineAddon> collector, List<ItemStack> recipeOutputStacks) {
-        // Create kinetic machines do not use GUI addon slots
-    }
-
-    @Override
-    public boolean adaptRecipeDetails(Object emiRecipe, Object backingRecipe, EmiRecipeConverter.RecipeDetails details) {
+    public boolean adaptRecipeDetails(Object emiRecipe, Object backingRecipe, RecipeDetails details) {
         return CreateRecipeHandler.adaptRecipeDetails(emiRecipe, backingRecipe, details);
     }
 
@@ -108,7 +132,7 @@ public class CreateModAdapter implements IModAdapter {
     ) {
         if (backingRecipe == null) return null;
         if (CreateSequencedRecipeExtractor.isSequencedRecipe(backingRecipe)) {
-            String machineName = preferredWorkstation != null ? EmiRecipeConverter.formatName(preferredWorkstation.getPath()) : "Sequenced Assembly";
+            String machineName = preferredWorkstation != null ? RecipeConversionHelper.formatName(preferredWorkstation.getPath()) : "Sequenced Assembly";
             ResourceLocation icon = preferredWorkstation != null ? preferredWorkstation : ResourceLocation.tryParse("create:sequenced_assembly");
             return CreateSequencedRecipeExtractor.buildCompoundCluster(
                     backingRecipe, machineName, icon, GTVoltageTier.ULV, startX, startY
@@ -121,114 +145,146 @@ public class CreateModAdapter implements IModAdapter {
     public void enrichCapabilities(CategoryCapabilityMatrix matrix, Object emiRecipeManager) {
     }
 
-    public static boolean isFanProcessingRecipe(RecipeNode node) {
-        if (node == null) return false;
-        ResourceLocation catId = node.getRecipeCategoryId();
-        if (catId != null) {
-            String path = catId.getPath().toLowerCase(Locale.ROOT);
-            if (path.contains("splashing") || path.contains("washing") || path.contains("haunting") || path.contains("smoking") || path.contains("blasting")) {
-                return true;
-            }
-        }
-        ResourceLocation icon = node.getMachineIcon();
-        if (icon != null) {
-            String path = icon.getPath().toLowerCase(Locale.ROOT);
-            if (path.contains("encased_fan") || path.contains("fan")) {
-                return true;
-            }
-        }
-        return false;
+    @Override
+    public boolean supportsAddons(RecipeNode node) {
+        return CreateProperties.isCreateBoiler(node);
     }
 
     @Override
-    public OverclockMode.OverclockResult computeOverclock(RecipeNode node, GTVoltageTier targetTier, boolean isGenerator) {
-        int rpm = node.getRpm();
-        double baseDuration = node.getBaseDurationTicks();
-        double basePower = node.getBaseEUt();
-
-        boolean isFanProcessing = isFanProcessingRecipe(node);
-
-        // 32 RPM is the baseline standard speed (1.0x)
-        double speedFactor = Math.max(0.01, rpm / 32.0);
-
-        double durationTicks;
-        double batchesPerTick;
-        if (isFanProcessing) {
-            // In Create mod, Fan processing (blasting/washing/smoking/haunting) duration is fixed in-world.
-            // RPM only affects airflow distance/range, NOT processing speed!
-            durationTicks = Math.max(1.0, baseDuration);
-            batchesPerTick = 1.0;
-        } else {
-            double rawDuration = baseDuration / speedFactor;
-            durationTicks = Math.max(1.0, rawDuration);
-            batchesPerTick = (rawDuration < 1.0 && rawDuration > 0.0) ? (1.0 / rawDuration) : 1.0;
+    public List<com.gtceu.calcboard.api.catalog.AddonCategory> getApplicableAddonCategories(RecipeNode node) {
+        if (CreateProperties.isCreateBoiler(node)) {
+            return List.of(com.gtceu.calcboard.api.catalog.AddonCategory.HEATER, com.gtceu.calcboard.api.catalog.AddonCategory.CUSTOM);
         }
-
-        double effectivePower;
-        if (isGenerator) {
-            effectivePower = basePower;
-        } else {
-            effectivePower = basePower * speedFactor;
-        }
-
-        return new OverclockMode.OverclockResult(durationTicks, effectivePower, batchesPerTick, 0);
+        return List.of();
     }
 
     @Override
-    public String formatEnergyStats(RecipeNode node, PowerDisplayMode displayMode) {
-        if (node == null) return "";
-        double suRate = node.getEffectiveTotalEUt();
-        return node.isGenerator()
-                ? String.format(Locale.ROOT, "§6+%,.0f SU", suRate)
-                : String.format(Locale.ROOT, "§e%,.0f SU", suRate);
+    public void discoverAddons(List<com.gtceu.calcboard.api.catalog.MachineAddon> collector, List<ItemStack> recipeOutputStacks) {
+        collector.add(new com.gtceu.calcboard.compat.create.addon.CreateHeaterAddon(
+                "create:blaze_burner_heated",
+                "gui.gtcalcboard.addon.create_heater",
+                "gui.gtcalcboard.addon.create_heater_desc",
+                ResourceLocation.tryParse("create:blaze_burner"),
+                1
+        ));
+        collector.add(new com.gtceu.calcboard.compat.create.addon.CreateHeaterAddon(
+                "create:blaze_burner_superheated",
+                "gui.gtcalcboard.addon.create_superheated_heater",
+                "gui.gtcalcboard.addon.create_superheated_heater_desc",
+                ResourceLocation.tryParse("create:blaze_burner"),
+                2
+        ));
     }
 
     @Override
-    public List<Component> buildEnergyTooltip(RecipeNode node) {
-        List<Component> tooltipLines = new ArrayList<>();
-        if (node == null) return tooltipLines;
-        double totSU = node.getEffectiveTotalEUt();
-        if (node.isGenerator()) {
-            tooltipLines.add(Component.literal("§6⚙ " + Component.translatable("gui.gtcalcboard.total_gen").getString()));
-            tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Total Capacity: §6+%,.0f SU", totSU)));
-        } else {
-            tooltipLines.add(Component.literal("§e⚙ " + Component.translatable("gui.gtcalcboard.total_power").getString()));
-            tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Total Stress Impact: §e%,.0f SU", totSU)));
+    public boolean isAddonCompatible(RecipeNode node, com.gtceu.calcboard.api.catalog.MachineAddon addon) {
+        if (node == null || addon == null) return false;
+        if (addon.getCategory().equals(com.gtceu.calcboard.api.catalog.AddonCategory.CUSTOM)) return true;
+        return CreateProperties.isCreateBoiler(node) && addon.getCategory().equals(com.gtceu.calcboard.api.catalog.AddonCategory.HEATER);
+    }
+
+    @Override
+    public boolean canInstallAddon(RecipeNode node, com.gtceu.calcboard.api.catalog.MachineAddon addon) {
+        if (!isAddonCompatible(node, addon)) return false;
+        if (addon instanceof com.gtceu.calcboard.compat.create.addon.CreateHeaterAddon heater) {
+            long currentBurners = node.getAddons().stream().filter(a -> a instanceof com.gtceu.calcboard.compat.create.addon.CreateHeaterAddon).count();
+            if (currentBurners >= 9) return false;
+            int currentHeat = CreateProperties.calculateTotalHeatFromAddons(node);
+            return currentHeat + heater.getHeatLevel() <= 18;
         }
-        tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Rotation Speed: §6%d RPM", node.getRpm())));
-        tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Duration: §f%.4fs §7(§f%,.4f cycles/s§7)", node.getEffectiveDurationSeconds(), node.getEffectiveCyclesPerSecond())));
-        if (isFanProcessingRecipe(node)) {
-            tooltipLines.add(Component.translatable("gui.gtcalcboard.tooltip.fan_fixed_duration_hint"));
-        }
-        return tooltipLines;
+        return true;
     }
 
     @Override
-    public EnergyType getEnergyType(RecipeNode node) {
-        return EnergyType.KINETIC_SU;
+    public void onAddonInstalled(RecipeNode node, com.gtceu.calcboard.api.catalog.MachineAddon addon) {
+        if (node == null || addon == null) return;
+        node.getAddons().add(addon);
+        int totalHeat = CreateProperties.calculateTotalHeatFromAddons(node);
+        CreateProperties.setBoilerHeat(node, totalHeat);
+        node.markOverclockDirty();
     }
 
     @Override
-    public void registerSyntheticEmiRecipes(Object emiRegistry, Object emiCategory, java.util.Set<net.minecraft.world.item.Item> activeRecipeItems) {
-        CreateRecipeHandler.registerSyntheticEmiRecipes(emiRegistry, emiCategory, activeRecipeItems);
+    public void onAddonRemoved(RecipeNode node, com.gtceu.calcboard.api.catalog.MachineAddon addon) {
+        if (node == null || addon == null) return;
+        int totalHeat = CreateProperties.calculateTotalHeatFromAddons(node);
+        CreateProperties.setBoilerHeat(node, totalHeat);
+        node.markOverclockDirty();
     }
 
     public static RecipeNode createKineticGeneratorNode(ItemStack stack) {
         RecipeNode node = CreateRecipeHandler.createKineticGeneratorNode(stack);
         if (node != null) return node;
-        return com.gtceu.calcboard.compat.createnewage.CreateNewAgeRecipeHandler.createKineticGeneratorNode(stack);
+        RecipeNode cnaNode = com.gtceu.calcboard.compat.createnewage.CreateNewAgeRecipeHandler.createKineticGeneratorNode(stack);
+        if (cnaNode != null) return cnaNode;
+        if (stack != null && !stack.isEmpty()) {
+            ResourceLocation itemId = net.minecraftforge.registries.ForgeRegistries.ITEMS.getKey(stack.getItem());
+            return com.gtceu.calcboard.compat.createdieselgenerators.CDGRecipeHandler.createKineticGeneratorNode(itemId, stack.getHoverName().getString());
+        }
+        return null;
     }
 
     public static RecipeNode createKineticGeneratorNode(ResourceLocation itemId, String displayName) {
         RecipeNode node = CreateRecipeHandler.createKineticGeneratorNode(itemId, displayName);
         if (node != null) return node;
-        return com.gtceu.calcboard.compat.createnewage.CreateNewAgeRecipeHandler.createKineticGeneratorNode(itemId, displayName);
+        RecipeNode cnaNode = com.gtceu.calcboard.compat.createnewage.CreateNewAgeRecipeHandler.createKineticGeneratorNode(itemId, displayName);
+        if (cnaNode != null) return cnaNode;
+        return com.gtceu.calcboard.compat.createdieselgenerators.CDGRecipeHandler.createKineticGeneratorNode(itemId, displayName);
     }
 
-    public static List<SearchableRecipe> getVirtualKineticSearchRecipes() {
-        List<SearchableRecipe> list = new ArrayList<>(CreateRecipeHandler.getVirtualKineticSearchRecipes());
-        list.addAll(com.gtceu.calcboard.compat.createnewage.CreateNewAgeRecipeHandler.getVirtualSearchRecipes());
-        return list;
+    @Override
+    public void collectNativeCatalogRecipes(List<SearchableRecipe> collector) {
+        CreateRecipeHandler.collectNativeCatalogRecipes(collector);
+    }
+
+    private static final ResourceLocation ITEM_FLUID_TANK = ResourceLocation.tryParse("create:fluid_tank");
+    private static final ResourceLocation ITEM_STEAM_ENGINE = ResourceLocation.tryParse("create:steam_engine");
+
+    @Override
+    public void populateExtraBOMParts(RecipeNode node, List<com.gtceu.calcboard.api.bom.MultiblockStructurePart> parts) {
+        if (node == null || parts == null) return;
+        if (!CreateProperties.isCreateBoiler(node)) return;
+
+        int sizeBlocks = node.getProperties().get(CreateProperties.BOILER_SIZE_BLOCKS);
+        if (sizeBlocks > 0) {
+            String tankName = com.gtceu.calcboard.api.bom.BOMDisplayNameResolver.resolve(ITEM_FLUID_TANK, "Fluid Tank");
+            parts.add(new com.gtceu.calcboard.api.bom.MultiblockStructurePart(
+                    ITEM_FLUID_TANK,
+                    tankName,
+                    sizeBlocks,
+                    com.gtceu.calcboard.api.bom.PartCategory.CASING
+            ));
+        }
+
+        int level = node.getProperties().get(CreateProperties.BOILER_LEVEL);
+        int requiredEngines = Math.max(1, level);
+        if (requiredEngines > 1) {
+            updateEngineControllerPartAmount(node, parts, requiredEngines);
+        }
+    }
+
+    private void updateEngineControllerPartAmount(RecipeNode node, List<com.gtceu.calcboard.api.bom.MultiblockStructurePart> parts, int requiredEngines) {
+        ResourceLocation icon = node.getMachineIcon();
+        for (int i = 0; i < parts.size(); i++) {
+            com.gtceu.calcboard.api.bom.MultiblockStructurePart p = parts.get(i);
+            if (p.category() == com.gtceu.calcboard.api.bom.PartCategory.CONTROLLER && Objects.equals(p.itemId(), icon)) {
+                parts.set(i, new com.gtceu.calcboard.api.bom.MultiblockStructurePart(
+                        p.itemId(),
+                        p.displayName(),
+                        requiredEngines,
+                        p.category()
+                ));
+                return;
+            }
+        }
+    }
+
+    @Override
+    public com.gtceu.calcboard.api.bom.PartCategory classifyBOMPart(ResourceLocation itemId) {
+        if (itemId == null) return null;
+        if (ITEM_FLUID_TANK.equals(itemId)) return com.gtceu.calcboard.api.bom.PartCategory.CASING;
+        if (ITEM_STEAM_ENGINE.equals(itemId)) return com.gtceu.calcboard.api.bom.PartCategory.CONTROLLER;
+        return null;
     }
 }
 

@@ -72,7 +72,7 @@ public class CanvasStickyNoteRenderer {
         graphics.fill(x, y + headerH - 1, x + w, y + headerH, borderCol);
 
         // 3. Header Title
-        graphics.drawString(font, "📌 " + note.getTitle(), x + 4, y + 5, 0xFFFFFFFF, true);
+        graphics.drawString(font, "★ " + note.getTitle(), x + 4, y + 5, 0xFFFFFFFF, true);
 
         // 4. Action buttons on header
         int btnY = y + 2;
@@ -83,7 +83,7 @@ public class CanvasStickyNoteRenderer {
         drawIconButton(graphics, font, "✕", curBtnX, btnY, BTN_SIZE, BTN_SIZE, delHover, 0xFFFF5555, 0x55FF0000);
         curBtnX -= (BTN_SIZE + BTN_SPACING);
 
-        // [🎨 Color]
+        // [✦ Color]
         boolean colorHover = isMouseOver(mouseX, mouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE);
         drawColorCycleButton(graphics, curBtnX, btnY, BTN_SIZE, BTN_SIZE, colorHover, color);
 
@@ -122,9 +122,9 @@ public class CanvasStickyNoteRenderer {
                 }
                 curBtnX -= (BTN_SIZE + BTN_SPACING);
 
-                // [🎨 Color]
+                // [✦ Color]
                 if (isMouseOver(canvasMouseX, canvasMouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
-                    BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal("§e🎨 ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_color")), mouseX, mouseY);
+                    BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal("§e✦ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_color")), mouseX, mouseY);
                     return;
                 }
             }
@@ -182,7 +182,7 @@ public class CanvasStickyNoteRenderer {
             }
             curBtnX -= (BTN_SIZE + BTN_SPACING);
 
-            // [🎨 Color]
+            // [✦ Color]
             if (isMouseOver(mouseX, mouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
                 return NoteAction.COLOR;
             }

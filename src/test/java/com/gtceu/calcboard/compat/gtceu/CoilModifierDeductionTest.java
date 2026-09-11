@@ -61,7 +61,7 @@ public class CoilModifierDeductionTest {
     }
 
     @Test
-    @DisplayName("Test Chemical Reactor Speed and Energy Multipliers")
+    @DisplayName("Test Chemical Reactor Speed and Energy Multipliers Isolated to StarT")
     public void testChemicalReactorMultipliers() {
         RecipeNode node = new RecipeNode("node-chem", "Chem Node", 10.0, 120.0, GTVoltageTier.MV);
         node.setMachineIcon(ResourceLocation.tryParse("gtceu:large_chemical_reactor"));
@@ -69,9 +69,24 @@ public class CoilModifierDeductionTest {
         CoilHelper.CoilStats stats = new CoilHelper.CoilStats(2700, 200, 80, 125, 80, 32);
         GTCoilAddon coil = new GTCoilAddon("gtceu:kanthal_coil", "Kanthal Coil", "2700K", null, stats);
 
-        MachineAddon tailored = CoilHelper.tailorCoilAddon(coil, node);
-        Assertions.assertEquals(0.8, tailored.getDurationMultiplier(), 0.001);
-        Assertions.assertEquals(0.8, tailored.getEutMultiplier(), 0.001);
+        // 1. In vanilla GTCEu environment (StarT not loaded), LCR does NOT receive coil buffs
+        com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.clearCache();
+        com.gtceu.calcboard.api.util.ModCompatHelper.setTestOverride("start_core", false);
+        MachineAddon vanillaTailored = CoilHelper.tailorCoilAddon(coil, node);
+        Assertions.assertEquals(1.0, vanillaTailored.getDurationMultiplier(), 0.001);
+        Assertions.assertEquals(1.0, vanillaTailored.getEutMultiplier(), 0.001);
+
+        // 2. In Star Technology environment, LCR receives coil speed/energy multipliers
+        try {
+            com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.clearCache();
+            com.gtceu.calcboard.api.util.ModCompatHelper.setTestOverride("start_core", true);
+            MachineAddon startTailored = CoilHelper.tailorCoilAddon(coil, node);
+            Assertions.assertEquals(0.8, startTailored.getDurationMultiplier(), 0.001);
+            Assertions.assertEquals(0.8, startTailored.getEutMultiplier(), 0.001);
+        } finally {
+            com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.clearCache();
+            com.gtceu.calcboard.api.util.ModCompatHelper.clearTestOverrides();
+        }
     }
 
     @Test
@@ -121,6 +136,211 @@ public class CoilModifierDeductionTest {
         Assertions.assertEquals(0.05, spec.customMultiplier().energyMultiplier(), 0.001);
         Assertions.assertEquals(4, spec.customMultiplier().parallelMultiplier());
         Assertions.assertEquals(2, spec.customMultiplier().baseParallel());
+    }
+
+    @Test
+    @DisplayName("Test Liquefaction Tower Coil Speed Bonus (Cupro 25% slower, Kanthal base, +50% speed per tier above Kanthal)")
+    public void testLiquefactionTowerCoilModifiers() {
+        ResourceLocation ltId = ResourceLocation.tryParse("gtceu:liquefaction_tower");
+        RecipeNode node = new RecipeNode("node-lt", "Liquefaction Tower", 10.0, 120.0, GTVoltageTier.MV);
+        node.setMachineIcon(ltId);
+        node.setMultiblock(true);
+
+        // 1. Detection check
+        Assertions.assertTrue(com.gtceu.calcboard.api.catalog.MultiblockDetector.isCoilMultiblock(ltId),
+                "Liquefaction Tower must be detected as a coil multiblock");
+
+        // 2. Cupronickel (1800K) -> 25% slower (speed = 0.75, duration = 1.0 / 0.75 = 1.333...)
+        CoilHelper.CoilStats cuproStats = new CoilHelper.CoilStats(1800, 100, 100, 100, 100, 16);
+        GTCoilAddon cupro = new GTCoilAddon("gtceu:cupronickel_coil", "Cupronickel Coil", "1800K", null, cuproStats);
+        MachineAddon tailoredCupro = CoilHelper.tailorCoilAddon(cupro, node);
+        Assertions.assertEquals(1.0 / 0.75, tailoredCupro.getDurationMultiplier(), 0.001);
+        Assertions.assertEquals(1.0, tailoredCupro.getEutMultiplier(), 0.001);
+
+        // 3. Kanthal (2700K) -> Base speed (1.0x)
+        CoilHelper.CoilStats kanthalStats = new CoilHelper.CoilStats(2700, 100, 90, 125, 95, 32);
+        GTCoilAddon kanthal = new GTCoilAddon("gtceu:kanthal_coil", "Kanthal Coil", "2700K", null, kanthalStats);
+        MachineAddon tailoredKanthal = CoilHelper.tailorCoilAddon(kanthal, node);
+        Assertions.assertEquals(1.0, tailoredKanthal.getDurationMultiplier(), 0.001);
+
+        // 4. Nichrome (3600K) -> +50% speed (1.5x speed -> duration = 1.0 / 1.5 = 0.666...)
+        CoilHelper.CoilStats nichromeStats = new CoilHelper.CoilStats(3600, 150, 80, 150, 90, 64);
+        GTCoilAddon nichrome = new GTCoilAddon("gtceu:nichrome_coil", "Nichrome Coil", "3600K", null, nichromeStats);
+        MachineAddon tailoredNichrome = CoilHelper.tailorCoilAddon(nichrome, node);
+        Assertions.assertEquals(1.0 / 1.5, tailoredNichrome.getDurationMultiplier(), 0.001);
+
+        // 5. RTM Alloy (4500K) -> +100% speed (2.0x speed -> duration = 1.0 / 2.0 = 0.5)
+        CoilHelper.CoilStats rtmStats = new CoilHelper.CoilStats(4500, 200, 70, 175, 85, 128);
+        GTCoilAddon rtm = new GTCoilAddon("gtceu:rtm_alloy_coil", "RTM Alloy Coil", "4500K", null, rtmStats);
+        MachineAddon tailoredRtm = CoilHelper.tailorCoilAddon(rtm, node);
+        Assertions.assertEquals(0.5, tailoredRtm.getDurationMultiplier(), 0.001);
+
+        // 6. HSS-G (5400K) -> +150% speed (2.5x speed -> duration = 1.0 / 2.5 = 0.4)
+        CoilHelper.CoilStats hssgStats = new CoilHelper.CoilStats(5400, 250, 60, 200, 80, 256);
+        GTCoilAddon hssg = new GTCoilAddon("gtceu:hssg_coil", "HSS-G Coil", "5400K", null, hssgStats);
+        MachineAddon tailoredHssg = CoilHelper.tailorCoilAddon(hssg, node);
+        Assertions.assertEquals(0.4, tailoredHssg.getDurationMultiplier(), 0.001);
+
+        // 7. Category capability check: AddonCategory.COIL must be present
+        var cats = com.gtceu.calcboard.compat.gtceu.handler.GTAddonCompatibilityHandler.getApplicableAddonCategories(node);
+        Assertions.assertTrue(cats.contains(com.gtceu.calcboard.api.catalog.AddonCategory.COIL),
+                "Liquefaction Tower applicable addon categories must contain COIL");
+    }
+
+    @Test
+    @DisplayName("Test Nuclear Fuel Factory Coil Speed Bonus (shares Pyrolyse Oven overclock speed formula)")
+    public void testNuclearFuelFactoryCoilSpeedModifiers() {
+        ResourceLocation nffId = ResourceLocation.tryParse("gtceu:nuclear_fuel_factory");
+        RecipeNode node = new RecipeNode("node-nff", "Nuclear Fuel Factory", 10.0, 1920.0, GTVoltageTier.EV);
+        node.setMachineIcon(nffId);
+        node.setMultiblock(true);
+
+        // Cupronickel (1800K) -> 75% speed -> duration = 1.0 / 0.75 = 1.333x
+        CoilHelper.CoilStats cuproStats = new CoilHelper.CoilStats(1800, 75, 100, 100, 100, 16);
+        GTCoilAddon cupro = new GTCoilAddon("gtceu:cupronickel_coil", "Cupronickel Coil", "1800K", null, cuproStats);
+        MachineAddon tailoredCupro = CoilHelper.tailorCoilAddon(cupro, node);
+        Assertions.assertEquals(1.0 / 0.75, tailoredCupro.getDurationMultiplier(), 0.001);
+
+        // RTM Alloy (4500K) -> 200% speed -> duration = 1.0 / 2.0 = 0.5x
+        CoilHelper.CoilStats rtmStats = new CoilHelper.CoilStats(4500, 200, 70, 175, 85, 128);
+        GTCoilAddon rtm = new GTCoilAddon("gtceu:rtm_alloy_coil", "RTM Alloy Coil", "4500K", null, rtmStats);
+        MachineAddon tailoredRtm = CoilHelper.tailorCoilAddon(rtm, node);
+        Assertions.assertEquals(0.5, tailoredRtm.getDurationMultiplier(), 0.001);
+
+        // Tritanium (10800K) -> 550% speed -> duration = 1.0 / 5.5 = 0.1818x
+        CoilHelper.CoilStats tritaniumStats = new CoilHelper.CoilStats(10800, 550, 40, 300, 60, 512);
+        GTCoilAddon tritanium = new GTCoilAddon("gtceu:tritanium_coil", "Tritanium Coil", "10800K", null, tritaniumStats);
+        MachineAddon tailoredTritanium = CoilHelper.tailorCoilAddon(tritanium, node);
+        Assertions.assertEquals(1.0 / 5.5, tailoredTritanium.getDurationMultiplier(), 0.001);
+    }
+
+    @Test
+    @DisplayName("Simulated KubeJS proxy modifier with pyrolyseOvenOverclock is properly classified")
+    public void testKubeJsProxyModifierClassification() {
+        // Simulates a Rhino/KubeJS JavaInterfaceProxy holding an anonymous function
+        Object dummyJsFunction = new Object() {
+            @Override
+            public String toString() {
+                return "(machine, recipe) => GTRecipeModifiers.pyrolyseOvenOverclock(machine, recipe)";
+            }
+        };
+
+        Object simulatedKubeJsProxy = new Object() {
+            public final Object function = dummyJsFunction;
+
+            @Override
+            public String toString() {
+                return "JavaInterfaceProxy[" + function + "]";
+            }
+        };
+
+        GTCEuCoilModifierHelper.CoilMachineKind kind = GTCEuCoilModifierHelper.classifyModifierObject(simulatedKubeJsProxy);
+        Assertions.assertEquals(GTCEuCoilModifierHelper.CoilMachineKind.PYROLYSE_OVEN, kind);
+    }
+
+    @Test
+    @DisplayName("Test Chemical Reactor OC modifier directly classified without mod gating")
+    public void testDirectModifierClassificationWithoutModGating() {
+        Object modifierWithId = new Object() {
+            public String getId() {
+                return "chemical_reactor_oc";
+            }
+        };
+
+        com.gtceu.calcboard.api.util.ModCompatHelper.setTestOverride("start_core", false);
+        try {
+            GTCEuCoilModifierHelper.CoilMachineKind kind = GTCEuCoilModifierHelper.classifyModifierObject(modifierWithId);
+            Assertions.assertEquals(GTCEuCoilModifierHelper.CoilMachineKind.CHEMICAL_REACTOR, kind);
+        } finally {
+            com.gtceu.calcboard.api.util.ModCompatHelper.clearTestOverrides();
+        }
+    }
+
+    @Test
+    @DisplayName("Test Star Technology LCR and ECR coil bonuses across all 11 heating coils")
+    public void testStarTLcrAndEcrCoilMultipliersAllTiers() {
+        com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.clearCache();
+        com.gtceu.calcboard.api.util.ModCompatHelper.setTestOverride("start_core", true);
+
+        try {
+            ResourceLocation[] reactors = new ResourceLocation[]{
+                    ResourceLocation.tryParse("gtceu:large_chemical_reactor"),
+                    ResourceLocation.tryParse("gtceu:extreme_chemical_reactor")
+            };
+
+            String[] coilIds = new String[]{
+                    "gtceu:cupronickel_coil_block",
+                    "gtceu:kanthal_coil_block",
+                    "gtceu:nichrome_coil_block",
+                    "gtceu:rtm_alloy_coil_block",
+                    "gtceu:hssg_coil_block",
+                    "gtceu:naquadah_coil_block",
+                    "gtceu:trinium_coil_block",
+                    "gtceu:tritanium_coil_block",
+                    "kubejs:zalloy_coil_block",
+                    "kubejs:magmada_alloy_coil_block",
+                    "kubejs:abyssal_alloy_coil_block"
+            };
+
+            for (ResourceLocation reactorId : reactors) {
+                RecipeNode node = new RecipeNode("node-reactor", reactorId.getPath(), 8.0, 7.0, GTVoltageTier.LV);
+                node.setMachineIcon(reactorId);
+                node.setMultiblock(true);
+
+                for (int tier = 0; tier < coilIds.length; tier++) {
+                    String coilId = coilIds[tier];
+                    CoilHelper.CoilStats stats = CoilHelper.getCoilStats(coilId);
+                    Assertions.assertNotNull(stats, "CoilStats must not be null for " + coilId);
+
+                    GTCoilAddon coil = new GTCoilAddon(coilId, coilId, "", null, stats);
+                    MachineAddon tailored = CoilHelper.tailorCoilAddon(coil, node);
+
+                    double expectedSpeed = 0.75 + (tier * 0.25);
+                    double expectedDurationMult = 1.0 / expectedSpeed;
+                    double expectedEutMult = 1.0 - (tier * 0.05);
+
+                    Assertions.assertEquals(expectedDurationMult, tailored.getDurationMultiplier(), 0.005,
+                            "Duration multiplier mismatch on " + reactorId + " with tier " + tier + " (" + coilId + ")");
+                    Assertions.assertEquals(expectedEutMult, tailored.getEutMultiplier(), 0.005,
+                            "EUt multiplier mismatch on " + reactorId + " with tier " + tier + " (" + coilId + ")");
+                }
+            }
+        } finally {
+            com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.clearCache();
+            com.gtceu.calcboard.api.util.ModCompatHelper.clearTestOverrides();
+        }
+    }
+
+    @Test
+    @DisplayName("Verify TFG and vanilla GTCEu Modern without StarT does not grant coil bonuses to LCR")
+    public void testTfgAndVanillaGtceuLcrHasNoCoilBonus() {
+        com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.clearCache();
+        com.gtceu.calcboard.api.util.ModCompatHelper.setTestOverride("start_core", false);
+
+        try {
+            ResourceLocation lcrId = ResourceLocation.tryParse("gtceu:large_chemical_reactor");
+            var spec = com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.getCoilMachineSpec(lcrId);
+            Assertions.assertEquals(com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.CoilMachineKind.GENERIC, spec.kind());
+
+            RecipeNode node = new RecipeNode("node-lcr", "Large Chemical Reactor", 8.0, 7.0, GTVoltageTier.LV);
+            node.setMachineIcon(lcrId);
+            node.setMultiblock(true);
+            node.setRecipeTemperature(0);
+
+            CoilHelper.CoilStats nichromeStats = CoilHelper.getCoilStats("gtceu:nichrome_coil_block");
+            GTCoilAddon coil = new GTCoilAddon("gtceu:nichrome_coil_block", "Nichrome Coil", "", null, nichromeStats);
+            MachineAddon tailored = CoilHelper.tailorCoilAddon(coil, node);
+
+            Assertions.assertEquals(1.0, tailored.getDurationMultiplier(), 0.001,
+                    "In TFG/Vanilla, LCR must have duration multiplier 1.0 (no bonus)");
+            Assertions.assertEquals(1.0, tailored.getEutMultiplier(), 0.001,
+                    "In TFG/Vanilla, LCR must have EU/t multiplier 1.0 (no discount)");
+            Assertions.assertEquals(1, tailored.getParallelMultiplier(),
+                    "In TFG/Vanilla, LCR coil must not multiply parallels");
+        } finally {
+            com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.clearCache();
+            com.gtceu.calcboard.api.util.ModCompatHelper.clearTestOverrides();
+        }
     }
 }
 

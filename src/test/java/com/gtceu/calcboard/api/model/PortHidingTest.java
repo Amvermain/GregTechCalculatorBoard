@@ -103,7 +103,7 @@ public class PortHidingTest {
         NodeWidget widget = new NodeWidget(node);
         // Direct method call via node + manual disconnect check
         node.hideInputPort(1);
-        graph.getConnections().removeIf(e -> e.toNodeId().equals(node.getId()) && e.inputIndex() == 1);
+        graph.removeConnectionIf(e -> e.toNodeId().equals(node.getId()) && e.inputIndex() == 1);
 
         Assertions.assertEquals(0, graph.getConnections().size());
         Assertions.assertTrue(node.isInputPortHidden(1));

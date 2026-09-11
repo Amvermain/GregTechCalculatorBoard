@@ -1,0 +1,579 @@
+# Changelog (v2.0.x)
+
+<p align="center">
+  <b>English</b> | <a href="CHANGELOG_v2.0_KR.md">한국어</a>
+</p>
+
+> **Version Navigation**:
+> - [Latest Changelog (v2.2.x)](../../CHANGELOG.md)
+> - [v2.1.x Changelog](CHANGELOG_v2.1.md)
+> - **v2.0.x Changelog (Current)**
+> - [v1.0.x Changelog](CHANGELOG_v1.0.md)
+
+## [2.0.2] - 2026-08-31
+
+### Added
+- **Multi-Column & Progressive Assembly Compound Cluster Generation (`EmiStepRecipeDetector`, `CompoundRecipeBuilder`)**:
+  - Multi-step, multi-slice, and progressive assembly recipes (such as `Stargate Component Assembly` and GTCEu `Assembly Line` with up to 16 columns) imported from recipe viewers are now automatically partitioned across sequential layer nodes (`Layer I` through `Layer XVI`) grouped inside a purple Compound Module frame (`🧩 ...`).
+
+### Fixed
+- **GTCEu Macerator Byproduct Tier Gating Logic (`GTPowerCalculator`, `NodeRateCalculator`, `BoardTooltipRenderer`)**:
+  - Fixed an issue where secondary outputs (slot 1 onward) in Macerator recipes with 100% base chance or multi-product definitions (such as Plant Ball processing) were incorrectly calculated and displayed as active on ULV/LV/MV tiers or labeled with inaccurate tier requirements.
+  - Gated all secondary outputs from slot 1 onward behind the HV+ voltage tier requirement (`Byproducts from HV+`), matching in-game singleblock and multiblock Macerator behavior, with inactive outputs properly displaying `0% (Requires HV+)`.
+
+## [2.0.1] - 2026-08-31
+
+### Added
+- **Automatic Fusion Reactor Controller Matching (`GTCEuModAdapter`, `GTAddonCompatibilityHandler`, `EmiRecipeConverter`, `JeiRecipeConverter`)**:
+  - When importing recipes for Fusion Reactors (Mk1, Mk2, Mk3), the controller workstation matching the recipe's minimum required voltage tier (e.g. 180M EU -> ZPM Mk2) is now strictly prioritized and assigned as the default machine icon upon creation.
+
+### Changed & Improved
+- **Machine Configuration Dialog Layout & Label Optimization (`MachineConfigDialog`, `GTCEuModGuiHandler`, `AddonCatalogView`)**:
+  - Compacted top header buttons (Recipe Switch, Single/Multiblock Toggle, Font Scale) and added ellipsis truncation for long machine titles to eliminate button overlap across all languages.
+  - Formatted controller buttons in the multiblock selector (e.g. `⚛ Fusion Mk1/Mk2/Mk3`, `⚡ Aux Mk1/Mk2`) by stripping internal bracket tags (such as `[FRC I]`) for clean rendering within constrained widths.
+  - Refined horizontal category scroll bar navigation (◀ / ▶ arrows) and added smart name shortening for long addon titles in the hardware catalog.
+- **Reroute Junction Flow Balancing & Multi-Branch Auto-Ratio (`FlowBalanceMatrixSolver`, `FlowGraphTopologyAnalyzer`, `FlowSummaryAggregator`)**:
+  - Enhanced Auto-Ratio backwards and forward balancing across complex multi-branch network graphs containing reroute/junction nodes, ensuring 100% operational efficiency without artificial flow bottlenecks.
+  - Improved port flow statistics gauges to accurately track pass-through demands on reroute nodes.
+
+### Fixed
+- **Fusion Reactor Node Tier & Badge Synchronization on Creation (`EmiRecipeConverter`, `GTBadgeProvider`, `GTAddonCompatibilityHandler`)**:
+  - Fixed an issue where recipes requiring Fusion Mk2 (ZPM) were overwritten with Mk3 (UV) controllers during multiblock conversion, causing voltage tier and badge mismatch.
+  - Fixed badge evaluation in `GTBadgeProvider` to derive reactor tier from the active controller model rather than purely runtime operating voltage, preserving accurate Mk1/Mk2/Mk3 display when overclocking.
+- **GTCEu Turbine Rotor Holder Efficiency Calculation (`GTPowerCalculator`, `GTTurbinePhysics`, `GTTurbineHelper`)**:
+  - Fixed an issue where the efficiency bonus from higher-tier rotor holders (e.g. EV, IV, ZPM) was incorrectly added rather than scaled multiplicatively with rotor efficiency, causing cycle duration and fuel consumption discrepancies.
+- **GTCEu Recipe Viewer Extraction & Condition Branching (`GTCEuRecipeHandler`, `JeiRecipeConverter`)**:
+  - Fixed an issue where certain complex GTCEu recipes with condition branches, multi-fluid outputs, or specific chance byproducts failed to extract properly or dropped valid output ports during EMI/JEI conversion (thanks to @kairan0 via PR #3, #4, #5).
+- **Reflector Missing Badge & Warning Text Formatting (`GTBadgeProvider`, `GTNodeValidator`, `BoardTooltipRenderer`)**:
+  - Fixed an issue where the missing reflector tier text displayed '(None)' in parentheses instead of a clean 'None' label, and standardized reflector badge symbols to ✦.
+
+## [2.0.0] - 2026-08-30
+
+### Added
+- **Systeams & Steam Boiler Multi-Mode Support (`SysteamsModAdapter`, `SysteamsRecipeHandler`, `SysteamsModGuiHandler`)**:
+  - Added seamless switching between Systeams Steam Boiler mode (steam generation) and Thermal Dynamo mode (RF generation) directly on machine cards.
+  - Implemented exact steam boiler thermodynamics and boiling physics calculations for water, distilled water, and alternative boiling fluids.
+- **Enhanced Thermal Series Augments & Upgrade Kits System (`ThermalAugmentHelper`, `ThermalModAdapter`, `ThermalModGuiHandler`)**:
+  - Distinctly separated tier upgrade kits (LV~EV, 1-kit limit with automatic replacement) and standard augments (up to 3 slots).
+  - Added Shift-click quick installation for multiple copies, clear slot capacity tooltips, and real-time RF/t power draw & cycle time scaling.
+- **Simplified Chinese (zh_cn) Localization**:
+  - Added full Simplified Chinese language support across all UI screens, dialogs, tooltips, and badges.
+
+### Changed & Improved
+- **Reroute Junction Flow Balancing & Supply Tracking (`FlowBalanceMatrixSolver`)**:
+  - Enhanced multi-input and multi-output reroute nodes to accurately track upstream producer operational efficiencies and downstream port demands, preventing flow bottlenecks and ratio calculation distortions.
+- **Fluid Tag Alternative Interpretations in Recipe Conversion (`EmiRecipeConverter`)**:
+  - Fluid input ports defined with fluid tags are now automatically expanded to discover and link all matching alternative fluid identifiers across installed mods.
+- **Canvas Interaction & Dialog Responsiveness**:
+  - Polished rendering and click handling for auto-connect filters, toolbars, summary overlays, and machine cards.
+
+### Fixed
+- **Thermal Dynamo Energy Extraction & Base RF Scaling**:
+  - Fixed an issue where certain Thermal and Systeams recipe categories failed to extract base recipe RF energy values, resulting in zero-duration or inaccurate throughput calculations.
+- **Thermal Augment Multiplier Duplication Glitch**:
+  - Fixed an issue where installing multiple identical augments could erroneously apply compounding multiplier calculations instead of linear additive scaling.
+
+## [2.0.0-beta.1] - 2026-08-29
+
+### Added
+- **Blueprint Metadata & Preview Import/Export Dialog (`ExportBlueprintDialog`, `ImportBlueprintDialog`)**:
+  - Added dedicated modal dialogs for exporting blueprints with custom titles, descriptions, and tags.
+  - Added an interactive blueprint preview dialog when importing, showing total nodes, machines, wire counts, and major inputs/outputs before choosing to "Open in New Page" or "Overwrite Current Page".
+- **Smart Auto-Connect Resource Selection Filter Dialog (`AutoConnectFilterDialog`)**:
+  - When auto-connecting nodes or dragging wires, a resource selection dialog now allows players to preview and selectively check/uncheck matching items and fluids to connect.
+- **Canvas Fit-to-View Feature & Hotkey (`Home` / `F`) (`ToolbarWidget`, `HotkeyHudWidget`)**:
+  - Added a "Fit to View" button on the toolbar and hotkey shortcuts (`Home` / `F`) to instantly center the canvas and scale the zoom level to encompass all placed nodes.
+- **Ratio & Mass Balance Settings Tab in Board Settings Dialog (`BoardSettingsDialog`)**:
+  - Added a dedicated "Ratio & Balance" configuration tab to customize the maximum machine count limit for perfect integer harmonization and adjust surplus tolerance thresholds.
+
+### Changed & Improved
+- **Large Workspace Streaming & On-Demand Page Loading**:
+  - Implemented chunked packet streaming for multiplayer team workspaces, preventing network payload overflows during large factory commits.
+  - Optimized multiplayer connection speed by synchronizing page metadata first and loading full page canvas data on-demand during tab switching.
+- **Wire Hover & Click Detection Performance Optimization**:
+  - Implemented spatial partitioning indexing for canvas wires, ensuring smooth, lag-free wire selection, hovering, and rerouting even in massive factory flowcharts with hundreds of connections.
+- **Multiplayer Edit Lock Instant Cleanup on Disconnect**:
+  - Teammate canvas edit locks are now immediately released when a player closes the board or disconnects from the server, eliminating wait times for other team members.
+
+### Fixed
+- **JEI Mode Inactive Probability Byproduct Output Ports**:
+  - Fixed an issue where 0% chance byproducts that should be inactive at lower voltage tiers (e.g. bone meal and feathers from raw chicken maceration in LV/MV) were incorrectly instantiated as output ports when imported via JEI.
+- **Tier Switching Internal State Desynchronization**:
+  - Fixed an issue where machine voltage tier adjustments temporarily displayed desynchronized power consumption figures until the node was moved or reopened.
+- **Team Page Deletion Permission Validation Conflict**:
+  - Fixed a client-server state desynchronization issue when non-admin team members attempted to delete shared team pages.
+
+## [2.0.0-alpha.12] - 2026-08-29
+
+### Added
+- **Integrated Board Settings Modal Dialog (`BoardSettingsDialog`, `ToolbarWidget`)**:
+  - Added a dedicated settings modal accessible via the `[⚙ Settings]` button on the top-right toolbar to easily configure and manage global fluid units (Auto, Always mB, Always B), time units (/s, /t, /min, /h), singleplayer pause toggling, and default overclock modes.
+
+### Changed & Improved
+- **Enhanced Hovered Recipe Addition Hotkey (`Shift + A`)**:
+  - Hovering over items or recipes anywhere—including EMI and JEI recipe viewer screens, container/inventory sidebars, and bookmark/favorites panels—and pressing `Shift + A` now immediately adds the target recipe to the flowchart board.
+  - Resolved modifier key conflicts ensuring `Shift + A` triggers reliably without interfering with active text inputs (`EditBox` search bar focus).
+- **Multiblock Model Controller Selection in Machine Configuration Dialog**:
+  - All valid multiblock machine variants (e.g. Large Macerator, Advanced Large Miner) supporting the same recipe category are now properly displayed and switchable via clicking or mouse-wheel scrolling in the dialog header.
+- **Auto-Hide FTB Library Sidebar Buttons in `BoardScreen` (`ClientForgeEvents`)**:
+  - Automatically hides FTB Quests, FTB Chunks, and FTB Teams sidebar buttons that previously overlapped the top-left canvas area in `BoardScreen`, providing a clean workspace while 100% preserving native EMI `[+]` transfer functionality.
+
+### Fixed
+- **Multiblock Energy Hatch & Parallel Hatch Combined Overclock Calculation Bug (`GTCEuModAdapter`, `GTParallelHatchAddon`, `EnergyHatchHelper`)**:
+  - Fixed an issue where parallel overclocking exceeded maximum supported voltage/amperage when energy hatches were installed and added support for dual lower-tier energy hatch tier-up (+1 tier).
+  - Fixed a multiplier calculation flaw where a machine's base parallel and equipped parallel hatch were erroneously compounded.
+- **Multiblock BoM Optional Hatch & Parallel Hatch Casing Reduction (`GTCEuBOMHelper`, `MultiblockStructureCatalog`)**:
+  - Uninstalled optional hatches (such as preview Elite Parallel Control Hatches) present in base 3D blueprint shapes are now properly excluded from the BoM and seamlessly restored to base structural casings (+1 count).
+  - Intelligently pruned unnecessary item/fluid buses from recipes without corresponding I/O.
+- **JEI / EMI Search Bar Typing Shortcut (`B`) Collision Bug (`ClientForgeEvents`)**:
+  - Fixed an issue where typing into JEI or EMI search boxes inside inventory, container, or recipe viewer screens would inadvertently intercept the `B` key and open the calculator board.
+- **JEI Recipe Indexing & Discovery in Search Dialog (`JeiRecipeViewerAdapter`)**:
+  - Fixed an issue in JEI-only environments where recipes were delayed or failed to populate when opening the Recipe Search Dialog.
+- **Programmed Circuit Input Port Bug in JEI Mode (`JeiRecipeConverter`, `GTCEuRecipeHandler`)**:
+  - Fixed an issue where non-consumed configuration circuits (`gtceu:programmed_circuit`, `gtceu:integrated_circuit`) were incorrectly added as demand input ports (`-0/s` or `Demand: 2/s`) when converting recipes from JEI.
+- **Steam Machine Tier Switching Icon Corruption (`GTCEuModAdapter`)**:
+  - Fixed an issue where changing tiers or switching from LP/HP steam machines would erroneously redirect the machine icon to an unrelated controller (e.g. Large Miner).
+- **Layered Recipe Extraction & Reflection Hardening (`LayeredRecipeHelper`)**:
+  - Resolved missing layout slots and wrapper object extraction issues during GTCEu and third-party recipe conversion.
+
+### Known Issues
+- **Unintended Byproduct Output Ports in JEI Mode for LV/MV Macerator Recipes**:
+  - When importing certain GTCEu recipes (e.g. Raw Chicken maceration) via JEI, byproducts with 0% chance that should be inactive at lower voltage tiers (LV/MV) are temporarily instantiated as output ports. (To be resolved in the next release).
+
+## [2.0.0-alpha.11] - 2026-08-28
+
+### Added
+- **Phoenix Guilds (Teams) Mod Integration (`PhoenixGuildsProvider`, `TeamProviderRegistry`, `TeamProviderTest`)**:
+  - Implemented soft-dependency team provider for Phoenix Guilds ([CurseForge 1612085](https://www.curseforge.com/minecraft/mc-mods/phoenix-guilds) / `phoenix_guilds`) using safe reflection.
+  - Automatically isolates team flowchart workspaces for guild members and grants team page administration privileges to guild officers and owners (`GuildRank.OFFICER`, `GuildRank.OWNER`).
+- **In-Place Alternative Recipe Switching (`RecipeNode`, `AlternativeRecipeFinder`, `MachineConfigDialog`, `RecipeSwitchTest`)**:
+  - Switch recipes for existing nodes on the canvas directly without deletion via the `[🔄 Switch Recipe]` header button in `MachineConfigDialog` or the right-click node context menu.
+  - Automatically matches and ranks candidate recipes by same machine ID and shared primary outputs.
+  - Smart wire preservation retains existing connections for shared input/output ingredients (`IngredientStack.getId()`), with complete Undo/Redo (`Ctrl+Z` / `Ctrl+Y`) support.
+- **Unified Recipe Viewer Support Extension (JEI / JEI++ & Vanilla Integration) (`IRecipeViewerAdapter`, `RecipeViewerRegistry`, `JeiRecipeViewerAdapter`, `VanillaRecipeViewerAdapter`, `RecipeViewerRegistryTest`)**:
+  - Seamlessly supports environments running JEI (Just Enough Items) and JEI++ (Just Enough Calculation / BoM) with recipe catalog indexing, `[R]`/`[U]` hotkey lookups, bookmark synchronization, and one-click multiblock BoM tree registration.
+  - Pure vanilla fallback enables offline and vanilla recipe catalog lookup when no recipe viewer mod is present.
+- **Uniform Global Fluid Unit Formatting Option (`FluidUnitMode`, `FormatUtil`, `ToolbarWidget`, `HotkeyHudWidget`, `UiFormattingTest`)**:
+  - Added canvas-wide fluid rate display unit toggles between `Auto` (smart unit scaling), `Always mB` (forced millibuckets), and `Always B` (forced buckets) via the toolbar button and `Shift+T` hotkey.
+  - Selected fluid unit preference is automatically persisted across game sessions in client configuration.
+- **5-Level UI Font Scale for Machine Configuration Dialog (`FontScale`, `MachineConfigDialog`)**:
+  - Scale machine settings UI across 5 presets (`0.75x`, `0.85x`, `1.0x`, `1.15x`, `1.30x`) via the `[Aa 1.0x]` header button.
+  - Supports left/right click cycling, mouse wheel scrolling, and `+`/`-` keyboard shortcuts with pixel-perfect center-anchored matrix unprojection.
+
+### Changed & Improved
+- **Page Tab Bar Overflow Navigation & Padding (`PageTabBarWidget`)**:
+  - Added click support on `«` and `»` overflow indicators to smoothly scroll through tab bars when page counts exceed screen width.
+  - Added a 16px right margin buffer preventing the final tab and the `[+]` button from being obscured by overflow arrows.
+- **Hotkey HUD Fluid Unit Guide (`HotkeyHudWidget`)**:
+  - Added `Shift+T` fluid unit cycle shortcut guide in the bottom-left hotkeys HUD widget.
+
+### Fixed
+- **Page Tab Bar Scissor Boundary Clipping & Unclickable Overflow Arrow Bug (`PageTabBarWidget`)**:
+  - Fixed an issue where the right overflow arrow `»` failed to respond to mouse clicks and the right border of the final tab was clipped outside the scissor rendering rectangle.
+
+## [2.0.0-alpha.10] - 2026-08-27
+
+### Added
+- **Target Batch Production Estimated Time (ETA) & Goal Node System (`RFC-005`, `ProductionETACalculator`, `NodeTargetBatchEditor`, `NodeProperties`, `ETACalculationTest`)**:
+  - Set target batch goals (e.g. `100x`, `1,000x`, `10 B`) on reroute and terminal goal nodes.
+  - Computes real-time estimated completion duration (Target Amount / Net Inflow Rate) and renders human-readable `ET: 24m 52s` badges beneath cards.
+  - Hovering over goal nodes reveals total energy required (EU) and raw upstream material consumption across the batch duration.
+  - Supports inline clicking/typing to edit batch goals with Shift + Click to reset.
+- **Kinetic Generator & Motor EMI Recipe Integration & SU Search Indexing (`KineticGenerationEmiRecipe`, `CalcBoardEmiPlugin`, `CreateRecipeHandler`, `CreateNewAgeRecipeHandler`, `RecipeSearchEngine`)**:
+  - Registered kinetic generation and motor recipes as native EMI synthetic recipes with workstations and outputs, allowing seamless favorite pinning and recipe lookup.
+  - Enriched search indices so querying `<su`, `<stress`, or machine names immediately matches stress unit generation recipes.
+- **Magnet & Multi-Stackable Addon Click Interaction (`MachineConfigDialog`, `CreateNewAgeModAdapter`)**:
+  - Left-clicking catalog cards now stacks addons (+1) up to 12 slots, while Shift + Left-Click fills remaining slots (+12) or batch-replaces them.
+  - Right-clicking uninstalls 1 copy (-1), and the top `Clear Magnets` button resets all installed magnets.
+
+### Changed & Improved
+- **Addon Configuration Dialog Performance & First-Open Stuttering Elimination (`MachineConfigDialog`, `MachineAddonCatalog`, `MultiblockDetector`, `GTCEuMultiblockScanner`, `CoilHelper`, `TurbineRotorHelper`)**:
+  - Eliminated the 1-second freeze and frame drops when opening the machine configuration dialog by converting linear scans across 100,000+ EMI recipes and 10,000+ blocks into pinpoint O(1) category lookups and early keyword skips.
+  - Optimized language code synchronization and preloading lifecycle so registry indexing executes seamlessly in background threads.
+- **Deferred Addon Tooltip Rendering (`MachineConfigDialog`)**:
+  - Resolved UI layering bug where lengthy addon descriptions were clipped by dialog boundaries.
+
+### Fixed
+- **Star Technology Greenhouse & Farm Threading/Coil Capability Misidentification Bug (`CategoryCapabilityMatrix`, `MultiblockDetector`, `StarTModAdapter`, `GTCEuThreadingTest`)**:
+  - Fixed an issue where Farm/Greenhouse multiblocks containing decorative coil blocks were misclassified as heating coil multiblocks or had threading tabs unexpectedly activated upon switching icons.
+- **Guarded Against Crashes When Pressing Keybinds Outside Worlds or in Config Menus (`BoardScreen`, `ClientForgeEvents`, `NetworkHandler`)**:
+  - Prevented a `NullPointerException` crash in vanilla `AbstractContainerScreen.containerTick()` caused by opening `BoardScreen` via hotkey when not in a world (e.g. while in the title screen, controls menu, or mod config screens where `mc.player == null`).
+  - Added guards so hotkeys do not intercept input while in pause, options, controls/keybinds, death, or configuration screens.
+  - Added lifecycle validation guards across `BoardScreen.init()` and `containerTick()` to ensure the screen closes cleanly if world/player context is absent.
+  - Gracefully closes `BoardScreen` upon logging out of a world and guarded packet dispatch against disconnected channels.
+- **GT Thermal Centrifuge & Crafting Table Mod Misidentification Bug (`ThermalAugmentHelper`, `GTCEuModAdapter`, `CreateModAdapter`, `VanillaModAdapter`, `ModAdapterRegistryTest`)**:
+  - Fixed a heuristic string matching bug where GregTech machines containing the word "thermal" (e.g. Thermal Centrifuge) were misclassified as Thermal Expansion machines and rendered with `⚡ Thermal` badges and RF power instead of GT EU/t.
+  - Fixed a workstation routing bug where Vanilla crafting table recipes with secondary workstations from Thermal (Tinker Bench) or Create (Mechanical Crafter) were incorrectly captured by mod adapters instead of falling back cleanly to Vanilla Passive (`🍃 Passive`).
+- **HP Steam to Electric Singleblock Machine Icon Recovery Bug (`CategoryCapabilityMatrix`, `GTCEuModAdapter`, `GTCEuSteamProcessingTest`)**:
+  - Fixed an issue where disabling HP Steam mode unexpectedly promoted singleblock machines to multiblock icons instead of restoring the original tier-specific singleblock workstation.
+- **Stress Unit (SU) Contextual Producer Search & Duplicate/Disabled Kinetic Entry Fix (`RecipeSearchDialog`, `RecipeSearchEngine`, `CalcBoardEmiPlugin`, `CreateRecipeHandler`, `CreateNewAgeRecipeHandler`, `RecipeSearchEngineTest`)**:
+  - Fixed an issue where dragging from a node's Stress Unit input port into the recipe search dialog yielded `No matching recipes found.` due to missing virtual stress IDs in kinetic generator recipe indices.
+  - Fixed duplicated `[kinetic generation]` and `[Create Kinetic]` entries in search dialogs.
+  - Filtered out non-kinetic or modpack-disabled/hidden items (such as `Solar Heating Plate` and `Reinforced Motor` in Star Technology) from recipe viewer registration.
+
+## [2.0.0-alpha.9] - 2026-08-26
+
+### Added
+- **Native EMI Recipe Transfer (`[+]`) Button & Drag-and-Drop Integration (`BoardEmiRecipeHandler`, `BoardEmiDragDropHandler`, `CalcBoardEmiPlugin`)**:
+  - Clicking EMI's native `[+]` button while viewing recipes with the Calculator Board open now directly instantiates and adds the recipe as an active node onto the canvas.
+  - Supports dragging recipes directly from EMI onto the board canvas to place new nodes.
+- **Multiblock Construction Bill of Materials (BOM) System (`RFC-003`, `MultiblockBOMCalculator`, `MultiblockStructureCatalog`, `MultiblockBOMDialog`, `MultiblockBOMEmiRecipe`, `MultiblockBOMTest`)**:
+  - Added dedicated global/per-page BOM calculation dialog opened via hotkey `B` or the `[📦 BOM]` toolbar button.
+  - Categorizes structure parts into Casings, Coils, Hatches/Buses, and Controllers with precise stack and remainder formatting (e.g. `3 stacks + 48 (240)`).
+  - One-click `[★ Register in EMI]` button to register the aggregated construction parts as a virtual root recipe in EMI's crafting tree for effortless ingredient tracing.
+  - Added `[📋 Copy List]` clipboard text export functionality.
+  - Real-time dual lower-tier energy hatch toggle (`⚡ 1x Normal Energy Hatch ↔ 2x 1-Tier Lower Energy Hatches`).
+- **Energy Hatch & Dynamic Hybrid Hatch Override System (`RFC-004`, `GTEnergyHatchAddon`, `GTHatchAddon`, `EnergyHatchHelper`, `GTHatchHelper`)**:
+  - Determines multiblock voltage tier and amperage (1A, 2A, 4A, 16A, etc.) through equipped energy hatch addons with automatic tier overclock ceiling clamping.
+  - Dynamically calculates needed I/O bus and hatch counts based on slot capacities (1x, 4x, 9x, 16x) and enforces Distillation Tower single-fluid hatch constraints.
+- **Horizontal Node Flip (`RecipeNode`, `NodeCardRenderer`, `BoardHotkeyHandler`, `NodeFlipTest`)**:
+  - Hotkey `Alt + F` or card flip button (`[⇄]`) horizontally mirrors input (left) and output (right) slot layout to minimize wire crossings in dense process layouts.
+- **Lifecycle Event Bus & Addon Hooks System (`RFC-001`, `RecipeNodeEvent`, `FlowGraphEvent`, `MachineCatalogEvent`, `LifecycleEventBusTest`)**:
+  - Standardized Forge event bus hooks notifying external listeners on node lifecycle stages (create, modify, delete, pre/post calculation, and catalog build).
+- **GregTech Large Multiblock Steam Boilers & Throttle Control (`GTBoilerTier`, `GTCEuRecipeHandler`, `GTCEuModAdapter`, `MachineConfigDialog`)**:
+  - Accurately parses Large Boiler recipes (`gtceu:large_boiler`), calculating baseline steam production (800 mB/t = 16,000 mB/s) and water consumption (5 mB/t = 100 mB/s, 1:160 ratio) for the Large Bronze Boiler.
+  - Multi-tier speed scaling for large boilers: L-Bronze 1.0x (800 mB/t), L-Steel 2.25x (1,800 mB/t), L-Titanium 4.0x (3,200 mB/t), and L-Tungstensteel 8.0x (6,400 mB/t).
+  - Integrated 25% ~ 100% Throttle slider and preset buttons in `MachineConfigDialog` and node cards, dynamically scaling duration, fuel burn rate, and steam output.
+- **Canvas Group Frame Selection Model, Clipboard & Undo/Redo Integration (`BoardSelectionModel`, `CanvasGroupFrameRenderer`, `CanvasInteractionHandler`, `NodeClipboard`, `BoardCommand`, `CanvasGroupFrameTest`)**:
+  - Full marquee box selection and Shift/Ctrl multi-selection support for group frames.
+  - Comprehensive clipboard support (`Ctrl + C`, `Ctrl + V`, `Ctrl + X`, `Ctrl + D`, `Delete`) for frames and contained nodes, preserving relative layout coordinates upon paste.
+  - Complete history tracking (`Undo / Redo`) for frame creation, deletion, movement, and resizing.
+  - Prevented duplicate delta application (Double-Delta) when dragging multiple selected frames and nodes.
+- **Create: New Age Carbon Brushes Generator Coil & Magnet BOM Aggregation (`MultiblockBOMCalculator`, `CreateNewAgeModAdapter`, `IModAdapter`, `CreateNewAgeTest`)**:
+  - Extended `IModAdapter.populateExtraBOMParts` SPI to automatically include 1x `Generator Coil` (`create_new_age:generator_coil`) per Carbon Brushes machine under the `COIL` category in the BOM.
+  - Automatically aggregates all installed singleblock and kinetic addons (up to 12 magnets per generator, thermal augments, threading helixes) into the BOM multiplied by machine count.
+  - Classified `MAGNET` items under the `COIL` category, properly displaying them in the Coils and All BOM tabs.
+- **Muffler & Maintenance Hatch Catalog and BOM Support (`MultiblockStructureCatalog`, `MultiblockBOMCalculator`, `GTCEuModAdapter`)**:
+  - Added Muffler Hatches (LV~MAX) and Maintenance / Auto-Maintenance Hatches to the catalog and BOM construction blueprints.
+- **Star Technology Sterile Cleaning Maintenance Hatch Support (`StarTAddonCrawler`, `StarTModAdapter`, `MachineAddonTest`)**:
+  - Added `start_core:sterile_cleaning_maintenance_hatch` to the maintenance addons catalog with full localization support.
+
+### Changed & Improved
+- **Background Data Indexing & Memory Footprint Optimization**:
+  - Optimized recipe search token caching and indexing throughput, eliminating frame drops and reducing memory allocation during startup and recipe search.
+- **Flow Graph JSON Serialization Payload Optimization (`FlowGraphSerializer`)**:
+  - Omitted default field values during graph serialization to significantly minimize blueprint and NBT data size.
+- **UI Layout and Toolbar Margin Polish (`BoardScreen`, `ToolbarWidget`)**:
+  - Refined toolbar button boundaries and padding, improving Favorites Dock placement and responsiveness.
+
+### Fixed
+- **Auto Connect Duplicate Bypass Wire Prevention (`ToolbarWidget`)**:
+  - Prevented redundant direct bypass wires from being created between producers and consumers that are already routed through a reroute junction hub.
+- **Large Boiler Recipe Double-Acceleration Duration Bug (`GTCEuRecipeHandler`, `GTCEuModAdapter`)**:
+  - Fixed an issue where singleblock boiler speed multipliers were redundantly applied to large boiler recipes, distorting cycle duration down to 0.05s (1 tick) and vastly overconsuming fuel.
+- **Dialog & Search Text Input 'E' Key / Canvas Hotkey Conflict Bug (`RecipeSearchDialog`, `BoardScreen`, `MultiblockBOMDialog`, `GlobalBalanceDashboardDialog`)**:
+  - Fixed a key routing bug where typing letters (such as 'E', 'B', 'T', 'F', 'J') into search boxes or modal input fields triggered Minecraft's inventory close key (E) or board canvas shortcuts instead of typing cleanly into the input box.
+
+---
+
+## [2.0.0-alpha.8] - 2026-08-25
+
+### Added
+- **Star Technology & Threading Helix System (`StarTModAdapter`, `StarTAddonCrawler`, `StarTTurbineHelper`, `GTThreadingHelix`, `NodeThreadingConfig`, `MachineConfigDialog`, `NodeCardRenderer`)**:
+  - Added dedicated `[🧵 Threading]` sub-tab in `MachineConfigDialog` for all GTCEu multiblock machines supporting Threading (Generalis, Velocitas, Efficienta, Parallelismus, Filum).
+  - Live two-way synchronization between the Threading Builder and the top `Active Addons` tray with combined stats badges and quantity indicators (e.g. `8x OpV Weaving Thread Helix`).
+  - Added item decoration quantity badges on addon slot icons and node card trays (e.g. `8`).
+  - Multi-model Plasma Turbine support: Large Plasma Turbine (LPT, 1x), Supreme Plasma Turbine (SPT, 6x), and Nyinsane Plasma Turbine (NPT, 12x).
+  - Star Technology Multiblock Traits: Lubricant Boosting (+25% / +50% EU/t with Tungsten Disulfide) and Coolant Boosting (+75% / +150% EU/t with Superstate Helium 3 / Oganesson Stabilized BEC).
+- **GregTech Steam-Era Processing Machinery (LP Bronze / HP Steel) & Direct Steam Consumption Mode (`SteamMode`, `RecipeNode`, `CategoryCapabilityMatrix`, `GTCEuGuiHandler`, `MachineConfigDialog`)**:
+  - Added direct steam processing modes (`LP Steam`, `HP Steam`) for all GregTech recipes that support steam processing machinery (Macerators, Compressors, Alloy Smelters, Furnaces, Extractors, Rock Breakers, etc.).
+  - **GregTech Steam Physics Ratio**: 1 EU = 2 mB Steam (2 L Steam).
+  - **Low Pressure Steam (LP Bronze)**: 2.0x duration (0.5x speed), disconnected from electric EU grid (0 EU/t), activates a BaseEUt * 2 mB/t Steam (`gtceu:steam`) fluid input slot.
+  - **High Pressure Steam (HP Steel)**: 1.0x duration (1.0x standard LV speed), disconnected from electric EU grid (0 EU/t), activates a BaseEUt * 2 mB/t Steam (`gtceu:steam`) fluid input slot.
+  - **Node Card Controls & Dialog Presets**: Interactive tier button cycling (`[LP Steam] ↔ [HP Steam] ↔ [LV] ↔ ...`) and 1-click preset buttons in `MachineConfigDialog`.
+  - **Direct Boiler Wiring & Auto-Ratio**: Seamlessly drag steam wires from Steam Boilers (`gtceu:steam_boiler`) directly to steam machines, fully supporting `Shift + Connect` Auto-Ratio machine scaling.
+- **Favorites Interactions & Live Synchronization (`RecipeSearchDialog`, `FavoritesDockWidget`)**:
+  - Added favorite star (⭐) toggle button to each recipe search result row and right-click to toggle favorite status.
+  - Added right-click on items in the Favorites Dock to instantly remove them from favorites.
+  - Enhanced workstation (machine item) favorites to correctly display all processable recipes in the search dialog's `[⭐ Favorites]` filter.
+
+### Changed & Improved
+- **GTCEu Modern / Star Technology Architecture Decoupling (`StarTModAdapter`, `ModAdapterRegistry`, `IModAdapter`)**:
+  - Cleanly isolated Star Technology and Threading mechanics into `StarTModAdapter` via the `IModAdapter` SPI pattern without hardcoding mod-specific logic into GTCEu core.
+- **Massive RAM & GC Optimization for 4GB Low-Memory Environments (`RecipeSearchEngine`, `DynamicAddonCrawler`, `ClientForgeEvents`, `CategoryCapabilityMatrix`)**:
+  - Completely refactored `SearchableRecipe` with the Flyweight pattern and `String.intern()`, reducing total recipe search heap allocation from **~320MB down to ~14MB (>95% reduction)** across 80,000+ recipes.
+  - Deduplicated item outputs by `Item` and NBT keys (`Set<Item>`) during dynamic addon crawler passes, slashing temporary heap allocations by >98%.
+  - Added automatic cache eviction (`clearGlobalCache`, `reset`) and explicit `System.gc()` call on world logout (`ClientPlayerNetworkEvent.LoggingOut`) to prevent `OutOfMemoryError` and data pack reload failures when reloading worlds on 4GB RAM.
+  - Eliminated per-frame list copying in `FavoritesDockWidget` and cached `findRecipesForFavorite` lookups to prevent periodic GC stuttering during rendering.
+- **Virtual FE Item Cleanup & Grid Energy Refinement (`CreateNewAgeRecipeHandler`, `CreateRecipeHandler`, `CreateNewAgeModAdapter`)**:
+  - Removed duplicate virtual `FE` item input/output slots from Generator Coils, Carbon Brushes, and Motors.
+  - Recipe item slots now only contain physical resources (Stress Units, items, fluids), while electricity is cleanly aggregated at the grid level on card headers and the summary overlay.
+- **Create Encased Fan Fixed Processing Duration (`CreateModAdapter`, `CreateGuiHandler`)**:
+  - Aligned Encased Fan bulk processing (Blasting, Splashing/Washing, Smoking, Haunting) with vanilla Create mechanics: processing time remains fixed (default 7.5s) regardless of RPM, as RPM only extends airflow reach/distance and increases SU impact.
+  - Added tooltip guidance noting that throughput is increased by placing multiple fans (`Machine Count: N`), not by speeding up RPM.
+- **Full GregTech Steam Boiler & Steam Production Support (`GTCEuRecipeHandler`, `GTCEuModAdapter`, `SysteamsModAdapter`)**:
+  - Fixed category routing collision where `SysteamsModAdapter` hijacked `gtceu:steam_boiler` recipes.
+  - Automatically calculates fuel burn, water consumption (`minecraft:water`), and steam production (`gtceu:steam`) based on official GTCEu ratios (Small Bronze Boiler baseline: 120 L/s = 6 mB/t Steam, 1 mB Water -> 160 mB Steam).
+  - Automatically generates empty container outputs (e.g. `minecraft:bucket` from Lava Buckets).
+  - Supported speed & throughput scaling across all boiler tiers: High Pressure Steel Boiler (3x), Large Bronze Boiler (8x), Large Steel Boiler (15x), Large Titanium Boiler (26.6x), and Large Tungstensteel Boiler (40x).
+- **Removed Recipe Shortcut Key ('A') (`ClientForgeEvents`, `KeyBindings`)**:
+  - Removed screen shortcut key recipe addition to eliminate keybinding conflicts with EMI/JEI bookmarks.
+
+### Fixed
+- **GTCEu Turbine Rotor Material NBT Persistence & Texture Tint Restoration (`GTRotorAddon`, `MachineAddon`, `TurbineRotorHelper`)**:
+  - Fixed turbine rotor material loss and color tint reverting to default Neutronium texture after returning from the Main Menu or reloading worlds.
+  - Serialized full `ItemStack` NBT (`GT.PartStats: {Material: ...}`) into `MachineAddon` save tags and added dynamic fallback material reconstruction in `GTRotorAddon.getItemStackSample()`.
+- **Plasma Turbine Trait Retrieval & Fluid Name Resolution (`GTCEuAddonCrawler`, `StarTAddonCrawler`, `GTTurbineHelper`, `StarTTurbineHelper`, `IngredientRenderer`)**:
+  - Fixed energy type condition in `isTurbine` and relaxed model matching in `isCompatibleStarTTrait`, allowing SPT/NPT boosting traits to properly display in `[📜 Traits]` and `[All]` tabs.
+  - Added dynamic namespace resolution (`gtceu`, `start_core`, `gtceu_start`) for boosting fluids, preventing `Fluids.EMPTY` from falling back to `AIR` text and icon.
+- **Threading Sub-Tab Label Overlap (`MachineConfigDialog`)**:
+  - Shortened sub-tab button labels (`Sup`, `Spd`, `Par`, `Thrd`) to eliminate text clipping and overlap.
+
+---
+
+## [2.0.0-alpha.7] - 2026-08-23
+
+### Added
+- **Create: New Age Integration (`CreateNewAgeModAdapter`, `CreateNewAgeGuiHandler`, `CreateNewAgeRecipeHandler`, `CreateNewAgeAddonCrawler`, `CreateMagnetAddon`)**:
+  - **Generator Coil & Carbon Brushes Calculations**:
+    - Supported equipping up to 12 magnet items with Shift-click batch install.
+    - Calculated Generator Coil base stress (`24.0 SU/RPM`) and total stress load ((24.0 + Strength) * RPM).
+    - Dynamically retrieved mod config (`suToEnergy`) via runtime reflection for power output (FE/t = Strength * RPM * suToEnergy).
+    - Rendered Goggle-style UI header with energy stats (Base Stress, Total Stress, Efficiency, FE/t).
+  - **Motors & Motor Extensions Calculations**: Calculated SU output and FE power consumption for motors and extension multipliers.
+  - **Kinetic Overstressed Handling (`FlowGraphSolver`)**: Halts nodes (`0.0 efficiency`, `0 FE/t`, `0 SU/s`) when Stress Unit supply is deficient.
+- **GTCEu Fusion Reactor Simulation & Start Buffer Aggregation (`RecipeNode`, `FlowGraphSolver`, `SummaryOverlay`, `NodeBadgeRegistry`)**:
+  - Extracted recipe `eu_to_start` (ignition requirement) and preserved in NBT.
+  - Automatically determined Fusion Tier (Mk1 <= 160M, Mk2 <= 320M, Mk3 > 320M EU) and minimum voltage tier (LuV/ZPM/UV) with target tier clamping.
+  - Supported Fusion Reflector addons (T1-T3) and spec integration.
+  - Displayed Fusion Start Buffer badge on node card headers.
+  - Aggregated per-tier reactor counts and total startup EU (`⚛ Fusion Start Buffer`) in the Summary Overlay with detailed tooltips.
+- **Parametric Search Input/Output Prefixes & Prefix Guide Dock (`RecipeSearchEngine`, `RecipeSearchDialog`)**:
+  - `in:`, `input:`, `>` : Input material filter.
+  - `out:`, `output:`, `<`, `^` : Output product filter.
+  - **Always-Visible Prefix Guide Dock**:
+    - Added a docked side panel on the left of the search dialog displaying 8 core prefixes (`@`, `#`, `[`, `>`, `<`, `!`, `|`, `"`).
+    - Added Quick Insert feature: Clicking any prefix chip auto-appends it into the search box.
+    - Applied responsive auto-centering layout.
+
+### Changed & Improved
+- **Addon Deductive Analysis Structure**:
+  - Replaced heuristic string parsing with official Java interfaces, deterministic NBT (`AugmentData`), and runtime config lookups.
+  - Refactored `DynamicAddonCrawler` and `MachineConfigDialog` polymorphic architecture.
+  - Supported equipping up to 12 slots for Thermal Augments.
+- **Code Quality & Javadoc Standardization**:
+  - Standardized all Javadoc comments to English and cleaned up redundant comments.
+
+---
+
+## [2.0.0-alpha.6] - 2026-08-23
+
+### Added
+- **Create Mod Kinetic System & Stress Unit (SU) Scaling (`CreateModAdapter`, `CreateRecipeHandler`, `CreateGuiHandler`)**:
+  - Added power generation calculations for Large Water Wheel, Water Wheel, Windmill Bearing, Steam Engine, Hand Crank, Creative Motor, and Electric Motor.
+  - Applied proportional scaling for processing duration and stress impact (Base SU * RPM / 32) based on rotation speed relative to 32 RPM.
+  - Added `create:stress_units` I/O ports with real-time rate display, wire connections, and Auto-Ratio balancing.
+  - Indexed Create processing recipes (Pressing, Crushing, Milling, Mixing, Cutting, Polishing, Rolling, etc.) under the SU consumer search dialog.
+  - Added SU/FE conversion and UI controls for Create Crafts & Additions Alternator and Electric Motor.
+- **Reroute & Junction Nodes (`RecipeNode`, `FlowGraph`, `FlowGraphSolver`)**:
+  - Added 32x32 zero-cost (0 EU/t, 0s) Reroute & Junction Nodes.
+  - Automatically bound ingredient specifications based on upstream/downstream connections.
+  - Added double-click splitting on wires to insert junction nodes.
+  - Supported pass-through flow during Auto-Ratio calculations.
+- **Canvas Group Frames & Sticky Notes (`CanvasGroupFrame`, `CanvasStickyNote`, `FrameEditDialog`, `NoteEditDialog`)**:
+  - Added 8-color group frames (`CanvasGroupFrame`) supporting header dragging, resizing, and 1-click compound module packaging.
+  - Added bounding-box-based frame creation on selected nodes with `Ctrl + G`.
+  - Added standalone sticky notes (`CanvasStickyNote`) with auto-wrapped text, color cycling, and double-click editing.
+  - Handled automatic containment when dragging nodes in and out of frames.
+  - Supported packaging and expanding compound modules containing group frames and notes.
+- **Canvas 4-Button Quick Action Marker ([🔍] [🔀] [🖼] [📝]) (`BoardScreen`, `CanvasInteractionHandler`)**:
+  - Added quick action marker on empty canvas clicks and wire drops (Recipe Search, Junction Node, Group Frame, Sticky Note).
+- **Node Card Controls & Multi-Energy Framework (`EnergyType`, `NodeCardRenderer`, `NodeWidget`)**:
+  - Added `EnergyType` domain model (`ELECTRIC_EU`, `ELECTRIC_FE`, `HEAT_OR_SELF`, `KINETIC_SU`, `MANA`).
+  - Thermal Boilers (`HEAT_OR_SELF`): Replaced voltage tier and EU/t display with Boiler banner and steam production rates.
+  - Thermal Dynamos (`ELECTRIC_FE`): Replaced tier buttons with Dynamo banner and RF/t units, converted to 4 RF = 1 EU for summary calculations.
+- **Updated Interactive Tutorial (`TutorialStep`, `TutorialManager`, `TutorialOverlay`)**:
+  - Restructured tutorial into a 7-step course covering junction nodes, group frames, quick actions, hardware config, and compound modules.
+- **Systeams Runtime Reflection Integration (`SysteamsModAdapter`, `ThermalModAdapter`)**:
+  - Queried Systeams configs (`STEAM_RATIO_*`, `SPEED_*`) and recipes at runtime.
+  - Categorized Steam Dynamo (`systeams:steam`) as a steam-consuming generator.
+
+### Fixed & Changed
+- **Hardware Config Dialog Performance & Synchronization (`DynamicAddonCrawler`, `MachineConfigDialog`)**:
+  - Removed synchronous recipe scans when opening the dialog; separated into registry lookup and background NBT queries to eliminate open latency.
+  - Updated catalog cache invalidation when removing active addons, clicking Clear All, or right-clicking catalog cards.
+- **Dynamo & Boiler Spec Calculation (`ThermalAugmentHelper`, `DynamicAddonCrawler`)**:
+  - Calculated specs based on `ThermalFuel`/`SteamFuel` class hierarchy, Forge tags, and KubeJS NBT tags (`DynEA`, `DynP`, `DynEM`).
+  - Indexed KubeJS upgrade kits (`kubejs:lv/mv/hv/ev_upgrade_kit`, `arc_kit`, `mci_kit`) while excluding disabled dummy items.
+- **Contextual Search Filtering (`RecipeSearchDialog`)**:
+  - Fixed an issue where searching machine categories (`[chemical reactor]`) in Producer/Consumer dialogs returned unmatched recipes.
+- **Singleblock Machine Config Interaction (`MachineConfigDialog`)**:
+  - Fixed click handling for augment kit cards on singleblock thermal machines and boilers.
+- **Dynamo & Boiler Tooltips (`BoardTooltipRenderer`)**:
+  - Corrected dynamo hover tooltip from consumption to generation (`Total Power Generation: +400.00 RF/t`).
+  - Added steam production rate (`Total Steam: +30,000.00 mB/s`) to boiler hover tooltips.
+- **Compound Module Power Stats Display (`NodeCardRenderer`)**:
+  - Fixed rendering condition causing net power generation/consumption stats (`+320.00 EU/t (Gen)`, etc.) to be omitted from row 2 of compound module cards.
+
+---
+
+## [2.0.0-alpha.5] - 2026-08-22
+
+### Added
+- **EMI Default Recipe Prioritization & Badge (`FavoritesDockWidget`, `RecipeSearchDialog`)**:
+  - Prioritized user-set EMI Default Recipes (`Ctrl + Left Click`) at the top of favorites sub-panels and search results.
+  - Added star (`★`) badge and highlight border to Default Recipes.
+- **Category Query with Spaces Support (`RecipeSearchEngine`, `RecipeSearchDialog`)**:
+  - Added support for bracketed category queries containing spaces, such as `[gas turbine]` and `[large chemical reactor]`.
+  - Improved ranking for exact multi-word category matches without brackets.
+- **Board Viewer Presence & Tooltip (`TeamPresenceTracker`, `WorkspaceTabBarWidget`)**:
+  - Displays count of teammates actively viewing the board with a hover tooltip listing player names and open page tabs.
+  - Updates presence state when toggling between Personal Board and Team Board tabs.
+
+### Fixed & Changed
+- **Multiplayer Team Workspace Isolation & LAN Support (`FTBTeamsProvider`, `ClientWorkspaceState`)**:
+  - Isolated team UUIDs for FTB Teams parties and solo players to prevent cross-team workspace access.
+  - Added collaboration synchronization support for LAN published worlds.
+- **Lock Badge Sync & Player Nickname Display (`WorkspaceTabBarWidget`, `BoardScreen`)**:
+  - Updated lock status badge to dynamically track the active page tab.
+  - Displays in-game player names (`Locked by <Name>`) instead of raw UUID substrings in lock badges and toasts.
+- **Team Page Deletion Permission Check (`FTBTeamsProvider`, `TeamProviderRegistry`)**:
+  - Added server-side permission checks verifying FTB Teams ranks (`OWNER`, `OFFICER`) and LAN host status before deleting team pages.
+- **Favorites Dock EMI Loading Decoupling (`FavoritesDockWidget`, `RecipeSearchDialog`)**:
+  - Decoupled Favorites Dock loading from full search cache indexing for faster rendering once EMI finishes loading.
+  - Simplified recipe caching flow using standard EMI APIs.
+- **Header Pass-Through & Tooltip Placement (`CanvasInteractionHandler`, `WorkspaceTabBarWidget`)**:
+  - Allowed canvas drag and click interactions to pass through empty regions of the top header and toolbar.
+  - Fixed Unicode font rendering glitch (`\uFE0F`) and adjusted top-bar tooltip positioning to prevent screen clipping.
+- **Search Freeze on 0 Results (`RecipeSearchDialog`)**:
+  - Fixed an issue where queries with 0 results triggered repeated searches during rendering.
+  - Isolated non-thread-safe calls from parallel streams and added search debouncing.
+- **Cleaned Up EMI Overlay Handler (`CalcBoardEmiOverlayHandler`)**:
+  - Removed unused reflection-based EMI overlay handler class.
+
+---
+
+## [2.0.0-alpha.4] - 2026-08-21
+
+### Added
+- **Favorites Dock Panel (`FavoritesDockWidget`, `BoardScreen`)**:
+  - Added a collapsible panel on the left of the board screen to place favorited items onto the canvas via single-click or drag-and-drop.
+- **Favorite Recipe Navigation & EMI Preview Integration (`FavoritesDockWidget`, `RecipeHoverPreviewRenderer`)**:
+  - Displays producing recipes and EMI preview cards upon hovering over favorites, supporting slot hover tooltips and R/U key lookups.
+  - Adjusted hover hitboxes between panels for smoother cursor transitions.
+- **Multi-Phase Loading State & Progress Bar (`MachineConfigDialog`, `RecipeSearchDialog`, `FavoritesDockWidget`)**:
+  - Added multi-phase progress text and progress bars to machine hardware config, recipe search, and favorites dock during background indexing.
+- **Bracket Category Search (`RecipeSearchEngine`, `RecipeSearchDialog`)**:
+  - Supports filtering recipes by category or machine using bracket syntax (`[smelting]`, `[pyro]`, `%smelting`).
+- **Recipe Category Filter Integration (`FavoritesDockWidget`, `RecipeFilterConfig`)**:
+  - Excluded categories in `RecipeFilterDialog` are automatically omitted from favorite recipe exploration and automatic node placement.
+
+### Fixed & Changed
+- **GTCEu High-Tier Coil Stats Calculation (`CoilHelper`, `MachineAddon`)**:
+  - Corrected formula calculations for high-tier and custom coils (e.g. `Abyssal Alloy Coil` Cracker discount `0.07x`, Pyrolyse speed, LCR, and Multi Smelter parallel).
+  - Prioritized `ICoilType.getTier()` to prevent tier calculation discrepancies.
+- **Recipe Search Performance Optimization (`RecipeSearchDialog`, `RecipeSearchEngine`)**:
+  - Removed unnecessary list copying and applied parallel stream filtering during search to improve query response time.
+- **Search Result Relevance & Ranking Improvements (`RecipeSearchEngine`, `RecipeSearchDialog`)**:
+  - Updated scoring logic to prioritize name and category matches when a query is provided.
+- **EMI Recipe Screen `[+]` Button Integration (`CalcBoardEmiOverlayHandler`)**:
+  - Clicking EMI's `[+]` button or pressing the hotkey now adds the recipe and switches to the board screen.
+- **`BoardScreen` Class Hierarchy Fix (`BoardScreen`, `BoardContainerMenu`)**:
+  - Restored `Screen` inheritance to prevent inventory-related sidebar overlays from rendering over the board.
+- **Language File Cleanup (`en_us.json`, `ko_kr.json`)**:
+  - Removed duplicate keys and synchronized resource entries between English and Korean language files.
+
+---
+
+## [2.0.0-alpha.3] - 2026-08-21
+
+### Added
+- **Category Capability Matrix Engine (`CategoryCapabilityMatrix`, `CategoryCapability`)**:
+  - Implemented pre-baked O(1) capability lookup matrix mapping recipe categories directly to machine workstations and supported addon categories.
+  - Added deterministic capability deduction for Heating Coils, Turbine Rotors, Parallel Hatches, Maintenance Hatches, and Thermal Series Augments.
+  - Added dedicated unit test suite (`CategoryCapabilityMatrixTest`) covering singleblock, multiblock, turbine, dynamo, and filtrator categories.
+- **Deductive Multiblock Capability Mapping (`MultiblockDetector`, `EmiRecipeConverter`)**:
+  - Automatically deduce coil and turbine capabilities for complex multiblocks (Large Chemical Reactor, Pyrolyse Oven, EBF, Cracker, etc.) by analyzing workstation structures from `multiblock_info`.
+  - Dynamically synchronize deduced categories with `MultiblockDetector.registerCoilCategory` and `registerTurbineCategory`.
+- **Thermal Machine Upgrade Kit Replacement & 3-Slot Augment Stacking (`RecipeNode`, `MachineConfigDialog`, `ThermalAugmentHelper`)**:
+  - Implemented 1-Kit-only rule for Thermal Upgrade Kits (LV~EV, 6x~48x parallel scale) with automatic replacement upon selecting a new tier.
+  - Added support for stacking identical regular augments (ARC, MCI, etc.) across up to 3 slots (e.g. 3x EV MCI = 4.096x fuel energy) using pure NBT float tags (`AugmentData.Type: Dynamo_Fuel`).
+  - Added catalog card badges (`✔ x2`, `✔ x3`, `3/3`), Left-Click (+1) / Right-Click (-1), and single-instance removal from top active slot bar.
+
+### Changed
+- **Elimination of Heuristic Addon Deduction (Rule 5 Addon Spec Deductive Analysis Policy)**:
+  - Completely purged all substring checks (`contains("rotor")`, `contains("coil")`, `id.getPath()`), tooltip string parsing, and item display name heuristics across the entire codebase.
+  - Migrated all addon extraction to deterministic official tags (`gtceu:circuits/*`, `thermal:upgrade_kit`), exact NBT float/int structures (`AugmentData`), and runtime reflection (`CoilHelper`, `TurbineRotorHelper`, `ParallelHelper`).
+- **Responsive Dialog Loading Overlays & Live State Updates (`MachineConfigDialog`, `RecipeSearchDialog`)**:
+  - Added clean section-level loading overlays with animated indicators while background indexing is in progress.
+  - Implemented reactive live updates: as soon as background baking completes, the `[♨ Coil]`, `[⚡ Parallel]`, and `[🔧 Maint]` chips auto-populate seamlessly without modal freezing or needing to reopen dialogs.
+- **Massive Recipe Search Indexing Speedup (250x faster, 2m -> <1s) (`RecipeSearchDialog`, `RecipeSearchEngine`)**:
+  - Eliminated O(N^2) category loops in EMI recipe caching using multi-core `parallelStream`, indexing 170,000+ recipes in under 1 second.
+  - Streamlined fluid stack detection using direct `FluidEmiStack` instance checks.
+- **Dynamic Addon Crawler 20ms Direct Extraction & Disabled Item Guard (`DynamicAddonCrawler`)**:
+  - Streamlined output collection directly from `EmiRecipe.getOutputs()` with preserved NBT, finishing in under 20ms.
+  - Removed blind Forge item registry scans for Thermal augments, completely eliminating disabled dummy items (`thermal_extra`, etc.) from catalog leaks.
+
+### Fixed
+- **Large Chemical Reactor & Multiblock Missing Coil Capabilities (`CategoryCapabilityMatrix`, `MultiblockDetector`)**:
+  - Fixed issue where Large Chemical Reactor and other multiblocks failed to expose the Coil tab due to disjoint singleblock vs. multiblock recipe categories in GTCEu.
+- **EMI & RecipeManager Async Lifecycle Synchronization (`CalcBoardEmiPlugin`, `ClientForgeEvents`, `RecipeSearchDialog`)**:
+  - Implemented background async retry polling (200ms intervals) on world load, guaranteeing matrix pre-baking starts the moment EMI finishes worker thread registration.
+  - Eliminated premature `bake(null)` wipeout bug where empty capabilities cleared matrix state.
+
+---
+
+## [2.0.0-alpha.2] - 2026-08-20
+
+### Added
+- **Interactive 6-Step Tutorial & Curated Dummy Recipes (`TutorialManager`, `RecipeSearchDialog`)**:
+  - Re-architected interactive onboarding tutorial into 6 clear steps: Step 1 (Add Boiler), Step 2 (Drag-to-Search Turbine & Auto-Wire), Step 3 (Sever Wire), Step 4 (Shift-Drag 1:1 Auto-Ratio), Step 5 (Process Summary & Compound Module `Ctrl+G`), Step 6 (Completion).
+  - Dedicated tutorial workspace isolation (`🎓 Tutorial`) and instant 0ms curated dummy recipes (`Steam Turbine (Tutorial)`, `Boiler (Tutorial)`, `Steam Engine (Tutorial)`) ensuring zero-lag and clutter-free onboarding.
+- **Type-Strict Stack Indexing & Prioritized Search Ranking (`RecipeSearchEngine`, `RecipeSearchDialog`)**:
+  - Divided searchable stacks into strict fluid vs. item registry indexing to prevent cross-type query pollution.
+  - Prioritized exact fluid ID matches (+1,000 pts) and generator/multiblock categories over generic crafting table items.
+
+### Changed
+- **Shortcut & Documentation Realignment (`GuideDialog`, `en_us.json`, `ko_kr.json`, `README.md`, `README_KR.md`)**:
+  - Replaced legacy toolbar button references with `Ctrl + G` for modular group packaging across all in-game guides and tutorials.
+  - Comprehensive documentation overhaul with complete feature coverage, dynamic addon crawler details, and matter-of-fact technical tone.
+
+### Fixed
+- **Tutorial Step 2 Auto-Wire Transition (`RecipeSearchDialog`)**:
+  - Resolved an issue where auto-wiring nodes spawned from the search dialog failed to notify `TutorialManager.onWireConnected()`, preventing advancement to Step 3.
+  - Added immediate canvas widget rebuilding upon auto-wire completion.
+
+---
+
+## [2.0.0-alpha.1] - 2026-08-20
+
+### Added
+- **Multiplayer Shared Team Workspace Architecture**:
+  - **Full Client-Server Synchronization**: Introduced bidirectional network protocol (`C2S`/`S2C`) enabling real-time collaboration on shared factory design flowcharts across multiplayer servers.
+  - **Pluggable Multi-Team Provider Backend (`ITeamProvider`, `TeamProviderRegistry`)**:
+    - Full soft-dependency integration with **FTB Teams** via safe runtime reflection.
+    - Automatic fallback support for **Vanilla Scoreboard Teams** and standalone world workspaces.
+  - **Granular Per-Page Edit Locks & Heartbeat (`WorkspaceLockManager`, `S2CLockResultPacket`)**:
+    - Automatic edit lock acquisition upon canvas/machine interactions to prevent concurrent editing collisions.
+    - Locks automatically release upon switching page tabs, closing the GUI, or after timeout expiration.
+  - **Live Teammate Presence & Cursor Tracking (`S2CBroadcastPresencePacket`)**:
+    - Real-time display of active teammates, their currently viewed page tabs, and presence indicators.
+  - **Seamless Frictionless Auto-Sync (Google Docs/Figma Style)**:
+    - 3-second inactivity debounced auto-saving combined with immediate commit on page navigation or screen exit.
+    - Server-side commit squashing in `TeamWorkspaceData` to keep history logs concise and clean.
+  - **Save History & Personal Forking (`RecentSavesDialog`)**:
+    - View revision history logs and fork/restore past team revisions directly into personal board tabs with full node and connection graph cloning.
+  - **Administrative Page Deletion Protection (`C2SDeleteTeamPagePacket`)**:
+    - Deletion of team pages restricted to **Team Owners, Officers, and Server Admins (OPs)**.
+    - Protected last remaining page from deletion to ensure design integrity.
+- **Singleplayer Game Pause Toggle (`BoardScreen`, `BoardManager`, `ToolbarWidget`)**:
+  - Added an interactive `[⏸ Pause: ON]` / `[▶ Pause: OFF]` toggle button on the singleplayer toolbar (`isPauseScreen` dynamic integration).
+  - Allows players to freely choose between pausing the world while calculating complex lines or letting factory automation run in background.
+- **Advanced Parametric & Boolean Recipe Search Engine (`RecipeSearchEngine`, `RecipeSearchDialog`)**:
+  - Implemented an EMI/JEI-style boolean and parametric search engine supporting multi-token AND (`&` / spaces), OR (`|`), NOT (`!`), Mod ID (`@gtceu`), Tags (`#logs`), Category/Machine (`[pyrolyse_oven]`), and Quoted phrases (`"..."`).
+  - Full indexing of machine display names, localized categories, inputs, outputs, and registry IDs.
+- **Contextual Drag-to-Search & Auto-Wire Node Creation (`CanvasInteractionHandler`, `RecipeSearchDialog`)**:
+  - Dragging a wire from any port into empty canvas space automatically opens the recipe search dialog pre-filtered for consumers (output drag) or producers (input drag).
+  - Spawns the new machine node at the cursor position and **automatically wires the ports together** in a single seamless action.
+  - Supports `Shift + Drag` for instant 1:1 auto-ratio matching upon creation.
+
+### Changed
+- **Adaptive Compact Header Layout (`BoardScreen`, `WorkspaceTabBarWidget`, `PageTabBarWidget`)**:
+  - Automatically hides team collaboration top bars in singleplayer or non-modded servers to preserve maximum canvas workspace.
+  - Cleaned up redundant manual save buttons in favor of seamless background auto-sync.
+- **Silent Background Collaboration Sync**:
+  - Removed intrusive toast notifications during routine background syncs and lock state transitions while keeping critical conflict alerts.
+
+### Fixed
+- **i18n & Modal Formatting Parity**:
+  - Completed 100% key parity and formatting token alignment across `en_us.json` and `ko_kr.json` (340 translation keys).

@@ -85,10 +85,10 @@ public class RecipeSwitchTest {
         // NOP Maker -> Greenhouse Input 1 (NOP Fertilizer)
         // Greenhouse Output 0 (Oak Log) -> Wood Cutter Input 0
         // Greenhouse Output 1 (Wood Tar) -> Tar Distiller Input 0
-        graph.getConnections().add(new FlowGraph.ConnectionEdge(waterSource.getId(), 0, greenhouse.getId(), 0));
-        graph.getConnections().add(new FlowGraph.ConnectionEdge(nopSupplier.getId(), 0, greenhouse.getId(), 1));
-        graph.getConnections().add(new FlowGraph.ConnectionEdge(greenhouse.getId(), 0, woodConsumer.getId(), 0));
-        graph.getConnections().add(new FlowGraph.ConnectionEdge(greenhouse.getId(), 1, tarConsumer.getId(), 0));
+        graph.addConnection(new FlowGraph.ConnectionEdge(waterSource.getId(), 0, greenhouse.getId(), 0));
+        graph.addConnection(new FlowGraph.ConnectionEdge(nopSupplier.getId(), 0, greenhouse.getId(), 1));
+        graph.addConnection(new FlowGraph.ConnectionEdge(greenhouse.getId(), 0, woodConsumer.getId(), 0));
+        graph.addConnection(new FlowGraph.ConnectionEdge(greenhouse.getId(), 1, tarConsumer.getId(), 0));
 
         Assertions.assertEquals(4, graph.getConnections().size());
 

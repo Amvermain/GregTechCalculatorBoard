@@ -3,6 +3,7 @@ package com.gtceu.calcboard.client.gui.canvas;
 import com.gtceu.calcboard.client.gui.BoardHotkeyHandler;
 import com.gtceu.calcboard.client.gui.BoardScreen;
 import com.gtceu.calcboard.client.gui.widget.NodeWidget;
+import com.gtceu.calcboard.integration.spi.RecipeViewerRegistry;
 import net.minecraft.client.Minecraft;
 
 /**
@@ -24,6 +25,9 @@ public class BoardKeybindDispatcher {
         }
         if (screen.getPageTabBar() != null && screen.getPageTabBar().keyPressed(keyCode, scanCode, modifiers)) {
             return true;
+        }
+        if (RecipeViewerRegistry.isAnySearchFocused()) {
+            return false;
         }
         if (BoardHotkeyHandler.handleKeyPressed(screen, keyCode, scanCode, modifiers, lastMouseX, lastMouseY)) {
             return true;
@@ -49,6 +53,9 @@ public class BoardKeybindDispatcher {
         }
         if (screen.getPageTabBar() != null && screen.getPageTabBar().charTyped(codePoint, modifiers)) {
             return true;
+        }
+        if (RecipeViewerRegistry.isAnySearchFocused()) {
+            return false;
         }
         for (NodeWidget w : screen.getNodeWidgets()) {
             if (w.charTyped(codePoint, modifiers)) {

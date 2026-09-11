@@ -163,6 +163,17 @@ public class CanvasStickyNoteTest {
         Assertions.assertEquals(1, graph.getFrames().size());
         Assertions.assertEquals(2, graph.getNodes().size());
     }
+
+    @Test
+    public void testContextMenuContainsStickyNoteAction() {
+        com.gtceu.calcboard.client.gui.interaction.CanvasContextMenuManager menuManager =
+                new com.gtceu.calcboard.client.gui.interaction.CanvasContextMenuManager(null);
+        menuManager.openForCanvas(100, 100, 50, 50);
+
+        boolean hasStickyNoteItem = menuManager.getItems().stream()
+                .anyMatch(item -> "gui.gtcalcboard.menu.add_sticky_note".equals(item.labelKey()) && "N".equals(item.shortcut()));
+        Assertions.assertTrue(hasStickyNoteItem, "Canvas context menu must contain Add Sticky Note action with shortcut N");
+    }
 }
 
 

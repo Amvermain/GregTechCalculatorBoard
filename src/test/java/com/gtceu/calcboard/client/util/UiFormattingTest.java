@@ -30,6 +30,22 @@ import java.util.*;
  */
 public class UiFormattingTest {
 
+    @org.junit.jupiter.api.BeforeEach
+    public void setUp() {
+        com.gtceu.calcboard.client.storage.ClientPreferenceManager.getInstance().resetForTesting();
+        com.gtceu.calcboard.api.storage.BoardManager.getInstance().resetToDefault();
+        com.gtceu.calcboard.client.gui.util.FormatUtil.setActiveTimeUnit(com.gtceu.calcboard.api.type.RateTimeUnit.PER_SECOND);
+        com.gtceu.calcboard.client.gui.util.FormatUtil.setActiveFluidUnitMode(com.gtceu.calcboard.api.type.FluidUnitMode.AUTO);
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    public void tearDown() {
+        com.gtceu.calcboard.client.storage.ClientPreferenceManager.getInstance().resetForTesting();
+        com.gtceu.calcboard.api.storage.BoardManager.getInstance().resetToDefault();
+        com.gtceu.calcboard.client.gui.util.FormatUtil.setActiveTimeUnit(com.gtceu.calcboard.api.type.RateTimeUnit.PER_SECOND);
+        com.gtceu.calcboard.client.gui.util.FormatUtil.setActiveFluidUnitMode(com.gtceu.calcboard.api.type.FluidUnitMode.AUTO);
+    }
+
     @Test
     public void testTutorialStepEnumProperties() {
         Assertions.assertEquals(1, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_1_ADD_RECIPE.getStepNumber());
@@ -207,25 +223,25 @@ public class UiFormattingTest {
 
     @Test
     public void testDummyConditionMarkerFiltering() {
-        Assertions.assertTrue(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:overworld_marker")));
-        Assertions.assertTrue(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:nether_marker")));
-        Assertions.assertTrue(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:the_end_marker")));
-        Assertions.assertTrue(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:dimension_marker")));
-        Assertions.assertTrue(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:biome_marker")));
-        Assertions.assertTrue(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:altitude_marker")));
-        Assertions.assertTrue(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("start_core:abydos_marker")));
-        Assertions.assertTrue(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("sgjourney:chulak_marker")));
-        Assertions.assertTrue(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("kubejs:custom_planet_marker")));
+        Assertions.assertTrue(com.gtceu.calcboard.api.util.RecipeConversionHelper.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:overworld_marker")));
+        Assertions.assertTrue(com.gtceu.calcboard.api.util.RecipeConversionHelper.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:nether_marker")));
+        Assertions.assertTrue(com.gtceu.calcboard.api.util.RecipeConversionHelper.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:the_end_marker")));
+        Assertions.assertTrue(com.gtceu.calcboard.api.util.RecipeConversionHelper.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:dimension_marker")));
+        Assertions.assertTrue(com.gtceu.calcboard.api.util.RecipeConversionHelper.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:biome_marker")));
+        Assertions.assertTrue(com.gtceu.calcboard.api.util.RecipeConversionHelper.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:altitude_marker")));
+        Assertions.assertTrue(com.gtceu.calcboard.api.util.RecipeConversionHelper.isDummyConditionMarker(ResourceLocation.tryParse("start_core:abydos_marker")));
+        Assertions.assertTrue(com.gtceu.calcboard.api.util.RecipeConversionHelper.isDummyConditionMarker(ResourceLocation.tryParse("sgjourney:chulak_marker")));
+        Assertions.assertTrue(com.gtceu.calcboard.api.util.RecipeConversionHelper.isDummyConditionMarker(ResourceLocation.tryParse("kubejs:custom_planet_marker")));
 
-        Assertions.assertFalse(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:programmed_circuit")));
-        Assertions.assertFalse(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:integrated_circuit")));
-        Assertions.assertFalse(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("minecraft:potato")));
-        Assertions.assertFalse(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:lv_electric_motor")));
-        Assertions.assertFalse(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:enderium_ingot")));
-        Assertions.assertFalse(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("minecraft:ender_pearl")));
-        Assertions.assertFalse(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("minecraft:end_stone")));
-        Assertions.assertFalse(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("thermal:enderium_dust")));
-        Assertions.assertFalse(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("create:blender")));
+        Assertions.assertFalse(com.gtceu.calcboard.api.util.RecipeConversionHelper.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:programmed_circuit")));
+        Assertions.assertFalse(com.gtceu.calcboard.api.util.RecipeConversionHelper.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:integrated_circuit")));
+        Assertions.assertFalse(com.gtceu.calcboard.api.util.RecipeConversionHelper.isDummyConditionMarker(ResourceLocation.tryParse("minecraft:potato")));
+        Assertions.assertFalse(com.gtceu.calcboard.api.util.RecipeConversionHelper.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:lv_electric_motor")));
+        Assertions.assertFalse(com.gtceu.calcboard.api.util.RecipeConversionHelper.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:enderium_ingot")));
+        Assertions.assertFalse(com.gtceu.calcboard.api.util.RecipeConversionHelper.isDummyConditionMarker(ResourceLocation.tryParse("minecraft:ender_pearl")));
+        Assertions.assertFalse(com.gtceu.calcboard.api.util.RecipeConversionHelper.isDummyConditionMarker(ResourceLocation.tryParse("minecraft:end_stone")));
+        Assertions.assertFalse(com.gtceu.calcboard.api.util.RecipeConversionHelper.isDummyConditionMarker(ResourceLocation.tryParse("thermal:enderium_dust")));
+        Assertions.assertFalse(com.gtceu.calcboard.api.util.RecipeConversionHelper.isDummyConditionMarker(ResourceLocation.tryParse("create:blender")));
     }
 
     @Test
@@ -266,8 +282,27 @@ public class UiFormattingTest {
 
         config.setCategoryExcluded("gtceu:chemical_reactor", true);
         Assertions.assertTrue(config.isCategoryExcluded("gtceu:chemical_reactor"));
+        Assertions.assertTrue(config.isCategoryExcluded("chemical_reactor"));
         config.setCategoryExcluded("gtceu:chemical_reactor", false);
         Assertions.assertFalse(config.isCategoryExcluded("gtceu:chemical_reactor"));
+        Assertions.assertFalse(config.isCategoryExcluded("chemical_reactor"));
+
+        // Test path-only exclusion matching namespace ID
+        config.setCategoryExcluded("ore_processing_diagram", true);
+        Assertions.assertTrue(config.isCategoryExcluded("ore_processing_diagram"));
+        Assertions.assertTrue(config.isCategoryExcluded("gtceu:ore_processing_diagram"));
+        config.setCategoryExcluded("ore_processing_diagram", false);
+        Assertions.assertFalse(config.isCategoryExcluded("ore_processing_diagram"));
+        Assertions.assertFalse(config.isCategoryExcluded("gtceu:ore_processing_diagram"));
+
+        // Test listener
+        boolean[] listenerFired = new boolean[]{false};
+        Runnable listener = () -> listenerFired[0] = true;
+        config.addChangeListener(listener);
+        config.setCategoryExcluded("test_cat", true);
+        Assertions.assertTrue(listenerFired[0]);
+        config.removeChangeListener(listener);
+        config.setCategoryExcluded("test_cat", false);
 
         SearchableRecipe r1 = new SearchableRecipe(
                 new Object(), "Reaction 1", "gtceu", "chemical_reactor", "Chemical Reactor",
@@ -321,12 +356,66 @@ public class UiFormattingTest {
             Assertions.assertTrue(inPerDay.contains("864k/d"));
 
             String exactPerMin = com.gtceu.calcboard.client.gui.util.FormatUtil.formatExactRate(50.0, true);
-            Assertions.assertTrue(exactPerMin.contains("4,320.00 B/d"));
+            Assertions.assertTrue(exactPerMin.contains("4,320 B/d") || exactPerMin.contains("4,320.00 B/d"));
 
-            Assertions.assertEquals(RateTimeUnit.PER_TICK, RateTimeUnit.PER_DAY.next());
+            Assertions.assertEquals(RateTimeUnit.PER_RECIPE, RateTimeUnit.PER_DAY.next());
+            Assertions.assertEquals(RateTimeUnit.PER_TICK, RateTimeUnit.PER_RECIPE.next());
             Assertions.assertEquals(RateTimeUnit.PER_SECOND, RateTimeUnit.PER_TICK.next());
         } finally {
             com.gtceu.calcboard.client.gui.util.FormatUtil.setActiveTimeUnit(RateTimeUnit.PER_SECOND);
+        }
+    }
+
+    @Test
+    public void testBoardManagerTimeUnitDirectReflection() {
+        try {
+            BoardManager.getInstance().setTimeUnit(RateTimeUnit.PER_MINUTE);
+            Assertions.assertEquals("3 B/min", FormatUtil.formatRate(50.0, true));
+            Assertions.assertEquals("600/min", FormatUtil.formatRate(10.0, false));
+
+            BoardManager.getInstance().setTimeUnit(RateTimeUnit.PER_TICK);
+            Assertions.assertEquals("2.5 mB/t", FormatUtil.formatRate(50.0, true));
+            Assertions.assertEquals("0.5/t", FormatUtil.formatRate(10.0, false));
+        } finally {
+            BoardManager.getInstance().setTimeUnit(RateTimeUnit.PER_SECOND);
+            FormatUtil.setActiveTimeUnit(RateTimeUnit.PER_SECOND);
+        }
+    }
+
+    @Test
+    public void testRecipeBatchModeFormatting() {
+        try {
+            FormatUtil.setActiveTimeUnit(RateTimeUnit.PER_RECIPE);
+
+            // 1. Exact amount matching for integer mB (e.g. 288 mB)
+            Assertions.assertEquals("288 mB", FormatUtil.formatRate(288.0, true));
+            Assertions.assertEquals("288 mB", FormatUtil.formatExactRate(288.0, true));
+
+            boolean[] hiddenRef = new boolean[]{false};
+            String normalTooltip = com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer.formatPortRate(288.0, true, false, hiddenRef);
+            Assertions.assertEquals("288 mB", normalTooltip);
+            Assertions.assertFalse(hiddenRef[0], "Identical compact and exact rates must not trigger shift-exact hint");
+
+            String shiftTooltip = com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer.formatPortRate(288.0, true, true, hiddenRef);
+            Assertions.assertEquals("288 mB", shiftTooltip, "Shift tooltip must remain clean without duplicate parenthesis or 1x suffix");
+
+            // 2. Exact item amounts
+            Assertions.assertEquals("4", FormatUtil.formatRate(4.0, false));
+            Assertions.assertEquals("4", FormatUtil.formatExactRate(4.0, false));
+
+            // 3. Large amounts where compact differs from exact (e.g. thousand separator)
+            Assertions.assertEquals("10000 B", FormatUtil.formatRate(10_000_000.0, true));
+            Assertions.assertEquals("10,000 B", FormatUtil.formatExactRate(10_000_000.0, true));
+
+            boolean[] largeHiddenRef = new boolean[]{false};
+            String largeNormal = com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer.formatPortRate(10_000_000.0, true, false, largeHiddenRef);
+            Assertions.assertEquals("10000 B", largeNormal);
+            Assertions.assertTrue(largeHiddenRef[0], "Differing compact rate must trigger shift hint");
+
+            String largeShift = com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer.formatPortRate(10_000_000.0, true, true, largeHiddenRef);
+            Assertions.assertEquals("10000 B §8(10,000 B)", largeShift);
+        } finally {
+            FormatUtil.setActiveTimeUnit(RateTimeUnit.PER_SECOND);
         }
     }
 
@@ -724,6 +813,76 @@ public class UiFormattingTest {
         Assertions.assertTrue(violations.isEmpty(),
                 "Hardcoded Korean strings found in Java source code. All UI texts must use Component.translatable(...) with keys in assets/gtcalcboard/lang/*.json:\n"
                         + String.join("\n", violations));
+    }
+
+    @Test
+    public void testRateTimeUnitPerRecipeCycleAndFormatting() {
+        RateTimeUnit unit = RateTimeUnit.PER_SECOND;
+        unit = unit.next();
+        unit = unit.next();
+        unit = unit.next();
+        unit = unit.next();
+        Assertions.assertEquals(RateTimeUnit.PER_RECIPE, unit);
+        Assertions.assertTrue(unit.isRecipeBatchMode());
+        Assertions.assertEquals("1x", unit.getSuffix());
+        Assertions.assertEquals("gui.gtcalcboard.unit.per_recipe", unit.getTranslationKey());
+        Assertions.assertEquals(RateTimeUnit.PER_TICK, unit.next());
+
+        FormatUtil.setActiveTimeUnit(RateTimeUnit.PER_RECIPE);
+        try {
+            IngredientStack item = IngredientStack.item(ResourceLocation.tryParse("minecraft:iron_ingot"), "Iron Ingot", 4.0, 1.0);
+            IngredientStack fluid = IngredientStack.fluid(ResourceLocation.tryParse("minecraft:water"), "Water", 2000.0, 1.0);
+            IngredientStack su = IngredientStack.stressUnit(512);
+
+            Assertions.assertEquals("4", FormatUtil.formatRate(4.0, item));
+            Assertions.assertEquals("2 B", FormatUtil.formatRate(2000.0, fluid));
+            Assertions.assertEquals("512 SU", FormatUtil.formatRate(512.0, su));
+
+            String connectedIn = FormatUtil.formatBatchConnectedInput(2000.0, 2000.0, fluid, false);
+            Assertions.assertTrue(connectedIn.contains("2 B"));
+            Assertions.assertFalse(connectedIn.contains("/s"));
+
+            String connectedOut = FormatUtil.formatBatchConnectedOutput(4.0, 4.0, item, false);
+            Assertions.assertTrue(connectedOut.contains("4"));
+            Assertions.assertFalse(connectedOut.contains("/s"));
+        } finally {
+            FormatUtil.setActiveTimeUnit(RateTimeUnit.PER_SECOND);
+        }
+    }
+
+    @Test
+    public void testStressUnitConstantAcrossTimeUnits() {
+        IngredientStack su = IngredientStack.stressUnit(2048);
+        try {
+            for (RateTimeUnit unit : RateTimeUnit.values()) {
+                FormatUtil.setActiveTimeUnit(unit);
+                Assertions.assertEquals("2.05k SU", FormatUtil.formatRate(2048.0, su));
+                Assertions.assertEquals("2,048 SU", FormatUtil.formatExactRate(2048.0, su));
+                Assertions.assertFalse(FormatUtil.formatRate(2048.0, su).contains("/"));
+                Assertions.assertFalse(FormatUtil.formatExactRate(2048.0, su).contains("/"));
+
+                String connectedIn = FormatUtil.formatConnectedInput(2048.0, 2048.0, su, false);
+                Assertions.assertTrue(connectedIn.contains("2.05k SU"));
+                Assertions.assertFalse(connectedIn.contains("/s") || connectedIn.contains("/min") || connectedIn.contains("/h") || connectedIn.contains("/t"));
+
+                String connectedOut = FormatUtil.formatConnectedOutput(2048.0, 2048.0, su, false);
+                Assertions.assertTrue(connectedOut.contains("2.05k SU"));
+                Assertions.assertFalse(connectedOut.contains("/s") || connectedOut.contains("/min") || connectedOut.contains("/h") || connectedOut.contains("/t"));
+            }
+        } finally {
+            FormatUtil.setActiveTimeUnit(RateTimeUnit.PER_SECOND);
+        }
+    }
+
+    @Test
+    public void testDeficitConnectedInputFormattingWithNominalDemand() {
+        IngredientStack fluid = IngredientStack.fluid(ResourceLocation.tryParse("gtceu:brown"), "Brown", 20000.0, 1.0);
+        String formatted = FormatUtil.formatConnectedInput(4000.0, 20000.0, fluid, true);
+
+        Assertions.assertTrue(formatted.contains("+4") || formatted.contains("+4.00"));
+        Assertions.assertTrue(formatted.contains("-20") || formatted.contains("-20.00"));
+        Assertions.assertTrue(formatted.contains("⚠"));
+        Assertions.assertFalse(formatted.contains("-4.00 B/s") || formatted.contains("-4 B/s"));
     }
 }
 

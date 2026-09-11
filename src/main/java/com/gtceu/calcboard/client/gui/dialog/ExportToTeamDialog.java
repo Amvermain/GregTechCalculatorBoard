@@ -15,12 +15,15 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 
+import com.gtceu.calcboard.client.gui.dialog.modal.IBoardModal;
+import com.gtceu.calcboard.client.gui.dialog.modal.ModalRenderContext;
+
 import java.util.UUID;
 
 /**
  * Modal dialog for exporting a personal board page directly to the team shared workspace.
  */
-public class ExportToTeamDialog {
+public class ExportToTeamDialog implements IBoardModal {
 
     private final BoardScreen screen;
     private boolean visible = false;
@@ -39,6 +42,11 @@ public class ExportToTeamDialog {
 
     public boolean isVisible() {
         return visible;
+    }
+
+    @Override
+    public void renderModal(ModalRenderContext context) {
+        render(context.graphics(), context.mouseX(), context.mouseY(), context.partialTicks());
     }
 
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
@@ -64,7 +72,7 @@ public class ExportToTeamDialog {
         graphics.renderOutline(x, y, dialogW, dialogH, 0xFF4F5B73);
 
         // Title
-        String title = "📤 " + Component.translatable("gui.gtcalcboard.dialog.export_to_team_title").getString();
+        String title = "» " + Component.translatable("gui.gtcalcboard.dialog.export_to_team_title").getString();
         graphics.drawString(font, title, x + 12, y + 10, 0xFFFFFFFF, false);
 
         String subtitle = Component.translatable("gui.gtcalcboard.dialog.export_to_team_sub").getString();
@@ -85,7 +93,7 @@ public class ExportToTeamDialog {
         boolean h2 = mouseX >= btn1X && mouseX <= btn1X + btnW && mouseY >= btn2Y && mouseY <= btn2Y + btnH;
         graphics.fill(btn1X, btn2Y, btn1X + btnW, btn2Y + btnH, h2 ? 0xFF3D4558 : 0xFF282D3B);
         graphics.renderOutline(btn1X, btn2Y, btnW, btnH, 0xFF4F5B73);
-        graphics.drawCenteredString(font, "📝 " + Component.translatable("gui.gtcalcboard.dialog.btn_export_overwrite").getString(), btn1X + btnW / 2, btn2Y + 7, 0xFFE0E6F0);
+        graphics.drawCenteredString(font, "▪ " + Component.translatable("gui.gtcalcboard.dialog.btn_export_overwrite").getString(), btn1X + btnW / 2, btn2Y + 7, 0xFFE0E6F0);
 
         // Cancel
         int cancelY = btn2Y + 26;
@@ -155,7 +163,8 @@ public class ExportToTeamDialog {
         BoardPage activePersonalPage = BoardManager.getInstance().getActivePage();
         String pageTitle = activePersonalPage != null ? activePersonalPage.getName() : "Exported Factory";
         String pageId = asNewPage ? ("page_" + System.currentTimeMillis()) : "page_main";
-        int rev = state.getGlobalRevision();
+        var existing = asNewPage ? null : state.getRemotePage(pageId);
+        int rev = existing != null ? existing.getPageRevision() : 0;
 
         CompoundTag tag = screen.getGraph().serializeNBT();
         byte[] compressed = BlueprintCodec.compressTag(tag);
