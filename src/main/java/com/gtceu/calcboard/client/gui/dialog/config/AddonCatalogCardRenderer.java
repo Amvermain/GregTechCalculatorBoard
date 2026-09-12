@@ -76,8 +76,11 @@ public final class AddonCatalogCardRenderer {
         int maxSlots = 0;
         int sameTypeTotal = 0;
         if (addon.getCategory() == MachineAddon.Category.HATCH_BUS) {
-            maxSlots = AddonCatalogView.getMaxHatchSlotsAllowed(node, addon);
-            sameTypeTotal = AddonCatalogView.getTotalInstalledHatchesOfSameType(node, addon);
+            maxSlots = AddonHatchSlotHelper.getMaxHatchSlotsAllowed(node, addon);
+            sameTypeTotal = AddonHatchSlotHelper.getTotalInstalledHatchesOfSameType(node, addon);
+        } else if (addon.getCategory() == MachineAddon.Category.ENERGY_HATCH) {
+            maxSlots = com.gtceu.calcboard.compat.gtceu.handler.GTEnergyHatchCalculator.getMaxAllowedEnergyHatches(node);
+            sameTypeTotal = (int) node.getAddons().stream().filter(a -> a.getCategory() == MachineAddon.Category.ENERGY_HATCH).count();
         }
 
         return new CachedCardData(
@@ -164,7 +167,8 @@ public final class AddonCatalogCardRenderer {
             if (count > 1) {
                 graphics.drawString(font, "§a✔x" + count, bx + cardW - 28, by + 4, 0xFFFFFFFF, false);
             } else if (count == 1) {
-                graphics.drawString(font, hover ? "§a+§7/§c-" : "§a✔", bx + cardW - (hover ? 18 : 11), by + 4, 0xFFFFFFFF, false);
+                boolean canAddMore = card.sameTypeTotal() < card.maxSlots();
+                graphics.drawString(font, hover ? (canAddMore ? "§a+§7/§c-" : "§c✖") : "§a✔", bx + cardW - (hover && canAddMore ? 18 : 11), by + 4, 0xFFFFFFFF, false);
             }
             return;
         }
@@ -298,7 +302,8 @@ public final class AddonCatalogCardRenderer {
     private static void handleEnergyHatchClick(RecipeNode node, MachineAddon addon, IModAdapter adapter) {
         int installedCount = adapter.getAddonInstalledCount(node, addon);
         int totalEnergyHatches = (int) node.getAddons().stream().filter(a -> a.getCategory() == MachineAddon.Category.ENERGY_HATCH).count();
-        if (installedCount == 0 || (installedCount == 1 && totalEnergyHatches < 2)) {
+        int maxHatches = com.gtceu.calcboard.compat.gtceu.handler.GTEnergyHatchCalculator.getMaxAllowedEnergyHatches(node);
+        if (installedCount == 0 || (installedCount >= 1 && totalEnergyHatches < maxHatches)) {
             adapter.handleInstallAddon(node, addon, false);
         } else {
             adapter.handleUninstallAddon(node, addon);

@@ -62,7 +62,9 @@ public class EmiLifecycleHook {
             return;
         }
 
-        PENDING_ACTIONS.add(action);
+        if (!PENDING_ACTIONS.contains(action)) {
+            PENDING_ACTIONS.add(action);
+        }
         ensureWatcherRunning();
     }
 

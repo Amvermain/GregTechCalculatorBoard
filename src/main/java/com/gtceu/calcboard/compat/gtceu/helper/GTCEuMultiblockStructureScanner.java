@@ -300,23 +300,28 @@ public class GTCEuMultiblockStructureScanner {
         rawVariants.sort(Comparator.comparingInt(d -> d.parts().stream().mapToInt(MultiblockStructurePart::amount).sum()));
         MultiblockStructureDef largest = rawVariants.get(rawVariants.size() - 1);
 
-        int maxCoil = rawVariants.stream().mapToInt(MultiblockStructureDef::coilSlotCount).max().orElse(0);
-        int maxEnergy = rawVariants.stream().mapToInt(MultiblockStructureDef::energyHatchSlotCount).max().orElse(0);
-        int maxInBus = rawVariants.stream().mapToInt(MultiblockStructureDef::inputBusSlotCount).max().orElse(0);
-        int maxOutBus = rawVariants.stream().mapToInt(MultiblockStructureDef::outputBusSlotCount).max().orElse(0);
-        int maxInHatch = rawVariants.stream().mapToInt(MultiblockStructureDef::inputHatchSlotCount).max().orElse(0);
-        int maxOutHatch = rawVariants.stream().mapToInt(MultiblockStructureDef::outputHatchSlotCount).max().orElse(0);
-        int maxMaint = rawVariants.stream().mapToInt(MultiblockStructureDef::maintenanceSlotCount).max().orElse(0);
-
         GTCEuPatternScanner.PatternScanResult patternRes = GTCEuPatternScanner.scanPattern(def);
         Class<?> mCls = GTCEuReflectionBridge.getMachineClass(def);
         boolean supportsCoilAbility = patternRes.allowedAbilities().contains("HEATING_COILS")
                 || (mCls != null && GTCEuReflectionBridge.isCoilWorkableClass(mCls))
                 || (GTCEuCoilModifierHelper.getCoilMachineSpec(controllerId).kind() != GTCEuCoilModifierHelper.CoilMachineKind.GENERIC);
 
-        if (!supportsCoilAbility) {
-            maxCoil = 0;
-        }
+        int maxCoil = supportsCoilAbility
+                ? rawVariants.stream().mapToInt(MultiblockStructureDef::coilSlotCount).max().orElse(0)
+                : 0;
+        int maxEnergy = patternRes.maxEnergyHatches() > 0
+                ? patternRes.maxEnergyHatches()
+                : (patternRes.allowedAbilities().contains("INPUT_ENERGY")
+                        ? 2
+                        : rawVariants.stream().mapToInt(MultiblockStructureDef::energyHatchSlotCount).max().orElse(0));
+
+        int maxInBus = rawVariants.stream().mapToInt(MultiblockStructureDef::inputBusSlotCount).max().orElse(0);
+        int maxOutBus = rawVariants.stream().mapToInt(MultiblockStructureDef::outputBusSlotCount).max().orElse(0);
+        int maxInHatch = rawVariants.stream().mapToInt(MultiblockStructureDef::inputHatchSlotCount).max().orElse(0);
+        int maxOutHatch = rawVariants.stream().mapToInt(MultiblockStructureDef::outputHatchSlotCount).max().orElse(0);
+        int maxMaint = patternRes.maxMaintenanceHatches() > 0
+                ? patternRes.maxMaintenanceHatches()
+                : rawVariants.stream().mapToInt(MultiblockStructureDef::maintenanceSlotCount).max().orElse(0);
 
         Set<String> finalAbilities = new HashSet<>(patternRes.allowedAbilities());
         if (supportsCoilAbility && maxCoil > 0) {

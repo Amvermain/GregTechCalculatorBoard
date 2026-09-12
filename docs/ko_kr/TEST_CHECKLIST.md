@@ -98,6 +98,12 @@
   - [ ] Star Technology Cyclonic Sifter Netherite Mesh 소모율 검증 (ZPM 기본 $3\% \rightarrow 0.0025\text{/s}$, UV 오버클럭 $2.8\% \rightarrow 0.00467\text{/s}$)
   - [ ] 투입 포트 툴팁의 동적 소모 확률 및 부호 반영 티어 변동치($\%+.1f\%/\text{Tier}$) 표시 확인
   - [ ] `InputConsumptionChanceTest` JUnit 자동화 헤드리스 회귀 테스트 100% 통과 확인
+- [ ] **에너지 해치 장착 검증 및 전압 티어 결손 게이팅 (Energy Hatch & Voltage Deficit Gating)**:
+  - [ ] 요구 전압보다 낮은 티어의 에너지 해치를 장착한 전기 멀티블록 기계의 가동 검증 실패(`isOperational = false`) 및 전력 소비 중단($0.0\text{ EU/t}$)을 확인하여 비정상 전류 인입(예: IV 레시피에 ULV 960A 등) 방지 검증
+  - [ ] 2개 해치를 지원하는 멀티블록에서 동일 티어 에너지 해치 2개 장착 시 $+1\text{ Tier}$ 스킵 오버클럭 정상 허용 검증
+  - [ ] 단일 에너지 해치만 지원하는 멀티블록 기계(암석 여과기, 대형 조립기 등)의 구조 술어로부터 최대 1개 해치 한도를 연역하여 2번째 해치 장착을 거부하고 전압 티어 스킵 오버클럭을 차단함을 검증
+  - [ ] 티어 버튼 호버 시 정보성 결손 경고 배너 및 툴팁(`gui.gtcalcboard.node_warning.energy_hatch_tier_deficit` / `voltage_tier_deficit`) 노출 확인
+  - [ ] `EnergyHatchTierDeficitGatingTest` 및 `MultiblockEnergyHatchLockTest` JUnit 자동화 헤드리스 테스트 100% 통과 확인
 
 ### 2.2 가우스-요르단 폐루프 질량 보존 솔버 (`MassBalanceSolver`)
 - [ ] **폐루프 선형 연립방정식 정식화 ($A\mathbf{x} = \mathbf{b}$)**:
@@ -133,6 +139,7 @@
   - [ ] Shift + 우클릭 또는 컨텍스트 메뉴 액션 [🔄 정상 상태에 대수 맞춤]으로 루프 내 모든 기계 대수를 정상 상태 용량으로 원클릭 스케일링 검증
   - [ ] 전역 유량 대시보드에서 순환 자원의 내부 재순환량 세부 내역 표기 확인
   - [ ] 외부 원료가 투입되는 다단계 순환 공정에서 외부 공급선이 없는 내부 중간 부산물 포트를 미공급 감쇄 루프로 오인하지 않고 정상 내부 유량으로 처리함을 검증 (`testMultiStepBrineLoopWithExternalFeed`)
+  - [ ] 순환 루프 내부에 정션(Junction) 노드가 배치되어도 외부 공급선을 투명하게 수집하고 유효 유량/수요 보존을 유지하여, 자원 증식([⚠ 증식]) 오판정 없이 정상 상태로 수렴하며 자동 비율 맞춤(Auto-Ratio) 시 기계 대수가 폭주하지 않음을 검증 (`JunctionRecirculationLoopRegressionTest`)
   - [ ] `DampedRecirculationLoopTest` JUnit 자동화 헤드리스 회귀 테스트 100% 통과 확인
 - [ ] **목표 배치 생산 소요 시간(ETA) 및 총 소요 자원 연산 (`ProductionETACalculator`)**:
   - [ ] 단말 노드의 목표 생산량 $A_{\text{target}}$ 기준 소요 시간 $T_{\text{ET}} = \frac{A_{\text{target}}}{\text{Rate}_{\text{in}}}$ 산출 검증

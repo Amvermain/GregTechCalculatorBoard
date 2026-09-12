@@ -19,6 +19,7 @@ import com.gtceu.calcboard.client.gui.util.BoardScissorHelper;
 import com.gtceu.calcboard.client.gui.widget.BoardToast;
 import com.gtceu.calcboard.api.spi.IModAdapter;
 import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
+import com.gtceu.calcboard.api.util.NumberFormatUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -531,10 +532,10 @@ public class MachineConfigDialog implements IBoardModal {
             sb.append(String.format("§a⚡%dx ", addon.getParallelMultiplier()));
         }
         if (addon.getDurationMultiplier() != 1.0) {
-            sb.append(String.format("§b⏱%.1fx ", addon.getDurationMultiplier()));
+            sb.append("§b⏱").append(NumberFormatUtil.formatMultiplier(addon.getDurationMultiplier())).append("x ");
         }
         if (addon.getEutMultiplier() != 1.0) {
-            sb.append(String.format("§e⚡%.1fx ", addon.getEutMultiplier()));
+            sb.append("§e⚡").append(NumberFormatUtil.formatMultiplier(addon.getEutMultiplier())).append("x ");
         }
         String res = sb.toString().trim();
         return !res.isEmpty() ? res : "§7" + Component.translatable("gui.gtcalcboard.addon.subtitle.default").getString();

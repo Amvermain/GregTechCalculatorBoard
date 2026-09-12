@@ -59,10 +59,11 @@ flowchart TD
 #### 1. 유효 수요 우선 충족 할당 (`allocateVariableEdges`)
 $$\mathcal{E}_{\text{var}} = \{e_1, e_2, \dots, e_n\}, \quad d_k = D_{\text{eff}}(e_k), \quad D_{\text{total}} = \sum_{k} d_k$$
 
-1. **공급 과잉 상태 ($S_{\text{rem}} \ge D_{\text{total}}$)**:
-   $$\text{alloc}(e_k) = d_k + (S_{\text{rem}} - D_{\text{total}}) \times \frac{d_k}{D_{\text{total}}}$$
-2. **공급 부족 상태 ($S_{\text{rem}} < D_{\text{total}}$)**:
-   $$\text{alloc}(e_k) = S_{\text{rem}} \times \frac{d_k}{D_{\text{total}}}$$
+* **공급 과잉 상태 ($S_{\text{rem}} \ge D_{\text{total}}$)**:
+$$\text{alloc}(e_k) = d_k + (S_{\text{rem}} - D_{\text{total}}) \times \frac{d_k}{D_{\text{total}}}$$
+
+* **공급 부족 상태 ($S_{\text{rem}} < D_{\text{total}}$)**:
+$$\text{alloc}(e_k) = S_{\text{rem}} \times \frac{d_k}{D_{\text{total}}}$$
 
 #### 2. 자급 순환 자원 불변식 보호 (`computeNodeEfficiencies`)
 강결합 컴포넌트 $C$ 내에서 순환하는 자원 $R$에 대해:

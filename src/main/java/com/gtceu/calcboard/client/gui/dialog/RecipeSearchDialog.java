@@ -30,6 +30,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -363,6 +364,20 @@ public class RecipeSearchDialog implements IBoardModal {
         return searchBox;
     }
 
+    @Override
+    public GuiEventListener getFocusedWidget() {
+        if (filterDialog != null && filterDialog.isVisible()) {
+            EditBox fb = filterDialog.getSearchBox();
+            if (fb != null && fb.isFocused() && fb.isVisible()) {
+                return fb;
+            }
+        }
+        if (searchBox != null && searchBox.isFocused() && searchBox.isVisible()) {
+            return searchBox;
+        }
+        return null;
+    }
+
     public List<SearchableRecipe> getFilteredRecipes() {
         return filteredRecipes;
     }
@@ -536,8 +551,6 @@ public class RecipeSearchDialog implements IBoardModal {
                 searchBox.setFocused(true);
                 searchBox.mouseClicked(mouseX, mouseY, button);
                 return true;
-            } else {
-                searchBox.setFocused(false);
             }
         }
 

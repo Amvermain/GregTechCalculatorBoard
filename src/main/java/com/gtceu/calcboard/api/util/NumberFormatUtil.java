@@ -97,4 +97,18 @@ public final class NumberFormatUtil {
             return String.format(Locale.ROOT, "%.2fA %s", amps, tierName).trim();
         }
     }
+
+    /**
+     * Formats multiplier values cleanly without trailing zeros, preserving up to 2 decimal places.
+     */
+    public static String formatMultiplier(double val) {
+        if (Math.abs(val - Math.round(val)) < 1e-6) {
+            return String.valueOf(Math.round(val));
+        }
+        String formatted = String.format(Locale.ROOT, "%.2f", val);
+        if (formatted.endsWith("0")) {
+            return formatted.substring(0, formatted.length() - 1);
+        }
+        return formatted;
+    }
 }

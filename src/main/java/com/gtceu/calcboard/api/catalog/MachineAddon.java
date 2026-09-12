@@ -105,49 +105,75 @@ public class MachineAddon {
     }
 
     private String resolveName() {
-        if ("gtceu:rotor_standard".equals(id) || "gtceu:reflector_none".equals(id)) {
-            if (name != null && !name.isEmpty()) {
-                if (name.startsWith("gui.gtcalcboard.") || name.contains(".")) {
-                    try {
-                        String trans = Component.translatable(name).getString();
-                        if (!trans.contains("%s")) return trans;
-                    } catch (Throwable ignored) {}
-                }
-                return name;
-            }
+        if (shouldPreferExplicitName()) {
+            String explicit = resolveTranslatableName();
+            if (explicit != null) return explicit;
         }
-        if (itemStackSample != null && !itemStackSample.isEmpty()) {
-            try {
-                String stackName = itemStackSample.getHoverName().getString();
-                if (stackName != null && !stackName.isEmpty() && !stackName.contains("%s")) {
-                    if (itemStackSample.getCount() > 1 && !stackName.startsWith(itemStackSample.getCount() + "x") && !stackName.startsWith(itemStackSample.getCount() + " ")) {
-                        return itemStackSample.getCount() + "x " + stackName;
-                    }
-                    return stackName;
-                }
-            } catch (Throwable ignored) {}
-        }
-        if (name != null && !name.isEmpty() && !name.contains("%s")) {
-            if (name.startsWith("gui.gtcalcboard.") || name.contains(".")) {
-                try {
-                    String trans = Component.translatable(name).getString();
-                    if (!trans.contains("%s")) return trans;
-                } catch (Throwable ignored) {}
-            }
-            return name;
-        }
-        if (itemIcon != null) {
-            try {
-                var item = ForgeRegistries.ITEMS.getValue(itemIcon);
-                if (item != null && item != Items.AIR) {
-                    String itemDesc = item.getDescription().getString();
-                    if (!itemDesc.contains("%s")) {
-                        return itemDesc;
-                    }
-                }
-            } catch (Throwable ignored) {}
-        }
+        String fromStack = resolveNameFromItemStack();
+        if (fromStack != null) return fromStack;
+
+        String explicit = resolveTranslatableName();
+        if (explicit != null) return explicit;
+
+        String fromItem = resolveNameFromItemRegistry();
+        if (fromItem != null) return fromItem;
+
         return name != null ? name : id;
+    }
+
+    private boolean shouldPreferExplicitName() {
+        if (category == AddonCategory.MULTIBLOCK_TRAIT || category == AddonCategory.CUSTOM) {
+            return true;
+        }
+        if (name != null && (name.startsWith("gui.gtcalcboard.") || name.startsWith("item.gtcalcboard.") || name.startsWith("block.gtcalcboard."))) {
+            return true;
+        }
+        return "gtceu:rotor_standard".equals(id) || "gtceu:reflector_none".equals(id);
+    }
+
+    private String resolveTranslatableName() {
+        if (name == null || name.isEmpty() || name.contains("%s")) {
+            return null;
+        }
+        if (name.startsWith("gui.gtcalcboard.") || name.contains(".")) {
+            try {
+                String trans = Component.translatable(name).getString();
+                if (!trans.contains("%s")) return trans;
+            } catch (Throwable ignored) {}
+        }
+        return name;
+    }
+
+    private String resolveNameFromItemStack() {
+        if (itemStackSample == null || itemStackSample.isEmpty()) {
+            return null;
+        }
+        try {
+            String stackName = itemStackSample.getHoverName().getString();
+            if (stackName != null && !stackName.isEmpty() && !stackName.contains("%s")) {
+                if (itemStackSample.getCount() > 1 && !stackName.startsWith(itemStackSample.getCount() + "x") && !stackName.startsWith(itemStackSample.getCount() + " ")) {
+                    return itemStackSample.getCount() + "x " + stackName;
+                }
+                return stackName;
+            }
+        } catch (Throwable ignored) {}
+        return null;
+    }
+
+    private String resolveNameFromItemRegistry() {
+        if (itemIcon == null) {
+            return null;
+        }
+        try {
+            var item = ForgeRegistries.ITEMS.getValue(itemIcon);
+            if (item != null && item != Items.AIR) {
+                String itemDesc = item.getDescription().getString();
+                if (!itemDesc.contains("%s")) {
+                    return itemDesc;
+                }
+            }
+        } catch (Throwable ignored) {}
+        return null;
     }
 
     public String getRawName() {

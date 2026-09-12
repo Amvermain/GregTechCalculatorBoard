@@ -73,25 +73,26 @@ flowchart TD
 
 ### 2.2 핵심 수학 공식 및 좌표 변환 규격
 
-1. **유효 배율 및 스케일 비 결정 ($S$)**:
-   $$\text{GameGUI} = \max(1, \lfloor \text{Window.GuiScale} \rceil)$$
-   $$G_{\text{board}} = \text{BoardGuiScale.resolveEffectiveScale}(\text{GameGUI}, W_{\text{phys}}, H_{\text{phys}})$$
-   $$S = \frac{G_{\text{board}}}{\text{GameGUI}}$$
+#### 1. 유효 배율 및 스케일 비 결정 ($S$)
+$$\text{GameGUI} = \max(1, \lfloor \text{Window.GuiScale} \rceil)$$
+$$G_{\text{board}} = \text{BoardGuiScale.resolveEffectiveScale}(\text{GameGUI}, W_{\text{phys}}, H_{\text{phys}})$$
+$$S = \frac{G_{\text{board}}}{\text{GameGUI}}$$
 
-2. **가상 뷰포트 해상도 ($W_{\text{virt}}, H_{\text{virt}}$)**:
-   $$W_{\text{virt}} = \max\left(320, \left\lfloor \frac{W_{\text{phys}}}{G_{\text{board}}} \right\rfloor\right) = \left\lfloor \frac{W_{\text{game}}}{S} \right\rfloor$$
-   $$H_{\text{virt}} = \max\left(240, \left\lfloor \frac{H_{\text{phys}}}{G_{\text{board}}} \right\rfloor\right) = \left\lfloor \frac{H_{\text{game}}}{S} \right\rfloor$$
+#### 2. 가상 뷰포트 해상도 ($W_{\text{virt}}, H_{\text{virt}}$)
+$$W_{\text{virt}} = \max\left(320, \left\lfloor \frac{W_{\text{phys}}}{G_{\text{board}}} \right\rfloor\right) = \left\lfloor \frac{W_{\text{game}}}{S} \right\rfloor$$
+$$H_{\text{virt}} = \max\left(240, \left\lfloor \frac{H_{\text{phys}}}{G_{\text{board}}} \right\rfloor\right) = \left\lfloor \frac{H_{\text{game}}}{S} \right\rfloor$$
 
-3. **마우스 이벤트 좌표 투영**:
-   $$X_{\text{virt}} = \frac{X_{\text{game}}}{S}, \quad Y_{\text{virt}} = \frac{Y_{\text{game}}}{S}$$
-   $$X_{\text{game}} = X_{\text{virt}} \times S, \quad Y_{\text{game}} = Y_{\text{virt}} \times S$$
+#### 3. 마우스 이벤트 좌표 투영
+$$X_{\text{virt}} = \frac{X_{\text{game}}}{S}, \quad Y_{\text{virt}} = \frac{Y_{\text{game}}}{S}$$
+$$X_{\text{game}} = X_{\text{virt}} \times S, \quad Y_{\text{game}} = Y_{\text{virt}} \times S$$
 
-4. **멀티블록 카탈로그 가변 행 계산**:
-   - 그리드 모드:
-     $$\text{visibleRows} = \max\left(2, \left\lfloor \frac{\text{catalogH} - 22}{54} \right\rfloor\right)$$
-     $$\text{cols} = \max\left(3, \left\lfloor \frac{\text{gridW} + 4}{124} \right\rfloor\right)$$
-   - 컴팩트 리스트 모드:
-     $$\text{visibleRows} = \max\left(4, \left\lfloor \frac{\text{catalogH} - 22}{22} \right\rfloor\right)$$
+#### 4. 멀티블록 카탈로그 가변 행 계산
+* **그리드 모드**:
+$$\text{visibleRows} = \max\left(2, \left\lfloor \frac{\text{catalogH} - 22}{54} \right\rfloor\right)$$
+$$\text{cols} = \max\left(3, \left\lfloor \frac{\text{gridW} + 4}{124} \right\rfloor\right)$$
+
+* **컴팩트 리스트 모드**:
+$$\text{visibleRows} = \max\left(4, \left\lfloor \frac{\text{catalogH} - 22}{22} \right\rfloor\right)$$
 
 ---
 

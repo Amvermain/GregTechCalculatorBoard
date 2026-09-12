@@ -118,6 +118,12 @@ public class PageBrowserDrawer {
         return searchBox;
     }
 
+    public EditBox getFocusedEditBox() {
+        if (promptBox != null && promptBox.isFocused()) return promptBox;
+        if (searchBox != null && searchBox.isFocused()) return searchBox;
+        return null;
+    }
+
     public double getScrollY() {
         return scrollY;
     }

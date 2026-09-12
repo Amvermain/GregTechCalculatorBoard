@@ -88,12 +88,13 @@ public final class AutoRatioFlowTraverser {
         if (!visited.add(cNode.getId() + ":0")) {
             return;
         }
-        double nextWeight = hop.weight;
+        int inDegree = countPortInDegree(graph, cNode.getId(), 0);
+        double nextWeight = hop.weight / Math.max(1, inDegree);
         if (cNode.isExternalSupply() && cNode.getExternalSupplyRate() > 0.0) {
             double downstreamDemand = calculateTotalConnectedPortDemand(graph, cNode, 0, countsMap);
             double netDemand = Math.max(0.0, downstreamDemand - cNode.getExternalSupplyRate());
             double factor = downstreamDemand > 0.0001 ? Math.min(1.0, netDemand / downstreamDemand) : 0.0;
-            nextWeight = hop.weight * factor;
+            nextWeight *= factor;
         }
         if (nextWeight > 0.00001) {
             queue.add(new DemandHop(cNode.getId(), 0, nextWeight));
@@ -188,14 +189,8 @@ public final class AutoRatioFlowTraverser {
             Set<String> visited,
             Queue<SupplyHop> queue
     ) {
-        double nextWeight;
-        if (demandProportional) {
-            int inDegree = countPortInDegree(graph, p.getId(), 0);
-            nextWeight = hop.weight / Math.max(1, inDegree);
-        } else {
-            int outDegree = countPortOutDegree(graph, p.getId(), 0);
-            nextWeight = hop.weight / Math.max(1, outDegree);
-        }
+        int outDegree = countPortOutDegree(graph, p.getId(), 0);
+        double nextWeight = hop.weight / Math.max(1, outDegree);
 
         if (visited.add(p.getId() + ":0")) {
             queue.add(new SupplyHop(p.getId(), 0, nextWeight));

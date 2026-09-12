@@ -1,5 +1,6 @@
 package com.gtceu.calcboard.client.gui.dialog.modal;
 
+import net.minecraft.client.gui.components.events.GuiEventListener;
 import org.lwjgl.glfw.GLFW;
 
 /**
@@ -10,6 +11,10 @@ public interface IBoardModal {
     boolean isVisible();
 
     void close();
+
+    default GuiEventListener getFocusedWidget() {
+        return null;
+    }
 
     default void onOpen() {}
 

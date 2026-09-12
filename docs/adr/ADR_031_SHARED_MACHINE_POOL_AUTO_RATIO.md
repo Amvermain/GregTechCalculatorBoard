@@ -53,22 +53,20 @@ flowchart TD
 
 공유 기계 풀 $P$에 속한 operational 레시피 노드 집합을 $V_P = \{v_1, v_2, \dots, v_k\}$라 하고, 각 노드의 현재 기계 대수를 $c_i$라 정의합니다.
 
-1. **현재 풀 총 듀티 (Current Pool Duty)**:
-   $$D_{\text{current}} = \sum_{v_i \in V_P} c_i \quad (D_{\text{current}} > 0)$$
+#### 1. 현재 풀 총 듀티 (Current Pool Duty)
+$$D_{\text{current}} = \sum_{v_i \in V_P} c_i \quad (D_{\text{current}} > 0)$$
 
-2. **목표 스케일 계수 (Scale Factor $S$)**:
-   $$S = \frac{M_{\text{target}}}{D_{\text{current}}} \quad (M_{\text{target}} \ge 0.01)$$
+#### 2. 목표 스케일 계수 (Scale Factor $S$)
+$$S = \frac{M_{\text{target}}}{D_{\text{current}}} \quad (M_{\text{target}} \ge 0.01)$$
 
-3. **모드별 라운딩 정책 (Rounding Policy by Mode)**:
-   - **`FRACTIONAL` (정밀 소수점 모드)**:
-     - 모든 연결 노드: $c'_u = \text{round}_4(c_u \times S)$
-   - **`INTEGER_CEIL` (정수 올림 모드)**:
-     - 풀 내부 노드 ($u \in V_P$): 시간 분할 운용 특성에 따라 소수점 유지:
-       $$c'_u = \text{round}_4(c_u \times S)$$
-     - 풀 외부 노드 ($u \notin V_P$): 실제 물리 기계 설치 대수에 맞춰 정수 올림:
-       $$c'_u = \max(1.0, \lceil c_u \times S \rceil)$$
-   - **`HARMONIZED` (조화 정수 모드)**:
-     - 1부터 $K_{\max}$까지 외부 노드들의 $c_u \times S \times k$가 정수에 수렴하는 최적 배수 $k$를 탐색하여 정수 조화 스케일링 적용.
+#### 3. 모드별 라운딩 정책 (Rounding Policy by Mode)
+* **`FRACTIONAL` (정밀 소수점 모드)**:
+  모든 연결 노드: $c'_u = \text{round}_4(c_u \times S)$
+* **`INTEGER_CEIL` (정수 올림 모드)**:
+  * 풀 내부 노드 ($u \in V_P$): 시간 분할 운용 특성에 따라 소수점 유지: $c'_u = \text{round}_4(c_u \times S)$
+  * 풀 외부 노드 ($u \notin V_P$): 실제 물리 기계 설치 대수에 맞춰 정수 올림: $c'_u = \max(1.0, \lceil c_u \times S \rceil)$
+* **`HARMONIZED` (조화 정수 모드)**:
+  1부터 $K_{\max}$까지 외부 노드들의 $c_u \times S \times k$가 정수에 수렴하는 최적 배수 $k$를 탐색하여 정수 조화 스케일링 적용.
 
 ### 2.3 클래스별 책임 및 구현 상세 (Component Responsibilities)
 

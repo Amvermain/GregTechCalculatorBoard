@@ -194,7 +194,7 @@
   "gui.gtcalcboard.addon.thermal.upgrade_desc": "Повышение тира: устанавливает масштаб машины в %sx (макс. 1 комплект)",
   "gui.gtcalcboard.addon.thermal.remove_kit": "[Нажмите] Снять комплект улучшения",
   "gui.gtcalcboard.addon.thermal.install_kit": "[Нажмите] Установить комплект улучшения (заменяет текущий)",
-  "gui.gtcalcboard.addon.throughput_boosting": "Разгон пропускной способности [Скорость 2.5x, 0.95x EU]",
+  "gui.gtcalcboard.addon.throughput_boosting": "Разгон пропускной способности",
   "gui.gtcalcboard.addon.throughput_boosting.desc": "4x порций за 1.6x времени (0.4x длительности, 0.95x EU)",
   "gui.gtcalcboard.addon.batch_processing": "Пакетный режим",
   "gui.gtcalcboard.addon.batch_processing.desc": "Включает пакетную обработку нескольких рецептов без штрафов",

@@ -33,6 +33,8 @@ import com.gtceu.calcboard.integration.spi.RecipeViewerRegistry;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -388,6 +390,41 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> implements I
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         if (BoardKeybindDispatcher.handleKeyPressed(this, keyCode, scanCode, modifiers, (int) lastMouseX, (int) lastMouseY)) return true;
         return super.keyPressed(keyCode, scanCode, modifiers);
+    }
+
+    public GuiEventListener getActiveFocusedWidget() {
+        if (dialogManager != null) {
+            GuiEventListener w = dialogManager.getActiveFocusedWidget();
+            if (w != null) return w;
+        }
+        if (pageTabBar != null && pageTabBar.isEditing()) {
+            EditBox rb = pageTabBar.getRenameBox();
+            if (rb != null && rb.isFocused()) return rb;
+        }
+        if (pageBrowserDrawer != null && pageBrowserDrawer.isOpen()) {
+            EditBox eb = pageBrowserDrawer.getFocusedEditBox();
+            if (eb != null) return eb;
+        }
+        return null;
+    }
+
+    @Override
+    public GuiEventListener getFocused() {
+        GuiEventListener active = getActiveFocusedWidget();
+        return active != null ? active : super.getFocused();
+    }
+
+    @Override
+    public List<? extends GuiEventListener> children() {
+        GuiEventListener active = getActiveFocusedWidget();
+        if (active == null) {
+            return super.children();
+        }
+        List<GuiEventListener> all = new ArrayList<>(super.children());
+        if (!all.contains(active)) {
+            all.add(active);
+        }
+        return all;
     }
 
     public double toCanvasX(double screenX) { return navigationHandler.toCanvasX(screenX); }

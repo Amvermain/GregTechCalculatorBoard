@@ -92,11 +92,16 @@ flowchart TD
 
 #### 2) 병렬 처리 및 연료 소모량 공식
 * **기본 병렬 수 ($P_{\text{base}}$)**:
-  $$P_{\text{base}} = \max\left(1, \left\lfloor \frac{V_{\text{tier}}}{\text{RecipeEU/t}} \right\rfloor\right)$$
+
+$$P_{\text{base}} = \max\left(1, \left\lfloor \frac{V_{\text{tier}}}{\text{RecipeEU/t}} \right\rfloor\right)$$
+
 * **실효 가동 병렬 수 ($P_{\text{eff}}$)**:
-  $$P_{\text{eff}} = P_{\text{base}} \times \left( \text{IsOxidizerBoosted} \,?\, 2 : 1 \right)$$
+
+$$P_{\text{eff}} = P_{\text{base}} \times \left( \text{IsOxidizerBoosted} \,?\, 2 : 1 \right)$$
+
 * **출력 전류 배율 ($M_{\text{amp}}$)**:
-  $$M_{\text{amp}} = \text{IsOxidizerBoosted} \,?\, A_{\text{boost}} : A_{\text{base}}$$
+
+$$M_{\text{amp}} = \text{IsOxidizerBoosted} \,?\, A_{\text{boost}} : A_{\text{base}}$$
 
 #### 3) MCF 프레임 냉각 부스팅 배율 ($M_{\text{frame}}$)
 

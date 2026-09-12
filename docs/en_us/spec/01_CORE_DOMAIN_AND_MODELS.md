@@ -462,9 +462,9 @@ Serves as fixed boundary conditions for flow scaling across cyclic loops and ter
 ### 12.2 Shared Machine Pool Frame Domain Model (`SharedMachinePool`)
 A frame-based domain model grouping multiple heterogeneous recipe nodes to run on a time-shared physical machine cluster:
 
-* **Duty Allocation & Machine Count Calculation**:
-  $$\text{Total Duty} = \sum_{i=1}^N \text{machineCount}_i$$
-  $$\text{Required Physical Machines} = \lceil \text{Total Duty} \rceil$$
+#### Duty Allocation & Machine Count Calculation
+$$\text{Total Duty} = \sum_{i=1}^N \text{machineCount}_i$$
+$$\text{Required Physical Machines} = \lceil \text{Total Duty} \rceil$$
 * **BOM & Power Aggregation Integration**:
   - When generating a Bill of Materials (`GTCEuBOMHelper`), fractional machine counts are not rounded up individually; only $\lceil \text{Total Duty} \rceil$ hulls and multiblock structures are requested for the pooled cluster.
   - Generates zero idle power loss, computing effective dynamic electrical load proportional to active utilization ($\text{Total Duty} / \text{Required Physical Machines}$).

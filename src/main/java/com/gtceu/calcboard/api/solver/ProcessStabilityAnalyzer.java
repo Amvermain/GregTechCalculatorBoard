@@ -126,7 +126,7 @@ public final class ProcessStabilityAnalyzer {
             }
             RecipeNode src = graph.findNodeById(edge.fromNodeId());
             RecipeNode dst = graph.findNodeById(edge.toNodeId());
-            if (src == null || dst == null || src.isReroute() || dst.isReroute()) {
+            if (src == null || dst == null || src.isReroute()) {
                 continue;
             }
 
@@ -171,17 +171,30 @@ public final class ProcessStabilityAnalyzer {
             return Collections.emptyList();
         }
 
-        List<FlowGraph.ConnectionEdge> cycle = new ArrayList<>();
-        cycle.add(closingEdge);
+        List<FlowGraph.ConnectionEdge> pathFromDstToSrc = new ArrayList<>();
         String curr = toId;
         while (!curr.equals(fromId)) {
             FlowGraph.ConnectionEdge edge = prevEdge.get(curr);
             if (edge == null) break;
-            cycle.add(edge);
+            pathFromDstToSrc.add(edge);
             curr = edge.fromNodeId();
         }
+        Collections.reverse(pathFromDstToSrc);
+
+        List<FlowGraph.ConnectionEdge> cycle = new ArrayList<>();
+        cycle.add(closingEdge);
+        cycle.addAll(pathFromDstToSrc);
         return cycle;
     }
+
+    private record MachineTransition(
+            RecipeNode producer,
+            int outputIndex,
+            RecipeNode consumer,
+            int inputIndex,
+            FlowGraph.ConnectionEdge finalEdge,
+            double retentionFactor
+    ) {}
 
     private static void checkCycleForDeficit(
             FlowGraph graph,
@@ -190,27 +203,24 @@ public final class ProcessStabilityAnalyzer {
             RecipeNode anchor,
             DivergenceContext divergenceContext
     ) {
+        List<MachineTransition> transitions = extractMachineTransitions(graph, cycleEdges, sccNodeIds);
+        if (transitions.isEmpty()) {
+            return;
+        }
+
         double cycleReturnRatio = 1.0;
         List<FlowGraph.ConnectionEdge> deficitEdges = new ArrayList<>();
 
-        for (FlowGraph.ConnectionEdge edge : cycleEdges) {
-            RecipeNode src = graph.findNodeById(edge.fromNodeId());
-            RecipeNode dst = graph.findNodeById(edge.toNodeId());
-            if (src == null || dst == null || src.isReroute() || dst.isReroute()) continue;
-            if (edge.outputIndex() >= src.getOutputs().size() || edge.inputIndex() >= dst.getInputs().size()) continue;
-
-            int totalOut = countPortOutDegree(graph, src.getId(), edge.outputIndex());
-            int outsideOut = countPortOutsideDegree(graph, src.getId(), edge.outputIndex(), sccNodeIds);
-            double retentionFactor = totalOut > 0 ? (double) (totalOut - outsideOut) / totalOut : 1.0;
-            double singleRate = src.calculateSingleMachineOutputRate(src.getOutputs().get(edge.outputIndex()));
-            double outRate = singleRate * retentionFactor;
-            double inRate = dst.calculateSingleMachineInputRate(dst.getInputs().get(edge.inputIndex()));
+        for (MachineTransition trans : transitions) {
+            double singleRate = trans.producer.calculateSingleMachineOutputRate(trans.producer.getOutputs().get(trans.outputIndex));
+            double outRate = singleRate * trans.retentionFactor;
+            double inRate = trans.consumer.calculateSingleMachineInputRate(trans.consumer.getInputs().get(trans.inputIndex));
             if (inRate <= 1e-5) continue;
 
             double stepRatio = outRate / inRate;
             cycleReturnRatio *= stepRatio;
             if (stepRatio < 1.0 - 1e-4) {
-                deficitEdges.add(edge);
+                deficitEdges.add(trans.finalEdge);
             }
         }
 
@@ -241,6 +251,72 @@ public final class ProcessStabilityAnalyzer {
         }
     }
 
+    private static List<MachineTransition> extractMachineTransitions(
+            FlowGraph graph,
+            List<FlowGraph.ConnectionEdge> cycleEdges,
+            Set<String> sccNodeIds
+    ) {
+        List<MachineTransition> transitions = new ArrayList<>();
+        int n = cycleEdges.size();
+        if (n == 0) return transitions;
+
+        int startIdx = findFirstMachineEdgeIndex(graph, cycleEdges);
+        if (startIdx == -1) return transitions;
+
+        RecipeNode currentProducer = null;
+        int currentOutputIndex = -1;
+        double currentRetention = 1.0;
+
+        for (int step = 0; step < n; step++) {
+            int idx = (startIdx + step) % n;
+            FlowGraph.ConnectionEdge edge = cycleEdges.get(idx);
+            RecipeNode src = graph.findNodeById(edge.fromNodeId());
+            RecipeNode dst = graph.findNodeById(edge.toNodeId());
+            if (src == null || dst == null) break;
+
+            if (!src.isReroute()) {
+                currentProducer = src;
+                currentOutputIndex = edge.outputIndex();
+                currentRetention = calculateNodeRetention(graph, src.getId(), edge.outputIndex(), sccNodeIds);
+            } else {
+                currentRetention *= calculateNodeRetention(graph, src.getId(), edge.outputIndex(), sccNodeIds);
+            }
+
+            if (!dst.isReroute()) {
+                if (currentProducer != null
+                        && currentOutputIndex < currentProducer.getOutputs().size()
+                        && edge.inputIndex() < dst.getInputs().size()) {
+                    transitions.add(new MachineTransition(
+                            currentProducer,
+                            currentOutputIndex,
+                            dst,
+                            edge.inputIndex(),
+                            edge,
+                            currentRetention
+                    ));
+                }
+                currentProducer = null;
+            }
+        }
+        return transitions;
+    }
+
+    private static int findFirstMachineEdgeIndex(FlowGraph graph, List<FlowGraph.ConnectionEdge> cycleEdges) {
+        for (int i = 0; i < cycleEdges.size(); i++) {
+            RecipeNode producer = graph.findNodeById(cycleEdges.get(i).fromNodeId());
+            if (producer != null && !producer.isReroute()) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private static double calculateNodeRetention(FlowGraph graph, String nodeId, int outIdx, Set<String> sccNodeIds) {
+        int totalOut = countPortOutDegree(graph, nodeId, outIdx);
+        int outsideOut = countPortOutsideDegree(graph, nodeId, outIdx, sccNodeIds);
+        return totalOut > 0 ? (double) (totalOut - outsideOut) / totalOut : 1.0;
+    }
+
     private static Set<RecipeNode> collectCycleNodes(FlowGraph graph, List<FlowGraph.ConnectionEdge> cycleEdges) {
         Set<RecipeNode> cycleNodes = new LinkedHashSet<>();
         for (FlowGraph.ConnectionEdge edge : cycleEdges) {
@@ -261,17 +337,33 @@ public final class ProcessStabilityAnalyzer {
         Set<IngredientStack> cycleResources = new HashSet<>();
         for (FlowGraph.ConnectionEdge cEdge : cycleEdges) {
             RecipeNode src = graph.findNodeById(cEdge.fromNodeId());
-            if (src != null && cEdge.outputIndex() < src.getOutputs().size()) {
+            if (src == null) continue;
+            if (src.isReroute()) {
+                IngredientStack rStack = src.getRerouteIngredient();
+                if (rStack != null) cycleResources.add(rStack);
+            } else if (cEdge.outputIndex() < src.getOutputs().size()) {
                 cycleResources.add(src.getOutputs().get(cEdge.outputIndex()));
             }
         }
 
+        Set<String> nodesToCheck = new HashSet<>();
         for (RecipeNode n : cycleNodes) {
+            nodesToCheck.add(n.getId());
+        }
+        for (FlowGraph.ConnectionEdge cEdge : cycleEdges) {
+            nodesToCheck.add(cEdge.fromNodeId());
+            nodesToCheck.add(cEdge.toNodeId());
+        }
+
+        for (String nodeId : nodesToCheck) {
+            RecipeNode n = graph.findNodeById(nodeId);
+            if (n == null) continue;
             for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
                 if (!edge.fromNodeId().equals(n.getId())) continue;
-                if (edge.outputIndex() >= n.getOutputs().size()) continue;
-                IngredientStack outStack = n.getOutputs().get(edge.outputIndex());
-                if (!cycleResources.contains(outStack)) continue;
+                IngredientStack outStack = n.isReroute()
+                        ? n.getRerouteIngredient()
+                        : (edge.outputIndex() < n.getOutputs().size() ? n.getOutputs().get(edge.outputIndex()) : null);
+                if (outStack == null || !cycleResources.contains(outStack)) continue;
 
                 RecipeNode target = graph.findNodeById(edge.toNodeId());
                 if (target != null && (target.isVoidSink() || !sccNodeIds.contains(target.getId()))) {

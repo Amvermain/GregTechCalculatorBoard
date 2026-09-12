@@ -11,6 +11,15 @@
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-09-12
+
+### Fixed
+- Fixed an issue where external recipe viewer (EMI) hotkeys intercepted text typing while the recipe search dialog is open, and prevented duplicate background caching calls during recipe reloading.
+- Fixed an issue where the Throughput Boosting multiblock trait displayed as "Pyrolyse Oven" in the machine configuration dialog and cards.
+- Fixed an issue where fractional power multipliers were rounded incorrectly on addon badges, and resolved an issue where Throughput Boosting's 4x parallel was mistakenly treated as extra power draw, preventing overclocking and causing excessive processing durations.
+- Fixed an issue where single-energy-hatch multiblock machines (such as Rock Filtrator) could be equipped with multiple energy hatches to trigger voltage tier-skip overclocking.
+- Fixed an issue where connecting a junction node in a recirculation loop could trigger false loop warnings, freeze machine rates, or cause machine counts to explode during auto-ratio calculation.
+
 ## [2.2.0-beta.4] - 2026-09-11
 
 ### Fixed

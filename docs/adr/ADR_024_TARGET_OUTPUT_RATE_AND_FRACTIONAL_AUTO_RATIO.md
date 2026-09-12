@@ -33,15 +33,18 @@ $$\text{Rate}_{\text{total}} = \text{Rate}_{\text{single}} \times N$$
   - 시간 단위 지원: `/s`, `/min`, `/h`, `/t`, `/d`
   - 유체 단위 지원: `mB/s`, `B/min`, `mB/min`
   - 입력 문자열을 $O(1)$ 정규식 파싱하여 초당 유량($R_{\text{target}}$ [items/s 또는 mB/s])으로 표준화 변환.
-- **대수 역산 공식 ($O(1)$)**:
-  $$N_{\text{req}} = \frac{R_{\text{target}}}{R_{\text{single}}}$$
-  $$N_{\text{final}} = \max\left(0.0001, \frac{\lfloor N_{\text{req}} \times 10{,}000 + 0.5 \rfloor}{10{,}000}\right)$$
+- **대수 역산 공식**:
+
+$$N_{\text{req}} = \frac{R_{\text{target}}}{R_{\text{single}}}$$
+$$N_{\text{final}} = \max\left(0.0001, \frac{\lfloor N_{\text{req}} \times 10{,}000 + 0.5 \rfloor}{10{,}000}\right)$$
+
 - **Undo/Redo 및 앵커 승격**: `ModifyPropertyCommand.machineCount`를 통해 변경 이력을 영속화하며, [Base Anchor로 지정] 옵션을 기본 제공합니다.
 
 ### 2.2 정밀 소수점 Auto-Ratio (`FlowGraphSolver.autoRatioFractional`)
 - `FlowBalanceMatrixSolver.autoRatioFromAnchor`에 소수점 스케일링 모드(`integerCounts = false`)를 추가 지원합니다.
 - 상류 기계 대수 산출 시 정수 올림을 생략하고 소수점 4자리 유효숫자(`0.0001` 단위) 정밀도로 비율을 동기화합니다:
-  $$N_{\text{upstream}} = \max\left(0.0001, \frac{\lfloor N_{\text{needed}} \times 10{,}000 + 0.5 \rfloor}{10{,}000}\right)$$
+
+$$N_{\text{upstream}} = \max\left(0.0001, \frac{\lfloor N_{\text{needed}} \times 10{,}000 + 0.5 \rfloor}{10{,}000}\right)$$
 
 ### 2.3 앵커 노드 소수점 대수 보존 (`preserveFractionalAnchor`)
 - 일반 정수 Auto-Ratio 실행 시에도, 앵커 노드 본인이 이미 소수점 대수($|N - \text{round}(N)| > 10^{-4}$)를 갖고 있는 경우 강제 정수 올림되지 않도록 보존하는 로직을 적용합니다:

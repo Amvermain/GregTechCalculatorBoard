@@ -13,6 +13,7 @@ import com.gtceu.calcboard.client.gui.dialog.modal.ModalStack;
 import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
 import com.gtceu.calcboard.client.gui.tutorial.WelcomeTutorialDialog;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.events.GuiEventListener;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -143,6 +144,15 @@ public class BoardDialogManager {
     public boolean isAnyModalOpen() {
         syncActiveModals();
         return modalStack.hasActiveModal();
+    }
+
+    public GuiEventListener getActiveFocusedWidget() {
+        syncActiveModals();
+        IBoardModal top = modalStack.getTopModal();
+        if (top != null) {
+            return top.getFocusedWidget();
+        }
+        return null;
     }
 
     public void renderModals(GuiGraphics graphics, int width, int height, int mouseX, int mouseY, float partialTicks) {

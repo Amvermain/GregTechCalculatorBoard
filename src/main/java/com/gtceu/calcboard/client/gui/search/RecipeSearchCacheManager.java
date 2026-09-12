@@ -132,7 +132,7 @@ public final class RecipeSearchCacheManager {
             if (onComplete != null) onComplete.run();
             return;
         }
-        if (onComplete != null) {
+        if (onComplete != null && !ON_COMPLETE_CALLBACKS.contains(onComplete)) {
             ON_COMPLETE_CALLBACKS.add(onComplete);
         }
         if (IS_CACHING) return;
@@ -142,12 +142,19 @@ public final class RecipeSearchCacheManager {
             return;
         }
 
+        IS_CACHING = true;
+
         var adapter = com.gtceu.calcboard.integration.spi.RecipeViewerRegistry.getActiveAdapter();
         if (!adapter.isRecipeBakingComplete()) {
-            adapter.runWhenReady(() -> ensureGlobalRecipesCachedAsync(null));
+            CACHING_PROGRESS = new RecipeLoadingProgress(1, 4, "gui.gtcalcboard.loading_recipe_phase.1", "Waiting for " + adapter.getViewerId().toUpperCase(Locale.ROOT) + " recipes to bake...");
+            adapter.runWhenReady(() -> startIndexingAsync(adapter));
             return;
         }
 
+        startIndexingAsync(adapter);
+    }
+
+    private static void startIndexingAsync(com.gtceu.calcboard.integration.spi.IRecipeViewerAdapter adapter) {
         IS_CACHING = true;
         CACHING_PROGRESS = new RecipeLoadingProgress(1, 4, "gui.gtcalcboard.loading_recipe_phase.1", "Connecting to " + adapter.getViewerId().toUpperCase(Locale.ROOT) + " Recipe Manager");
 
@@ -199,7 +206,7 @@ public final class RecipeSearchCacheManager {
                     Minecraft.getInstance().execute(cb);
                 }
             } catch (Throwable t) {
-                IS_CACHING = false;
+                com.gtceu.calcboard.GregTechCalcBoard.LOGGER.error("[GTCalcBoard] [RecipeSearch] Error during recipe indexing", t);
             } finally {
                 IS_CACHING = false;
             }

@@ -1410,6 +1410,124 @@ public class MachineAddonTest {
         Assertions.assertTrue(hasTranslatableKey(multiTooltip, "gui.gtcalcboard.addon.thermal.combined_effect"), "Tooltip for multiple installed copies must include combined effect key");
     }
 
+    @Test
+    public void testThroughputBoostingNameNotOverriddenByItemStackSample() {
+        MachineAddon trait = new MachineAddon(
+                "gtceu:throughput_boosting",
+                "gui.gtcalcboard.addon.throughput_boosting",
+                MachineAddon.Category.MULTIBLOCK_TRAIT,
+                "gui.gtcalcboard.addon.throughput_boosting.desc",
+                null
+        );
+        ItemStack sample = new ItemStack(net.minecraft.world.item.Items.FURNACE);
+        sample.setHoverName(Component.literal("Unexpected Furnace Override [PO]"));
+        trait.setItemStackSample(sample);
+
+        Assertions.assertNotEquals("Unexpected Furnace Override [PO]", trait.getName());
+        Assertions.assertEquals("gui.gtcalcboard.addon.throughput_boosting", trait.getName());
+    }
+
+    @Test
+    public void testThroughputBoostingCatalogRegistration() {
+        MachineAddonCatalog.getInstance().ensureFastLoaded();
+        MachineAddon boost = MachineAddonCatalog.getInstance().getAddon("gtceu:throughput_boosting");
+
+        Assertions.assertNotNull(boost);
+        Assertions.assertEquals(MachineAddon.Category.MULTIBLOCK_TRAIT, boost.getCategory());
+        Assertions.assertEquals("gui.gtcalcboard.addon.throughput_boosting", boost.getName());
+        Assertions.assertNull(boost.getItemIcon());
+        Assertions.assertEquals(4, boost.getParallelMultiplier());
+        Assertions.assertEquals(1.6, boost.getDurationMultiplier(), 0.001);
+        Assertions.assertEquals(0.95, boost.getEutMultiplier(), 0.001);
+        Assertions.assertTrue(boost.isPowerConstant());
+    }
+
+    @Test
+    public void testThroughputBoostingArcticChillingUnitOverclockAndPowerConstant() {
+        MachineAddonCatalog.getInstance().ensureFastLoaded();
+        MachineAddon boost = MachineAddonCatalog.getInstance().getAddon("gtceu:throughput_boosting");
+        Assertions.assertNotNull(boost);
+        Assertions.assertTrue(boost.isPowerConstant());
+
+        RecipeNode node = RecipeNode.create("Arctic Chilling Unit", 10.0, 30720.0, GTVoltageTier.LuV);
+        node.setTargetTier(GTVoltageTier.ZPM);
+        node.setMultiblock(true);
+        node.addAddon(new GTEnergyHatchAddon("gtceu:zpm_energy_hatch", "ZPM Energy Hatch", "",
+                ResourceLocation.tryParse("gtceu:zpm_energy_hatch"), GTVoltageTier.ZPM, 1, false, false, false));
+
+        com.gtceu.calcboard.api.type.OverclockMode.OverclockResult baseRes =
+                com.gtceu.calcboard.compat.gtceu.physics.GTPowerCalculator.computeOverclock(node, GTVoltageTier.ZPM, false);
+        Assertions.assertEquals(5.0, baseRes.durationTicks(), 0.001);
+        Assertions.assertEquals(122880.0, baseRes.eut(), 0.001);
+        Assertions.assertEquals(122880.0, node.getSingleMachineEUt(), 0.001);
+        Assertions.assertEquals(1, node.getTotalParallel());
+        Assertions.assertEquals(4.0, node.getCyclesPerSecond(), 0.001);
+
+        node.addAddon(boost);
+
+        com.gtceu.calcboard.api.type.OverclockMode.OverclockResult tpbRes =
+                com.gtceu.calcboard.compat.gtceu.physics.GTPowerCalculator.computeOverclock(node, GTVoltageTier.ZPM, false);
+        Assertions.assertEquals(8.0, tpbRes.durationTicks(), 0.001);
+        Assertions.assertEquals(116736.0, tpbRes.eut(), 0.001);
+        Assertions.assertEquals(116736.0, node.getSingleMachineEUt(), 0.001);
+        Assertions.assertEquals(4, node.getTotalParallel());
+        Assertions.assertEquals(10.0, node.getCyclesPerSecond(), 0.001);
+        Assertions.assertEquals(0.40, node.getEffectiveDurationSeconds(), 0.001);
+    }
+
+    @Test
+    public void testThroughputBoostingOverclockAndDurationFlooring() {
+        MachineAddonCatalog.getInstance().ensureFastLoaded();
+        MachineAddon boost = MachineAddonCatalog.getInstance().getAddon("gtceu:throughput_boosting");
+        Assertions.assertNotNull(boost);
+
+        RecipeNode node = RecipeNode.create("Test TPB Node", 10.0, 30.0, GTVoltageTier.LV);
+        node.setTargetTier(GTVoltageTier.MV);
+        node.setMultiblock(true);
+        node.addAddon(boost);
+
+        com.gtceu.calcboard.api.type.OverclockMode.OverclockResult res =
+                com.gtceu.calcboard.compat.gtceu.physics.GTPowerCalculator.computeOverclock(node, GTVoltageTier.MV, false);
+
+        Assertions.assertEquals(8.0, res.durationTicks(), 0.001);
+        Assertions.assertEquals(114.0, res.eut(), 0.001);
+        Assertions.assertEquals(4, node.getTotalParallel());
+    }
+
+    @Test
+    public void testThroughputBoostingMultipleOverclockStepFlooring() {
+        MachineAddonCatalog.getInstance().ensureFastLoaded();
+        MachineAddon boost = MachineAddonCatalog.getInstance().getAddon("gtceu:throughput_boosting");
+        Assertions.assertNotNull(boost);
+
+        RecipeNode node = RecipeNode.create("Test TPB Multi OC", 19.0, 30.0, GTVoltageTier.LV);
+        node.setTargetTier(GTVoltageTier.HV);
+        node.setMultiblock(true);
+        node.addAddon(boost);
+
+        com.gtceu.calcboard.api.type.OverclockMode.OverclockResult res =
+                com.gtceu.calcboard.compat.gtceu.physics.GTPowerCalculator.computeOverclock(node, GTVoltageTier.HV, false);
+
+        Assertions.assertEquals(6.0, res.durationTicks(), 0.001);
+    }
+
+    @Test
+    public void testThroughputBoostingOddDurationFlooring() {
+        MachineAddonCatalog.getInstance().ensureFastLoaded();
+        MachineAddon boost = MachineAddonCatalog.getInstance().getAddon("gtceu:throughput_boosting");
+        Assertions.assertNotNull(boost);
+
+        RecipeNode node = RecipeNode.create("Test TPB Odd", 7.0, 30.0, GTVoltageTier.LV);
+        node.setTargetTier(GTVoltageTier.MV);
+        node.setMultiblock(true);
+        node.addAddon(boost);
+
+        com.gtceu.calcboard.api.type.OverclockMode.OverclockResult res =
+                com.gtceu.calcboard.compat.gtceu.physics.GTPowerCalculator.computeOverclock(node, GTVoltageTier.MV, false);
+
+        Assertions.assertEquals(4.0, res.durationTicks(), 0.001);
+    }
+
     private static boolean hasTranslatableKey(List<Component> tooltip, String key) {
         for (Component c : tooltip) {
             if (matchesKey(c, key)) return true;

@@ -54,17 +54,17 @@ $$
 When aggressive overclocks push calculated recipe durations below $1.0\text{ tick}$ ($0.05\text{ s}$), processing branches according to singleblock and multiblock hardware capabilities:
 
 1. **Singleblock Machines (Early Break)**:
-   - Singleblock machines do not support sub-tick parallel processing.
-   - When the overclock loop reaches a duration of $1.0\text{ tick}$ or lower ($\text{duration} \le 1.0$), the overclock calculation terminates immediately (Early Break).
-   - Duration is clamped at $\max(1.0, \, \lfloor \text{duration} \rfloor) = 1.0\text{ tick}$, preventing uncontrolled power factor growth ($\text{Energy Factor}$) or EU/t spikes:
-     $$\text{BatchesPerTick} = 1.0, \quad \text{Effective Duration} = 1.0\text{ tick} \quad (0.05\text{ s})$$
-     $$\text{Cycles Per Second (CPS)} = 20.0 \times \text{Parallel} \times \text{MachineCount}$$
+   Singleblock machines do not support sub-tick parallel processing. When the overclock loop reaches a duration of $1.0\text{ tick}$ or lower ($\text{duration} \le 1.0$), the overclock calculation terminates immediately (Early Break). Duration is clamped at $\max(1.0, \, \lfloor \text{duration} \rfloor) = 1.0\text{ tick}$, preventing uncontrolled power factor growth ($\text{Energy Factor}$) or EU/t spikes:
+
+$$\text{BatchesPerTick} = 1.0, \quad \text{Effective Duration} = 1.0\text{ tick} \quad (0.05\text{ s})$$
+$$\text{Cycles Per Second (CPS)} = 20.0 \times \text{Parallel} \times \text{MachineCount}$$
 
 2. **Multiblock Machines (Subtick Parallel)**:
-   - Multiblocks continue to support sub-tick batching for voltage tiers exceeding the $1.0\text{ tick}$ threshold:
-     $$\text{BatchesPerTick} = \frac{1.0}{\text{Calculated Duration (ticks)}}, \quad \text{Effective Duration} = 1.0\text{ tick}$$
-     $$\text{Effective EU/t} = \text{Calculated EU/t} \times \text{BatchesPerTick}$$
-     $$\text{Cycles Per Second (CPS)} = 20.0 \times \text{BatchesPerTick} \times \text{Parallel} \times \text{MachineCount}$$
+   Multiblocks continue to support sub-tick batching for voltage tiers exceeding the $1.0\text{ tick}$ threshold:
+
+$$\text{BatchesPerTick} = \frac{1.0}{\text{Calculated Duration (ticks)}}, \quad \text{Effective Duration} = 1.0\text{ tick}$$
+$$\text{Effective EU/t} = \text{Calculated EU/t} \times \text{BatchesPerTick}$$
+$$\text{Cycles Per Second (CPS)} = 20.0 \times \text{BatchesPerTick} \times \text{Parallel} \times \text{MachineCount}$$
 
 ---
 
@@ -76,47 +76,55 @@ $$\text{Total Duration} = \text{Effective Duration} \times \prod_{a \in \text{Ad
 $$\text{Total EU/t} = \text{Effective EU/t} \times \prod_{a \in \text{Addons}} a.\text{getEutMultiplier}()$$
 
 #### Heating Coil Machine-Specific Bonus Deduction
-- **Electric Blast Furnace (EBF)**:
-  Given recipe temperature $T_{\text{recipe}}$ and coil temperature $T_{\text{coil}}$:
-  $$\Delta T_{\text{excess}} = \max(0, \, T_{\text{coil}} - T_{\text{recipe}})$$
-  $$\text{EUt Multiplier} = 0.95^{\lfloor \Delta T_{\text{excess}} / 900 \rfloor}$$
-  *(5% compounding power reduction per 900K excess temperature)*
 
-- **Pyrolyse Oven**:
-  $$\text{Duration Multiplier} = \frac{100.0}{\text{PyrolyseSpeedPercent}}$$
+##### Electric Blast Furnace (EBF)
+Given recipe temperature $T_{\text{recipe}}$ and coil temperature $T_{\text{coil}}$:
 
-- **Cracking Unit**:
-  $$\text{EUt Multiplier} = \frac{\text{CrackingEnergyPercent}}{100.0}$$
+$$\Delta T_{\text{excess}} = \max(0, \, T_{\text{coil}} - T_{\text{recipe}})$$
+$$\text{EUt Multiplier} = 0.95^{\lfloor \Delta T_{\text{excess}} / 900 \rfloor}$$
 
-- **Large Chemical Reactor (LCR / ECR / ICR)**:
-  $$\text{Duration Multiplier} = \frac{100.0}{\text{ChemicalSpeedPercent}}, \quad \text{EUt Multiplier} = \frac{\text{ChemicalEnergyPercent}}{100.0}$$
+*(5% compounding power reduction per 900K excess temperature)*
 
-- **Multi Smelter**:
-  $$\text{Parallel} = \text{SmelterParallel} \quad (32\text{x}, 64\text{x}, 128\text{x}\dots)$$
+##### Pyrolyse Oven
+$$\text{Duration Multiplier} = \frac{100.0}{\text{PyrolyseSpeedPercent}}$$
+
+##### Cracking Unit
+$$\text{EUt Multiplier} = \frac{\text{CrackingEnergyPercent}}{100.0}$$
+
+##### Large Chemical Reactor (LCR / ECR / ICR)
+$$\text{Duration Multiplier} = \frac{100.0}{\text{ChemicalSpeedPercent}}, \quad \text{EUt Multiplier} = \frac{\text{ChemicalEnergyPercent}}{100.0}$$
+
+##### Multi Smelter
+$$\text{Parallel} = \text{SmelterParallel} \quad (32\text{x}, 64\text{x}, 128\text{x}\dots)$$
 
 #### Large Steam/Gas/Plasma Turbine Rotor, Decoupled Tiers & Durability Formulas (ADR-006)
-- **Decoupled Rotor Holder & Dynamo Hatch Tiers**:
-  Given Rotor Holder tier voltage $V_{\text{holder}}$, Dynamo Hatch tier voltage $V_{\text{dynamo}}$, and amperage $A_{\text{dynamo}}$:
-  $$\text{Cap}_{\text{holder}} = V_{\text{holder}} \times 2.0 \quad (\text{EU/t, Flow Rate Limit})$$
-  $$\text{Cap}_{\text{dynamo}} = V_{\text{dynamo}} \times A_{\text{dynamo}} \quad (\text{EU/t, Power Generation Ceiling})$$
-  $$\text{P}_{\text{max, turbine}} = \min(\text{Cap}_{\text{holder}}, \, \text{Cap}_{\text{dynamo}})$$
 
-- **Turbine Rotor Efficiency & Generation Calculation**:
-  Given rotor efficiency $E_{\text{rotor}}$, rotor power $P_{\text{rotor}}$, rotor holder tier bonus $B_{\text{holder}} = \max(0, (\text{HolderTier} - \text{BaseTier}) \times 10\%)$, and lubricant boost multiplier $M_{\text{boost}} \in \{1.0, 1.25, 1.50\}$:
-  $$\text{RotorEffMult} = \max\left(1.0, \, \frac{E_{\text{rotor}}}{100.0} \times \left(1.0 + \frac{B_{\text{holder}}}{100.0}\right) \times M_{\text{boost}}\right)$$
-  $$\text{Calculated Output EU/t} = \min\left(\text{P}_{\text{max, turbine}}, \, \text{BaseRecipeEUt} \times \frac{P_{\text{rotor}}}{100.0} \times M_{\text{boost}}\right)$$
-  $$\text{Total Parallel} = \left\lfloor \frac{\text{Calculated Output EU/t}}{\text{BaseRecipeEUt}} \right\rfloor$$
+##### 1. Decoupled Rotor Holder & Dynamo Hatch Tiers
+Given Rotor Holder tier voltage $V_{\text{holder}}$, Dynamo Hatch tier voltage $V_{\text{dynamo}}$, and amperage $A_{\text{dynamo}}$:
 
-- **Rotor Durability Wear Rate & Lifetime ($T_{\text{lifespan}}$) Formulas**:
-  Given base durability $D_{\text{rotor}}$ and loss rate per second $\text{Loss}_{\text{sec}}$:
-  $$\text{Loss}_{\text{sec}} = \text{BaseLossRate} \times \left(\frac{\text{ActualFlowRate}}{\text{OptimalFlowRate}}\right) \times \frac{1.0}{M_{\text{boost}}}$$
-  $$T_{\text{lifespan}} = \frac{D_{\text{rotor}}}{\text{Loss}_{\text{sec}}} \quad (\text{seconds})$$
-  $$\text{Rotor Replacement Rate (Items/hour)} = \frac{3600.0}{T_{\text{lifespan}}} \times \text{MachineCount}$$
+$$\text{Cap}_{\text{holder}} = V_{\text{holder}} \times 2.0 \quad (\text{EU/t, Flow Rate Limit})$$
+$$\text{Cap}_{\text{dynamo}} = V_{\text{dynamo}} \times A_{\text{dynamo}} \quad (\text{EU/t, Power Generation Ceiling})$$
+$$P_{\text{max, turbine}} = \min(\text{Cap}_{\text{holder}}, \, \text{Cap}_{\text{dynamo}})$$
+
+##### 2. Turbine Rotor Efficiency & Generation Calculation
+Given rotor efficiency $E_{\text{rotor}}$, rotor power $P_{\text{rotor}}$, rotor holder tier bonus $B_{\text{holder}} = \max(0, (\text{HolderTier} - \text{BaseTier}) \times 10\%)$, and lubricant boost multiplier $M_{\text{boost}} \in \{1.0, 1.25, 1.50\}$:
+
+$$\text{RotorEffMult} = \max\left(1.0, \, \frac{E_{\text{rotor}}}{100.0} \times \left(1.0 + \frac{B_{\text{holder}}}{100.0}\right) \times M_{\text{boost}}\right)$$
+$$\text{Calculated Output EU/t} = \min\left(P_{\text{max, turbine}}, \, \text{BaseRecipeEUt} \times \frac{P_{\text{rotor}}}{100.0} \times M_{\text{boost}}\right)$$
+$$\text{Total Parallel} = \left\lfloor \frac{\text{Calculated Output EU/t}}{\text{BaseRecipeEUt}} \right\rfloor$$
+
+##### 3. Rotor Durability Wear Rate & Lifetime ($T_{\text{lifespan}}$) Formulas
+Given base durability $D_{\text{rotor}}$ and loss rate per second $\text{Loss}_{\text{sec}}$:
+
+$$\text{Loss}_{\text{sec}} = \text{BaseLossRate} \times \left(\frac{\text{ActualFlowRate}}{\text{OptimalFlowRate}}\right) \times \frac{1.0}{M_{\text{boost}}}$$
+$$T_{\text{lifespan}} = \frac{D_{\text{rotor}}}{\text{Loss}_{\text{sec}}} \quad (\text{seconds})$$
+$$\text{Rotor Replacement Rate (Items/hour)} = \frac{3600.0}{T_{\text{lifespan}}} \times \text{MachineCount}$$
 
 #### Power Supply Based Maximum Available Machine Parallel ($P_{\max}$) Formula
 Given equipped Energy Hatch voltage $V_{\text{hatch}}$, amperage $A_{\text{hatch}}$, and single recipe power $E_{\text{recipe}}$:
 $$P_{\max} = \min\left(\text{ConfiguredParallel}, \, \left\lfloor \frac{V_{\text{hatch}} \times A_{\text{hatch}}}{E_{\text{recipe}}} \right\rfloor\right)$$
 If $\text{ConfiguredParallel} > P_{\max}$, a hardware capacity warning badge is rendered on the canvas node card.
+For multiblock structures with single energy hatch limits ($\text{energyHatchSlotCount} = 1$, such as Rock Filtrator), at most one energy hatch may be installed and dual-hatch tier skip overclocking is disallowed.
 
 ---
 
@@ -146,7 +154,7 @@ Physics formulas for intrinsic multiblock processing modifiers and traits:
    - Multipliers: Parallel $P_{\text{trait}} = 4$, Duration $D_{\text{mult}} = 1.6$, Power $E_{\text{mult}} = 0.95$
    - Effective Duration: $T_{\text{eff}} = T_{\text{base}} \times 1.6 \text{ (ticks)}$
    - Effective Cycles Per Second (CPS): $\text{CPS} = \frac{20}{T_{\text{eff}}} \times (P_{\text{hatch}} \times 4) = \text{CPS}_{\text{base}} \times 2.5 \quad (2.5\times \text{ speed acceleration})$
-   - Single Machine Power: $\text{EUt}_{\text{single}} = \text{EUt}_{\text{base}} \times 0.95 \times P_{\text{trait}}$
+   - Single Machine Power: $\text{EUt}_{\text{single}} = \text{EUt}_{\text{base}} \times 0.95$ (Constant power parallel: $P_{\text{trait}}$ does not increase power draw)
 2. **Bulk Processing (Bulk Processing Array, LOAF, etc.)**:
    - Multipliers: Parallel $P_{\text{trait}} = 16$, Duration $D_{\text{mult}} = 13.0$
    - Effective Duration: $T_{\text{eff}} = T_{\text{base}} \times 13.0 \text{ (ticks)}$
@@ -155,10 +163,12 @@ Physics formulas for intrinsic multiblock processing modifiers and traits:
    - Multipliers: Parallel $P_{\text{trait}} = 8$, Duration $D_{\text{mult}} = 1.5$, Power $E_{\text{mult}} = 1.25$
    - Effective Cycles Per Second (CPS): $\text{CPS} = \frac{20}{T_{\text{eff}}} \times (P_{\text{hatch}} \times 8) = \text{CPS}_{\text{base}} \times \frac{8}{1.5} \approx \text{CPS}_{\text{base}} \times 5.333 \quad (5.33\times \text{ speed acceleration})$
 4. **Multiblock Trait Stacking**:
-   - For endgame multiblocks combining multiple traits (e.g. LOAF, Ultimate EBF):
-   $$\text{Total Parallel} = P_{\text{hatch}} \times \prod_{k} P_{\text{trait}, k}$$
-   $$\text{Combined Duration Multiplier} = \prod_{k} D_{\text{mult}, k}$$
-   - Example: `Throughput Boosting` ($4\times \text{ Par, } 1.6\times \text{ Dur}$) + `Bulk Processing` ($16\times \text{ Par, } 13.0\times \text{ Dur}$) = $64\times \text{ Parallel, } 20.8\times \text{ Duration} \Rightarrow \frac{64}{20.8} \approx 3.077\times \text{ overall speedup}$.
+   For endgame multiblocks combining multiple traits (e.g. LOAF, Ultimate EBF):
+
+$$\text{Total Parallel} = P_{\text{hatch}} \times \prod_{k} P_{\text{trait}, k}$$
+$$\text{Combined Duration Multiplier} = \prod_{k} D_{\text{mult}, k}$$
+
+   Example: `Throughput Boosting` ($4\times \text{ Par, } 1.6\times \text{ Dur}$) + `Bulk Processing` ($16\times \text{ Par, } 13.0\times \text{ Dur}$) = $64\times \text{ Parallel, } 20.8\times \text{ Duration} \Rightarrow \frac{64}{20.8} \approx 3.077\times \text{ overall speedup}$.
 
 ---
 
@@ -209,10 +219,11 @@ Iteratively converges machine steady-state utilization efficiencies ($\eta_v \in
 
 1. **Initialization**: Set $\eta_v^{(0)} = 1.0$ for all $v \in V$.
 2. **Relaxation Iteration ($k = 1 \dots 10$)**:
-   - Upstream supplier effective output: $\text{Supply}_{P_j} = \text{NominalOutputRate}_{P_j} \times \eta_{P_j}^{(k-1)}$
-   - Proportionally distributed incoming supply:
-     $$\text{IncomingSupply}_i = \sum_{P_j} \min\left(\text{NominalDemand}_{C, i}, \, \text{Supply}_{P_j} \times \frac{\text{NominalDemand}_{C, i}}{\text{TotalDemand}_{P_j}}\right)$$
-   - Consumer machine efficiency update: $\eta_C^{(k)} = \min_{i} \left(\frac{\text{IncomingSupply}_i}{\text{NominalDemand}_{C, i}}, \, 1.0\right)$
+   Upstream supplier effective output is $\text{Supply}_{P_j} = \text{NominalOutputRate}_{P_j} \times \eta_{P_j}^{(k-1)}$, and proportionally distributed incoming supply is calculated as:
+
+$$\text{IncomingSupply}_i = \sum_{P_j} \min\left(\text{NominalDemand}_{C, i}, \, \text{Supply}_{P_j} \times \frac{\text{NominalDemand}_{C, i}}{\text{TotalDemand}_{P_j}}\right)$$
+
+   Consumer machine efficiency update: $\eta_C^{(k)} = \min_{i} \left(\frac{\text{IncomingSupply}_i}{\text{NominalDemand}_{C, i}}, \, 1.0\right)$
 3. **Early Termination**: Halts immediately when $\max_{v} |\eta_v^{(k)} - \eta_v^{(k-1)}| < 10^{-4}$.
 
 ---
@@ -243,15 +254,17 @@ $$\Delta_{\text{material}} = \sum \text{Output Rates} - \sum \text{Input Rates}$
 #### 1. Estimated Completion Time (ET)
 For a terminal or reroute node with target quota $A_{\text{target}}$, net inflow rate $\text{Rate}_{\text{in}}$, and maximum upstream cycle duration $T_{\text{cycle}}$:
 
-1. **Continuous Flow Model** ($T_{\text{cycle}} \le 0$):
-   $$T_{\text{ET}} = \frac{A_{\text{target}}}{\text{Rate}_{\text{in}}} \quad [\text{seconds}]$$
-2. **Discrete Machine Cycle Quantization Model** ($T_{\text{cycle}} > 0$):
-   For single-cycle production capacity $\text{Cap}_{\text{cycle}} = \text{Rate}_{\text{in}} \times T_{\text{cycle}}$, an epsilon guard ($\epsilon = 10^{-7}$) prevents false cycle increments caused by double-precision division rounding:
-   $$N_{\text{cycle}} = \left\lceil \frac{A_{\text{target}}}{\text{Cap}_{\text{cycle}}} - 10^{-7} \right\rceil, \quad T_{\text{ET}} = N_{\text{cycle}} \times T_{\text{cycle}} \quad [\text{seconds}]$$
+##### Continuous Flow Model ($T_{\text{cycle}} \le 0$)
+$$T_{\text{ET}} = \frac{A_{\text{target}}}{\text{Rate}_{\text{in}}} \quad [\text{seconds}]$$
 
-3. **Total Batch Energy & Feedstock Aggregation**:
-   $$E_{\text{total}} = \sum_{n \in \text{UpstreamNodes}} \left( n.\text{getTotalEUt}() \times n.\text{getEfficiency}() \times 20 \times T_{\text{ET}} \right) \quad [\text{EU}]$$
-   $$C_{\text{raw}}(M) = \text{UnconnectedInputRate}(M) \times T_{\text{ET}} \quad [\text{Items / mB}]$$
+##### Discrete Machine Cycle Quantization Model ($T_{\text{cycle}} > 0$)
+For single-cycle production capacity $\text{Cap}_{\text{cycle}} = \text{Rate}_{\text{in}} \times T_{\text{cycle}}$, an epsilon guard ($\epsilon = 10^{-7}$) prevents false cycle increments caused by double-precision division rounding:
+
+$$N_{\text{cycle}} = \left\lceil \frac{A_{\text{target}}}{\text{Cap}_{\text{cycle}}} - 10^{-7} \right\rceil, \quad T_{\text{ET}} = N_{\text{cycle}} \times T_{\text{cycle}} \quad [\text{seconds}]$$
+
+##### Total Batch Energy & Feedstock Aggregation
+$$E_{\text{total}} = \sum_{n \in \text{UpstreamNodes}} \left( n.\text{getTotalEUt}() \times n.\text{getEfficiency}() \times 20 \times T_{\text{ET}} \right) \quad [\text{EU}]$$
+$$C_{\text{raw}}(M) = \text{UnconnectedInputRate}(M) \times T_{\text{ET}} \quad [\text{Items / mB}]$$
 
 #### 2. Raw Material Stock Depletion Time (DT)
 For an unconnected raw feedstock junction buffer with stock amount $A_{\text{buffer}}$, total downstream outflow rate $\text{Rate}_{\text{out}}$, and downstream cycle duration $T_{\text{cycle, down}}$:
@@ -264,15 +277,18 @@ $$N_{\text{drain}} = \left\lceil \frac{A_{\text{buffer}}}{\text{Rate}_{\text{out
 
 When external resource supply modes (`SupplyMode`) are configured on junction or source nodes, upstream demand backpropagation is deterministically controlled and raw deficits are neutralized:
 
-1. **Infinite Supply Mode (`SupplyMode.INFINITE`)**:
-   - Blocks upstream demand propagation regardless of downstream demand $D_{\text{down}}$:
-     $$\text{Demand}_{\text{upstream}} = 0$$
-   - Satisfies 100% of downstream demand from infinite external feed, preventing unwarranted upstream machine scaling.
-2. **Fixed Rate Supply Mode (`SupplyMode.FIXED_RATE`)**:
-   - Propagates only the remaining demand exceeding the fixed per-second feed rate $R_{\text{ext}}$:
-     $$\text{Demand}_{\text{upstream}} = \max(0.0, \, D_{\text{down}} - R_{\text{ext}})$$
-3. **Summary Deficit Offset (`FlowSummaryAggregator`)**:
-   - When compiling total unconnected raw material deficits ($\text{RawDeficit}$), subtracts effective supply from external nodes ($\min(D_{\text{down}}, R_{\text{ext}})$ or $\text{INFINITE}$) to account only for genuine net deficits.
+##### 1. Infinite Supply Mode (`SupplyMode.INFINITE`)
+Blocks upstream demand propagation regardless of downstream demand $D_{\text{down}}$, preventing unwarranted upstream machine scaling:
+
+$$\text{Demand}_{\text{upstream}} = 0$$
+
+##### 2. Fixed Rate Supply Mode (`SupplyMode.FIXED_RATE`)
+Propagates only the remaining demand exceeding the fixed per-second feed rate $R_{\text{ext}}$:
+
+$$\text{Demand}_{\text{upstream}} = \max(0.0, \, D_{\text{down}} - R_{\text{ext}})$$
+
+##### 3. Summary Deficit Offset (`FlowSummaryAggregator`)
+When compiling total unconnected raw material deficits ($\text{RawDeficit}$), subtracts effective supply from external nodes ($\min(D_{\text{down}}, R_{\text{ext}})$ or $\text{INFINITE}$) to account only for genuine net deficits.
 
 ---
 
@@ -280,15 +296,17 @@ When external resource supply modes (`SupplyMode`) are configured on junction or
 
 For multi-page flowchart graphs bound to AE2 crafting patterns, calculates exact parallel execution times and pipeline latency over an $O(K)$ topologically sorted DAG:
 
-1. **Single Node Batch Duration ($T_{\text{batch}}$) & Run Count ($N_{\text{runs}}$)**:
-   $$\text{EffectiveParallel} = \text{node.getParallel}() \times \text{node.getMachineCount}()$$
-   $$N_{\text{runs}} = \left\lceil \frac{\text{RequiredQuantity}}{\text{RecipeOutputAmount} \times \text{EffectiveParallel}} \right\rceil$$
-   $$T_{\text{node}} = N_{\text{runs}} \times \text{node.getEffectiveDurationSeconds}()$$
-2. **Critical Path & Pipeline Staggering ($T_{\text{pipeline}}$)**:
-   For upstream predecessor set $\text{Pred}(u)$:
-   $$T_{\text{start}}(u) = \max_{p \in \text{Pred}(u)} \left( T_{\text{start}}(p) + \text{FirstBatchDuration}(p) \right)$$
-   $$T_{\text{finish}}(u) = T_{\text{start}}(u) + T_{\text{node}}(u)$$
-   $$\text{Total ETA} = \max_{u \in \text{TerminalNodes}} T_{\text{finish}}(u)$$
+##### 1. Single Node Batch Duration ($T_{\text{batch}}$) & Run Count ($N_{\text{runs}}$)
+$$\text{EffectiveParallel} = \text{node.getParallel}() \times \text{node.getMachineCount}()$$
+$$N_{\text{runs}} = \left\lceil \frac{\text{RequiredQuantity}}{\text{RecipeOutputAmount} \times \text{EffectiveParallel}} \right\rceil$$
+$$T_{\text{node}} = N_{\text{runs}} \times \text{node.getEffectiveDurationSeconds}()$$
+
+##### 2. Critical Path & Pipeline Staggering ($T_{\text{pipeline}}$)
+For upstream predecessor set $\text{Pred}(u)$:
+
+$$T_{\text{start}}(u) = \max_{p \in \text{Pred}(u)} \left( T_{\text{start}}(p) + \text{FirstBatchDuration}(p) \right)$$
+$$T_{\text{finish}}(u) = T_{\text{start}}(u) + T_{\text{node}}(u)$$
+$$\text{Total ETA} = \max_{u \in \text{TerminalNodes}} T_{\text{finish}}(u)$$
 
 ---
 
@@ -296,16 +314,22 @@ For multi-page flowchart graphs bound to AE2 crafting patterns, calculates exact
 
 Accurately aggregates Bill of Materials (BOM) for flowcharts containing deeply nested compound modules (`isModule()`) and Shared Machine Pool frames (`isSharedMachineFrame()`) in a single flattened resolution pass:
 
-1. **Recursive Parent Multiplier Propagation (`flattenNodesAndFrames`)**:
-   When descending from root nodes into subgraphs $G_{\text{sub}}$, the parent multiplier $P$ is compounded with the module machine count $M_{\text{module}}$:
-   $$P_{\text{child}} = P_{\text{parent}} \times \max(1.0, \, M_{\text{module}})$$
-   Upon reaching leaf node $n$, its effective machine count is scaled to $n.\text{getMachineCount}() \times P$, ensuring module container cards are excluded from BOM parts while internal operational machines scale faithfully.
-2. **Shared Machine Frame Duty Aggregation & Ceiling Quantization**:
-   For machine nodes $\{n_1, n_2, \dots, n_k\}$ enclosed in a Shared Machine Frame, cumulative duty cycle is computed and quantized to an integral physical machine count:
-   $$M_{\text{req}} = \max\left(1, \, \left\lceil \sum_{i=1}^{k} n_i.\text{getMachineCount}() - 10^{-5} \right\rceil\right)$$
-   $M_{\text{req}}$ is assigned to the primary master node, while dependent slave nodes are pruned from duplicate BOM counts.
-3. **Singleblock Tiered Resolution & Traceability (`usedByMachines`)**:
-   Singleblock machines resolve into tier-specific item IDs (e.g. `gtceu:lv_rock_breaker`) matching their target voltage tier, and record contributing machine labels and counts in the `usedByMachines` trace list.
+##### 1. Recursive Parent Multiplier Propagation (`flattenNodesAndFrames`)
+When descending from root nodes into subgraphs $G_{\text{sub}}$, the parent multiplier $P$ is compounded with the module machine count $M_{\text{module}}$:
+
+$$P_{\text{child}} = P_{\text{parent}} \times \max(1.0, \, M_{\text{module}})$$
+
+Upon reaching leaf node $n$, its effective machine count is scaled to $n.\text{getMachineCount}() \times P$, ensuring module container cards are excluded from BOM parts while internal operational machines scale faithfully.
+
+##### 2. Shared Machine Frame Duty Aggregation & Ceiling Quantization
+For machine nodes $\{n_1, n_2, \dots, n_k\}$ enclosed in a Shared Machine Frame, cumulative duty cycle is computed and quantized to an integral physical machine count:
+
+$$M_{\text{req}} = \max\left(1, \, \left\lceil \sum_{i=1}^{k} n_i.\text{getMachineCount}() - 10^{-5} \right\rceil\right)$$
+
+$M_{\text{req}}$ is assigned to the primary master node, while dependent slave nodes are pruned from duplicate BOM counts.
+
+##### 3. Singleblock Tiered Resolution & Traceability (`usedByMachines`)
+Singleblock machines resolve into tier-specific item IDs (e.g. `gtceu:lv_rock_breaker`) matching their target voltage tier, and record contributing machine labels and counts in the `usedByMachines` trace list.
 
 ---
 
@@ -313,23 +337,25 @@ Accurately aggregates Bill of Materials (BOM) for flowcharts containing deeply n
 
 Integrates physical Junction void sinks (`SupplyMode.VOID_SINK`) and direct port-level void marking (`isOutputPortVoided`) to purge surplus byproducts generated in petrochem, acid refining, and catalytic loops:
 
-1. **Mass Balance Formulation with Void Sinks**:
-   For any material $s$ in the process flow graph:
-   $$\Delta(s) = P(s) - C(s) - V(s)$$
-   - $P(s) = \sum \text{Produced}(s)$: Total production rate
-   - $C(s) = \sum \text{Consumed}(s)$: Total consumption rate
-   - $\text{netSurplus}(s) = \max(0, \, P(s) - C(s))$: Net surplus exceeding consumption
-   - $V(s) = \min\Big(\text{netSurplus}(s), \, V_{\text{marked}}(s) + V_{\text{sink}}(s)\Big)$: Effective voided flow rate
-   - $\text{NetOutput}(s) = \text{netSurplus}(s) - V(s)$: Final net production rate displayed in `SummaryOverlay`
+##### 1. Mass Balance Formulation with Void Sinks
+For any material $s$ in the process flow graph:
 
-2. **Deficit Exemption ($P(s) < C(s)$)**:
-   Materials in deficit are strictly exempt from voiding. Downstream consumers maintain absolute first-priority access to available supply; only net surplus ($\text{netSurplus} > 0$) is eligible for voiding up to $V(s)$.
+$$\Delta(s) = P(s) - C(s) - V(s)$$
 
-3. **1:N Branch Priority Isolation (`getConnectedConsumerDemand`)**:
-   In topologies where a single output port splits concurrently into normal machines and a `VOID_SINK` junction:
-   - `FlowBalanceMatrixSolver.getConnectedConsumerDemand()` enforces a return value of **strictly 0.0** for consumers where `consumer.isVoidSink()` is true.
-   - The void sink is completely excluded from the output port's total demand sum (`totalPortDemand`), mathematically preventing it from siphoning flow away from or starving (Input Starvation) legitimate downstream machines.
-   - Only surplus remaining after satisfying downstream consumers ($P - \sum C_{\text{normal}}$) is absorbed by the void sink ($V_{\text{sink}}$).
+* $P(s) = \sum \text{Produced}(s)$: Total production rate
+* $C(s) = \sum \text{Consumed}(s)$: Total consumption rate
+* $\text{netSurplus}(s) = \max(0, \, P(s) - C(s))$: Net surplus exceeding consumption
+* $V(s) = \min\Big(\text{netSurplus}(s), \, V_{\text{marked}}(s) + V_{\text{sink}}(s)\Big)$: Effective voided flow rate
+* $\text{NetOutput}(s) = \text{netSurplus}(s) - V(s)$: Final net production rate displayed in `SummaryOverlay`
+
+##### 2. Deficit Exemption ($P(s) < C(s)$)
+Materials in deficit are strictly exempt from voiding. Downstream consumers maintain absolute first-priority access to available supply; only net surplus ($\text{netSurplus} > 0$) is eligible for voiding up to $V(s)$.
+
+##### 3. 1:N Branch Priority Isolation (`getConnectedConsumerDemand`)
+In topologies where a single output port splits concurrently into normal machines and a `VOID_SINK` junction:
+- `FlowBalanceMatrixSolver.getConnectedConsumerDemand()` enforces a return value of **strictly 0.0** for consumers where `consumer.isVoidSink()` is true.
+- The void sink is completely excluded from the output port's total demand sum (`totalPortDemand`), mathematically preventing it from siphoning flow away from or starving (Input Starvation) legitimate downstream machines.
+- Only surplus remaining after satisfying downstream consumers ($P - \sum C_{\text{normal}}$) is absorbed by the void sink ($V_{\text{sink}}$).
 
 ---
 
@@ -337,15 +363,19 @@ Integrates physical Junction void sinks (`SupplyMode.VOID_SINK`) and direct port
 
 Proportionally scales processes sharing a physical machine frame to match a designated target machine capacity:
 
-1. **Sum Current Operational Duty**:
-   For node set $N = \{n_1, n_2, \dots, n_k\}$ enclosed within the shared frame:
-   $$D_{\text{current}} = \sum_{i=1}^{k} n_i.\text{getMachineCount}()$$
-2. **Compute Scaling Multiplier ($S$)**:
-   Given target physical capacity $M_{\text{target}}$ (default $1.0$):
-   $$S = \frac{M_{\text{target}}}{D_{\text{current}}}$$
-3. **Machine Count Updates**:
-   - **Continuous Mode (Default Click)**: Preserves decimal precision via $n_i.\text{setMachineCount}(n_i.\text{getMachineCount}() \times S)$.
-   - **Integer Ceiling Mode (Alt+Click)**: Quantizes to full physical machine units via $\lceil n_i.\text{getMachineCount}() \times S \rceil$.
+##### 1. Sum Current Operational Duty
+For node set $N = \{n_1, n_2, \dots, n_k\}$ enclosed within the shared frame:
+
+$$D_{\text{current}} = \sum_{i=1}^{k} n_i.\text{getMachineCount}()$$
+
+##### 2. Compute Scaling Multiplier ($S$)
+Given target physical capacity $M_{\text{target}}$ (default $1.0$):
+
+$$S = \frac{M_{\text{target}}}{D_{\text{current}}}$$
+
+##### 3. Machine Count Updates
+- **Continuous Mode (Default Click)**: Preserves decimal precision via $n_i.\text{setMachineCount}(n_i.\text{getMachineCount}() \times S)$.
+- **Integer Ceiling Mode (Alt+Click)**: Quantizes to full physical machine units via $\lceil n_i.\text{getMachineCount}() \times S \rceil$.
 
 ---
 

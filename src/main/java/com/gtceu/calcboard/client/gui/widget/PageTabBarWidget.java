@@ -506,6 +506,10 @@ public class PageTabBarWidget {
         this.testEditing = editing;
     }
 
+    public EditBox getRenameBox() {
+        return renameBox;
+    }
+
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         if (isEditing()) {
             if (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER) {

@@ -464,9 +464,9 @@ public class MachineHardwareTemplate {
 ### 12.2 공유 기계 풀 프레임 도메인 명세 (`SharedMachinePool`)
 복수의 서로 다른 레시피 노드를 하나의 물리적 기계 풀로 묶어 시간 분할(Time-Sharing) 가동하는 프레임 도메인 모델입니다:
 
-* **분담률 및 기계 대수 연산**:
-  $$\text{Total Duty} = \sum_{i=1}^N \text{machineCount}_i$$
-  $$\text{Required Physical Machines} = \lceil \text{Total Duty} \rceil$$
+#### 분담률 및 기계 대수 연산
+$$\text{Total Duty} = \sum_{i=1}^N \text{machineCount}_i$$
+$$\text{Required Physical Machines} = \lceil \text{Total Duty} \rceil$$
 * **BOM(자재 청구서) 및 전력 집계 연동**:
   - 자재 청구서(`GTCEuBOMHelper`) 생성 시 각 레시피의 소수점 기계 대수를 개별 올림하지 않고, 풀 단위로 합산된 $\lceil \text{Total Duty} \rceil$ 대의 본체 및 멀티블록 구조물 재료만 정확히 청구합니다.
   - 유휴 상태에서는 전력 소모가 발생하지 않으며, 실효 가동률($\text{Total Duty} / \text{Required Physical Machines}$)에 비례한 유효 전력 부하를 산출합니다.

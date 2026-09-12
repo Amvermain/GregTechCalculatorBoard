@@ -194,7 +194,7 @@
   "gui.gtcalcboard.addon.thermal.upgrade_desc": "티어 업그레이드: 기계 배율을 %sx로 설정 (최대 1개)",
   "gui.gtcalcboard.addon.thermal.remove_kit": "[클릭] 업그레이드 킷 해제",
   "gui.gtcalcboard.addon.thermal.install_kit": "[클릭] 업그레이드 킷 장착 (기존 킷 교체)",
-  "gui.gtcalcboard.addon.throughput_boosting": "처리량 부스팅 [4x 병렬, 1.6x 시간, 0.95x EU]",
+  "gui.gtcalcboard.addon.throughput_boosting": "처리량 부스팅",
   "gui.gtcalcboard.addon.throughput_boosting.desc": "4x 병렬 처리, 처리 시간 1.6x, 전력 0.95x (2.5배 가속)",
   "gui.gtcalcboard.addon.batch_processing": "배치 모드 (Batch Mode)",
   "gui.gtcalcboard.addon.batch_processing.desc": "패널티 없이 다회차 레시피 일괄 가동 지원",

@@ -27,14 +27,17 @@
 ## 2. 아키텍처 결정 사항 (Decision Drivers)
 
 ### 2.1 스크롤바 인터랙션 상태 머신 (`RecipeSearchDialog`)
-- **트랙 클릭 점프 및 썸 드래그**:
-  $$O_{\text{new}} = \text{clamp}\left(\left\lfloor \frac{Y_{\text{mouse}} - Y_{\text{track}} - \frac{H_{\text{thumb}}}{2}}{H_{\text{track}} - H_{\text{thumb}}} \times O_{\text{max}} \right\rfloor, 0, O_{\text{max}}\right)$$
-- `isDraggingScrollBar` 플래그와 `dragGrabOffsetY`를 통해 마우스 이벤트(`mouseClicked`, `mouseDragged`, `mouseReleased`)를 $O(1)$로 동기화.
+* **트랙 클릭 점프 및 썸 드래그**:
+
+$$O_{\text{new}} = \text{clamp}\left(\left\lfloor \frac{Y_{\text{mouse}} - Y_{\text{track}} - \frac{H_{\text{thumb}}}{2}}{H_{\text{track}} - H_{\text{thumb}}} \times O_{\text{max}} \right\rfloor, 0, O_{\text{max}}\right)$$
+
+* `isDraggingScrollBar` 플래그와 `dragGrabOffsetY`를 통해 마우스 이벤트(`mouseClicked`, `mouseDragged`, `mouseReleased`)를 동기화.
 
 ### 2.2 격자 스냅(Grid Snap) 좌표 양자화 (`CanvasInteractionHandler`)
-- **동작 조건**: `Screen.hasControlDown() || BoardManager.getInstance().isGridSnapEnabled()`
-- **스냅 공식**:
-  $$\Delta X_{\text{snapped}} = \text{round}\left(\frac{\Delta X_{\text{total}}}{G}\right) \times G, \quad \Delta Y_{\text{snapped}} = \text{round}\left(\frac{\Delta Y_{\text{total}}}{G}\right) \times G \quad (G = 16)$$
+* **동작 조건**: `Screen.hasControlDown() || BoardManager.getInstance().isGridSnapEnabled()`
+* **스냅 공식**:
+
+$$\Delta X_{\text{snapped}} = \text{round}\left(\frac{\Delta X_{\text{total}}}{G}\right) \times G, \quad \Delta Y_{\text{snapped}} = \text{round}\left(\frac{\Delta Y_{\text{total}}}{G}\right) \times G \quad (G = 16)$$
 - 다중 선택된 모든 노드/프레임/노트의 원점(`dragStartPositions`) 대비 절대 변위를 적용하여 그룹 내부의 상대적 기하 배치를 유지.
 
 ### 2.3 외부 공급원 정션 도메인 모델 (`SupplyMode` & `RecipeNode`)
