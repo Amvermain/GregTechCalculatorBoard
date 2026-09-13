@@ -14,6 +14,9 @@ import com.gtceu.calcboard.api.bom.MultiblockStructureDef;
 import com.gtceu.calcboard.api.bom.MultiblockStructurePart;
 import com.gtceu.calcboard.api.bom.PartCategory;
 import com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon;
+import com.gtceu.calcboard.compat.gtceu.model.mcf.MCFModuleSlot;
+import com.gtceu.calcboard.compat.gtceu.model.mcf.MCFModuleType;
+import com.gtceu.calcboard.compat.gtceu.model.mcf.MCFSlotConfiguration;
 import com.gtceu.calcboard.compat.start.helper.RecipeNodeThreadingHelper;
 import com.gtceu.calcboard.api.spi.IModAdapter;
 import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
@@ -85,7 +88,11 @@ public final class GTCEuBOMHelper {
             }
         }
 
-        return resolveMachineParts(node, def, dualLowerTierEnergyHatches);
+        List<MultiblockStructurePart> list = resolveMachineParts(node, def, dualLowerTierEnergyHatches);
+        if (GTCombustionHelper.isModularCombustionFrame(node)) {
+            list = appendMCFModuleParts(node, list, dualLowerTierEnergyHatches);
+        }
+        return list;
     }
 
     private static List<MultiblockStructurePart> resolveMachineParts(RecipeNode node, MultiblockStructureDef def, boolean dualLowerTierEnergyHatches) {
@@ -638,6 +645,82 @@ public final class GTCEuBOMHelper {
         }
 
         return list;
+    }
+
+    private static List<MultiblockStructurePart> appendMCFModuleParts(RecipeNode node, List<MultiblockStructurePart> list, boolean dualLowerTierEnergyHatches) {
+        List<MultiblockStructurePart> result = new ArrayList<>(list);
+
+        boolean hasMCFController = result.stream().anyMatch(p -> p != null && GTCombustionHelper.START_MCF.equals(p.itemId()));
+        if (!hasMCFController) {
+            result.add(0, new MultiblockStructurePart(
+                    GTCombustionHelper.START_MCF,
+                    "Modular Combustion Frame",
+                    1,
+                    PartCategory.CONTROLLER
+            ));
+        }
+
+        double totalPower = GTCombustionHelper.computeMCFTotalPower(node);
+        GTCombustionHelper.LaserHatchRecommendation rec = GTCombustionHelper.getLaserHatchRecommendation(totalPower);
+        ResourceLocation laserId = ResourceLocation.tryParse("gtceu:" + rec.tier().getName().toLowerCase(Locale.ROOT) + "_laser_source_hatch");
+        if (laserId != null) {
+            result.add(new MultiblockStructurePart(
+                    laserId,
+                    rec.tier().name() + " Laser Source Hatch",
+                    1,
+                    PartCategory.HATCH_BUS
+            ));
+        }
+
+        MCFSlotConfiguration config = GTCombustionHelper.getMCFConfiguration(node);
+        for (MCFModuleSlot slot : config.getActiveSlots()) {
+            MCFModuleType type = slot.getModuleType();
+            if (type == null) continue;
+            MultiblockStructureDef moduleDef = MultiblockStructureCatalog.getStructure(type.getMachineId());
+            if (moduleDef != null) {
+                appendModuleDefParts(result, moduleDef, type);
+            } else {
+                appendModuleFallbackParts(result, type, slot.isOxidizerBoosted());
+            }
+        }
+
+        return result;
+    }
+
+    private static void appendModuleDefParts(List<MultiblockStructurePart> result, MultiblockStructureDef moduleDef, MCFModuleType type) {
+        boolean hasController = false;
+        for (MultiblockStructurePart p : moduleDef.parts()) {
+            if (p == null) continue;
+            if (p.category() == PartCategory.CONTROLLER || (moduleDef.controllerId() != null && moduleDef.controllerId().equals(p.itemId()))) {
+                hasController = true;
+            }
+            result.add(p);
+        }
+        if (!hasController) {
+            result.add(0, new MultiblockStructurePart(
+                    moduleDef.controllerId() != null ? moduleDef.controllerId() : type.getMachineId(),
+                    moduleDef.controllerName() != null ? moduleDef.controllerName() : type.getDisplayName(),
+                    1,
+                    PartCategory.CONTROLLER
+            ));
+        }
+    }
+
+    private static void appendModuleFallbackParts(List<MultiblockStructurePart> result, MCFModuleType type, boolean oxidizerBoosted) {
+        result.add(new MultiblockStructurePart(
+                type.getMachineId(),
+                type.getDisplayName() + " Controller",
+                1,
+                PartCategory.CONTROLLER
+        ));
+        ResourceLocation inputHatch = resolveInputHatchId(type.getTier());
+        if (inputHatch == null) return;
+
+        String hatchName = resolveDisplayName(inputHatch, formatDisplayName(inputHatch));
+        result.add(new MultiblockStructurePart(inputHatch, hatchName, 2, PartCategory.HATCH_BUS));
+        if (oxidizerBoosted) {
+            result.add(new MultiblockStructurePart(inputHatch, hatchName, 1, PartCategory.HATCH_BUS));
+        }
     }
 
     public static ResourceLocation resolveEnergyHatchId(GTVoltageTier tier, boolean dualLowerTier) {

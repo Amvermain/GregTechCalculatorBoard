@@ -18,6 +18,7 @@ public final class AddonCategory {
     public static final AddonCategory COIL = register("coil", "Heating Coils", "gui.gtcalcboard.addon_cat.coil", 90);
     public static final AddonCategory HEATER = register("heater", "Heaters & Burners", "gui.gtcalcboard.addon_cat.heater", 85);
     public static final AddonCategory ROTOR = register("rotor", "Turbine Rotors", "gui.gtcalcboard.addon_cat.rotor", 80);
+    public static final AddonCategory MCF_MODULE = register("mcf_module", "MCF Modules", "gui.gtcalcboard.addon_cat.mcf_module", 75);
     public static final AddonCategory REFLECTOR = register("reflector", "Fusion Reflectors", "gui.gtcalcboard.addon_cat.reflector", 70);
     public static final AddonCategory THREADING = register("threading", "Threading Helixes", "gui.gtcalcboard.addon_cat.threading", 68);
     public static final AddonCategory MULTIBLOCK_TRAIT = register("multiblock_trait", "Multiblock Traits", "gui.gtcalcboard.addon_cat.trait", 65);

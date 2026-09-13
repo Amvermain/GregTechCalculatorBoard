@@ -93,6 +93,10 @@ public final class GTCEuWorkstationResolver {
             }
         }
 
+        if (GTCombustionHelper.START_MCF.equals(icon)) {
+            return GTVoltageTier.LuV;
+        }
+
         return null;
     }
 
@@ -117,6 +121,7 @@ public final class GTCEuWorkstationResolver {
         }
 
         appendCapabilityMultiblocks(catId, result);
+        appendModularCombustionFrame(node, catId, result);
 
         if (result.isEmpty() && node.getMachineIcon() != null && MultiblockDetector.isMultiblock(node.getMachineIcon())) {
             result.add(node.getMachineIcon());
@@ -144,6 +149,19 @@ public final class GTCEuWorkstationResolver {
         }
 
         return result;
+    }
+
+    private static void appendModularCombustionFrame(RecipeNode node, ResourceLocation catId, List<ResourceLocation> result) {
+        if (node == null || result == null) return;
+        boolean isCombustion = (catId != null && GTCombustionHelper.COMBUSTION_CATEGORY_ID.equals(catId))
+                || (node.getMachineIcon() != null && GTCombustionHelper.isCombustionMachine(node.getMachineIcon()));
+        boolean isRocket = (catId != null && GTCombustionHelper.ROCKET_CATEGORY_ID.equals(catId))
+                || (node.getMachineIcon() != null && GTCombustionHelper.isStarTRocketMachine(node.getMachineIcon()));
+        if ((isCombustion || isRocket) && GTCombustionHelper.hasModularCombustionFrame()) {
+            if (!result.contains(GTCombustionHelper.START_MCF)) {
+                result.add(GTCombustionHelper.START_MCF);
+            }
+        }
     }
 
     private static void appendCapabilityMultiblocks(ResourceLocation catId, List<ResourceLocation> result) {

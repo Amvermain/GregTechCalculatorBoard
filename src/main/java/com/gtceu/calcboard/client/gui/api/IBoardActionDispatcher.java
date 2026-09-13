@@ -126,4 +126,6 @@ public interface IBoardActionDispatcher {
     void openNoteEditDialog(CanvasStickyNote note);
 
     void openTargetOutputRateDialog(RecipeNode node, int outputIndex);
+ 
+    void batchApplyPageTargetVoltage();
 }

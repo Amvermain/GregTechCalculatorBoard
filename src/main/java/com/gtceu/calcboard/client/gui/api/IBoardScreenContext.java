@@ -3,6 +3,7 @@ package com.gtceu.calcboard.client.gui.api;
 import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.solver.BalanceSummary;
+import com.gtceu.calcboard.api.storage.BoardPage;
 import com.gtceu.calcboard.client.gui.CanvasInteractionHandler;
 import com.gtceu.calcboard.client.gui.canvas.CanvasWireRenderer;
 import com.gtceu.calcboard.client.gui.dialog.*;
@@ -75,6 +76,12 @@ public interface IBoardScreenContext extends IBoardViewportAccessor, IBoardSelec
     GuideDialog getGuideDialog();
 
     MachineConfigDialog getMachineConfigDialog();
+
+    PageSettingsDialog getPageSettingsDialog();
+
+    void openPageSettingsDialog(BoardPage page);
+
+    void openPageSettingsDialog();
 
     void onNodeInspectorOpened();
 

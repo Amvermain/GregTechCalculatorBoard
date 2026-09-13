@@ -42,6 +42,14 @@ public final class SimulatedGTEnvironment {
         registerSimulatedCapabilities();
     }
 
+    public static void tearDownEnvironment() {
+        MultiblockStructureCatalog.clear();
+        CategoryCapabilityMatrix.getInstance().reset();
+        MultiblockDetector.reinitialize();
+        TestMultiblockFixtures.initTestEnvironmentDefaults();
+        com.gtceu.calcboard.api.catalog.MachineAddonCatalog.getInstance().reset();
+    }
+
     private static void registerSimulatedStructures() {
         MultiblockStructureCatalog.registerManualStructure(buildDistillationTowerDef());
         MultiblockStructureCatalog.registerManualStructure(buildLargeSteamTurbineDef());

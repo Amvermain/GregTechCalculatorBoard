@@ -7,7 +7,7 @@
 > 📘 **Detailed Technical Specification Series**:
 > * 🇰🇷 **Korean Edition**: [docs/ko_kr/CODE_SPECIFICATION.md](ko_kr/CODE_SPECIFICATION.md)
 > * 🇺🇸 **English Edition**: [docs/en_us/CODE_SPECIFICATION.md](en_us/CODE_SPECIFICATION.md)
-> The complete v2.2.0 architecture specifications, 5 graph algorithms, Gauss-Jordan mass balance linear solver, `CategoryCapabilityMatrix`, and 2-tier on-demand streaming protocol are documented in the links above.
+> The complete v2.2.1 architecture specifications, 5 graph algorithms, Gauss-Jordan mass balance linear solver, `CategoryCapabilityMatrix`, and 2-tier on-demand streaming protocol are documented in the links above.
 
 This document describes the internal architecture, mathematical solver engine, canvas rendering pipeline, and multi-mod compatibility layer (SPI) of **GregTech Calculator Board**.
 
@@ -177,6 +177,31 @@ The Core Domain Engine (`com.gtceu.calcboard.api`) and Common Mod Adapters (`com
 ### 2.17 Damped Recirculation Loop Closed-Form Solver & Steady-State Visualization (ADR-044)
 * **Infinite Geometric Series Closed-Form Convergence**: Solves steady-state recirculating supply via $S_{\text{steady}} = \frac{S_{\text{ext}}}{1 - r}$ in $O(1)$ without artificial deficit warnings.
 * **Steady-State Operational Visualization**: Displays cyan circulating indicators for balanced recirculation loops and provides 1-click machine scaling to steady-state capacity.
+
+### 2.18 RecipeNode Role Composition Decomposition (ADR-045)
+* **INodeRole Composition**: Decomposes `RecipeNode` into a slim canvas entity composing specialized operational roles (`MachineNodeRole`, `SubPageModuleNodeRole`, `JunctionNodeRole`, `BoundaryPinNodeRole`).
+* **Dual-Write NBT Backward Compatibility**: Maintains full read/write serialization compatibility with legacy blueprints and storage tags without data loss.
+* **Immutable Calculation Snapshots**: Captures lock-free `NodeCalculationSnapshot` and `FlowGraphSnapshot` records to decouple background math calculations from canvas rendering.
+
+### 2.19 Deterministic Spec Deduction & Compat Normalization (ADR-047)
+* **Zero String Heuristics (Rule 5 Compliance)**: Eliminates legacy `contains` substring lookups across Create sequenced assembly, threading helix modifiers, offline energy hatch tiers, and Thermal dynamos.
+* **Exact-Match Mapping & Strong Types**: Employs immutable identifier lookup tables (`Map<ResourceLocation, T>`) and static reflection caches (`Class.isAssignableFrom`) for deterministic behavior across custom modpacks.
+
+### 2.20 Page Target Voltage Tier & Multiblock Auto-Provisioning (ADR-048)
+* **Page-Level Target Voltage (`defaultVoltageTier`)**: Enables per-page default operating tiers, automatically upgrading singleblock machines and auto-equipping matching energy hatches on multiblock structures upon recipe insertion.
+* **Transactional Batch Application**: Supports 1-click page-wide tier synchronization via `BatchChangeTierCommand` with full atomic Undo/Redo integration.
+
+### 2.21 Machine & Recipe Transition Hardware Reconciler (ADR-049)
+* **Idempotent Transition Pipeline (`NodeHardwareReconciler`)**: Standardizes hardware adaptation when switching recipes or machine models, purging incompatible addons, clamping voltage tiers, and maintaining lifecycle parity.
+* **Complete Hardware Mementos**: Extends `SwitchRecipeCommand` to capture full snapshots of machine icons, multiblock state, parallel values, and installed addons for lossless Undo/Redo restoration.
+
+### 2.22 Immutable Recipe Specification & Dynamic Port Projection (ADR-050)
+* **Immutable Recipe Spec (`RecipeSpec`)**: Preserves pristine base recipe inputs and outputs, preventing loss of original ingredients when toggling machine models or addons.
+* **Dynamic Hardware Port Projection (`IPortProjectionProvider`)**: Dynamically projects auxiliary fluid ports (steam, oxidizer, coolant) via pure derivation while isolating core recipe port indices (0..N-1) to protect existing wire topologies.
+
+### 2.23 Star Technology Modular Combustion Complex (MCF) Integration (ADR-013)
+* **Single Macro Node Model**: Models Star Technology's Modular Combustion Frame and up to 8 docked combustion/rocket modules within a unified macro node.
+* **Centralized Coolant Consumption**: Derives common coolant demand proportionally across active module slots into a single external port, while aggregating complete frame and module blocks in the Multiblock BOM.
 
 ---
 

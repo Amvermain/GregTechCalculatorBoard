@@ -17,6 +17,8 @@ public final class MultiblockMachineInspector {
 
     private static final Class<?> COIL_WORKABLE_CLS;
     private static final Class<?> THREADING_CAPABLE_CLS;
+    private static final Class<?> THREADING_MODIFIER_CLS;
+    private static final Class<?> START_THREADING_MOD_CLS;
     private static final Class<?> GT_MODIFIERS_CLS;
     private static final Class<?> GT_REGISTRIES_CLS;
     private static final Field RECIPE_TYPES_FIELD;
@@ -38,6 +40,18 @@ public final class MultiblockMachineInspector {
             threadCls = Class.forName("com.startechnology.start_core.machine.threading.StarTThreadingCapableMachine", false, cl);
         } catch (ReflectiveOperationException | LinkageError ignored) {}
         THREADING_CAPABLE_CLS = threadCls;
+
+        Class<?> threadModCls = null;
+        try {
+            threadModCls = Class.forName("com.startechnology.start_core.recipe.modifier.ThreadingMachineRecipeModifier", false, cl);
+        } catch (ReflectiveOperationException | LinkageError ignored) {}
+        THREADING_MODIFIER_CLS = threadModCls;
+
+        Class<?> startThreadModCls = null;
+        try {
+            startThreadModCls = Class.forName("com.startechnology.start_core.recipe.modifier.StartRecipeModifiers$Threading", false, cl);
+        } catch (ReflectiveOperationException | LinkageError ignored) {}
+        START_THREADING_MOD_CLS = startThreadModCls;
 
         Class<?> modCls = null;
         try {
@@ -205,8 +219,8 @@ public final class MultiblockMachineInspector {
         if (THREADING_CAPABLE_CLS != null && THREADING_CAPABLE_CLS.isAssignableFrom(mCls)) {
             return true;
         }
-        String mClsName = mCls.getName().toLowerCase(Locale.ROOT);
-        return mClsName.contains("threadingcapable") || mClsName.contains("startthreading");
+        String simpleName = mCls.getSimpleName();
+        return "StarTThreadingCapableMachine".equals(simpleName) || "ThreadingCapableMachine".equals(simpleName);
     }
 
     public static boolean hasThreadingModifier(Class<?> cls, Object def) {
@@ -215,11 +229,51 @@ public final class MultiblockMachineInspector {
             mGetModifiers.setAccessible(true);
             Object modifiers = mGetModifiers.invoke(def);
             if (modifiers != null) {
-                String modStr = modifiers.toString().toLowerCase(Locale.ROOT);
-                return modStr.contains("threading_machine") || modStr.contains("startrecipemodifiers") || modStr.contains("threading");
+                return containsThreadingModifier(modifiers);
             }
         } catch (ReflectiveOperationException | LinkageError ignored) {}
         return false;
+    }
+
+    private static boolean containsThreadingModifier(Object modifiers) {
+        if (modifiers instanceof Iterable<?> iterable) {
+            return containsInIterable(iterable);
+        }
+        if (modifiers instanceof Object[] array) {
+            return containsInArray(array);
+        }
+        return isThreadingModifier(modifiers);
+    }
+
+    private static boolean containsInIterable(Iterable<?> iterable) {
+        for (Object item : iterable) {
+            if (isThreadingModifier(item)) return true;
+        }
+        return false;
+    }
+
+    private static boolean containsInArray(Object[] array) {
+        for (Object item : array) {
+            if (isThreadingModifier(item)) return true;
+        }
+        return false;
+    }
+
+    private static boolean isThreadingModifier(Object modifier) {
+        if (modifier == null) return false;
+        Class<?> clazz = modifier.getClass();
+        if (THREADING_MODIFIER_CLS != null && THREADING_MODIFIER_CLS.isAssignableFrom(clazz)) {
+            return true;
+        }
+        if (START_THREADING_MOD_CLS != null && START_THREADING_MOD_CLS.isAssignableFrom(clazz)) {
+            return true;
+        }
+        String simpleName = clazz.getSimpleName();
+        String fullName = clazz.getName();
+        return "ThreadingMachineRecipeModifier".equals(simpleName)
+                || "Threading".equals(simpleName)
+                || fullName.endsWith("StartRecipeModifiers$Threading")
+                || fullName.endsWith("$Threading");
     }
 
     public static boolean isThreadingFromCatalog(ResourceLocation id) {

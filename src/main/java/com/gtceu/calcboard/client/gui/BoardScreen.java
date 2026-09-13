@@ -461,6 +461,11 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> implements I
         return actionHandler.scaleLoopToSteadyState(targetNodeId);
     }
 
+    @Override
+    public void batchApplyPageTargetVoltage() {
+        actionHandler.batchApplyPageTargetVoltage();
+    }
+
     public FlowGraph.ConnectionEdge findHoveredWire(double canvasMouseX, double canvasMouseY, double maxDist) {
         return wireRenderer.findHoveredWire(canvasMouseX, canvasMouseY, maxDist);
     }
@@ -636,6 +641,9 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> implements I
     public void openFrameEditDialog(CanvasGroupFrame frame) { dialogManager.openFrameEditDialog(frame); }
     public void openNoteEditDialog(CanvasStickyNote note) { dialogManager.openNoteEditDialog(note); }
     public void openTargetOutputRateDialog(RecipeNode node, int outputIndex) { dialogManager.openTargetOutputRateDialog(node, outputIndex); }
+    public void openPageSettingsDialog(BoardPage page) { dialogManager.openPageSettingsDialog(page); }
+    public void openPageSettingsDialog() { dialogManager.openPageSettingsDialog(com.gtceu.calcboard.api.storage.BoardManager.getInstance().getActivePage()); }
+    public PageSettingsDialog getPageSettingsDialog() { return dialogManager.getPageSettingsDialog(); }
 
     public void openModuleSubPage(RecipeNode moduleNode) { navigationHandler.openModuleSubPage(moduleNode); }
     public void returnToParentPage() { navigationHandler.returnToParentPage(); }

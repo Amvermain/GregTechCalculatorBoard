@@ -200,6 +200,10 @@ public class BoardScreenContextDecouplingTest {
         @Override public void openFrameEditDialog(CanvasGroupFrame frame) {}
         @Override public void openNoteEditDialog(CanvasStickyNote note) {}
         @Override public void openTargetOutputRateDialog(RecipeNode node, int outputIndex) {}
+        @Override public void openPageSettingsDialog(com.gtceu.calcboard.api.storage.BoardPage page) {}
+        @Override public void openPageSettingsDialog() {}
+        @Override public PageSettingsDialog getPageSettingsDialog() { return null; }
+        @Override public void batchApplyPageTargetVoltage() {}
 
         @Override public FlowGraph getGraph() { return graph; }
         @Override public BalanceSummary getCachedSummary() { return null; }

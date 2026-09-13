@@ -52,6 +52,7 @@ public class BoardDialogManager {
     private PatternBindingDialog patternBindingDialog;
     private JunctionSupplyDialog junctionSupplyDialog;
     private TargetOutputRateDialog targetOutputRateDialog;
+    private PageSettingsDialog pageSettingsDialog;
 
     public BoardDialogManager(BoardScreen screen) {
         this.screen = screen;
@@ -82,6 +83,7 @@ public class BoardDialogManager {
         if (this.patternBindingDialog == null) this.patternBindingDialog = new PatternBindingDialog(screen);
         if (this.junctionSupplyDialog == null) this.junctionSupplyDialog = new JunctionSupplyDialog(screen);
         if (this.targetOutputRateDialog == null) this.targetOutputRateDialog = new TargetOutputRateDialog(screen);
+        if (this.pageSettingsDialog == null) this.pageSettingsDialog = new PageSettingsDialog(screen);
         this.welcomeDialog.setScreen(screen);
 
         registerAllModals();
@@ -115,6 +117,7 @@ public class BoardDialogManager {
         trackModal(patternBindingDialog);
         trackModal(junctionSupplyDialog);
         trackModal(targetOutputRateDialog);
+        trackModal(pageSettingsDialog);
     }
 
     private void trackModal(IBoardModal modal) {
@@ -440,4 +443,15 @@ public class BoardDialogManager {
     public PatternBindingDialog getPatternBindingDialog() { return patternBindingDialog; }
     public JunctionSupplyDialog getJunctionSupplyDialog() { return junctionSupplyDialog; }
     public TargetOutputRateDialog getTargetOutputRateDialog() { return targetOutputRateDialog; }
+    public PageSettingsDialog getPageSettingsDialog() { return pageSettingsDialog; }
+
+    public void openPageSettingsDialog(BoardPage page) {
+        if (!screen.ensureEditPermission() || page == null) return;
+        if (pageSettingsDialog == null) {
+            pageSettingsDialog = new PageSettingsDialog(screen);
+            trackModal(pageSettingsDialog);
+        }
+        pageSettingsDialog.open(page);
+        modalStack.push(pageSettingsDialog);
+    }
 }

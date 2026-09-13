@@ -49,6 +49,7 @@ public class CalcBoardEmiPlugin implements EmiPlugin {
 
         if (cluster != null && !cluster.nodes().isEmpty()) {
             for (RecipeNode n : cluster.nodes()) {
+                com.gtceu.calcboard.client.gui.action.NodeProvisioningPipeline.provision(n, BoardManager.getInstance().getActivePage());
                 BoardManager.getInstance().getActiveGraph().addNode(n);
             }
             if (cluster.frame() != null) {
@@ -61,6 +62,7 @@ public class CalcBoardEmiPlugin implements EmiPlugin {
             RecipeNode node = EmiRecipeConverter.convert(recipe);
             node.setPosX(pos[0]);
             node.setPosY(pos[1]);
+            com.gtceu.calcboard.client.gui.action.NodeProvisioningPipeline.provision(node, BoardManager.getInstance().getActivePage());
             BoardManager.getInstance().getActiveGraph().addNode(node);
         }
 

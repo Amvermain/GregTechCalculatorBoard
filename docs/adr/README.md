@@ -75,7 +75,9 @@ flowchart TD
     ADR029 --> ADR037["ADR-037<br/>도메인 순수성 회복 & 역방향 의존성 격리"]
     ADR037 --> ADR038["ADR-038<br/>레거시 알고리즘 & 시뮬레이션 순수성"]
     ADR037 --> ADR040["ADR-040<br/>갓 클래스 모듈화 & SRP 분해"]
-    ADR040 -.->|기안 진행 중| RFC045["RFC-045<br/>RecipeNode 역할 컴포지션 분해"]
+    ADR040 --> ADR045["ADR-045<br/>RecipeNode 역할 컴포지션 분해"]
+    ADR045 --> ADR049["ADR-049<br/>하드웨어 정합성 조정자 & UI 동기화"]
+    ADR049 --> ADR050["ADR-050<br/>불변 레시피 명세 & 동적 포트 프로젝션"]
     ADR024 --> ADR031["ADR-031<br/>공유 기계 풀(Shared Pool) 모델"]
     ADR031 --> ADR042["ADR-042<br/>공유 기계 풀 비파괴 인플레이스 접기"]
 ```
@@ -101,6 +103,10 @@ flowchart TD
 | **[ADR-037](ADR_037_DOMAIN_PURITY_AND_DETERMINISTIC_DEDUCTION_REFACTORING.md)** | 도메인 엔티티 순수성 회복, 역방향 의존성 격리 및 결정론적 스펙 연역 무결성 개편 명세 | 🟢 `IMPLEMENTED` | `v2.2.0-beta.2` | IModAdapter를 api.spi로 이전하여 역방향 참조 0건 달성, RecipeNode 모드 필드 완전 이전 |
 | **[ADR-038](ADR_038_LEGACY_CALCULATION_ALGORITHM_AND_SIMULATION_PURITY_REFACTORING.md)** | 레거시 계산 알고리즘 및 물리 시뮬레이션 순수성 개편 명세 | 🟢 `IMPLEMENTED` | `v2.2.0-beta.2` | 순수 연산 중 포트 변조 및 부수 효과 근절, UI 렌더링 중 캐시 무효화 차단 |
 | **[ADR-040](ADR_040_RUNTIME_CONCURRENCY_REFLECTION_AND_GOD_CLASS_DECOMPOSITION.md)** | 런타임 동시성 무결성, 리플렉션 정적 최적화 및 갓 클래스 모듈화 명세 | 🟢 `IMPLEMENTED` | `v2.2.0-beta.3` | 카탈로그 스레드 안전화, 텍스트 캐시 리로드 훅, 251개 리플렉션 캐싱, 7대 갓 클래스 SRP 분해 |
+| **[ADR-045](ADR_045_RECIPE_NODE_COMPOSITION_DECOMPOSITION.md)** | RecipeNode 역할 컴포지션 분해 및 불변 계산 스냅샷 아키텍처 | 🟢 `IMPLEMENTED` | `v2.2.1` | RecipeNode 순수 캔버스 엔티티 슬림화, 4대 역할(Machine, Module, Junction, BoundaryPin) INodeRole 컴포지션 분해, NBT 듀얼 라이트 무손실 호환 및 불변 계산 스냅샷 락-프리 렌더링 |
+| **[ADR-048](ADR_048_PAGE_TARGET_VOLTAGE_AND_MULTIBLOCK_ENERGY_HATCH_PROVISIONING.md)** | 페이지별 목표 전압 티어 및 멀티블록 에너지 해치 자동 프로비저닝 명세 | 🟢 `IMPLEMENTED` | `v2.2.1` | 페이지 단위 기본 목표 전압 지정, 노드 추가 시 단일 기계 자동 오버클록 및 멀티블록 에너지 해치 자동 장착, 안전 가드, 일괄 적용 트랜잭션(Undo/Redo), 미니 뱃지 UI |
+| **[ADR-049](ADR_049_MACHINE_RECIPE_TRANSITION_RECONCILER_AND_UI_SYNC.md)** | 기계 및 레시피 변경 시 하드웨어 정합성 조정자 및 반응형 UI 동기화 명세 | 🟢 `IMPLEMENTED` | `v2.2.1` | 기계/레시피 전환 멱등성 보정(NodeHardwareReconciler), 완전한 하드웨어 메멘토(SwitchRecipeCommand), IModAdapter 생명주기 및 다이얼로그 rebind UI 동기화 |
+| **[ADR-050](ADR_050_IMMUTABLE_RECIPE_SPEC_AND_DYNAMIC_PORT_PROJECTION.md)** | 불변 레시피 명세 및 동적 하드웨어 포트 프로젝션 아키텍처 명세 | 🟢 `IMPLEMENTED` | `v2.2.1` | 불변 RecipeSpec 도입, 제자리 컬렉션 변조 근절, Core/Auxiliary 포트 정체성 분리 및 IPortProjectionProvider 기반 지연 캐싱 투영 |
 
 ### 02. 유량 솔버 & 그래프 수학 (Flow Balance Solver & Graph Algorithms)
 > **연관 사양서**: [`docs/ko_kr/spec/02_MATH_AND_ALGORITHMS.md`](../ko_kr/spec/02_MATH_AND_ALGORITHMS.md)
@@ -154,6 +160,7 @@ flowchart TD
 | :---: | :--- | :---: | :---: | :--- |
 | **[ADR-006](ADR_006_TURBINE_AND_MACHINE_PARALLEL_ENHANCEMENT.md)** | 터빈 발전기 소모품 모델링·독립 티어 분리 및 기계 가용 병렬 산출 명세 | 🟢 `IMPLEMENTED` | `v2.1.0-alpha.3` | 로터 마모율/수명 모델링, 로터 홀더/다이나모 해치 티어 분리, 윤활유 부스트 토글 |
 | **[ADR-008](ADR_008_AE2_AUTOCRAFTING_PLAN_AND_PRECISION_ETA_INTEGRATION.md)** | AE2 오토크래프팅 플랜 연동 및 패턴-페이지 기반 정밀 ETA 시스템 | 🟢 `IMPLEMENTED` | `v2.1.0-alpha.3` | BoardPage ↔ AE2 가공 패턴 1:1 바인딩, ICraftingPlan 인터셉트 및 정밀 ETA/병목 산출 |
+| **[ADR-013](ADR_013_MODULAR_COMBUSTION_COMPLEX_INTEGRATION.md)** | Star Technology 모듈러 연소 복합체 및 프레임 부스팅 발전 시스템 통합 명세 | 🟢 `IMPLEMENTED` | `v2.2.1` | MCF 프레임 매크로 단일 노드 모델, 중앙 냉각수($N \times 500\text{ B/hr}$) 단일 풀 소모, 최대 8대 도킹 모듈 슬롯 관리, 프레임+모듈 Multiblock BOM 일괄 산출 및 개별 모듈 로컬 냉각수 트레이트 정규화 |
 | **[ADR-021](ADR_021_GREATE_KINETIC_TIER_ADAPTER_INTEGRATION.md)** | Greate 모드 연동을 위한 AbstractKineticModAdapter 계층 분리 및 티어드 회전 운동 기계 어댑터 명세 | 🟢 `IMPLEMENTED` | `v2.2.0` | AbstractKineticModAdapter 계층 분리, GreateModAdapter 10단계 티어 매핑 |
 | **[ADR-028](ADR_028_COMPOSABLE_RECIPE_SEARCH_SPECIFICATION.md)** | 합성 가능한 레시피 검색 쿼리 명세 패턴 | 🟢 `IMPLEMENTED` | `v2.2.0-alpha.3` | 검색 필터 로직 Specification Pattern 모듈화, And/Or/Not 합성 및 단락 평가 최적화 |
 | **[ADR-029](ADR_029_MOD_ADAPTER_INTERFACE_SEGREGATION_AND_EXTENSIONS.md)** | IModAdapter 인터페이스 분리(ISP) 및 Extension Object 패턴 명세 | 🟢 `IMPLEMENTED` | `v2.2.0-alpha.3` | IModAdapter 824줄에서 86줄 슬림화, 6대 도메인 Provider 분리 및 Extension Object 패턴 |
@@ -177,6 +184,7 @@ flowchart TD
 | **[ADR-010](ADR_010_STATIC_REFLECTION_CACHING_AND_CLEAN_EXCEPTION.md)** | 리플렉션 정적 캐싱 및 예외 처리 무결성 개편 명세 | 🟢 `IMPLEMENTED` | `v2.1.0-alpha.3` | 2026-09-01 | 동적 리플렉션의 static final 1회 캐싱, bare catch 제거 |
 | **[ADR-011](ADR_011_CONTROL_FLOW_FLATTENING_AND_SELF_DESCRIPTIVE_CODE.md)** | 제어 흐름 평탄화 및 자기 서술적 클린 코드 정비 명세 | 🟢 `IMPLEMENTED` | `v2.1.0-alpha.3` | 2026-09-01 | 중첩 깊이 1~2단계 평탄화, 조기 반환 가드 적용, CanvasInteractionHandler 3대 핸들러 분해 |
 | **[ADR-012](ADR_012_BOARD_USABILITY_AND_PRECISION_FLOW_MODELING.md)** | 보드 사용성 개선 및 정밀 플로우 모델링 사양 | 🟢 `IMPLEMENTED` | `v2.1.0-alpha.4` | 2026-09-02 | 16px 격자 스냅, 커스텀 병렬 정수 지정, 외부/무한 공급원 정션 노드 확장 |
+| **[ADR-013](ADR_013_MODULAR_COMBUSTION_COMPLEX_INTEGRATION.md)** | Star Technology 모듈러 연소 복합체 및 프레임 부스팅 발전 시스템 통합 명세 | 🟢 `IMPLEMENTED` | `v2.2.1` | 2026-09-13 | MCF 프레임 매크로 단일 노드 모델, 중앙 냉각수($N \times 500\text{ B/hr}$) 단일 풀 소모, 최대 8대 도킹 모듈 슬롯 관리, 프레임+모듈 Multiblock BOM 일괄 산출 및 개별 모듈 로컬 냉각수 트레이트 정규화 |
 | **[ADR-014](ADR_014_CANVAS_GRAPHICS_PIPELINE_AND_FLOW_SOLVER_OPTIMIZATION.md)** | 대규모 노드 캔버스 그래픽 파이프라인 및 포트 플로우 계산 최적화 명세 | 🟢 `IMPLEMENTED` | `v2.1.0-alpha.5` | 2026-09-03 | O(1) 포트 플로우 캐싱, 위젯 O(1) 해시 맵, 뷰포트 AABB 컬링 |
 | **[ADR-015](ADR_015_BACKGROUND_INDEXING_STABILIZATION_AND_PIPELINE_OPTIMIZATION.md)** | 백그라운드 레시피 인덱싱 파이프라인 및 머신 매트릭스 베이킹 최적화 명세 | 🟢 `IMPLEMENTED` | `v2.1.0-beta.1` | 2026-09-03 | Phase 3 클라이언트 프리징 해소, EMI 인덱싱 지연 베이킹, 비동기 스레드 동기화 안정화 |
 | **[ADR-016](ADR_016_BOARD_SCREEN_MODULAR_DECOMPOSITION.md)** | BoardScreen 모듈화 분해 및 단일 책임 아키텍처 명세 | 🟢 `IMPLEMENTED` | `v2.1.0-beta.1` | 2026-09-03 | 모놀리식 BoardScreen을 4대 서브시스템으로 분해 및 65% 경량화 |
@@ -208,6 +216,11 @@ flowchart TD
 | **[ADR-042](ADR_042_SHARED_MACHINE_POOL_IN_PLACE_FOLDING_AND_RATIO_PRESERVATION.md)** | 공유 기계 풀 비파괴 인플레이스 접기 및 비율 보존형 가상 머신 카드 명세 | 🟢 `IMPLEMENTED` | `v2.2.0-beta.3` | 2026-09-10 | 토폴로지 비파괴형 프레임 접기, 단일 기계 카드 축소, 내부 레시피 비율 보존 스케일링, 결손 인디케이터 연동 |
 | **[ADR-043](ADR_043_DEDICATED_SUBPAGE_COMPOSITE_MODULE_AND_BOUNDARY_IO.md)** | 전용 서브페이지 기반 복합 공정 모듈 및 경계 I/O 핀 규격화 명세 | 🟢 `IMPLEMENTED` | `v2.2.0-beta.3` | 2026-09-10 | 1:1 전용 서브페이지 격리, 더블클릭 비파괴 내비게이션, 경계 I/O 핀 노드 외부 인터페이스 규격화 |
 | **[ADR-044](ADR_044_DAMPED_RECIRCULATION_LOOP_SOLVER_AND_STEADY_STATE_VISUALIZATION.md)** | 감쇠 순환 공정의 닫힌 형태 해석적 수렴 및 정상 상태 시각화 명세 | 🟢 `IMPLEMENTED` | `v2.2.0-beta.3` | 2026-09-10 | 무한 등비급수 $O(1)$ 해석적 수렴, 정상 상태 연속 가동 포트 상태, 원클릭 대수 맞춤 |
+| **[ADR-045](ADR_045_RECIPE_NODE_COMPOSITION_DECOMPOSITION.md)** | RecipeNode 역할 컴포지션 분해 및 불변 계산 스냅샷 아키텍처 | 🟢 `IMPLEMENTED` | `v2.2.1` | 2026-09-13 | INodeRole 인터페이스 기반 기계/정션/모듈/핀 역할 컴포지션 분해, 듀얼 라이트 NBT 역호환성, 불변 계산 스냅샷 |
+| **[ADR-047](ADR_047_COMPAT_DETERMINISTIC_EXACT_MATCH_NORMALIZATION.md)** | 외부 모드 호환 계층 레거시 폴백 제거 및 Rule 5 결정론적 정규화 | 🟢 `IMPLEMENTED` | `v2.2.1` | 2026-09-13 | Create 시퀀스 조립, 스레딩 모디파이어, 에너지 해치 오프라인 티어, 서멀 다이내모 등 5개 폴백의 문자열 contains 휴리스틱을 완전 제거하고 완전 일치 매핑 테이블 및 강타입 검사로 전환 |
+| **[ADR-048](ADR_048_PAGE_TARGET_VOLTAGE_AND_MULTIBLOCK_ENERGY_HATCH_PROVISIONING.md)** | 페이지별 목표 전압 티어 및 멀티블록 에너지 해치 자동 프로비저닝 명세 | 🟢 `IMPLEMENTED` | `v2.2.1` | 2026-09-13 | 페이지 단위 기본 목표 전압 지정, 노드 추가 시 단일 기계 자동 오버클록 및 멀티블록 에너지 해치 자동 장착, 안전 가드, 일괄 적용 트랜잭션(Undo/Redo), 미니 뱃지 UI |
+| **[ADR-049](ADR_049_MACHINE_RECIPE_TRANSITION_RECONCILER_AND_UI_SYNC.md)** | 기계 및 레시피 변경 시 하드웨어 정합성 조정자 및 반응형 UI 동기화 명세 | 🟢 `IMPLEMENTED` | `v2.2.1` | 2026-09-13 | 기계/레시피 전환 멱등성 보정(NodeHardwareReconciler), 완전한 하드웨어 메멘토(SwitchRecipeCommand), IModAdapter 생명주기 및 다이얼로그 rebind UI 동기화 |
+| **[ADR-050](ADR_050_IMMUTABLE_RECIPE_SPEC_AND_DYNAMIC_PORT_PROJECTION.md)** | 불변 레시피 명세 및 동적 하드웨어 포트 프로젝션 아키텍처 명세 | 🟢 `IMPLEMENTED` | `v2.2.1` | 2026-09-13 | 불변 RecipeSpec 도입, 제자리 컬렉션 변조 근절, Core/Auxiliary 포트 정체성 분리 및 IPortProjectionProvider 기반 지연 캐싱 투영 |
 
 ---
 
@@ -217,8 +230,4 @@ flowchart TD
 
 | 문서 번호 | RFC 제목 | 상태 (Status) | 목표 버전 | 기안일 | 핵심 제안 요약 |
 | :---: | :--- | :---: | :---: | :---: | :--- |
-| **[RFC-013](../rfc/RFC_013_MODULAR_COMBUSTION_COMPLEX_INTEGRATION.md)** | Star Technology 모듈러 연소 복합체(Modular Combustion Complex) 및 프레임 부스팅 발전 시스템 통합 명세 | 🟡 `PARTIALLY_IMPLEMENTED` | `v2.2.0` | 2026-09-02 | Trait 기반 물리/승수(5A~12A, 냉각 1.2x/1.4x) 및 머신 설정 UI 통합 완료(Phase 1), 부수 유체 입력 주입 대기(Phase 2) |
-| **[RFC-045](../rfc/RFC_045_RECIPE_NODE_COMPOSITION_DECOMPOSITION.md)** | RecipeNode 역할 컴포지션 분해 및 불변 계산 스냅샷 아키텍처 명세 | ⚪ `PROPOSED` | `v2.3.0` | 2026-09-11 | RecipeNode를 순수 캔버스 엔티티로 슬림화하고 4대 역할(Machine, Module, Junction, BoundaryPin)을 INodeRole 컴포지션으로 분리, NBT 100% 역호환 및 불변 계산 스냅샷 모델 연계 |
-| **[RFC-046](../rfc/RFC_046_BOARD_PAGE_PROVIDER_ABSTRACTION.md)** | 멀티 워크스페이스 통합 페이지 공급자 추상화 명세 | ⚪ `PROPOSED` | `v2.3.0` | 2026-09-11 | MultiblockBOMDialog 및 전역 UI의 ClientWorkspaceState 정적 싱글톤 결합을 IBoardPageProvider SPI 인터페이스로 추상화하여 로컬/원격 페이지 투명 공급 및 헤드리스 테스트 용이성 확보 |
-| **[RFC-047](../rfc/RFC_047_COMPAT_DETERMINISTIC_EXACT_MATCH_NORMALIZATION.md)** | 외부 모드 호환 계층 레거시 폴백 제거 및 Rule 5 결정론적 정규화 명세 | ⚪ `PROPOSED` | `v2.3.0` | 2026-09-11 | Create 시퀀스 조립, 스레딩 모디파이어, 에너지 해치 오프라인 티어, 서멀 다이내모 등 과거 작성된 5개 폴백의 문자열 contains 휴리스틱을 완전 제거하고 ResourceLocation Exact Match 테이블 및 강타입 클래스 검사로 100% 전환 |
-| **[RFC-048](../rfc/RFC_048_PAGE_TARGET_VOLTAGE_AND_MULTIBLOCK_ENERGY_HATCH_PROVISIONING.md)** | 페이지별 목표 전압 티어 및 멀티블록 에너지 해치 자동 프로비저닝 명세 | ⚪ `PROPOSED` | `v2.3.0` | 2026-09-12 | 페이지 단위 기본 전압 지정(BoardPage.defaultVoltageTier), 신규 노드 추가 시 단일 머신 자동 오버클록 및 멀티블록 에너지 해치 자동 장착, 안전 가드, 미니 뱃지 및 기존 노드 일괄 적용 트랜잭션 |
+| **[RFC-046](../rfc/RFC_046_BOARD_PAGE_PROVIDER_ABSTRACTION.md)** | 멀티 워크스페이스 통합 페이지 공급자 추상화 명세 | 🔴 `REJECTED` | `v2.3.0` | 2026-09-11 | ClientWorkspaceState 헤드리스 테스트 불필요 전제(이미 테스트 가능) 및 원격 페이지 지연 압축 해제 아키텍처를 파괴하는 메모리 결함으로 인해 영구 기각 |

@@ -7,7 +7,16 @@ import com.gtceu.calcboard.compat.gtceu.GTCEuProperties;
 import com.gtceu.calcboard.compat.gtceu.physics.GTPowerCalculator;
 import net.minecraft.resources.ResourceLocation;
 
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
+import com.gtceu.calcboard.compat.gtceu.model.mcf.MCFFuel;
+import com.gtceu.calcboard.compat.gtceu.model.mcf.MCFModuleSlot;
+import com.gtceu.calcboard.compat.gtceu.model.mcf.MCFModuleType;
+import com.gtceu.calcboard.compat.gtceu.model.mcf.MCFSlotConfiguration;
 
 /**
  * Helper utility for combustion generator machines across singleblock and multiblock tiers.
@@ -101,9 +110,14 @@ public final class GTCombustionHelper {
             START_T4_ROCKET
     );
 
-    private static final ResourceLocation COMBUSTION_CATEGORY_ID = ResourceLocation.tryParse("gtceu:combustion_generator");
+    public static final ResourceLocation COMBUSTION_CATEGORY_ID = ResourceLocation.tryParse("gtceu:combustion_generator");
+    public static final ResourceLocation ROCKET_CATEGORY_ID = ResourceLocation.tryParse("start_core:modular_rocket_module");
 
     private GTCombustionHelper() {}
+
+    public static boolean isStarTRocketMachine(ResourceLocation icon) {
+        return icon != null && START_ROCKET_MODULES.contains(icon);
+    }
 
     public static boolean isCombustionFamily(RecipeNode node) {
         if (node == null) {
@@ -208,7 +222,14 @@ public final class GTCombustionHelper {
         if (node.getMachineIcon() != null && isSingleblockCombustionGenerator(node.getMachineIcon())) {
             return false;
         }
-        return START_MCF.equals(node.getMachineIcon()) || START_MCF.equals(node.getMultiblockWorkstation());
+        if (node.getMachineIcon() != null) {
+            return isModularCombustionFrame(node.getMachineIcon());
+        }
+        return isModularCombustionFrame(node.getMultiblockWorkstation());
+    }
+
+    public static boolean isModularCombustionFrame(ResourceLocation icon) {
+        return icon != null && START_MCF.equals(icon);
     }
 
     public static boolean isCombustionMultiblock(com.gtceu.calcboard.api.type.GTVoltageTier tier) {
@@ -226,9 +247,22 @@ public final class GTCombustionHelper {
         return com.gtceu.calcboard.api.type.GTVoltageTier.IV;
     }
 
+    private static boolean forceStarTForTesting = false;
+
+    public static void setForceStarTForTesting(boolean force) {
+        forceStarTForTesting = force;
+    }
+
     public static boolean hasStarTCombustionModules() {
+        if (forceStarTForTesting) return true;
         return net.minecraftforge.registries.ForgeRegistries.ITEMS != null
                 && net.minecraftforge.registries.ForgeRegistries.ITEMS.containsKey(START_T1_COMBUSTION);
+    }
+
+    public static boolean hasModularCombustionFrame() {
+        if (forceStarTForTesting) return true;
+        return (net.minecraftforge.registries.ForgeRegistries.ITEMS != null && net.minecraftforge.registries.ForgeRegistries.ITEMS.containsKey(START_MCF))
+                || (net.minecraftforge.registries.ForgeRegistries.BLOCKS != null && net.minecraftforge.registries.ForgeRegistries.BLOCKS.containsKey(START_MCF));
     }
 
     public static java.util.List<com.gtceu.calcboard.api.type.GTVoltageTier> getAvailableCombustionTiers() {
@@ -261,6 +295,7 @@ public final class GTCombustionHelper {
 
     public static com.gtceu.calcboard.api.type.GTVoltageTier getCombustionTierForMachine(ResourceLocation icon) {
         if (icon == null) return null;
+        if (START_MCF.equals(icon)) return com.gtceu.calcboard.api.type.GTVoltageTier.LuV;
         if (LV_COMBUSTION.equals(icon) || LEGACY_LV_COMBUSTION_GENERATOR.equals(icon)) return com.gtceu.calcboard.api.type.GTVoltageTier.LV;
         if (MV_COMBUSTION.equals(icon) || LEGACY_MV_COMBUSTION_GENERATOR.equals(icon)) return com.gtceu.calcboard.api.type.GTVoltageTier.MV;
         if (HV_COMBUSTION.equals(icon) || LEGACY_HV_COMBUSTION_GENERATOR.equals(icon)) return com.gtceu.calcboard.api.type.GTVoltageTier.HV;
@@ -316,7 +351,7 @@ public final class GTCombustionHelper {
             return Boolean.TRUE.equals(node.getProperties().get(GTCEuProperties.LIQUID_OXYGEN_BOOST)) ? 2.0 : 1.0;
         }
         if (isStarTCombustionModule(node) || isStarTRocketModule(node)) {
-            return getStarTModulePowerMultiplier(node) * getFrameCoolantMultiplier(node);
+            return getStarTModulePowerMultiplier(node);
         }
         if (isModularCombustionFrame(node)) {
             return getFrameCoolantMultiplier(node);
@@ -389,8 +424,26 @@ public final class GTCombustionHelper {
         return oxidizer != null && !oxidizer.isEmpty() && !"none".equalsIgnoreCase(oxidizer);
     }
 
+    public static String getMCFCoolantType(RecipeNode node) {
+        if (node == null) return "none";
+        String mcf = node.getProperties().get(GTCEuProperties.MCF_COOLANT_TYPE);
+        if (mcf != null && !mcf.isEmpty() && !"none".equalsIgnoreCase(mcf)) {
+            return mcf;
+        }
+        String comb = node.getProperties().get(GTCEuProperties.COMBUSTION_COOLANT_TYPE);
+        return (comb != null && !comb.isEmpty()) ? comb : "none";
+    }
+
+    public static void setMCFCoolantType(RecipeNode node, String coolantType) {
+        if (node == null) return;
+        String val = (coolantType != null && !coolantType.isBlank()) ? coolantType : "none";
+        node.getProperties().set(GTCEuProperties.MCF_COOLANT_TYPE, val);
+        node.getProperties().set(GTCEuProperties.COMBUSTION_COOLANT_TYPE, val);
+        syncCombustionInputs(node);
+    }
+
     public static double getFrameCoolantMultiplier(RecipeNode node) {
-        String coolant = node.getProperties().get(GTCEuProperties.COMBUSTION_COOLANT_TYPE);
+        String coolant = getMCFCoolantType(node);
         if ("deionized_water".equalsIgnoreCase(coolant)) {
             return 1.4;
         }
@@ -401,6 +454,98 @@ public final class GTCombustionHelper {
             return 0.9;
         }
         return 1.0;
+    }
+
+    public static MCFSlotConfiguration getMCFConfiguration(RecipeNode node) {
+        return MCFSlotConfiguration.readFromNode(node);
+    }
+
+    public static void setMCFConfiguration(RecipeNode node, MCFSlotConfiguration config) {
+        if (node == null) return;
+        if (config != null) {
+            config.saveToNode(node);
+        }
+        syncCombustionInputs(node);
+    }
+
+    public static double computeMCFTotalPower(RecipeNode node) {
+        if (node == null) return 0.0;
+        MCFSlotConfiguration config = getMCFConfiguration(node);
+        List<MCFModuleSlot> activeSlots = config.getActiveSlots();
+        double coolantMult = getFrameCoolantMultiplier(node);
+
+        if (activeSlots.isEmpty()) {
+            return 0.0;
+        }
+
+        double rawTotal = 0.0;
+        for (MCFModuleSlot slot : activeSlots) {
+            rawTotal += computeSlotRawPower(slot);
+        }
+        return rawTotal * coolantMult;
+    }
+
+    public static double computeSlotRawPower(MCFModuleSlot slot) {
+        if (slot == null || !slot.isEnabled()) return 0.0;
+        MCFModuleType type = slot.getModuleType();
+        if (type == null) return 0.0;
+        long vTier = type.getTier().getVoltage();
+        int amps = slot.isOxidizerBoosted() ? type.getBoostAmps() : type.getBaseAmps();
+        return (double) vTier * amps;
+    }
+
+    public record LaserHatchRecommendation(com.gtceu.calcboard.api.type.GTVoltageTier tier, double amps, String label) {}
+
+    public static LaserHatchRecommendation getLaserHatchRecommendation(double totalPowerEUt) {
+        if (totalPowerEUt <= 0.0) {
+            return new LaserHatchRecommendation(com.gtceu.calcboard.api.type.GTVoltageTier.IV, 0.0, "IV Laser Hatch, 0.0A");
+        }
+        com.gtceu.calcboard.api.type.GTVoltageTier[] tiers = {
+                com.gtceu.calcboard.api.type.GTVoltageTier.MAX, com.gtceu.calcboard.api.type.GTVoltageTier.OpV,
+                com.gtceu.calcboard.api.type.GTVoltageTier.UXV, com.gtceu.calcboard.api.type.GTVoltageTier.UIV,
+                com.gtceu.calcboard.api.type.GTVoltageTier.UEV, com.gtceu.calcboard.api.type.GTVoltageTier.UHV,
+                com.gtceu.calcboard.api.type.GTVoltageTier.UV, com.gtceu.calcboard.api.type.GTVoltageTier.ZPM,
+                com.gtceu.calcboard.api.type.GTVoltageTier.LuV, com.gtceu.calcboard.api.type.GTVoltageTier.IV
+        };
+        com.gtceu.calcboard.api.type.GTVoltageTier chosenTier = com.gtceu.calcboard.api.type.GTVoltageTier.IV;
+        for (com.gtceu.calcboard.api.type.GTVoltageTier t : tiers) {
+            if (totalPowerEUt >= t.getVoltage()) {
+                chosenTier = t;
+                break;
+            }
+        }
+        double amps = totalPowerEUt / (double) chosenTier.getVoltage();
+        String label = String.format(Locale.ROOT, "%s Laser Hatch, %.1fA", chosenTier.name(), amps);
+        return new LaserHatchRecommendation(chosenTier, amps, label);
+    }
+
+    public static double getCentralCoolantDemandMbPerSec(RecipeNode node) {
+        if (node == null || !isModularCombustionFrame(node)) return 0.0;
+        String coolant = getMCFCoolantType(node);
+        if ("none".equalsIgnoreCase(coolant)) return 0.0;
+        MCFSlotConfiguration cfg = getMCFConfiguration(node);
+        int activeModules = cfg.getActiveSlotCount();
+        if (activeModules <= 0) return 0.0;
+        return activeModules * (500000.0 / 3600.0);
+    }
+
+    public static Map<MCFFuel, Double> getMCFFuelDemandMbPerSec(RecipeNode node) {
+        Map<MCFFuel, Double> fuelDemandMbPerSec = new LinkedHashMap<>();
+        if (node == null || !isModularCombustionFrame(node)) return fuelDemandMbPerSec;
+        MCFSlotConfiguration cfg = getMCFConfiguration(node);
+        for (MCFModuleSlot slot : cfg.getActiveSlots()) {
+            MCFFuel fuel = slot.getFuel();
+            MCFModuleType type = slot.getModuleType();
+            if (fuel == null || type == null) continue;
+            double energyPerMb = fuel.getEnergyPerMb();
+            if (energyPerMb <= 0.0) continue;
+            long vTier = type.getTier().getVoltage();
+            int parallelMult = slot.isOxidizerBoosted() ? 2 : 1;
+            double demandPerTick = ((double) vTier * parallelMult) / energyPerMb;
+            double demandPerSec = demandPerTick * 20.0;
+            fuelDemandMbPerSec.merge(fuel, demandPerSec, Double::sum);
+        }
+        return fuelDemandMbPerSec;
     }
 
     public static boolean isOxygenBoosted(RecipeNode node) {
@@ -417,7 +562,7 @@ public final class GTCombustionHelper {
 
     public static boolean isCoolantBoosted(RecipeNode node) {
         if (node == null) return false;
-        String coolant = node.getProperties().get(GTCEuProperties.COMBUSTION_COOLANT_TYPE);
+        String coolant = getMCFCoolantType(node);
         return coolant != null && !coolant.isEmpty() && !"none".equalsIgnoreCase(coolant);
     }
 
@@ -452,27 +597,42 @@ public final class GTCombustionHelper {
             return (LIQUID_OXYGEN.equals(fluidId) && isLiquidOxygenBoosted(node)) ? 80.0 : 0.0;
         }
         if (isStarTCombustionModule(node) || isStarTRocketModule(node)) {
-            double coolantRate = getCoolantRate(node, fluidId);
-            if (coolantRate > 0.0) {
-                return coolantRate;
-            }
             return getStarTModuleAuxiliaryRate(node, fluidId);
         }
         if (isModularCombustionFrame(node)) {
-            return getCoolantRate(node, fluidId);
+            if (DISTILLED_WATER.equals(fluidId) || DEIONIZED_WATER.equals(fluidId)) {
+                return getCoolantRate(node, fluidId);
+            }
+            return getMCFAggregatedAuxiliaryRate(node, fluidId);
         }
         return 0.0;
     }
 
     private static double getCoolantRate(RecipeNode node, ResourceLocation fluidId) {
-        String coolant = node.getProperties().get(GTCEuProperties.COMBUSTION_COOLANT_TYPE);
+        String coolant = getMCFCoolantType(node);
         if ("distilled_water".equalsIgnoreCase(coolant) && DISTILLED_WATER.equals(fluidId)) {
-            return 500000.0 / 3600.0;
+            return getCentralCoolantDemandMbPerSec(node);
         }
         if ("deionized_water".equalsIgnoreCase(coolant) && DEIONIZED_WATER.equals(fluidId)) {
-            return 500000.0 / 3600.0;
+            return getCentralCoolantDemandMbPerSec(node);
         }
         return 0.0;
+    }
+
+    private static double getMCFAggregatedAuxiliaryRate(RecipeNode node, ResourceLocation fluidId) {
+        MCFSlotConfiguration config = getMCFConfiguration(node);
+        double rate = 0.0;
+        for (MCFModuleSlot slot : config.getActiveSlots()) {
+            MCFModuleType type = slot.getModuleType();
+            if (type == null) continue;
+            if (type.getLubricantFluid().equals(fluidId)) {
+                rate += type.getLubricantMbPerPeriod() / 3.6;
+            }
+            if (slot.isOxidizerBoosted() && type.getOxidizerFluid().equals(fluidId)) {
+                rate += type.getOxidizerMbPerPeriod() / 3.6;
+            }
+        }
+        return rate;
     }
 
     public static ResourceLocation getExpectedLubricantFluid(RecipeNode node) {
@@ -535,72 +695,13 @@ public final class GTCombustionHelper {
         if (node == null || !isCombustionFamily(node)) {
             return;
         }
-        removeCombustionAuxiliaryInputs(node);
-        if (!isCombustionEngine(node)) {
-            return;
-        }
-
-        double durSec = Math.max(0.05, node.getBaseDurationTicks() / 20.0);
-        int parallel = Math.max(1, GTPowerCalculator.computeEffectiveParallel(node));
-
-        if (isLargeCombustionEngine(node)) {
-            if (isOxygenBoosted(node)) {
-                double batchAmount = (20.0 * durSec) / parallel;
-                node.addInput(IngredientStack.fluid(OXYGEN, "Oxygen", batchAmount));
-            }
-        } else if (isExtremeCombustionEngine(node)) {
-            if (isLiquidOxygenBoosted(node)) {
-                double batchAmount = (80.0 * durSec) / parallel;
-                node.addInput(IngredientStack.fluid(LIQUID_OXYGEN, "Liquid Oxygen", batchAmount));
-            }
-        } else if (isStarTCombustionModule(node) || isStarTRocketModule(node)) {
-            syncStarTModuleInputs(node, durSec, parallel);
-        } else if (isModularCombustionFrame(node)) {
-            syncCoolantInput(node, durSec, parallel);
-        }
-        node.markOverclockDirty();
+        node.syncProjectedPorts();
     }
 
     public static void removeCombustionAuxiliaryInputs(RecipeNode node) {
         if (node == null) return;
-        node.getInputs().removeIf(in -> in.isFluid() && in.getId() != null && COMBUSTION_AUXILIARY_FLUIDS.contains(in.getId()));
-    }
-
-    private static void syncStarTModuleInputs(RecipeNode node, double durSec, int parallel) {
-        ResourceLocation icon = node.getMachineIcon();
-        if (START_T1_COMBUSTION.equals(icon)) {
-            node.addInput(IngredientStack.fluid(LUBRICANT, "Lubricant", ((100.0 / 3.6) * durSec) / parallel));
-            if (isStarTModuleBoosted(node)) {
-                node.addInput(IngredientStack.fluid(WHITE_FUMING_NITRIC_ACID, "White Fuming Nitric Acid", ((324.0 / 3.6) * durSec) / parallel));
-            }
-        } else if (START_T2_COMBUSTION.equals(icon)) {
-            node.addInput(IngredientStack.fluid(LUBRICANT, "Lubricant", ((200.0 / 3.6) * durSec) / parallel));
-            if (isStarTModuleBoosted(node)) {
-                node.addInput(IngredientStack.fluid(RED_FUMING_NITRIC_ACID, "Red Fuming Nitric Acid", ((432.0 / 3.6) * durSec) / parallel));
-            }
-        } else if (START_T3_ROCKET.equals(icon)) {
-            node.addInput(IngredientStack.fluid(TUNGSTEN_DISULFIDE, "Tungsten Disulfide", ((200.0 / 3.6) * durSec) / parallel));
-            if (isStarTModuleBoosted(node)) {
-                node.addInput(IngredientStack.fluid(DIOXYGEN_DIFLUORIDE, "Dioxygen Difluoride", ((756.0 / 3.6) * durSec) / parallel));
-            }
-        } else if (START_T4_ROCKET.equals(icon)) {
-            node.addInput(IngredientStack.fluid(TUNGSTEN_DISULFIDE, "Tungsten Disulfide", ((400.0 / 3.6) * durSec) / parallel));
-            if (isStarTModuleBoosted(node)) {
-                node.addInput(IngredientStack.fluid(FERROCENIUM_SUPEROXIDE, "Ferrocenium Superoxide", ((864.0 / 3.6) * durSec) / parallel));
-            }
-        }
-        syncCoolantInput(node, durSec, parallel);
-    }
-
-    private static void syncCoolantInput(RecipeNode node, double durSec, int parallel) {
-        String coolant = node.getProperties().get(GTCEuProperties.COMBUSTION_COOLANT_TYPE);
-        double coolantRate = 500000.0 / 3600.0;
-        double batchAmount = (coolantRate * durSec) / parallel;
-        if ("distilled_water".equalsIgnoreCase(coolant)) {
-            node.addInput(IngredientStack.fluid(DISTILLED_WATER, "Distilled Water", batchAmount));
-        } else if ("deionized_water".equalsIgnoreCase(coolant)) {
-            node.addInput(IngredientStack.fluid(DEIONIZED_WATER, "Deionized Water", batchAmount));
-        }
+        node.restoreBaseRecipe();
+        node.syncProjectedPorts();
     }
 
     public static void ensureCombustionInputs(RecipeNode node) {
@@ -632,6 +733,46 @@ public final class GTCombustionHelper {
             if (isStarTModuleBoosted(node) != hasOx) {
                 return true;
             }
+            if (hasAuxiliaryFluid(node, DISTILLED_WATER) || hasAuxiliaryFluid(node, DEIONIZED_WATER)) {
+                return true;
+            }
+            return false;
+        }
+        if (isModularCombustionFrame(node)) {
+            Set<ResourceLocation> expected = new HashSet<>();
+            Map<MCFFuel, Double> fuelDemands = getMCFFuelDemandMbPerSec(node);
+            for (MCFFuel fuel : fuelDemands.keySet()) {
+                if (fuel.getFluidId() != null) {
+                    expected.add(fuel.getFluidId());
+                }
+            }
+
+            String coolant = getMCFCoolantType(node);
+            if (getCentralCoolantDemandMbPerSec(node) > 0.0) {
+                if ("distilled_water".equalsIgnoreCase(coolant)) {
+                    expected.add(DISTILLED_WATER);
+                } else if ("deionized_water".equalsIgnoreCase(coolant)) {
+                    expected.add(DEIONIZED_WATER);
+                }
+            }
+
+            MCFSlotConfiguration config = getMCFConfiguration(node);
+            for (MCFModuleSlot slot : config.getActiveSlots()) {
+                MCFModuleType type = slot.getModuleType();
+                if (type == null) continue;
+                expected.add(type.getLubricantFluid());
+                if (slot.isOxidizerBoosted()) {
+                    expected.add(type.getOxidizerFluid());
+                }
+            }
+
+            Set<ResourceLocation> actual = new HashSet<>();
+            for (IngredientStack in : node.getInputs()) {
+                if (in.isFluid() && in.getId() != null) {
+                    actual.add(in.getId());
+                }
+            }
+            return !expected.equals(actual);
         }
         boolean hasCoolant = hasAuxiliaryFluid(node, DISTILLED_WATER) || hasAuxiliaryFluid(node, DEIONIZED_WATER);
         return isCoolantBoosted(node) != hasCoolant;

@@ -95,6 +95,9 @@ public final class GTPowerCalculator {
     }
 
     public static double computeCombustionPower(RecipeNode node) {
+        if (GTCombustionHelper.isModularCombustionFrame(node)) {
+            return GTCombustionHelper.computeMCFTotalPower(node);
+        }
         double recipeEUt = Math.abs(node.getBaseEUt());
         if (recipeEUt <= 0.0) {
             return 0.0;

@@ -60,6 +60,9 @@ public interface IHardwareAddonProvider extends IModExtension {
         node.markOverclockDirty();
     }
 
+    default void onAddonsUpdated(RecipeNode node) {
+    }
+
     default List<MachineAddon> getResetAddonCards(RecipeNode node) {
         return List.of();
     }

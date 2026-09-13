@@ -2,6 +2,7 @@ package com.gtceu.calcboard.client.gui.widget;
 
 import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.api.storage.BoardPage;
+import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.client.gui.api.IBoardScreenContext;
 import com.gtceu.calcboard.client.gui.util.BoardScissorHelper;
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -106,8 +107,19 @@ public class PageBrowserDrawer {
         this.searchBox.setValue("");
     }
 
+    private BoardPage hoveredBadgePage = null;
+
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
+        this.hoveredBadgePage = null;
         PageBrowserDrawerRenderer.render(this, graphics, mouseX, mouseY, partialTicks);
+    }
+
+    public BoardPage getHoveredBadgePage() {
+        return hoveredBadgePage;
+    }
+
+    public void setHoveredBadgePage(BoardPage page) {
+        this.hoveredBadgePage = page;
     }
 
     public IBoardScreenContext getScreen() {
@@ -232,6 +244,13 @@ public class PageBrowserDrawer {
             }));
             items.add(new ContextMenuItem("§b⚡ " + Component.translatable("gui.gtcalcboard.browser.clone_recipe").getString(), () -> {
                 screen.openTemplateCloneDialog(contextPage);
+                contextMenuOpen = false;
+                setOpen(false);
+            }));
+            items.add(new ContextMenuItem("§6⚙ " + Component.translatable("gui.gtcalcboard.browser.page_settings").getString(), () -> {
+                BoardManager.getInstance().openPage(contextPage.getId());
+                screen.rebuildBoardWidgets();
+                screen.openPageSettingsDialog(contextPage);
                 contextMenuOpen = false;
                 setOpen(false);
             }));
@@ -522,6 +541,29 @@ public class PageBrowserDrawer {
         if (mouseX >= listX + indent && mouseX <= listX + indent + 10 && button == 0) {
             return handlePinClick(ip);
         }
+
+        BoardPage page = ip.page();
+        Font font = Minecraft.getInstance().font;
+        GTVoltageTier vTier = page.getDefaultVoltageTier();
+        String badgeText = (vTier != null) ? (vTier.getFormatCode() + "⚡" + vTier.getName()) : "⚡Auto";
+        int badgeW = font.width(badgeText) + 4;
+        int listW = DRAWER_WIDTH - 12;
+        int badgeX = listX + listW - 6 - badgeW;
+
+        if (mouseX >= badgeX && mouseX <= badgeX + badgeW) {
+            if (button == 0) {
+                page.cycleVoltageTier(true);
+                BoardManager.getInstance().saveForCurrentContext();
+                screen.rebuildBoardWidgets();
+                playClickSound();
+                return true;
+            } else if (button == 1) {
+                screen.openPageSettingsDialog(page);
+                playClickSound();
+                return true;
+            }
+        }
+
         if (button == 0) {
             return handlePageLeftClick(ip, mouseX, mouseY);
         }
@@ -679,6 +721,15 @@ public class PageBrowserDrawer {
         if (!open || mouseX < DRAWER_X || mouseX > DRAWER_X + DRAWER_WIDTH) return false;
         int topY = screen.getHeaderBottomY();
         if (mouseY < topY || mouseY > screen.getScreenHeight() - 4) return false;
+
+        if (hoveredBadgePage != null) {
+            hoveredBadgePage.cycleVoltageTier(delta > 0);
+            BoardManager.getInstance().saveForCurrentContext();
+            screen.rebuildBoardWidgets();
+            playClickSound();
+            return true;
+        }
+
         scrollY = Math.max(0, Math.min(maxScrollY, scrollY - delta * 20.0));
         return true;
     }

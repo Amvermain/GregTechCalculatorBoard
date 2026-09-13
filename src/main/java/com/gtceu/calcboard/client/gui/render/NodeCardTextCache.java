@@ -11,6 +11,7 @@ import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.util.NumberFormatUtil;
 import com.gtceu.calcboard.client.gui.util.FormatUtil;
 import com.gtceu.calcboard.api.storage.BoardManager;
+import com.gtceu.calcboard.api.model.role.NodeCalculationSnapshot;
 import com.gtceu.calcboard.client.gui.widget.NodeWidget;
 import com.gtceu.calcboard.api.spi.IModAdapter;
 import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
@@ -112,13 +113,14 @@ public class NodeCardTextCache {
     public void update(NodeWidget widget, Font font, FlowGraph graph, RecipeNode node, int cardW, int titleX, int x, int headerBtnMargin) {
         if (!dirty) return;
 
-        boolean isOperational = node.isOperational(graph);
+        NodeCalculationSnapshot snapshot = (graph != null) ? graph.getNodeSnapshot(node.getId()) : NodeCalculationSnapshot.EMPTY;
+        boolean isOperational = (snapshot != NodeCalculationSnapshot.EMPTY) ? snapshot.isOperational() : node.isOperational(graph);
 
         updateTitle(node, cardW, titleX, x, headerBtnMargin, isOperational);
-        updatePowerAndDuration(widget, font, node, cardW, isOperational);
+        updatePowerAndDuration(widget, font, node, cardW, isOperational, snapshot);
         updateBadges(node, graph);
         updatePorts(widget, font, graph, node, cardW, isOperational);
-        updateStarved(graph, node);
+        updateStarved(graph, node, snapshot);
         updateRow2Buttons(widget, font, node, cardW, isOperational);
 
         this.dirty = false;
@@ -134,7 +136,11 @@ public class NodeCardTextCache {
         }
     }
 
-    private void updateStarved(FlowGraph graph, RecipeNode node) {
+    private void updateStarved(FlowGraph graph, RecipeNode node, NodeCalculationSnapshot snapshot) {
+        if (snapshot != null && snapshot != NodeCalculationSnapshot.EMPTY) {
+            this.starved = snapshot.isStarved();
+            return;
+        }
         if (graph == null || node == null) {
             this.starved = false;
             return;
@@ -162,9 +168,13 @@ public class NodeCardTextCache {
         this.titleColor = !isOperational ? 0xFFFF7777 : (node.isModule() ? 0xFFFFB3FF : (node.isFusion() ? 0xFFFFB3FF : (node.isBaseNode() ? 0xFFFFE066 : (node.isGenerator() ? 0xFF77FFAA : 0xFFE0E0E0))));
     }
 
-    private void updatePowerAndDuration(NodeWidget widget, Font font, RecipeNode node, int cardW, boolean isOperational) {
-        double durationSec = node.getEffectiveDurationSeconds();
-        double effCps = node.getEffectiveCyclesPerSecond();
+    private void updatePowerAndDuration(NodeWidget widget, Font font, RecipeNode node, int cardW, boolean isOperational, NodeCalculationSnapshot snapshot) {
+        double durationSec = (snapshot != null && snapshot != NodeCalculationSnapshot.EMPTY)
+                ? snapshot.durationSeconds()
+                : node.getEffectiveDurationSeconds();
+        double effCps = (snapshot != null && snapshot != NodeCalculationSnapshot.EMPTY)
+                ? snapshot.effectiveCyclesPerSecond()
+                : node.getEffectiveCyclesPerSecond();
 
         boolean isBatch = FormatUtil.getActiveTimeUnit().isRecipeBatchMode();
         if (!isOperational) {

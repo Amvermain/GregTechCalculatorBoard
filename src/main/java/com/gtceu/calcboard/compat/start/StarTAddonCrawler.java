@@ -11,8 +11,15 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.List;
+import java.util.Set;
 
 public class StarTAddonCrawler {
+
+    public static final Set<ResourceLocation> STAR_T_MAINTENANCE_IDS = Set.of(
+            ResourceLocation.tryParse("start_core:sterile_cleaning_maintenance_hatch"),
+            ResourceLocation.tryParse("start_core:auto_maintenance_hatch"),
+            ResourceLocation.tryParse("start_core:cleaning_maintenance_hatch")
+    );
 
     public static void discoverAddons(List<MachineAddon> collector, List<ItemStack> recipeOutputStacks) {
         java.util.Set<String> seenIds = new java.util.HashSet<>();
@@ -39,8 +46,7 @@ public class StarTAddonCrawler {
                     String ns = id.getNamespace();
                     if (!ns.equals("start_core") && !ns.equals("gtceu_start")) continue;
 
-                    String path = id.getPath();
-                    if (!path.contains("parallel") && !path.contains("reflector") && !path.contains("maintenance") && !path.contains("hatch")) {
+                    if (!isAddonCandidate(id)) {
                         continue;
                     }
 
@@ -170,18 +176,27 @@ public class StarTAddonCrawler {
     }
 
     public static MachineAddon parseStarTMaintenanceHatch(ItemStack stack, ResourceLocation id) {
-        if (id == null) return null;
-        String path = id.getPath().toLowerCase(java.util.Locale.ROOT);
-        if (path.contains("maintenance") || path.contains("maint")) {
-            String nameKey = "gui.gtcalcboard.addon." + path;
-            String descKey = "gui.gtcalcboard.addon." + path + ".desc";
-            MachineAddon addon = new MachineAddon(id.toString(), nameKey, MachineAddon.Category.MAINTENANCE, descKey, id);
-            addon.setDurationMultiplier(1.0);
-            addon.setEutMultiplier(1.0);
-            addon.setDiscoverySource("Star Technology Maintenance Hatch Specification [" + id + "]");
-            return addon;
+        if (id == null || !STAR_T_MAINTENANCE_IDS.contains(id)) return null;
+        String path = id.getPath();
+        String nameKey = "gui.gtcalcboard.addon." + path;
+        String descKey = "gui.gtcalcboard.addon." + path + ".desc";
+        MachineAddon addon = new MachineAddon(id.toString(), nameKey, MachineAddon.Category.MAINTENANCE, descKey, id);
+        addon.setDurationMultiplier(1.0);
+        addon.setEutMultiplier(1.0);
+        addon.setDiscoverySource("Star Technology Maintenance Hatch Specification [" + id + "]");
+        return addon;
+    }
+
+    private static boolean isAddonCandidate(ResourceLocation id) {
+        if (id == null) return false;
+        if (STAR_T_MAINTENANCE_IDS.contains(id)) return true;
+        String[] tokens = id.getPath().toLowerCase(java.util.Locale.ROOT).split("[._/-]");
+        for (String token : tokens) {
+            if ("parallel".equals(token) || "reflector".equals(token) || "hatch".equals(token)) {
+                return true;
+            }
         }
-        return null;
+        return false;
     }
 
     private static boolean containsAddonId(List<MachineAddon> list, String id) {

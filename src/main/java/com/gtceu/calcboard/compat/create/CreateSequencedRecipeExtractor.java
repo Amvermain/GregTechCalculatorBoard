@@ -227,34 +227,52 @@ public final class CreateSequencedRecipeExtractor {
         } catch (Throwable ignored) {}
     }
 
+    private static final Map<ResourceLocation, ResourceLocation> SEQUENCED_STEP_MACHINES = Map.of(
+            ResourceLocation.tryParse("create:deploying"), ResourceLocation.tryParse("create:deployer"),
+            ResourceLocation.tryParse("create:filling"), ResourceLocation.tryParse("create:spout"),
+            ResourceLocation.tryParse("create:pressing"), ResourceLocation.tryParse("create:mechanical_press"),
+            ResourceLocation.tryParse("create:cutting"), ResourceLocation.tryParse("create:mechanical_saw")
+    );
+
+    private static final Map<String, ResourceLocation> STEP_CLASS_SIMPLE_NAME_MACHINES = Map.of(
+            "DeployerApplicationRecipe", ResourceLocation.tryParse("create:deployer"),
+            "FillingRecipe", ResourceLocation.tryParse("create:spout"),
+            "PressingRecipe", ResourceLocation.tryParse("create:mechanical_press"),
+            "CuttingRecipe", ResourceLocation.tryParse("create:mechanical_saw")
+    );
+
+    private static final ResourceLocation DEFAULT_STEP_MACHINE = ResourceLocation.tryParse("create:deployer");
+
+    @SuppressWarnings("deprecation")
     public static ResourceLocation extractStepMachineIcon(Object subRecipe) {
         if (subRecipe == null) return null;
-        String clName = subRecipe.getClass().getName().toLowerCase(Locale.ROOT);
-        if (clName.contains("deploy")) {
-            return ResourceLocation.tryParse("create:deployer");
-        } else if (clName.contains("fill") || clName.contains("spout")) {
-            return ResourceLocation.tryParse("create:spout");
-        } else if (clName.contains("press")) {
-            return ResourceLocation.tryParse("create:mechanical_press");
-        } else if (clName.contains("cut") || clName.contains("saw")) {
-            return ResourceLocation.tryParse("create:mechanical_saw");
+
+        String simpleName = subRecipe.getClass().getSimpleName();
+        ResourceLocation classMatch = STEP_CLASS_SIMPLE_NAME_MACHINES.get(simpleName);
+        if (classMatch != null) {
+            return classMatch;
         }
 
         try {
             Method getSerializerM = subRecipe.getClass().getMethod("getSerializer");
             Object ser = getSerializerM.invoke(subRecipe);
-            if (ser != null) {
-                ResourceLocation sId = ForgeRegistries.RECIPE_SERIALIZERS.getKey((net.minecraft.world.item.crafting.RecipeSerializer<?>) ser);
+            if (ser instanceof net.minecraft.world.item.crafting.RecipeSerializer<?> serializer) {
+                ResourceLocation sId = null;
+                if (ForgeRegistries.RECIPE_SERIALIZERS != null) {
+                    sId = ForgeRegistries.RECIPE_SERIALIZERS.getKey(serializer);
+                }
+                if (sId == null && BuiltInRegistries.RECIPE_SERIALIZER != null) {
+                    sId = BuiltInRegistries.RECIPE_SERIALIZER.getKey(serializer);
+                }
                 if (sId != null) {
-                    String p = sId.getPath().toLowerCase(Locale.ROOT);
-                    if (p.contains("deploy")) return ResourceLocation.tryParse("create:deployer");
-                    if (p.contains("fill") || p.contains("spout")) return ResourceLocation.tryParse("create:spout");
-                    if (p.contains("press")) return ResourceLocation.tryParse("create:mechanical_press");
-                    if (p.contains("cut") || p.contains("saw")) return ResourceLocation.tryParse("create:mechanical_saw");
+                    ResourceLocation mapped = SEQUENCED_STEP_MACHINES.get(sId);
+                    if (mapped != null) {
+                        return mapped;
+                    }
                 }
             }
         } catch (Throwable ignored) {}
 
-        return ResourceLocation.tryParse("create:deployer");
+        return DEFAULT_STEP_MACHINE;
     }
 }

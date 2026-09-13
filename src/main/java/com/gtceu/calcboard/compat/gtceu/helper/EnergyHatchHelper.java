@@ -1,8 +1,11 @@
 package com.gtceu.calcboard.compat.gtceu.helper;
 
 import com.gtceu.calcboard.api.catalog.MachineAddon;
+import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon;
+import com.gtceu.calcboard.compat.gtceu.handler.GTAddonLifecycleHandler;
+import com.gtceu.calcboard.compat.gtceu.handler.GTEnergyHatchCalculator;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -12,9 +15,11 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -30,7 +35,20 @@ public class EnergyHatchHelper {
     private static final Class<?> HOLDER_CLS;
     private static volatile Object DUMMY_HOLDER_PROXY = null;
 
+    private static final Map<String, GTVoltageTier> TIER_BY_TOKEN;
+    private static final Set<String> DISQUALIFIED_TOKENS = Set.of(
+            "core", "crystal", "detector", "module", "creative", "dynamo",
+            "output", "source", "emitter", "sensor", "cover", "cell",
+            "battery", "storage", "wire", "cable", "transformer"
+    );
+
     static {
+        Map<String, GTVoltageTier> tierMap = new HashMap<>();
+        for (GTVoltageTier tier : GTVoltageTier.values()) {
+            tierMap.put(tier.name().toLowerCase(Locale.ROOT), tier);
+        }
+        TIER_BY_TOKEN = Map.copyOf(tierMap);
+
         ClassLoader cl = EnergyHatchHelper.class.getClassLoader();
         Class<?> gtRegs = null;
         Field mField = null;
@@ -130,18 +148,38 @@ public class EnergyHatchHelper {
         return foundAny;
     }
 
-    private static boolean isLikelyEnergyHatchPath(String path) {
-        if (path.contains("output") || path.contains("dynamo") || path.contains("source") || path.contains("emitter") || path.contains("cover")) {
-            return false;
-        }
-        return path.contains("energy_hatch") || path.contains("energy_input_hatch") || path.contains("power_hatch")
-                || path.contains("laser_target") || (path.contains("dream_link") && path.contains("hatch"));
+    public static boolean isLikelyEnergyHatchPath(String path) {
+        return !isDisqualifiedHatchPath(path);
     }
 
     private static String formatHatchDescription(EnergyHatchStats stats) {
         return stats.isLaser()
                 ? String.format(Locale.ROOT, "Laser Target Input (%s, %,dA)", stats.tier().getName(), stats.amperage())
                 : String.format(Locale.ROOT, "Energy Input Hatch (%s, %,dA)", stats.tier().getName(), stats.amperage());
+    }
+
+    public static ResourceLocation getDefaultHatchIdForTier(GTVoltageTier tier) {
+        if (tier == null) return null;
+        return ResourceLocation.tryParse("gtceu:" + tier.name().toLowerCase(Locale.ROOT) + "_energy_input_hatch");
+    }
+
+    public static boolean installDefaultEnergyHatch(RecipeNode node, GTVoltageTier targetTier) {
+        if (node == null || targetTier == null || !node.isMultiblock()) return false;
+        if (!GTEnergyHatchCalculator.requiresEnergyHatch(node)) return false;
+
+        node.getAddons().removeIf(a -> a.getCategory() == MachineAddon.Category.ENERGY_HATCH);
+
+        ResourceLocation hatchId = getDefaultHatchIdForTier(targetTier);
+        if (hatchId == null) return false;
+
+        EnergyHatchStats stats = getEnergyHatchStats(hatchId);
+        int amp = stats != null ? stats.amperage() : 2;
+        String name = targetTier.getName() + " Energy Input Hatch (" + amp + "A)";
+        String desc = formatHatchDescription(new EnergyHatchStats(targetTier, amp, false, false));
+
+        GTEnergyHatchAddon addon = new GTEnergyHatchAddon(hatchId.toString(), name, desc, hatchId, targetTier, amp, false, false, false);
+        GTAddonLifecycleHandler.onAddonInstalled(node, addon);
+        return true;
     }
 
     private static void registerDefaultHatches(List<MachineAddon> collector) {
@@ -232,26 +270,55 @@ public class EnergyHatchHelper {
 
         GTVoltageTier tier = parseVoltageTier(path);
         int amperage = parseAmperageFromPath(path);
-        boolean isLaser = path.contains("laser");
-        boolean isSubstation = path.contains("substation");
+        boolean isLaser = hasToken(path, "laser");
+        boolean isSubstation = hasToken(path, "substation");
 
         EnergyHatchStats stats = new EnergyHatchStats(tier, amperage, isLaser, isSubstation);
         STATS_CACHE.put(id, stats);
         return stats;
     }
 
-    private static boolean isDisqualifiedHatchPath(String path) {
-        if (path.contains("core") || path.contains("crystal") || path.contains("detector") ||
-            path.contains("module") || path.contains("creative") || path.contains("dynamo") ||
-            path.contains("output") || path.contains("source") || path.contains("emitter") ||
-            path.contains("sensor") || path.contains("cover") || path.contains("cell") ||
-            path.contains("battery") || path.contains("storage") || path.contains("wire") ||
-            path.contains("cable") || path.contains("transformer")) {
-            return true;
+    private static boolean hasToken(String path, String target) {
+        if (path == null) return false;
+        String[] tokens = path.toLowerCase(Locale.ROOT).split("[._/-]");
+        for (String token : tokens) {
+            if (token.equals(target)) return true;
         }
-        return !path.contains("energy_input_hatch") && !path.contains("laser_target_hatch") &&
-                !path.contains("substation_input_hatch") && !path.contains("energy_hatch") &&
-                !path.contains("power_hatch") && !(path.contains("dream_link") && path.contains("hatch"));
+        return false;
+    }
+
+    private static boolean hasAnyToken(String path, String... targets) {
+        if (path == null) return false;
+        String[] tokens = path.toLowerCase(Locale.ROOT).split("[._/-]");
+        for (String token : tokens) {
+            for (String target : targets) {
+                if (token.equals(target)) return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isQualifiedHatchPath(String path) {
+        if (path == null) return false;
+        String[] tokens = path.toLowerCase(Locale.ROOT).split("[._/-]");
+        boolean hasHatch = false;
+        boolean hasKind = false;
+        for (String token : tokens) {
+            if ("hatch".equals(token)) hasHatch = true;
+            if ("energy".equals(token) || "laser".equals(token) || "substation".equals(token) || "power".equals(token) || "link".equals(token)) {
+                hasKind = true;
+            }
+        }
+        return hasHatch && hasKind;
+    }
+
+    private static boolean isDisqualifiedHatchPath(String path) {
+        if (path == null) return true;
+        String[] tokens = path.toLowerCase(Locale.ROOT).split("[._/-]");
+        for (String token : tokens) {
+            if (DISQUALIFIED_TOKENS.contains(token)) return true;
+        }
+        return !isQualifiedHatchPath(path);
     }
 
     private static EnergyHatchStats queryStatsFromGTRegistries(ResourceLocation id) {
@@ -277,14 +344,14 @@ public class EnergyHatchHelper {
                 return Integer.parseInt(m.group(1));
             } catch (NumberFormatException ignored) {}
         }
-        return path.contains("laser") ? 256 : 2;
+        return hasToken(path, "laser") ? 256 : 2;
     }
 
     private static EnergyHatchStats extractStatsFromMachineDef(Object def, ResourceLocation id) {
         if (def == null) return null;
         String path = id != null ? id.getPath().toLowerCase(Locale.ROOT) : "";
 
-        if (path.contains("dynamo") || path.contains("output") || path.contains("source")) {
+        if (hasAnyToken(path, "dynamo", "output", "source")) {
             return null;
         }
 
@@ -302,9 +369,12 @@ public class EnergyHatchHelper {
             }
         }
 
-        String machineClsName = machine != null ? machine.getClass().getName() : def.getClass().getName();
-        boolean isEnergyHatch = machineClsName.contains("EnergyHatchPartMachine") || machineClsName.contains("LaserTargetHatchPartMachine") || machineClsName.contains("SubstationLaserTarget");
-        if (!isEnergyHatch && !path.contains("energy_input_hatch") && !path.contains("laser_target_hatch")) {
+        String simpleName = machine != null ? machine.getClass().getSimpleName() : def.getClass().getSimpleName();
+        boolean isEnergyHatch = "EnergyHatchPartMachine".equals(simpleName)
+                || "LaserTargetHatchPartMachine".equals(simpleName)
+                || "SubstationLaserTargetPartMachine".equals(simpleName)
+                || "SubstationLaserTarget".equals(simpleName);
+        if (!isEnergyHatch && !isQualifiedHatchPath(path)) {
             return null;
         }
 
@@ -332,8 +402,12 @@ public class EnergyHatchHelper {
             amp = parseAmperageFromPath(path);
         }
 
-        boolean isLaser = machineClsName.contains("Laser") || path.contains("laser");
-        boolean isSubstation = machineClsName.contains("Substation") || path.contains("substation");
+        boolean isLaser = "LaserTargetHatchPartMachine".equals(simpleName)
+                || "SubstationLaserTargetPartMachine".equals(simpleName)
+                || hasToken(path, "laser");
+        boolean isSubstation = "SubstationLaserTargetPartMachine".equals(simpleName)
+                || "SubstationLaserTarget".equals(simpleName)
+                || hasToken(path, "substation");
 
         return new EnergyHatchStats(tier, amp, isLaser, isSubstation);
     }
@@ -372,11 +446,11 @@ public class EnergyHatchHelper {
     }
 
     private static GTVoltageTier parseVoltageTier(String path) {
-        GTVoltageTier[] tiers = GTVoltageTier.values().clone();
-        Arrays.sort(tiers, (a, b) -> Integer.compare(b.name().length(), a.name().length()));
-        for (GTVoltageTier tier : tiers) {
-            String nameLower = tier.name().toLowerCase(Locale.ROOT);
-            if (path.startsWith(nameLower + "_") || path.contains("_" + nameLower + "_") || path.endsWith("_" + nameLower) || path.contains(nameLower)) {
+        if (path == null || path.isEmpty()) return GTVoltageTier.LV;
+        String[] tokens = path.toLowerCase(Locale.ROOT).split("[._/-]");
+        for (String token : tokens) {
+            GTVoltageTier tier = TIER_BY_TOKEN.get(token);
+            if (tier != null) {
                 return tier;
             }
         }

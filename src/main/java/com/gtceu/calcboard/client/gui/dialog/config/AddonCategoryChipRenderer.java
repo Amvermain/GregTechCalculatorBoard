@@ -52,7 +52,10 @@ public final class AddonCategoryChipRenderer {
 
         for (AddonCategory cat : relCats) {
             if (cat != null && !cat.equals(AddonCategory.CUSTOM) && !list.contains(cat)) {
-                if (cat.equals(AddonCategory.THREADING) || activeCategories.contains(cat)) {
+                if (cat.equals(AddonCategory.THREADING)
+                        || cat.equals(AddonCategory.MCF_MODULE)
+                        || (cat.equals(AddonCategory.HEATER) && com.gtceu.calcboard.compat.create.CreateProperties.isCreateBoiler(node))
+                        || activeCategories.contains(cat)) {
                     list.add(cat);
                 }
             }

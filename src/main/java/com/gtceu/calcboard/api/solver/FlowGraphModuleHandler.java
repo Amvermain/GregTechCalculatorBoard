@@ -535,13 +535,15 @@ public final class FlowGraphModuleHandler {
     public static void syncModulePortsFromSubGraph(RecipeNode moduleNode, FlowGraph subGraph) {
         if (moduleNode == null || subGraph == null) return;
 
-        List<ModuleInputPin> inputPins = new ArrayList<>();
-        List<ModuleOutputPin> outputPins = new ArrayList<>();
+        List<RecipeNode> inputPins = new ArrayList<>();
+        List<RecipeNode> outputPins = new ArrayList<>();
         for (RecipeNode n : subGraph.getNodes()) {
-            if (n instanceof ModuleInputPin inPin) {
-                inputPins.add(inPin);
-            } else if (n instanceof ModuleOutputPin outPin) {
-                outputPins.add(outPin);
+            if (n != null && n.isBoundaryPin()) {
+                if (n.asBoundaryPin().getDirection() == BoundaryPinNode.PinDirection.INPUT) {
+                    inputPins.add(n);
+                } else {
+                    outputPins.add(n);
+                }
             }
         }
 
@@ -552,37 +554,37 @@ public final class FlowGraphModuleHandler {
         outputPins.sort(pinSorter);
 
         moduleNode.getInputPinNodeIds().clear();
-        for (ModuleInputPin pin : inputPins) {
+        for (RecipeNode pin : inputPins) {
             moduleNode.getInputPinNodeIds().add(pin.getId());
         }
 
         moduleNode.getOutputPinNodeIds().clear();
-        for (ModuleOutputPin pin : outputPins) {
+        for (RecipeNode pin : outputPins) {
             moduleNode.getOutputPinNodeIds().add(pin.getId());
         }
 
         moduleNode.getInputs().clear();
         moduleNode.getModuleInputOrigins().clear();
-        for (ModuleInputPin pin : inputPins) {
-            IngredientStack bound = pin.getBoundIngredient();
+        for (RecipeNode pin : inputPins) {
+            IngredientStack bound = pin.asBoundaryPin().getBoundIngredient();
             double demand = calculatePinInternalFlow(subGraph, pin, true);
             if (demand <= 0.0001 && bound != null) {
                 demand = bound.getAmount();
             }
-            IngredientStack portStack = bound != null ? bound.withAmount(demand) : IngredientStack.item(null, pin.getPinLabel(), demand, 1.0);
+            IngredientStack portStack = bound != null ? bound.withAmount(demand) : IngredientStack.item(null, pin.asBoundaryPin().getPinLabel(), demand, 1.0);
             moduleNode.addInput(portStack);
             moduleNode.getModuleInputOrigins().add(new ArrayList<>(List.of(new RecipeNode.PortOrigin(pin.getId(), 0))));
         }
 
         moduleNode.getOutputs().clear();
         moduleNode.getModuleOutputOrigins().clear();
-        for (ModuleOutputPin pin : outputPins) {
-            IngredientStack bound = pin.getBoundIngredient();
+        for (RecipeNode pin : outputPins) {
+            IngredientStack bound = pin.asBoundaryPin().getBoundIngredient();
             double supply = calculatePinInternalFlow(subGraph, pin, false);
             if (supply <= 0.0001 && bound != null) {
                 supply = bound.getAmount();
             }
-            IngredientStack portStack = bound != null ? bound.withAmount(supply) : IngredientStack.item(null, pin.getPinLabel(), supply, 1.0);
+            IngredientStack portStack = bound != null ? bound.withAmount(supply) : IngredientStack.item(null, pin.asBoundaryPin().getPinLabel(), supply, 1.0);
             moduleNode.addOutput(portStack);
             moduleNode.getModuleOutputOrigins().add(new ArrayList<>(List.of(new RecipeNode.PortOrigin(pin.getId(), 0))));
         }
@@ -595,7 +597,7 @@ public final class FlowGraphModuleHandler {
         moduleNode.setTargetTier(summary.highestVoltageTier());
     }
 
-    private static double calculatePinInternalFlow(FlowGraph subGraph, BoundaryPinNode pin, boolean isInput) {
+    private static double calculatePinInternalFlow(FlowGraph subGraph, RecipeNode pin, boolean isInput) {
         if (subGraph == null || pin == null) return 0.0;
         double total = 0.0;
         for (FlowGraph.ConnectionEdge edge : subGraph.getConnections()) {
@@ -608,7 +610,7 @@ public final class FlowGraphModuleHandler {
         return total;
     }
 
-    private static double calculateInputPinEdgeFlow(FlowGraph subGraph, BoundaryPinNode pin, FlowGraph.ConnectionEdge edge) {
+    private static double calculateInputPinEdgeFlow(FlowGraph subGraph, RecipeNode pin, FlowGraph.ConnectionEdge edge) {
         if (!edge.fromNodeId().equals(pin.getId())) return 0.0;
         RecipeNode target = subGraph.findNodeById(edge.toNodeId());
         if (target == null || edge.inputIndex() >= target.getInputs().size()) return 0.0;
@@ -629,7 +631,7 @@ public final class FlowGraphModuleHandler {
         return otherSupplied;
     }
 
-    private static double calculateOutputPinEdgeFlow(FlowGraph subGraph, BoundaryPinNode pin, FlowGraph.ConnectionEdge edge) {
+    private static double calculateOutputPinEdgeFlow(FlowGraph subGraph, RecipeNode pin, FlowGraph.ConnectionEdge edge) {
         if (!edge.toNodeId().equals(pin.getId())) return 0.0;
         RecipeNode source = subGraph.findNodeById(edge.fromNodeId());
         if (source == null || edge.outputIndex() >= source.getOutputs().size()) return 0.0;

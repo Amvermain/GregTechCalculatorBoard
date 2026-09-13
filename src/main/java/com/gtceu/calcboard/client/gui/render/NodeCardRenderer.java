@@ -72,7 +72,7 @@ public class NodeCardRenderer {
         }
 
         if (node.isBoundaryPin()) {
-            renderBoundaryPinNode(widget, graphics, font, (BoundaryPinNode) node, x, y, cardW, height, mouseX, mouseY);
+            renderBoundaryPinNode(widget, graphics, font, node, x, y, cardW, height, mouseX, mouseY);
             return;
         }
 
@@ -907,7 +907,7 @@ public class NodeCardRenderer {
             NodeWidget widget,
             GuiGraphics graphics,
             Font font,
-            BoundaryPinNode pin,
+            RecipeNode pin,
             int x,
             int y,
             int cardW,
@@ -917,7 +917,7 @@ public class NodeCardRenderer {
     ) {
         boolean isSelected = (Minecraft.getInstance().screen instanceof BoardScreen bs) && bs.isNodeSelected(pin.getId());
         boolean isHovered = widget.isPointInside(mouseX, mouseY);
-        boolean isInput = pin.getDirection() == BoundaryPinNode.PinDirection.INPUT;
+        boolean isInput = pin.asBoundaryPin().getDirection() == BoundaryPinNode.PinDirection.INPUT;
         boolean isFlipped = pin.isFlipped();
 
         renderBoundaryPinFrame(graphics, x, y, isSelected, isHovered, isInput);
@@ -960,8 +960,8 @@ public class NodeCardRenderer {
         graphics.pose().popPose();
     }
 
-    private static void renderBoundaryPinCenterIcon(GuiGraphics graphics, Font font, BoundaryPinNode pin, int x, int y, boolean isInput) {
-        IngredientStack stack = pin.getBoundIngredient();
+    private static void renderBoundaryPinCenterIcon(GuiGraphics graphics, Font font, RecipeNode pin, int x, int y, boolean isInput) {
+        IngredientStack stack = pin.asBoundaryPin().getBoundIngredient();
         if (stack == null) {
             stack = isInput
                     ? (!pin.getOutputs().isEmpty() ? pin.getOutputs().get(0) : null)
@@ -974,8 +974,8 @@ public class NodeCardRenderer {
         }
     }
 
-    private static void renderBoundaryPinRateBadge(GuiGraphics graphics, Font font, NodeWidget widget, BoundaryPinNode pin, int x, int y, boolean isInput) {
-        IngredientStack stack = pin.getBoundIngredient();
+    private static void renderBoundaryPinRateBadge(GuiGraphics graphics, Font font, NodeWidget widget, RecipeNode pin, int x, int y, boolean isInput) {
+        IngredientStack stack = pin.asBoundaryPin().getBoundIngredient();
         if (stack == null) {
             stack = isInput
                     ? (!pin.getOutputs().isEmpty() ? pin.getOutputs().get(0) : null)

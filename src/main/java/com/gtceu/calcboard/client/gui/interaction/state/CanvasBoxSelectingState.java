@@ -74,10 +74,30 @@ public final class CanvasBoxSelectingState implements CanvasInteractionState {
 
         ctx.getQuickAddMarkerHandler().clearQuickAddMarker();
         BoardScreen screen = ctx.getScreen();
-        if (screen != null && (Math.abs(maxX - minX) > 6 || Math.abs(maxY - minY) > 6)) {
-            handler.finishBoxSelection(screen, Screen.hasShiftDown());
-        } else {
+        if (screen == null) {
             handler.stopBoxSelection();
+            return;
+        }
+
+        boolean isDrag = Math.abs(maxX - minX) > 6 || Math.abs(maxY - minY) > 6;
+        if (!isDrag) {
+            handler.stopBoxSelection();
+            return;
+        }
+
+        handler.finishBoxSelection(screen, Screen.hasShiftDown());
+        reconcileInspectorAfterBoxSelection(screen);
+    }
+
+    private void reconcileInspectorAfterBoxSelection(BoardScreen screen) {
+        if (screen.getSelectedNodeIds().size() == 1 && screen.getSelectedNoteIds().isEmpty() && screen.getSelectedFrameIds().isEmpty()) {
+            String singleId = screen.getSelectedNodeIds().iterator().next();
+            screen.selectNode(singleId, false);
+            return;
+        }
+        boolean hasMultiSelection = !screen.getSelectedNodeIds().isEmpty() || !screen.getSelectedNoteIds().isEmpty() || !screen.getSelectedFrameIds().isEmpty();
+        if (hasMultiSelection && screen.getNodeInspectorPanel() != null && screen.getNodeInspectorPanel().isPageSettingsMode()) {
+            screen.getNodeInspectorPanel().close();
         }
     }
 }

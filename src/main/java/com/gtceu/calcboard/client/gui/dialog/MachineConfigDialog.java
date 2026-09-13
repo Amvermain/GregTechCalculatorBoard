@@ -10,6 +10,7 @@ import com.gtceu.calcboard.client.gui.compat.ModGuiHandlerRegistry;
 import com.gtceu.calcboard.client.gui.dialog.config.ActiveAddonsView;
 import com.gtceu.calcboard.client.gui.dialog.config.AddonCatalogView;
 import com.gtceu.calcboard.client.gui.dialog.config.CustomAddonBuilderView;
+import com.gtceu.calcboard.client.gui.dialog.config.MCFConfigView;
 import com.gtceu.calcboard.client.gui.dialog.config.ThreadingHelixView;
 import com.gtceu.calcboard.api.preset.CategoryMachinePreset;
 import com.gtceu.calcboard.api.preset.CategoryMachinePresetManager;
@@ -61,6 +62,7 @@ public class MachineConfigDialog implements IBoardModal {
     private final CustomAddonBuilderView customAddonBuilderView;
     private final ThreadingHelixView threadingHelixView;
     private final com.gtceu.calcboard.client.gui.compat.create.CreateBoilerConfigView createBoilerConfigView;
+    private final MCFConfigView mcfConfigView;
 
     // Top Base Parallel EditBox
     private EditBox parallelBox;
@@ -88,6 +90,7 @@ public class MachineConfigDialog implements IBoardModal {
         this.customAddonBuilderView = new CustomAddonBuilderView(this);
         this.threadingHelixView = new ThreadingHelixView(this);
         this.createBoilerConfigView = new com.gtceu.calcboard.client.gui.compat.create.CreateBoilerConfigView(this);
+        this.mcfConfigView = new MCFConfigView(this);
     }
 
     public BoardScreen getParent() {
@@ -153,56 +156,110 @@ public class MachineConfigDialog implements IBoardModal {
         this.visible = true;
         if (initialCategory != null) {
             this.selectedCategory = initialCategory;
-        } else if (com.gtceu.calcboard.compat.create.CreateProperties.isCreateBoiler(node)) {
-            this.selectedCategory = AddonCategory.HEATER;
-        } else if (MachineAddon.isTurbineMachine(node) && node.isMultiblock()) {
-            this.selectedCategory = MachineAddon.Category.ROTOR;
-        } else if (MachineAddon.isCombustionMachine(node) && node.isMultiblock()) {
-            this.selectedCategory = AddonCategory.MULTIBLOCK_TRAIT;
         } else {
-            this.selectedCategory = null;
+            this.selectedCategory = getDefaultCategoryForNode(node);
         }
         this.isCustomBuilderActive = (this.selectedCategory == AddonCategory.CUSTOM);
-        this.activeAddonsView.resetScroll();
-        this.addonCatalogView.init();
-        this.addonCatalogView.ensureCategoryVisible(node, this.selectedCategory, DIALOG_WIDTH);
-        this.customAddonBuilderView.init();
 
         this.lastObservedCatalogVersion = MachineAddonCatalog.getInstance().getVersion();
         this.wasReady = MachineAddonCatalog.getInstance().isReady() && CategoryCapabilityMatrix.getInstance().isBaked();
         this.wasExhaustiveComplete = MachineAddonCatalog.getInstance().isExhaustiveScanComplete();
-        invalidateFilteredCatalog();
 
-        Minecraft mc = Minecraft.getInstance();
-        if (mc != null && mc.font != null) {
-            this.parallelBox = new EditBox(mc.font, 0, 0, 48, 16, Component.translatable("gui.gtcalcboard.config.parallel"));
-            this.parallelBox.setMaxLength(6);
-            boolean isCombustion = com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isCombustionEngine(node);
-            if (isCombustion) {
-                node.setParallel(1);
-                node.setCustomParallel(0);
-            }
-            int initParallel = isCombustion ? 1 : Math.max(1, node.getParallel());
-            this.parallelBox.setValue(String.valueOf(initParallel));
-            this.parallelBox.setResponder(text -> {
-                if (isCombustion) {
-                    return;
-                }
-                try {
-                    int p = Integer.parseInt(text.trim());
-                    if (p >= 1 && p <= 100000) {
-                        node.setParallel(p);
-                        node.setCustomParallel(p);
-                        if (parent != null) parent.markSummaryDirty();
-                    }
-                } catch (NumberFormatException ignored) {}
-            });
-            if (isCombustion) {
-                this.parallelBox.setEditable(false);
-            }
+        if (this.parallelBox == null) {
+            initParallelBox();
         }
 
+        rebind(node);
+    }
+
+    public void rebind(RecipeNode node) {
+        this.node = node;
+        if (node == null) return;
+
+        if (this.addonCatalogView != null) {
+            this.addonCatalogView.invalidateCache();
+        }
+        validateAndAdjustSelectedCategory();
+        syncParallelBox();
+
+        this.activeAddonsView.resetScroll();
+        this.addonCatalogView.init();
+        this.addonCatalogView.ensureCategoryVisible(node, this.selectedCategory, DIALOG_WIDTH);
+        this.customAddonBuilderView.init();
+        invalidateFilteredCatalog();
+
         syncThreadingAddons(node);
+    }
+
+    public static AddonCategory getDefaultCategoryForNode(RecipeNode node) {
+        if (node == null) return null;
+        if (com.gtceu.calcboard.compat.create.CreateProperties.isCreateBoiler(node)) {
+            return AddonCategory.HEATER;
+        }
+        if (MachineAddon.isTurbineMachine(node) && node.isMultiblock()) {
+            return MachineAddon.Category.ROTOR;
+        }
+        if (com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isModularCombustionFrame(node)) {
+            return AddonCategory.MCF_MODULE;
+        }
+        if (MachineAddon.isCombustionMachine(node) && node.isMultiblock()) {
+            return AddonCategory.MULTIBLOCK_TRAIT;
+        }
+        return null;
+    }
+
+    private void validateAndAdjustSelectedCategory() {
+        if (node == null) return;
+        List<AddonCategory> validCats = this.addonCatalogView != null
+                ? this.addonCatalogView.getAllCategoriesForFilter(node)
+                : List.of();
+        if (selectedCategory != null && !validCats.contains(selectedCategory)) {
+            this.selectedCategory = getDefaultCategoryForNode(node);
+            if (this.selectedCategory != null && !validCats.contains(this.selectedCategory)) {
+                this.selectedCategory = null;
+            }
+            this.isCustomBuilderActive = (this.selectedCategory == AddonCategory.CUSTOM);
+        }
+    }
+
+    private void syncParallelBox() {
+        if (parallelBox == null || node == null) return;
+        boolean isCombustion = com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isCombustionEngine(node);
+        if (isCombustion) {
+            node.setParallel(1);
+            node.setCustomParallel(0);
+        }
+        int effectiveParallel = isCombustion ? 1 : Math.max(1, node.getParallel());
+        parallelBox.setValue(String.valueOf(effectiveParallel));
+        parallelBox.setEditable(!isCombustion);
+    }
+
+    private void initParallelBox() {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc == null || mc.font == null) return;
+        this.parallelBox = new EditBox(mc.font, 0, 0, 48, 16, Component.translatable("gui.gtcalcboard.config.parallel"));
+        this.parallelBox.setMaxLength(6);
+        this.parallelBox.setResponder(text -> {
+            if (this.node == null) return;
+            boolean combustionNow = com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isCombustionEngine(this.node);
+            if (combustionNow) return;
+            try {
+                int p = Integer.parseInt(text.trim());
+                if (p >= 1 && p <= 100000) {
+                    this.node.setParallel(p);
+                    this.node.setCustomParallel(p);
+                    if (parent != null) parent.markSummaryDirty();
+                }
+            } catch (NumberFormatException ignored) {}
+        });
+    }
+
+    public EditBox getParallelBox() {
+        return parallelBox;
+    }
+
+    public void setParallelBox(EditBox parallelBox) {
+        this.parallelBox = parallelBox;
     }
 
     public static void syncThreadingAddons(RecipeNode node) {
@@ -485,6 +542,8 @@ public class MachineConfigDialog implements IBoardModal {
             threadingHelixView.render(graphics, font, node, catalogStartX + 4, catalogStartY + 4, catalogW - 8, catalogH - 8, virtualMouseX, virtualMouseY);
         } else if (selectedCategory == AddonCategory.HEATER && com.gtceu.calcboard.compat.create.CreateProperties.isCreateBoiler(node)) {
             createBoilerConfigView.render(graphics, font, node, catalogStartX + 4, catalogStartY + 4, catalogW - 8, catalogH - 8, virtualMouseX, virtualMouseY);
+        } else if (selectedCategory == AddonCategory.MCF_MODULE && com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isModularCombustionFrame(node)) {
+            mcfConfigView.render(graphics, font, node, catalogStartX + 4, catalogStartY + 4, catalogW - 8, catalogH - 8, virtualMouseX, virtualMouseY);
         } else {
             addonCatalogView.renderCatalogGrid(graphics, font, node, catalogStartX + 4, catalogStartY + 4, catalogW - 8, catalogH - 8, virtualMouseX, virtualMouseY);
         }
@@ -658,9 +717,10 @@ public class MachineConfigDialog implements IBoardModal {
                 if (sbWs != null) {
                     node.setMachineIcon(sbWs);
                 }
-                node.setParallel(1);
             }
-            invalidateFilteredCatalog();
+            com.gtceu.calcboard.api.model.NodeHardwareReconciler.purgeIncompatibleAddons(node);
+            com.gtceu.calcboard.api.model.NodeHardwareReconciler.clampParallel(node);
+            rebind(node);
             if (parent != null) parent.markSummaryDirty();
             return true;
         }
@@ -765,6 +825,12 @@ public class MachineConfigDialog implements IBoardModal {
             }
         } else if (selectedCategory == AddonCategory.HEATER && com.gtceu.calcboard.compat.create.CreateProperties.isCreateBoiler(node)) {
             return createBoilerConfigView.mouseClicked(node, catalogStartX + 4, catalogStartY + 4, catalogW - 8, catalogH - 8, mX, mY, button, parent);
+        } else if (selectedCategory == AddonCategory.MCF_MODULE && com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isModularCombustionFrame(node)) {
+            if (mcfConfigView.mouseClicked(catalogStartX + 4, catalogStartY + 4, catalogW - 8, catalogH - 8, mX, mY, button, node, parent)) {
+                if (parent != null) parent.markSummaryDirty();
+                return true;
+            }
+            return true;
         } else {
             return addonCatalogView.mouseClicked(mX, mY, button, node, catalogStartX + 4, catalogStartY + 4, catalogW - 8, catalogH - 8, parent);
         }
@@ -824,6 +890,9 @@ public class MachineConfigDialog implements IBoardModal {
         int catalogH = dialogH - 158;
 
         if (!isCustomBuilderActive && selectedCategory != AddonCategory.THREADING) {
+            if (selectedCategory == AddonCategory.MCF_MODULE && com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isModularCombustionFrame(node)) {
+                return mcfConfigView.mouseScrolled(mX, mY, delta, catalogStartX + 4, catalogStartY + 4, catalogW - 8, catalogH - 8);
+            }
             return addonCatalogView.mouseScrolled(mX, mY, delta, node, catalogStartX + 4, catalogStartY + 4, catalogW - 8, catalogH - 8);
         }
 

@@ -215,8 +215,11 @@ public final class FlowSummaryAggregator {
 
     public static BalanceSummary computeSummary(FlowGraph graph, boolean recomputeEfficiencies) {
         BalanceSummary summary = computeSummaryInternal(graph, recomputeEfficiencies, 0, Collections.newSetFromMap(new IdentityHashMap<>()));
-        if (graph != null && recomputeEfficiencies) {
-            graph.setCachedSummary(summary);
+        if (graph != null) {
+            if (recomputeEfficiencies) {
+                graph.setCachedSummary(summary);
+            }
+            graph.captureSnapshot();
         }
         return summary;
     }
@@ -434,6 +437,8 @@ public final class FlowSummaryAggregator {
         double netEUt = totalConsumedEUt - totalGeneratedEUt;
         double netSU = totalGeneratedSU - totalConsumedSU;
         double netFE = totalGeneratedFE - totalConsumedFE;
+
+        graph.captureSnapshot();
         return new BalanceSummary(netEUt, netSU, netFE, highestTier, totalMachineCount, machineBreakdown, rawInputs, netOutputs, balanced, totalProduction, totalConsumption, voidedOutputs, totalFusionStartupEU, fusionTierCounts, fusionTierStartupEU);
     }
 

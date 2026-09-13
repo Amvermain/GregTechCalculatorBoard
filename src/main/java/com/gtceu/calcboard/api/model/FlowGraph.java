@@ -12,6 +12,10 @@ import net.minecraft.resources.ResourceLocation;
 
 import java.util.*;
 
+import com.gtceu.calcboard.api.model.role.FlowGraphSnapshot;
+import com.gtceu.calcboard.api.model.role.NodeCalculationSnapshot;
+import java.util.concurrent.atomic.AtomicReference;
+
 /**
  * Pure graph topology data container for the Calculator Board.
  * Holds nodes, connection edges, and NBT serialization/deserialization.
@@ -24,8 +28,37 @@ public class FlowGraph {
     private final List<CanvasStickyNote> stickyNotes = new ArrayList<>();
     private final Map<String, RecipeNode> nodeMap = new HashMap<>();
     private final Map<PortKey, FlowGraphSolver.PortFlowStats> portStatsCache = new HashMap<>();
+    private final AtomicReference<FlowGraphSnapshot> currentSnapshot = new AtomicReference<>(FlowGraphSnapshot.EMPTY);
     private BalanceSummary cachedSummary = null;
     private boolean summaryDirty = true;
+
+    public FlowGraphSnapshot getSnapshot() {
+        FlowGraphSnapshot snap = currentSnapshot.get();
+        if (snap == FlowGraphSnapshot.EMPTY && !nodes.isEmpty()) {
+            return captureSnapshot();
+        }
+        return snap;
+    }
+
+    public void updateSnapshot(FlowGraphSnapshot snapshot) {
+        this.currentSnapshot.set(snapshot != null ? snapshot : FlowGraphSnapshot.EMPTY);
+    }
+
+    public FlowGraphSnapshot captureSnapshot() {
+        Map<String, NodeCalculationSnapshot> map = new HashMap<>();
+        for (RecipeNode node : nodes) {
+            if (node != null && node.getRole() != null) {
+                map.put(node.getId(), node.getRole().captureSnapshot(this));
+            }
+        }
+        FlowGraphSnapshot snapshot = new FlowGraphSnapshot(map, System.currentTimeMillis());
+        currentSnapshot.set(snapshot);
+        return snapshot;
+    }
+
+    public NodeCalculationSnapshot getNodeSnapshot(String nodeId) {
+        return getSnapshot().getNodeSnapshot(nodeId);
+    }
 
     public record PortKey(String nodeId, boolean isInput, int portIndex) {}
 
@@ -759,8 +792,7 @@ public class FlowGraph {
         if (targetNode == null || newRecipeTemplate == null) return null;
 
         String nodeId = targetNode.getId();
-        var oldSnapshot = com.gtceu.calcboard.api.history.BoardCommand.SwitchRecipeCommand.RecipeSnapshot.of(targetNode);
-        var newSnapshot = com.gtceu.calcboard.api.history.BoardCommand.SwitchRecipeCommand.RecipeSnapshot.of(newRecipeTemplate);
+        var oldSnapshot = com.gtceu.calcboard.api.history.command.SwitchRecipeCommand.RecipeSnapshot.of(targetNode);
 
         List<ConnectionEdge> oldEdges = new ArrayList<>();
         for (ConnectionEdge e : connections) {
@@ -769,7 +801,17 @@ public class FlowGraph {
             }
         }
 
-        newSnapshot.applyTo(targetNode);
+        targetNode.setName(newRecipeTemplate.getRawName());
+        targetNode.setBaseDurationTicks(newRecipeTemplate.getBaseDurationTicks());
+        targetNode.setBaseEUt(newRecipeTemplate.getBaseEUt());
+        targetNode.setRecipeTier(newRecipeTemplate.getRecipeTier());
+        targetNode.setRecipeCategoryId(newRecipeTemplate.getRecipeCategoryId());
+        targetNode.setBaseSpec(newRecipeTemplate.getBaseSpec());
+
+        NodeHardwareReconciler.reconcileForRecipe(targetNode, newRecipeTemplate);
+        targetNode.syncProjectedPorts();
+
+        var newSnapshot = com.gtceu.calcboard.api.history.command.SwitchRecipeCommand.RecipeSnapshot.of(targetNode);
 
         List<ConnectionEdge> newEdges = new ArrayList<>();
         List<IngredientStack> oldInputs = oldSnapshot.inputs();

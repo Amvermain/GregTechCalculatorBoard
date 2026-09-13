@@ -469,6 +469,7 @@ public class JeiRecipeViewerAdapter implements IRecipeViewerAdapter {
         double[] pos = com.gtceu.calcboard.client.gui.BoardScreen.getNextNodeCenterPosition();
         node.setPosX(pos[0]);
         node.setPosY(pos[1]);
+        com.gtceu.calcboard.client.gui.action.NodeProvisioningPipeline.provision(node, com.gtceu.calcboard.api.storage.BoardManager.getInstance().getActivePage());
         com.gtceu.calcboard.api.storage.BoardManager.getInstance().getActiveGraph().addNode(node);
 
         String name = node.getName();

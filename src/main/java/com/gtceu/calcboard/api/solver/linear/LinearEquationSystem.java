@@ -27,7 +27,7 @@ public final class LinearEquationSystem {
         if (graph == null) return;
 
         Set<String> orderedNodeIds = new LinkedHashSet<>();
-        if (anchor != null && !anchor.isReroute()) {
+        if (anchor != null && (anchor.isMachine() || anchor.isModule())) {
             orderedNodeIds.add(anchor.getId());
             Set<String> directSuppliers = com.gtceu.calcboard.api.solver.FlowGraphTopologyAnalyzer.getDirectSuppliers(graph, anchor.getId());
             Set<String> down = com.gtceu.calcboard.api.solver.FlowGraphTopologyAnalyzer.findDownstreamNodes(graph, anchor.getId(), directSuppliers);
@@ -37,13 +37,13 @@ public final class LinearEquationSystem {
         }
 
         for (RecipeNode node : graph.getNodes()) {
-            if (node == null || node.isReroute()) continue;
+            if (node == null || (!node.isMachine() && !node.isModule())) continue;
             orderedNodeIds.add(node.getId());
         }
 
         for (String id : orderedNodeIds) {
             RecipeNode n = graph.findNodeById(id);
-            if (n != null && !n.isReroute()) {
+            if (n != null && (n.isMachine() || n.isModule())) {
                 nodeIndexMap.put(id, variableNodeIds.size());
                 variableNodeIds.add(id);
             }

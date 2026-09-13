@@ -34,6 +34,7 @@ public final class PageBrowserDrawerRenderer {
         renderHeader(graphics, font, topY, mouseX, mouseY);
         renderSearchBox(drawer, graphics, mouseX, mouseY, partialTicks, topY);
         renderTreeView(drawer, graphics, font, topY, drawerH, mouseX, mouseY);
+        renderBadgeTooltip(drawer, graphics, font, mouseX, mouseY);
         renderDragGhost(drawer, graphics, font, mouseX, mouseY);
         renderContextMenuOverlay(drawer, graphics, font, mouseX, mouseY);
         renderPromptModalOverlay(drawer, graphics, font, mouseX, mouseY, partialTicks);
@@ -172,15 +173,53 @@ public final class PageBrowserDrawerRenderer {
             graphics.drawString(font, "§7▪", listX + indent + 12, curY + 5, 0xFFFFFFFF, false);
         }
 
+        com.gtceu.calcboard.api.type.GTVoltageTier vTier = page.getDefaultVoltageTier();
+        String badgeText = (vTier != null) ? (vTier.getFormatCode() + "⚡" + vTier.getName()) : "⚡Auto";
+        int badgeW = font.width(badgeText) + 4;
+        int badgeX = listX + listW - 6 - badgeW;
+        int badgeY = curY + 4;
+        int badgeH = 12;
+
+        boolean badgeHover = mouseX >= badgeX && mouseX <= badgeX + badgeW && mouseY >= badgeY && mouseY <= badgeY + badgeH;
+        int badgeBg = badgeHover ? 0xCC2A364C : 0x8811151C;
+        int badgeBorder = (vTier != null) ? (vTier.getColor() | 0xFF000000) : (badgeHover ? 0xFF66AACC : 0xFF446688);
+        String badgeRenderStr = (vTier != null) ? badgeText : (badgeHover ? "§b⚡Auto" : "§7⚡§fAuto");
+
+        graphics.fill(badgeX, badgeY, badgeX + badgeW, badgeY + badgeH, badgeBg);
+        graphics.renderOutline(badgeX, badgeY, badgeW, badgeH, badgeBorder);
+        graphics.drawString(font, badgeRenderStr, badgeX + 2, badgeY + 2, 0xFFFFFFFF, false);
+
+        if (badgeHover) {
+            drawer.setHoveredBadgePage(page);
+        }
+
         boolean isAe2 = com.gtceu.calcboard.integration.ae2.registry.PatternGraphRegistry.getInstance().isPageBound(page.getId());
         String nameColor = isSelected ? "§b" : (isActive ? "§a" : (isAe2 ? "§b" : "§f"));
         int nameX = listX + indent + 30;
-        int maxNameW = listW - (indent + 34);
+        int maxNameW = Math.max(10, badgeX - nameX - 4);
         String prefixTag = isAe2 && !page.getName().startsWith("[AE2]") ? "§b[AE2] " : "";
         String trimmedName = font.plainSubstrByWidth(prefixTag + page.getName(), maxNameW);
         graphics.drawString(font, nameColor + trimmedName, nameX, curY + 6, 0xFFFFFFFF, false);
 
         return curY + PageBrowserDrawer.ITEM_HEIGHT + 2;
+    }
+
+    private static void renderBadgeTooltip(PageBrowserDrawer drawer, GuiGraphics graphics, Font font, int mouseX, int mouseY) {
+        if (drawer.isContextMenuOpen() || drawer.getPromptMode() != PageBrowserDrawer.PromptMode.NONE) return;
+        BoardPage page = drawer.getHoveredBadgePage();
+        if (page == null) return;
+
+        com.gtceu.calcboard.api.type.GTVoltageTier vTier = page.getDefaultVoltageTier();
+        String tierText = (vTier != null) ? (vTier.getFormatCode() + vTier.getName()) : "§bAuto";
+
+        List<Component> tooltipLines = new java.util.ArrayList<>();
+        tooltipLines.add(Component.translatable("gui.gtcalcboard.page_settings.badge_tooltip_title", tierText));
+        tooltipLines.add(Component.translatable("gui.gtcalcboard.page_settings.badge_tooltip_cycle"));
+        tooltipLines.add(Component.translatable("gui.gtcalcboard.page_settings.badge_tooltip_settings"));
+
+        com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer.renderComponentTooltip(
+                graphics, font, tooltipLines, mouseX, mouseY, drawer.getScreen().getScreenWidth(), drawer.getScreen().getScreenHeight()
+        );
     }
 
     private static void renderDragGhost(PageBrowserDrawer drawer, GuiGraphics graphics, Font font, int mouseX, int mouseY) {

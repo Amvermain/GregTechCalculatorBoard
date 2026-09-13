@@ -556,6 +556,9 @@ public final class CanvasIdleState implements CanvasInteractionState {
         ctx.getSelectionHandler().startBoxSelection(canvasX, canvasY);
         if (!Screen.hasShiftDown() && ctx.getScreen() != null) {
             ctx.getScreen().clearSelection();
+            if (ctx.getScreen().getNodeInspectorPanel() != null) {
+                ctx.getScreen().getNodeInspectorPanel().openPageSettings();
+            }
         }
         ctx.getStateMachine().transitionTo(new CanvasBoxSelectingState());
         return true;

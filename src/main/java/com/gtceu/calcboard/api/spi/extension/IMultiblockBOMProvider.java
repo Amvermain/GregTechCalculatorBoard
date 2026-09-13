@@ -116,4 +116,8 @@ public interface IMultiblockBOMProvider extends IModExtension {
         if (availableWorkstations == null || availableWorkstations.isEmpty()) return null;
         return availableWorkstations.get(0);
     }
+
+    default int getMultiblockCount(RecipeNode node, int baseMachineCount) {
+        return baseMachineCount;
+    }
 }

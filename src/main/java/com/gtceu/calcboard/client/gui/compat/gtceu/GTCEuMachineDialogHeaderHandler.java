@@ -89,17 +89,19 @@ public class GTCEuMachineDialogHeaderHandler {
             curX += oxBtnW + gap;
         }
 
-        String cl = node.getProperties().get(GTCEuProperties.COMBUSTION_COOLANT_TYPE);
-        boolean clActive = cl != null && !cl.isEmpty() && !"none".equalsIgnoreCase(cl);
-        String clLabel = "❄ " + (clActive ? ("§b" + GTCombustionHelper.getCoolantDisplayName(cl)) : "§7Coolant: None");
-        int clBtnW = Math.max(110, font.width(clLabel) + 12);
+        if (GTCombustionHelper.isModularCombustionFrame(node)) {
+            String cl = GTCombustionHelper.getMCFCoolantType(node);
+            boolean clActive = cl != null && !cl.isEmpty() && !"none".equalsIgnoreCase(cl);
+            String clLabel = "❄ " + (clActive ? ("§b" + GTCombustionHelper.getCoolantDisplayName(cl)) : "§7Coolant: None");
+            int clBtnW = Math.max(110, font.width(clLabel) + 12);
 
-        if (mouseX >= curX && mouseX <= curX + clBtnW && mouseY >= btnY && mouseY <= btnY + 16) {
-            cycleStarTCoolant(node);
-            if (dialog != null) dialog.invalidateFilteredCatalog();
-            if (parent != null) parent.markSummaryDirty();
-            Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F));
-            return true;
+            if (mouseX >= curX && mouseX <= curX + clBtnW && mouseY >= btnY && mouseY <= btnY + 16) {
+                cycleStarTCoolant(node);
+                if (dialog != null) dialog.invalidateFilteredCatalog();
+                if (parent != null) parent.markSummaryDirty();
+                Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F));
+                return true;
+            }
         }
 
         return false;
@@ -126,24 +128,23 @@ public class GTCEuMachineDialogHeaderHandler {
     }
 
     private void cycleStarTCoolant(RecipeNode node) {
-        String cur = node.getProperties().get(GTCEuProperties.COMBUSTION_COOLANT_TYPE);
+        String cur = GTCombustionHelper.getMCFCoolantType(node);
         node.getAddons().removeIf(GTAddonCompatibilityHandler::isCoolantAddon);
         if (cur == null || "none".equalsIgnoreCase(cur) || cur.isEmpty()) {
             MachineAddon dist = MachineAddonCatalog.getInstance().getAddon("start_core:distilled_water_coolant");
             if (dist != null) {
                 node.getAddons().add(dist);
             }
-            node.getProperties().set(GTCEuProperties.COMBUSTION_COOLANT_TYPE, "distilled_water");
+            GTCombustionHelper.setMCFCoolantType(node, "distilled_water");
         } else if ("distilled_water".equalsIgnoreCase(cur)) {
             MachineAddon deion = MachineAddonCatalog.getInstance().getAddon("start_core:deionized_water_coolant");
             if (deion != null) {
                 node.getAddons().add(deion);
             }
-            node.getProperties().set(GTCEuProperties.COMBUSTION_COOLANT_TYPE, "deionized_water");
+            GTCombustionHelper.setMCFCoolantType(node, "deionized_water");
         } else {
-            node.getProperties().set(GTCEuProperties.COMBUSTION_COOLANT_TYPE, "none");
+            GTCombustionHelper.setMCFCoolantType(node, "none");
         }
-        GTCombustionHelper.syncCombustionInputs(node);
     }
 
     private boolean handleLceBoostClick(MachineConfigDialog dialog, RecipeNode node, int curX, int btnY,

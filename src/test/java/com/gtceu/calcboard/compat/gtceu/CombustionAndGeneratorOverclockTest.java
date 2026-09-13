@@ -360,17 +360,11 @@ public class CombustionAndGeneratorOverclockTest {
         Assertions.assertNotNull(distWater);
         Assertions.assertNotNull(deionWater);
 
-        Assertions.assertTrue(adapter.isAddonCompatible(t1Node, distWater));
-        Assertions.assertTrue(adapter.isAddonCompatible(t1Node, deionWater));
-
-        adapter.onAddonInstalled(t1Node, deionWater);
-        Assertions.assertEquals("deionized_water", t1Node.getProperties().get(GTCEuProperties.COMBUSTION_COOLANT_TYPE));
-        Assertions.assertEquals(1.4, GTCombustionHelper.getCombustionPowerMultiplier(t1Node), 0.001);
-        Assertions.assertEquals(32768.0 * 1.4, GTPowerCalculator.computeSingleMachinePower(t1Node), 0.001);
-
-        adapter.onAddonRemoved(t1Node, deionWater);
-        Assertions.assertEquals("none", t1Node.getProperties().get(GTCEuProperties.COMBUSTION_COOLANT_TYPE));
+        // Under RFC-013 / ADR-013 US-05, standalone modules reject coolant addons and operate at 1.0x base
+        Assertions.assertFalse(adapter.isAddonCompatible(t1Node, distWater));
+        Assertions.assertFalse(adapter.isAddonCompatible(t1Node, deionWater));
         Assertions.assertEquals(1.0, GTCombustionHelper.getCombustionPowerMultiplier(t1Node), 0.001);
+        Assertions.assertEquals(32768.0, GTPowerCalculator.computeSingleMachinePower(t1Node), 0.001);
     }
 
     @Test
@@ -582,18 +576,10 @@ public class CombustionAndGeneratorOverclockTest {
         Assertions.assertEquals(100.0 / 3.6, ucm.getInputSlotRate(1, false), 0.001);
         Assertions.assertEquals(324.0 / 3.6, ucm.getInputSlotRate(2, false), 0.001);
 
-        MachineAddon coolant = MachineAddonCatalog.getInstance().getAddon("start_core:distilled_water_coolant");
-        Assertions.assertNotNull(coolant);
-        adapter.onAddonInstalled(ucm, coolant);
-
-        Assertions.assertEquals(4, ucm.getInputs().size());
-        Assertions.assertEquals(GTCombustionHelper.DISTILLED_WATER, ucm.getInputs().get(3).getId());
-        Assertions.assertEquals(500000.0 / 3600.0, ucm.getInputSlotRate(3, false), 0.001);
-
         adapter.onAddonRemoved(ucm, oxidizer);
-        Assertions.assertEquals(3, ucm.getInputs().size());
+        Assertions.assertEquals(2, ucm.getInputs().size());
+        Assertions.assertEquals(fuel, ucm.getInputs().get(0));
         Assertions.assertEquals(GTCombustionHelper.LUBRICANT, ucm.getInputs().get(1).getId());
-        Assertions.assertEquals(GTCombustionHelper.DISTILLED_WATER, ucm.getInputs().get(2).getId());
 
         adapter.onMachineIconChanged(ucm, GTCombustionHelper.START_T1_COMBUSTION, GTCombustionHelper.LV_COMBUSTION_GENERATOR);
         Assertions.assertEquals(1, ucm.getInputs().size());

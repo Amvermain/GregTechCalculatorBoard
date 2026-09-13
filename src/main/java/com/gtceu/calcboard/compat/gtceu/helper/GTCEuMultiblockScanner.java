@@ -85,6 +85,9 @@ public class GTCEuMultiblockScanner {
             if (caps.supportsLaserHatch()) {
                 MultiblockDetector.registerLaserHatchMultiblock(id);
             }
+            if (caps.hasNativePerfectOverclock()) {
+                MultiblockDetector.registerPerfectOverclockMachine(id);
+            }
         }
 
         registerMachineRecipeCategories(id, def, caps);

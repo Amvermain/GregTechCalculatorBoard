@@ -4,6 +4,7 @@ import com.gtceu.calcboard.api.catalog.MachineAddon;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.compat.gtceu.GTCEuProperties;
 import com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper;
+import net.minecraft.resources.ResourceLocation;
 
 /**
  * Handles combustion engine addons (oxygen boost, coolant, oxidizers) installation and compatibility.
@@ -44,23 +45,20 @@ public final class GTCombustionAddonHelper {
         if (GTCombustionHelper.isExtremeCombustionEngine(node)) {
             return "gtceu:liquid_oxygen_boost".equals(id);
         }
-        if (GTCombustionHelper.isModularCombustionFrame(node)
-                || GTCombustionHelper.isStarTCombustionModule(node)
-                || GTCombustionHelper.isStarTRocketModule(node)) {
-            if (isCoolantAddon(addon)) {
-                return true;
-            }
+        if (GTCombustionHelper.isModularCombustionFrame(node)) {
+            return isCoolantAddon(addon);
         }
-        if (GTCombustionHelper.START_T1_COMBUSTION.equals(node.getMachineIcon())) {
+        ResourceLocation icon = node.getMachineIcon() != null ? node.getMachineIcon() : node.getMultiblockWorkstation();
+        if (GTCombustionHelper.START_T1_COMBUSTION.equals(icon)) {
             return "start_core:t1_oxidizer_boost".equals(id);
         }
-        if (GTCombustionHelper.START_T2_COMBUSTION.equals(node.getMachineIcon())) {
+        if (GTCombustionHelper.START_T2_COMBUSTION.equals(icon)) {
             return "start_core:t2_oxidizer_boost".equals(id);
         }
-        if (GTCombustionHelper.START_T3_COMBUSTION.equals(node.getMachineIcon())) {
+        if (GTCombustionHelper.START_T3_COMBUSTION.equals(icon)) {
             return "start_core:t3_oxidizer_boost".equals(id);
         }
-        if (GTCombustionHelper.START_T4_COMBUSTION.equals(node.getMachineIcon())) {
+        if (GTCombustionHelper.START_T4_COMBUSTION.equals(icon)) {
             return "start_core:t4_oxidizer_boost".equals(id);
         }
         return false;
@@ -76,9 +74,11 @@ public final class GTCombustionAddonHelper {
             node.getProperties().set(GTCEuProperties.LIQUID_OXYGEN_BOOST, true);
         } else if ("start_core:distilled_water_coolant".equals(id)) {
             node.getAddons().removeIf(GTCombustionAddonHelper::isCoolantAddon);
+            node.getProperties().set(GTCEuProperties.MCF_COOLANT_TYPE, "distilled_water");
             node.getProperties().set(GTCEuProperties.COMBUSTION_COOLANT_TYPE, "distilled_water");
         } else if ("start_core:deionized_water_coolant".equals(id)) {
             node.getAddons().removeIf(GTCombustionAddonHelper::isCoolantAddon);
+            node.getProperties().set(GTCEuProperties.MCF_COOLANT_TYPE, "deionized_water");
             node.getProperties().set(GTCEuProperties.COMBUSTION_COOLANT_TYPE, "deionized_water");
         } else if ("start_core:t1_oxidizer_boost".equals(id)) {
             node.getAddons().removeIf(GTCombustionAddonHelper::isOxidizerAddon);
@@ -93,6 +93,7 @@ public final class GTCombustionAddonHelper {
             node.getAddons().removeIf(GTCombustionAddonHelper::isOxidizerAddon);
             node.getProperties().set(GTCEuProperties.COMBUSTION_OXIDIZER_TYPE, "ferrocenium_superoxide");
         }
+        GTCombustionHelper.syncCombustionInputs(node);
     }
 
     public static void applyCombustionBoostRemoval(RecipeNode node, MachineAddon addon) {
@@ -102,6 +103,7 @@ public final class GTCombustionAddonHelper {
         } else if ("gtceu:liquid_oxygen_boost".equals(id)) {
             node.getProperties().set(GTCEuProperties.LIQUID_OXYGEN_BOOST, false);
         } else if ("start_core:distilled_water_coolant".equals(id) || "start_core:deionized_water_coolant".equals(id)) {
+            node.getProperties().set(GTCEuProperties.MCF_COOLANT_TYPE, "none");
             node.getProperties().set(GTCEuProperties.COMBUSTION_COOLANT_TYPE, "none");
         } else if ("start_core:t1_oxidizer_boost".equals(id)
                 || "start_core:t2_oxidizer_boost".equals(id)

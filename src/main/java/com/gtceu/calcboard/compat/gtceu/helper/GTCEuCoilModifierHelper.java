@@ -79,7 +79,7 @@ public final class GTCEuCoilModifierHelper {
         LCR_COIL_BENEFITS_FIELD = lcrField;
     }
 
-    private static boolean isStarTCoilReactor() {
+    public static boolean isStarTCoilReactor() {
         if (ModCompatHelper.isStarTLoaded() || StarTReflectionBridge.isStarTLoaded()) {
             return true;
         }

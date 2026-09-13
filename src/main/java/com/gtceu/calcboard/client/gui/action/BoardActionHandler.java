@@ -1,13 +1,17 @@
 package com.gtceu.calcboard.client.gui.action;
 
 import com.gtceu.calcboard.api.history.BoardCommand;
+import com.gtceu.calcboard.api.history.command.BatchChangeTierCommand;
 import com.gtceu.calcboard.api.model.CanvasGroupFrame;
 import com.gtceu.calcboard.api.model.CanvasStickyNote;
 import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.api.storage.BoardPage;
+import com.gtceu.calcboard.compat.gtceu.helper.EnergyHatchHelper;
 import com.gtceu.calcboard.api.solver.FixedPointEfficiencySolver;
+import com.gtceu.calcboard.api.spi.IModAdapter;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.type.SteamMode;
 import com.gtceu.calcboard.client.gui.BoardScreen;
@@ -35,9 +39,129 @@ public class BoardActionHandler {
 
     public void addNode(RecipeNode node) {
         if (!screen.ensureEditPermission()) return;
+        BoardPage activePage = BoardManager.getInstance().getActivePage();
+        NodeProvisioningPipeline.provision(node, activePage);
         screen.getGraph().addNode(node);
         screen.rebuildWidgets();
         TutorialManager.getInstance().onNodeAdded(node);
+    }
+
+    public void batchApplyPageTargetVoltage() {
+        if (!screen.ensureEditPermission()) return;
+        BoardPage activePage = BoardManager.getInstance().getActivePage();
+        if (activePage == null || activePage.getDefaultVoltageTier() == null) return;
+        GTVoltageTier targetTier = activePage.getDefaultVoltageTier();
+
+        List<BatchChangeTierCommand.NodeTierSnapshot> prevSnapshots = new ArrayList<>();
+        List<BatchChangeTierCommand.NodeTierSnapshot> newSnapshots = new ArrayList<>();
+
+        for (RecipeNode node : screen.getGraph().getNodes()) {
+            if (node.getEnergyType() != com.gtceu.calcboard.api.type.EnergyType.ELECTRIC_EU || node.isModule()) {
+                continue;
+            }
+            GTVoltageTier effectiveTier = resolveEffectiveTier(node, targetTier);
+            if (node.isMultiblock()) {
+                applyBatchMultiblock(node, effectiveTier, prevSnapshots, newSnapshots);
+            } else {
+                applyBatchSingleblock(node, effectiveTier, prevSnapshots, newSnapshots);
+            }
+        }
+
+        if (newSnapshots.isEmpty()) return;
+
+        screen.recordCommand(new BatchChangeTierCommand(prevSnapshots, newSnapshots, targetTier));
+        screen.rebuildWidgets();
+        screen.markSummaryDirty();
+        Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
+        BoardToast.show(Component.translatable("gui.gtcalcboard.page_settings.apply_success_toast", targetTier.getName(), newSnapshots.size()));
+    }
+
+    private static GTVoltageTier resolveEffectiveTier(RecipeNode node, GTVoltageTier targetTier) {
+        GTVoltageTier recipeTier = node.getRecipeTier();
+        GTVoltageTier effectiveTier = targetTier;
+        if (recipeTier != null && recipeTier.ordinal() > targetTier.ordinal()) {
+            effectiveTier = recipeTier;
+        }
+        if (!node.isMultiblock()) {
+            IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
+            if (adapter != null) {
+                effectiveTier = adapter.sanitizeTargetTier(node, effectiveTier);
+            }
+        }
+        return effectiveTier;
+    }
+
+    private static void applyBatchMultiblock(
+            RecipeNode node,
+            GTVoltageTier effectiveTier,
+            List<BatchChangeTierCommand.NodeTierSnapshot> prevSnapshots,
+            List<BatchChangeTierCommand.NodeTierSnapshot> newSnapshots
+    ) {
+        if (!isBatchApplicableMultiblock(node, effectiveTier)) return;
+
+        var prev = BatchChangeTierCommand.NodeTierSnapshot.of(node);
+        EnergyHatchHelper.installDefaultEnergyHatch(node, effectiveTier);
+        var next = BatchChangeTierCommand.NodeTierSnapshot.of(node);
+        prevSnapshots.add(prev);
+        newSnapshots.add(next);
+    }
+
+    private static void applyBatchSingleblock(
+            RecipeNode node,
+            GTVoltageTier effectiveTier,
+            List<BatchChangeTierCommand.NodeTierSnapshot> prevSnapshots,
+            List<BatchChangeTierCommand.NodeTierSnapshot> newSnapshots
+    ) {
+        if (node.getTargetTier() == effectiveTier) return;
+
+        var prev = BatchChangeTierCommand.NodeTierSnapshot.of(node);
+        node.setTargetTier(effectiveTier);
+        GTVoltageTier actualTier = node.getTargetTier() != null ? node.getTargetTier() : effectiveTier;
+        ResourceLocation ws = com.gtceu.calcboard.api.model.NodeWorkstationResolver.getWorkstationForTier(node, actualTier);
+        if (ws != null) {
+            node.setMachineIcon(ws);
+        }
+        node.markOverclockDirty();
+        var next = BatchChangeTierCommand.NodeTierSnapshot.of(node);
+        prevSnapshots.add(prev);
+        newSnapshots.add(next);
+    }
+
+    public static int countBatchApplicableNodes(FlowGraph graph, GTVoltageTier targetTier) {
+        if (graph == null || targetTier == null) return 0;
+        int count = 0;
+        for (RecipeNode node : graph.getNodes()) {
+            if (node.getEnergyType() != com.gtceu.calcboard.api.type.EnergyType.ELECTRIC_EU || node.isModule()) {
+                continue;
+            }
+            GTVoltageTier effectiveTier = resolveEffectiveTier(node, targetTier);
+            if (node.isMultiblock()) {
+                if (isBatchApplicableMultiblock(node, effectiveTier)) count++;
+            } else if (node.getTargetTier() != effectiveTier) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private static boolean isBatchApplicableMultiblock(RecipeNode node, GTVoltageTier effectiveTier) {
+        if (!com.gtceu.calcboard.compat.gtceu.handler.GTEnergyHatchCalculator.requiresEnergyHatch(node)) {
+            return false;
+        }
+        List<com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon> hatches = collectEnergyHatches(node);
+        boolean hasSpecialHatch = hatches.stream().anyMatch(h -> h.isLaser() || h.isSubstation() || h.getAmperage() > 2);
+        if (hasSpecialHatch) return false;
+        return hatches.size() != 1 || hatches.get(0).getTier() != effectiveTier;
+    }
+
+    private static List<com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon> collectEnergyHatches(RecipeNode node) {
+        List<com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon> hatches = new ArrayList<>();
+        for (com.gtceu.calcboard.api.catalog.MachineAddon a : node.getAddons()) {
+            if (a instanceof com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon h) {
+                hatches.add(h);
+            }
+        }
+        return hatches;
     }
 
     public void removeNode(NodeWidget widget) {
@@ -183,8 +307,9 @@ public class BoardActionHandler {
         SteamMode oldSteam = node.getSteamMode();
         GTVoltageTier oldTier = node.getTargetTier();
         String oldName = node.getName();
+        List<com.gtceu.calcboard.api.catalog.MachineAddon> oldAddons = new ArrayList<>(node.getAddons());
 
-        node.setMachineIcon(newWs);
+        com.gtceu.calcboard.api.model.NodeHardwareReconciler.reconcileForMachine(node, newWs);
         TutorialManager.getInstance().onMachineSwitched(node, newWs);
 
         String machineDisplayName = (newMachineDisplayName != null && !newMachineDisplayName.isBlank())
@@ -198,10 +323,14 @@ public class BoardActionHandler {
         }
 
         screen.recordCommand(new BoardCommand.SetMachineIconCommand(
-                node, oldIcon, newWs, oldMb, oldPar, oldSteam, oldTier, oldName, newName
+                node, oldIcon, newWs, oldMb, oldPar, oldSteam, oldTier, oldName, newName, oldAddons
         ));
         screen.markSummaryDirty();
         screen.rebuildWidgets();
+
+        if (screen.getMachineConfigDialog() != null && screen.getMachineConfigDialog().isVisible()) {
+            screen.getMachineConfigDialog().rebind(node);
+        }
 
         BoardToast.show(Component.literal("§b▦ ").append(Component.translatable("message.gtcalcboard.machine_switched", machineDisplayName)));
     }
@@ -233,6 +362,9 @@ public class BoardActionHandler {
             if (widget.getNode().getId().equals(targetNode.getId())) {
                 widget.invalidateCache();
             }
+        }
+        if (screen.getMachineConfigDialog() != null && screen.getMachineConfigDialog().isVisible()) {
+            screen.getMachineConfigDialog().rebind(targetNode);
         }
         BoardToast.show(Component.literal("§e⟲ ").append(Component.translatable("message.gtcalcboard.recipe_switched", targetNode.getName())));
     }

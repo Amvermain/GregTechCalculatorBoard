@@ -39,7 +39,8 @@ public class ArchitectureTest {
     public static final ArchRule domain_models_should_not_depend_on_concrete_compat =
         noClasses().that().resideInAnyPackage(
             "com.gtceu.calcboard.api.model..",
-            "com.gtceu.calcboard.api.solver.."
+            "com.gtceu.calcboard.api.solver..",
+            "com.gtceu.calcboard.api.history.."
         )
         .should().dependOnClassesThat().resideInAnyPackage(
             "com.gtceu.calcboard.compat.gtceu..",

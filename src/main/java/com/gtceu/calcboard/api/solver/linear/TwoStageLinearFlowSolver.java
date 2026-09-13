@@ -97,11 +97,7 @@ public final class TwoStageLinearFlowSolver {
             }
 
             for (RecipeNode reroute : net.reroutes) {
-                if (reroute.isFixedDrain() && reroute.getExternalDrainRate() > 0.0) {
-                    constant += reroute.getExternalDrainRate();
-                } else if (reroute.isExternalSupply() && reroute.getExternalSupplyRate() > 0.0) {
-                    constant -= reroute.getExternalSupplyRate();
-                }
+                constant += calculateRerouteNetConstant(reroute);
             }
 
             if (!coeffs.isEmpty()) {
@@ -110,8 +106,20 @@ public final class TwoStageLinearFlowSolver {
         }
     }
 
+    private static double calculateRerouteNetConstant(RecipeNode reroute) {
+        if (reroute == null || !reroute.isJunction()) return 0.0;
+        var junction = reroute.asJunction();
+        if (junction.isFixedDrain() && junction.getExternalDrainRate() > 0.0) {
+            return junction.getExternalDrainRate();
+        }
+        if (junction.isExternalSupply() && junction.getExternalSupplyRate() > 0.0) {
+            return -junction.getExternalSupplyRate();
+        }
+        return 0.0;
+    }
+
     private static void buildAnchorEquation(FlowGraph graph, RecipeNode anchor, LinearEquationSystem system) {
-        if (!anchor.isReroute()) {
+        if (anchor.isMachine() || anchor.isModule()) {
             double target = anchor.getMachineCount() > 0.0001 ? anchor.getMachineCount() : 1.0;
             system.addFixedAnchorEquation(anchor.getId(), target);
         }

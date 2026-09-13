@@ -54,8 +54,10 @@ public class BoardWidgetLayerRenderer {
             BoardTooltipRenderer.renderTooltips(screen, graphics, screen.getMinecraftFont(), mouseX, mouseY);
             screen.getFavoritesDockWidget().renderTooltips(graphics, screen.getMinecraftFont(), mouseX, mouseY);
             screen.getWorkspaceTabBar().renderTooltips(graphics, screen.getMinecraftFont(), mouseX, mouseY);
+            screen.getPageTabBar().renderTooltips(graphics, screen.getMinecraftFont(), mouseX, mouseY);
             screen.getLeftActivityBar().renderTooltips(graphics, screen.getMinecraftFont(), mouseX, mouseY);
             screen.getSelectionToolbarWidget().renderTooltips(graphics, screen.getMinecraftFont(), mouseX, mouseY);
+            screen.getNodeInspectorPanel().renderTooltips(graphics, screen.getMinecraftFont(), mouseX, mouseY);
         } else if (mouseX >= 0 && mouseX <= LeftActivityBarWidget.BAR_WIDTH) {
             graphics.flush();
             RenderSystem.clear(GL11.GL_DEPTH_BUFFER_BIT, Minecraft.ON_OSX);

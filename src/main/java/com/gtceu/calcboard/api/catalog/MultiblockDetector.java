@@ -34,6 +34,7 @@ public class MultiblockDetector {
     private static final Set<ResourceLocation> COIL_PARALLEL_CONTROLLERS = ConcurrentHashMap.newKeySet();
     private static final Set<ResourceLocation> PARALLEL_HATCH_CONTROLLERS = ConcurrentHashMap.newKeySet();
     private static final Set<ResourceLocation> LASER_HATCH_CONTROLLERS = ConcurrentHashMap.newKeySet();
+    private static final Set<ResourceLocation> PERFECT_OVERCLOCK_MACHINES = ConcurrentHashMap.newKeySet();
     private static final Set<ResourceLocation> STEAM_MULTIBLOCKS = ConcurrentHashMap.newKeySet();
     private static final Map<ResourceLocation, Double> STEAM_MULTIBLOCK_CONSUMPTIONS = new ConcurrentHashMap<>();
     private static final Map<ResourceLocation, Integer> THREADING_MAX_HELIX_CAPACITY = new ConcurrentHashMap<>();
@@ -253,6 +254,36 @@ public class MultiblockDetector {
         }
     }
 
+    public static void registerPerfectOverclockMachine(ResourceLocation controllerId) {
+        if (controllerId != null) {
+            PERFECT_OVERCLOCK_MACHINES.add(controllerId);
+        }
+    }
+
+    public static void unregisterPerfectOverclockMachine(ResourceLocation controllerId) {
+        if (controllerId != null) {
+            PERFECT_OVERCLOCK_MACHINES.remove(controllerId);
+        }
+    }
+
+    public static boolean isPerfectOverclockMachine(ResourceLocation id) {
+        if (id == null) return false;
+        ensureInitialized();
+        if (PERFECT_OVERCLOCK_MACHINES.contains(id)) return true;
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForMod(id.getNamespace());
+        return adapter != null && adapter.hasNativePerfectOverclock(id);
+    }
+
+    public static void registerBaselinePerfectOverclockMachines() {
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForMod("gtceu");
+        if (adapter != null) {
+            ResourceLocation lcr = ResourceLocation.tryParse("gtceu:large_chemical_reactor");
+            if (lcr != null && adapter.hasNativePerfectOverclock(lcr)) {
+                registerPerfectOverclockMachine(lcr);
+            }
+        }
+    }
+
     public static void registerDefaultParallel(ResourceLocation controllerId, int defaultParallel) {
         if (controllerId != null && defaultParallel > 1) {
             DEFAULT_MULTIBLOCK_PARALLELS.put(controllerId, defaultParallel);
@@ -293,6 +324,7 @@ public class MultiblockDetector {
             initializing = true;
             try {
                 registerBaselineTurbines();
+                registerBaselinePerfectOverclockMachines();
                 initializeStructureCatalog();
                 scanEmiMultiblockRecipes(rmObj);
                 scanAdapterMultiblocks(rmObj);
@@ -345,10 +377,15 @@ public class MultiblockDetector {
         OVERPRESSURE_CONTROLLERS.clear();
         PARALLEL_HATCH_CONTROLLERS.clear();
         LASER_HATCH_CONTROLLERS.clear();
+        PERFECT_OVERCLOCK_MACHINES.clear();
         STEAM_MULTIBLOCKS.clear();
         STEAM_MULTIBLOCK_CONSUMPTIONS.clear();
         THREADING_MAX_HELIX_CAPACITY.clear();
         initialize(rmObj);
+    }
+
+    public static boolean isInitialized() {
+        return initialized;
     }
 
     private static void ensureInitialized() {
