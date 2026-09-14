@@ -228,6 +228,24 @@ dependencies {
     testImplementation 'com.tngtech.archunit:archunit-junit5:1.3.0'
 }
 
+// A small stdlib-only worker keeps AWT out of Minecraft's forced-headless JVM.
+sourceSets {
+    clipboard
+}
+
+def clipboardJar = tasks.register('clipboardJar', Jar) {
+    from sourceSets.clipboard.output
+    archiveFileName = 'gtcalcboard-clipboard.jar'
+    destinationDirectory = layout.buildDirectory.dir('clipboard-helper')
+    manifest { attributes 'Main-Class': 'com.gtceu.calcboard.clipboard.ClipboardWorker' }
+}
+tasks.named('processResources') {
+    from(clipboardJar)
+}
+dependencies {
+    testImplementation sourceSets.clipboard.output
+}
+
 test {
     useJUnitPlatform()
 }

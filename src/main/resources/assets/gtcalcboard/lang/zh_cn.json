@@ -1,4 +1,12 @@
 {
+  "gui.gtcalcboard.png.copy": "将产线复制为 PNG",
+  "gui.gtcalcboard.png.working": "正在以 2 倍分辨率渲染完整产线…",
+  "gui.gtcalcboard.png.busy": "正在复制产线图像，请稍候。",
+  "gui.gtcalcboard.png.copied": "已复制产线图像（%s × %s 像素）。",
+  "gui.gtcalcboard.png.empty": "此页面没有可复制的产线。",
+  "gui.gtcalcboard.png.too_large": "产线过大，无法清晰导出（超过 GPU 限制或 1600 万像素）。请将其拆分到多个页面。",
+  "gui.gtcalcboard.png.failed": "无法导出产线图像。详情请查看日志。",
+  "gui.gtcalcboard.png.saved": "图像剪贴板不可用。PNG 已保存至：%s",
   "key.categories.gtcalcboard": "GregTech 产线计算板",
   "key.gtcalcboard.open_board": "打开产线计算板",
   "key.gtcalcboard.add_recipe_to_board": "将配方添加到产线计算板",

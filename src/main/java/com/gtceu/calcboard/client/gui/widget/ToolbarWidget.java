@@ -344,6 +344,7 @@ public class ToolbarWidget {
     }
 
     private void populateIoDropdown() {
+        currentDropdownItems.add(new DropdownItem(Component.translatable("gui.gtcalcboard.png.copy").getString(), null, screen::copyFlowAsPng));
         currentDropdownItems.add(new DropdownItem("» " + Component.translatable("gui.gtcalcboard.export").getString(), "Ctrl+C", this::copyBlueprintToClipboard));
         currentDropdownItems.add(new DropdownItem("« " + Component.translatable("gui.gtcalcboard.import").getString(), "Ctrl+V", this::importBlueprintFromClipboard));
 

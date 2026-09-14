@@ -78,7 +78,7 @@ public class NodeCardRenderer {
 
         boolean isModalOpen = (Minecraft.getInstance().screen instanceof BoardScreen bs) && bs.isAnyModalOpen();
         double zoom = (Minecraft.getInstance().screen instanceof BoardScreen bs) ? bs.getZoom() : BoardScreen.lastZoom;
-        if (isModalOpen || zoom < 0.28) {
+        if (!ExportRenderScope.isActive() && (isModalOpen || zoom < 0.28)) {
             renderLOD(widget, graphics, font, x, y, cardW, height, node);
             return;
         }
@@ -87,8 +87,8 @@ public class NodeCardRenderer {
         boolean isOperational = node.isOperational(graph);
 
         boolean isCardHovered = mouseX >= x && mouseX <= x + cardW && mouseY >= y && mouseY <= y + height;
-        int activeMouseX = isCardHovered ? mouseX : -9999;
-        int activeMouseY = isCardHovered ? mouseY : -9999;
+        int activeMouseX = ExportRenderScope.isActive() ? Integer.MIN_VALUE : (isCardHovered ? mouseX : -9999);
+        int activeMouseY = ExportRenderScope.isActive() ? Integer.MIN_VALUE : (isCardHovered ? mouseY : -9999);
 
         int titleX = (node.getMachineIcon() != null) ? (x + 22) : (x + 6);
         int headerBtnMargin = node.isModule() ? 76 : 58;
@@ -120,7 +120,7 @@ public class NodeCardRenderer {
 
         renderPortRows(widget, graphics, font, node, x, cardW, bounds.getContentStartY(), isCardHovered, mouseX, mouseY, textCache);
         renderHiddenPorts(widget, graphics, font, node, x, y, cardW, height, isCardHovered, mouseX, mouseY);
-        renderResizeHandle(widget, graphics, font, x, y, cardW, height, isCardHovered, mouseX, mouseY);
+        if (!ExportRenderScope.isActive()) renderResizeHandle(widget, graphics, font, x, y, cardW, height, isCardHovered, mouseX, mouseY);
     }
 
     private static void renderCardBackground(NodeWidget widget, GuiGraphics graphics, RecipeNode node, int x, int y, int cardW, int height, boolean isOperational, int activeMouseX, int activeMouseY) {
@@ -142,7 +142,7 @@ public class NodeCardRenderer {
     private static void renderCardOutline(GuiGraphics graphics, RecipeNode node, int x, int y, int cardW, int height, boolean isOperational, NodeCardTextCache textCache) {
         boolean isSelected = false;
         if (Minecraft.getInstance().screen instanceof BoardScreen bs) {
-            isSelected = bs.isNodeSelected(node.getId());
+            isSelected = !ExportRenderScope.isActive() && bs.isNodeSelected(node.getId());
         }
 
         boolean isStarved = false;
@@ -273,7 +273,7 @@ public class NodeCardRenderer {
     private static void renderTargetButton(NodeWidget widget, GuiGraphics graphics, Font font, RecipeNode node, int x, int y, int cardW, int activeMouseX, int activeMouseY) {
         int targetX = x + cardW - 36;
         int targetY = y + 2;
-        boolean isTargetGlowing = TutorialManager.getInstance().isNodeBaseTargetButtonGlowing(node.getId());
+        boolean isTargetGlowing = !ExportRenderScope.isActive() && TutorialManager.getInstance().isNodeBaseTargetButtonGlowing(node.getId());
         boolean targetHover = widget.isTargetButtonHovered(activeMouseX, activeMouseY);
         int targetBg = node.isBaseNode() ? 0xFF886600 : (isTargetGlowing ? TutorialManager.getGlowBgColor(0xFF222834) : (targetHover ? 0xFF3A4456 : 0xFF222834));
         int targetBorder = node.isBaseNode() ? 0xFFFFD700 : (isTargetGlowing ? TutorialManager.getGlowBorderColor(0xFF4A5568) : (targetHover ? 0xFF88AAFF : 0xFF4A5568));
@@ -288,7 +288,7 @@ public class NodeCardRenderer {
     private static void renderCloseButton(NodeWidget widget, GuiGraphics graphics, Font font, RecipeNode node, int x, int y, int cardW, int activeMouseX, int activeMouseY) {
         int closeX = x + cardW - 18;
         int closeY = y + 2;
-        boolean isCloseGlowing = TutorialManager.getInstance().isNodeCloseButtonGlowing(node.getId());
+        boolean isCloseGlowing = !ExportRenderScope.isActive() && TutorialManager.getInstance().isNodeCloseButtonGlowing(node.getId());
         boolean closeHover = widget.isCloseButtonHovered(activeMouseX, activeMouseY);
         int closeBg = (closeHover || isCloseGlowing) ? 0xFFFF4444 : 0x44FF4444;
         graphics.fill(closeX, closeY, closeX + 16, closeY + 16, closeBg);
@@ -396,7 +396,7 @@ public class NodeCardRenderer {
 
         if (!node.isModule()) {
             var guiHandler = com.gtceu.calcboard.client.gui.compat.ModGuiHandlerRegistry.getHandlerForNode(node);
-            boolean isGlowing = TutorialManager.getInstance().isMachineConfigButtonGlowing(node.getId());
+            boolean isGlowing = !ExportRenderScope.isActive() && TutorialManager.getInstance().isMachineConfigButtonGlowing(node.getId());
             guiHandler.renderCardControls(widget, graphics, font, node, x, row2Y, cardW, activeMouseX, activeMouseY, isGlowing);
         }
 
@@ -444,8 +444,8 @@ public class NodeCardRenderer {
         int inPortY = rowY + 5;
         NodeCardTextCache.PortText left = textCache.getLeftPortTexts().get(r);
 
-        boolean isPortGlowing = TutorialManager.getInstance().isPortGlowing(node.getId(), true, inOrigIdx);
-        boolean isPortSelected = (Minecraft.getInstance().screen instanceof BoardScreen bs && bs.isPortSelected(node.getId(), true, inOrigIdx));
+        boolean isPortGlowing = !ExportRenderScope.isActive() && TutorialManager.getInstance().isPortGlowing(node.getId(), true, inOrigIdx);
+        boolean isPortSelected = !ExportRenderScope.isActive() && (Minecraft.getInstance().screen instanceof BoardScreen bs && bs.isPortSelected(node.getId(), true, inOrigIdx));
         if (isPortSelected) {
             boolean hasBoth = !inputs.isEmpty() && !outputs.isEmpty();
             int slotW = hasBoth ? ((cardW / 2) - 4) : (cardW - 4);
@@ -475,8 +475,8 @@ public class NodeCardRenderer {
         int outPortY = rowY + 5;
         NodeCardTextCache.PortText left = textCache.getLeftPortTexts().get(r);
 
-        boolean isPortGlowing = TutorialManager.getInstance().isPortGlowing(node.getId(), false, outOrigIdx);
-        boolean isPortSelected = (Minecraft.getInstance().screen instanceof BoardScreen bs && bs.isPortSelected(node.getId(), false, outOrigIdx));
+        boolean isPortGlowing = !ExportRenderScope.isActive() && TutorialManager.getInstance().isPortGlowing(node.getId(), false, outOrigIdx);
+        boolean isPortSelected = !ExportRenderScope.isActive() && (Minecraft.getInstance().screen instanceof BoardScreen bs && bs.isPortSelected(node.getId(), false, outOrigIdx));
         if (isPortSelected) {
             boolean hasBoth = !inputs.isEmpty() && !outputs.isEmpty();
             int slotW = hasBoth ? ((cardW / 2) - 4) : (cardW - 4);
@@ -506,8 +506,8 @@ public class NodeCardRenderer {
         int outPortY = rowY + 5;
         NodeCardTextCache.PortText right = textCache.getRightPortTexts().get(r);
 
-        boolean isPortGlowing = TutorialManager.getInstance().isPortGlowing(node.getId(), false, outOrigIdx);
-        boolean isPortSelected = (Minecraft.getInstance().screen instanceof BoardScreen bs && bs.isPortSelected(node.getId(), false, outOrigIdx));
+        boolean isPortGlowing = !ExportRenderScope.isActive() && TutorialManager.getInstance().isPortGlowing(node.getId(), false, outOrigIdx);
+        boolean isPortSelected = !ExportRenderScope.isActive() && (Minecraft.getInstance().screen instanceof BoardScreen bs && bs.isPortSelected(node.getId(), false, outOrigIdx));
         if (isPortSelected) {
             boolean hasBoth = !inputs.isEmpty() && !outputs.isEmpty();
             int slotW = hasBoth ? ((cardW / 2) - 4) : (cardW - 4);
@@ -538,8 +538,8 @@ public class NodeCardRenderer {
         int inPortY = rowY + 5;
         NodeCardTextCache.PortText right = textCache.getRightPortTexts().get(r);
 
-        boolean isPortGlowing = TutorialManager.getInstance().isPortGlowing(node.getId(), true, inOrigIdx);
-        boolean isPortSelected = (Minecraft.getInstance().screen instanceof BoardScreen bs && bs.isPortSelected(node.getId(), true, inOrigIdx));
+        boolean isPortGlowing = !ExportRenderScope.isActive() && TutorialManager.getInstance().isPortGlowing(node.getId(), true, inOrigIdx);
+        boolean isPortSelected = !ExportRenderScope.isActive() && (Minecraft.getInstance().screen instanceof BoardScreen bs && bs.isPortSelected(node.getId(), true, inOrigIdx));
         if (isPortSelected) {
             boolean hasBoth = !inputs.isEmpty() && !outputs.isEmpty();
             int slotW = hasBoth ? ((cardW / 2) - 4) : (cardW - 4);
@@ -706,7 +706,7 @@ public class NodeCardRenderer {
         RecipeNode node = widget.getNode();
         boolean isSelected = false;
         if (Minecraft.getInstance().screen instanceof BoardScreen bs) {
-            isSelected = bs.isNodeSelected(node.getId());
+            isSelected = !ExportRenderScope.isActive() && bs.isNodeSelected(node.getId());
         }
         boolean isHovered = widget.isPointInside(mouseX, mouseY);
         boolean isFlipped = node.isFlipped();
@@ -915,7 +915,7 @@ public class NodeCardRenderer {
             int mouseX,
             int mouseY
     ) {
-        boolean isSelected = (Minecraft.getInstance().screen instanceof BoardScreen bs) && bs.isNodeSelected(pin.getId());
+        boolean isSelected = !ExportRenderScope.isActive() && (Minecraft.getInstance().screen instanceof BoardScreen bs) && bs.isNodeSelected(pin.getId());
         boolean isHovered = widget.isPointInside(mouseX, mouseY);
         boolean isInput = pin.getDirection() == BoundaryPinNode.PinDirection.INPUT;
         boolean isFlipped = pin.isFlipped();

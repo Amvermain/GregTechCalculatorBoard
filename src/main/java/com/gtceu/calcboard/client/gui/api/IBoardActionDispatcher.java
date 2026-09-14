@@ -71,6 +71,8 @@ public interface IBoardActionDispatcher {
 
     void fitToView();
 
+    void copyFlowAsPng();
+
     boolean scaleLoopToSteadyState(String targetNodeId);
 
     void openModuleSubPage(RecipeNode moduleNode);
