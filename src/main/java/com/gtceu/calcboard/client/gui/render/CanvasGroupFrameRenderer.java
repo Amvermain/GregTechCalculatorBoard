@@ -189,7 +189,7 @@ public class CanvasGroupFrameRenderer {
 
         // [▦ Collapse to Module]
         boolean colHover = isMouseOver(mouseX, mouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE);
-        boolean isColGlowing = com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().isFrameCollapseButtonGlowing(frame.getId());
+        boolean isColGlowing = !ExportRenderScope.isActive() && com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().isFrameCollapseButtonGlowing(frame.getId());
         drawIconButton(graphics, font, "▦", curBtnX, btnY, BTN_SIZE, BTN_SIZE, colHover, 0xFF60A5FA, 0x553B82F6, isColGlowing);
         curBtnX -= (BTN_SIZE + BTN_SPACING);
 
@@ -217,7 +217,7 @@ public class CanvasGroupFrameRenderer {
         drawCornerGrip(graphics, x, y, borderCol, false, false);
         drawCornerGrip(graphics, x + w, y, borderCol, true, false);
         drawCornerGrip(graphics, x, y + h, borderCol, false, true);
-        drawResizeGrip(graphics, x + w - 12, y + h - 12, borderCol);
+        if (!ExportRenderScope.isActive()) drawResizeGrip(graphics, x + w - 12, y + h - 12, borderCol);
 
         ResizeDirection hoverDir = getResizeDirection(frame, mouseX, mouseY);
         if (hoverDir != ResizeDirection.NONE) {
@@ -536,7 +536,7 @@ public class CanvasGroupFrameRenderer {
             boolean isSelected
     ) {
         int targetW = (int) Math.max(frame.getWidth(), CanvasGroupFrame.MIN_SHARED_FRAME_WIDTH);
-        if (frame.getWidth() < targetW) {
+        if (!ExportRenderScope.isActive() && frame.getWidth() < targetW) {
             frame.setWidth(targetW);
         }
         int x = (int) frame.getPosX();
@@ -547,7 +547,7 @@ public class CanvasGroupFrameRenderer {
         FlowGraphTopologyAnalyzer.FoldedPortSummary summary = FlowGraphTopologyAnalyzer.aggregateFoldedPorts(graph, frame);
         int portRows = summary.maxPortCount();
         int cardH = 64 + Math.max(portRows, 1) * 18 + 6;
-        if (Math.abs(frame.getHeight() - cardH) > 0.5) {
+        if (!ExportRenderScope.isActive() && Math.abs(frame.getHeight() - cardH) > 0.5) {
             frame.setHeight(cardH);
         }
         int h = cardH;

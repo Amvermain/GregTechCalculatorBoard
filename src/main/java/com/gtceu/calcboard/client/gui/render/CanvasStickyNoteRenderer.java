@@ -99,7 +99,7 @@ public class CanvasStickyNoteRenderer {
         }
 
         // 6. Resize Grip
-        drawResizeGrip(graphics, x + w - 10, y + h - 10, borderCol);
+        if (!ExportRenderScope.isActive()) drawResizeGrip(graphics, x + w - 10, y + h - 10, borderCol);
     }
 
     public static void renderNoteTooltips(GuiGraphics graphics, Font font, FlowGraph graph, double canvasMouseX, double canvasMouseY, int mouseX, int mouseY) {

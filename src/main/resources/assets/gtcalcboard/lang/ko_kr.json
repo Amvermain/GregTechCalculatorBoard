@@ -1,4 +1,12 @@
 {
+  "gui.gtcalcboard.png.copy": "흐름도를 PNG로 복사",
+  "gui.gtcalcboard.png.working": "전체 흐름도를 2배 해상도로 렌더링하는 중…",
+  "gui.gtcalcboard.png.busy": "이미 흐름도 이미지를 복사하고 있습니다.",
+  "gui.gtcalcboard.png.copied": "흐름도 이미지를 복사했습니다 (%s × %s 픽셀).",
+  "gui.gtcalcboard.png.empty": "이 페이지에는 복사할 흐름도가 없습니다.",
+  "gui.gtcalcboard.png.too_large": "흐름도가 너무 커서 선명하게 내보낼 수 없습니다 (GPU 제한 또는 1,600만 픽셀 초과). 여러 페이지로 나누세요.",
+  "gui.gtcalcboard.png.failed": "흐름도 이미지를 내보내지 못했습니다. 자세한 내용은 로그를 확인하세요.",
+  "gui.gtcalcboard.png.saved": "이미지 클립보드를 사용할 수 없습니다. PNG 저장 위치: %s",
   "key.categories.gtcalcboard": "그렉텍 계산기 보드",
   "key.gtcalcboard.open_board": "계산기 보드 열기",
   "key.gtcalcboard.add_recipe_to_board": "계산기 보드에 레시피 추가",

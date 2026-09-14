@@ -171,6 +171,8 @@ public class BoardScreenContextDecouplingTest {
         @Override public void groupNodesIntoModule(Set<String> targetNodeIds, String moduleName, CanvasGroupFrame primaryFrame) {}
         @Override public void collapseFrameIntoModule(CanvasGroupFrame frame) {}
         @Override public void bringNodeToFront(RecipeNode node) {}
+        @Override public void copyFlowAsPng() {}
+
         @Override public void fitToView() {}
         @Override public boolean scaleLoopToSteadyState(String targetNodeId) { return false; }
         @Override public void openModuleSubPage(RecipeNode moduleNode) {}

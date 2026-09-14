@@ -7,6 +7,7 @@ import com.gtceu.calcboard.api.solver.FlowGraphTopologyAnalyzer;
 import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.client.gui.BoardScreen;
 import com.gtceu.calcboard.client.gui.render.ConnectionRenderer;
+import com.gtceu.calcboard.client.gui.render.ExportRenderScope;
 import com.gtceu.calcboard.client.gui.render.ParticleBatchingEngine;
 import com.gtceu.calcboard.client.gui.render.WireSpatialIndex;
 import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
@@ -60,6 +61,11 @@ public class CanvasWireRenderer {
     ) {}
 
     public static ResolvedWireEndpoints resolveWireEndpoints(FlowGraph graph, BoardScreen screen, FlowGraph.ConnectionEdge edge) {
+        return resolveWireEndpointsForWidgets(graph, n -> screen != null ? screen.findWidgetForNode(n) : null, edge);
+    }
+
+    public static ResolvedWireEndpoints resolveWireEndpointsForWidgets(FlowGraph graph,
+            java.util.function.Function<RecipeNode, NodeWidget> widgets, FlowGraph.ConnectionEdge edge) {
         RecipeNode fromNode = graph.findNodeById(edge.fromNodeId());
         RecipeNode toNode = graph.findNodeById(edge.toNodeId());
         if (fromNode == null || toNode == null) return null;
@@ -80,7 +86,7 @@ public class CanvasWireRenderer {
             y1 = (float) (fromFolded.getPosY() + 64.0 + outIdx * 18.0 + 8.0);
             fromDirX = 1.0f;
         } else {
-            NodeWidget fromWidget = screen != null ? screen.findWidgetForNode(fromNode) : null;
+            NodeWidget fromWidget = widgets.apply(fromNode);
             if (fromWidget != null) {
                 x1 = fromWidget.getOutputPortX(edge.outputIndex());
                 y1 = fromWidget.getOutputPortY(edge.outputIndex());
@@ -103,7 +109,7 @@ public class CanvasWireRenderer {
             y2 = (float) (toFolded.getPosY() + 64.0 + inIdx * 18.0 + 8.0);
             toDirX = -1.0f;
         } else {
-            NodeWidget toWidget = screen != null ? screen.findWidgetForNode(toNode) : null;
+            NodeWidget toWidget = widgets.apply(toNode);
             if (toWidget != null) {
                 x2 = toWidget.getInputPortX(edge.inputIndex());
                 y2 = toWidget.getInputPortY(edge.inputIndex());
@@ -135,15 +141,23 @@ public class CanvasWireRenderer {
                             double canvasMouseX, double canvasMouseY,
                             double screenLeft, double screenRight, double screenTop, double screenBottom,
                             double zoom) {
-        updateSpatialIndex(screen, graph);
+        renderWires(graphics, screen, graph, canvasMouseX, canvasMouseY, screenLeft, screenRight,
+                screenTop, screenBottom, zoom, screen::findWidgetForNode);
+    }
 
-        FlowGraph.ConnectionEdge hoveredEdge = findHoveredWire(canvasMouseX, canvasMouseY, 6.0);
+    public void renderWires(GuiGraphics graphics, BoardScreen screen, FlowGraph graph,
+                            double canvasMouseX, double canvasMouseY,
+                            double screenLeft, double screenRight, double screenTop, double screenBottom,
+                            double zoom, java.util.function.Function<RecipeNode, NodeWidget> widgets) {
+        boolean exporting = ExportRenderScope.isActive();
+        if (!exporting) updateSpatialIndex(screen, graph);
+        FlowGraph.ConnectionEdge hoveredEdge = exporting ? null : findHoveredWire(canvasMouseX, canvasMouseY, 6.0);
 
         ConnectionRenderer.beginBatch(graphics);
         visibleWiresBuffer.clear();
         List<WirePriorityBadge> priorityBadges = new ArrayList<>();
         for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
-            ResolvedWireEndpoints pts = resolveWireEndpoints(graph, screen, edge);
+            ResolvedWireEndpoints pts = resolveWireEndpointsForWidgets(graph, widgets, edge);
             if (pts == null || pts.isInternalCull()) continue;
 
             float x1 = pts.x1();
@@ -174,7 +188,7 @@ public class CanvasWireRenderer {
 
             float satRatio = calculateSaturationRatio(graph, toNode, edge.inputIndex());
             boolean isHovered = edge.equals(hoveredEdge);
-            boolean isWireGlowing = TutorialManager.getInstance().isWireGlowing(fromNode.getId(), toNode.getId());
+            boolean isWireGlowing = !exporting && TutorialManager.getInstance().isWireGlowing(fromNode.getId(), toNode.getId());
             int defWireColor = BoardManager.getInstance().getWireColor();
             int matchedWireColor = BoardManager.getInstance().getMatchedWireColor();
             WireStyle wireStyle = resolveWireStyle(isHovered, isWireGlowing, satRatio, defWireColor, matchedWireColor);
@@ -196,7 +210,7 @@ public class CanvasWireRenderer {
 
         // Render Active Wire Dragging (Single or Multi-Port Bundle)
         var canvasHandler = screen.getCanvasHandler();
-        NodeWidget wireStart = canvasHandler.getWireStartNode();
+        NodeWidget wireStart = exporting ? null : canvasHandler.getWireStartNode();
         if (wireStart != null) {
             int matchedColor = BoardManager.getInstance().getMatchedWireColor();
             int dragWireColor = Screen.hasShiftDown() ? 0xFFFFD700 : matchedColor;
@@ -241,7 +255,7 @@ public class CanvasWireRenderer {
 
         // Draw animated flow pulse dots (Single-batch GPU rendering)
         var animMode = BoardManager.getInstance().getWireAnimationMode();
-        if (zoom >= 0.28 && animMode != com.gtceu.calcboard.api.type.WireAnimationMode.DISABLED) {
+        if (!exporting && zoom >= 0.28 && animMode != com.gtceu.calcboard.api.type.WireAnimationMode.DISABLED) {
             ConnectionRenderer.renderPulseDotsBatch(graphics, visibleWiresBuffer, animMode);
         }
 

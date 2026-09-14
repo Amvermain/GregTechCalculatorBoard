@@ -210,4 +210,3 @@ This project was developed through pair programming between the maintainer and a
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details.
-

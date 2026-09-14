@@ -1,4 +1,12 @@
 {
+  "gui.gtcalcboard.png.copy": "Copy flow as PNG",
+  "gui.gtcalcboard.png.working": "Rendering full flow at 2× resolution…",
+  "gui.gtcalcboard.png.busy": "A flow image is already being copied.",
+  "gui.gtcalcboard.png.copied": "Flow image copied (%s × %s pixels).",
+  "gui.gtcalcboard.png.empty": "This page has no flow to copy.",
+  "gui.gtcalcboard.png.too_large": "Flow is too large to export clearly (GPU limit or 16 megapixels). Split it into smaller pages.",
+  "gui.gtcalcboard.png.failed": "Could not export the flow image. See the log for details.",
+  "gui.gtcalcboard.png.saved": "Image clipboard unavailable. PNG saved to: %s",
   "key.categories.gtcalcboard": "GregTech Calculator Board",
   "key.gtcalcboard.open_board": "Open Calculator Board",
   "key.gtcalcboard.add_recipe_to_board": "Add Recipe to Calculator Board",

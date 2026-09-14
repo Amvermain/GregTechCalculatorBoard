@@ -284,6 +284,11 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> implements I
 
         if (showDebug) profiler.startSection("Summary Solver");
         updateGraphSummaryIfDirty();
+        if (pngCaptureRequested) {
+            pngCaptureRequested = false;
+            graphics.flush();
+            com.gtceu.calcboard.client.gui.export.FlowPngExporter.capture(this);
+        }
 
         graphics.pose().pushPose();
         viewportTransform.applyPose(graphics.pose());
@@ -569,6 +574,15 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> implements I
     public void undo() { actionHandler.undo(); }
     public void redo() { actionHandler.redo(); }
     public void fitToView() { actionHandler.fitToView(); }
+
+    private boolean pngCaptureRequested;
+
+    @Override
+    public void copyFlowAsPng() {
+        com.gtceu.calcboard.client.gui.export.FlowPngExporter.request(this);
+    }
+
+    public void requestPngCapture() { pngCaptureRequested = true; }
 
     public BoardDialogManager getDialogManager() { return dialogManager; }
     public BoardCanvasRenderer getCanvasRenderer() { return canvasRenderer; }

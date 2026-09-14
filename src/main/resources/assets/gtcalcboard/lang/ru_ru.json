@@ -1,4 +1,12 @@
 {
+  "gui.gtcalcboard.png.copy": "Копировать схему как PNG",
+  "gui.gtcalcboard.png.working": "Создание изображения всей схемы в масштабе 2×…",
+  "gui.gtcalcboard.png.busy": "Изображение схемы уже копируется.",
+  "gui.gtcalcboard.png.copied": "Изображение схемы скопировано (%s × %s пикселей).",
+  "gui.gtcalcboard.png.empty": "На этой странице нет схемы для копирования.",
+  "gui.gtcalcboard.png.too_large": "Схема слишком велика для чёткого экспорта (ограничение GPU или 16 мегапикселей). Разделите её на несколько страниц.",
+  "gui.gtcalcboard.png.failed": "Не удалось экспортировать изображение схемы. Подробности в журнале.",
+  "gui.gtcalcboard.png.saved": "Буфер обмена изображениями недоступен. PNG сохранён: %s",
   "key.categories.gtcalcboard": "Вычислительная доска GregTech",
   "key.gtcalcboard.open_board": "Открыть вычислительную доску",
   "key.gtcalcboard.add_recipe_to_board": "Добавить рецепт на вычислительную доску",
