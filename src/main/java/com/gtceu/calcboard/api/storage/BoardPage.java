@@ -5,6 +5,8 @@ import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.model.IngredientStack;
 
+import com.gtceu.calcboard.api.type.GTVoltageTier;
+
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.ItemStack;
 
@@ -25,6 +27,8 @@ public class BoardPage {
     private PageType pageType = PageType.STANDARD;
     private String parentPageId = "";
     private String parentModuleNodeId = "";
+    private GTVoltageTier defaultVoltageTier = null;
+    private boolean autoEquipEnergyHatches = true;
 
     private final FlowGraph graph;
     private double panX = 40.0;
@@ -186,6 +190,58 @@ public class BoardPage {
         this.zoom = Math.max(0.2, Math.min(3.0, zoom));
     }
 
+    public GTVoltageTier getDefaultVoltageTier() {
+        return defaultVoltageTier;
+    }
+
+    public void setDefaultVoltageTier(GTVoltageTier defaultVoltageTier) {
+        this.defaultVoltageTier = defaultVoltageTier;
+    }
+
+    public void cycleVoltageTier(boolean forward) {
+        GTVoltageTier[] tiers = GTVoltageTier.values();
+        if (forward) {
+            if (defaultVoltageTier == null) {
+                defaultVoltageTier = GTVoltageTier.ULV;
+            } else {
+                int nextOrdinal = defaultVoltageTier.ordinal() + 1;
+                defaultVoltageTier = (nextOrdinal < tiers.length) ? tiers[nextOrdinal] : null;
+            }
+        } else {
+            if (defaultVoltageTier == null) {
+                defaultVoltageTier = tiers[tiers.length - 1];
+            } else {
+                int prevOrdinal = defaultVoltageTier.ordinal() - 1;
+                defaultVoltageTier = (prevOrdinal >= 0) ? tiers[prevOrdinal] : null;
+            }
+        }
+    }
+
+    public boolean isAutoEquipEnergyHatches() {
+        return autoEquipEnergyHatches;
+    }
+
+    public void setAutoEquipEnergyHatches(boolean autoEquipEnergyHatches) {
+        this.autoEquipEnergyHatches = autoEquipEnergyHatches;
+    }
+
+    public BoardPage copy() {
+        BoardPage clone = new BoardPage(UUID.randomUUID().toString(), this.name, this.graph.copy());
+        clone.folderPath = this.folderPath;
+        clone.representativeIcon = this.representativeIcon.copy();
+        clone.isPinned = this.isPinned;
+        clone.isFolderCollapsed = this.isFolderCollapsed;
+        clone.pageType = this.pageType;
+        clone.parentPageId = this.parentPageId;
+        clone.parentModuleNodeId = this.parentModuleNodeId;
+        clone.panX = this.panX;
+        clone.panY = this.panY;
+        clone.zoom = this.zoom;
+        clone.defaultVoltageTier = this.defaultVoltageTier;
+        clone.autoEquipEnergyHatches = this.autoEquipEnergyHatches;
+        return clone;
+    }
+
     public CompoundTag serializeNBT() {
         CompoundTag tag = new CompoundTag();
         tag.putString("id", id);
@@ -201,6 +257,10 @@ public class BoardPage {
         if (representativeIcon != null && !representativeIcon.isEmpty()) {
             tag.put("icon", representativeIcon.save(new CompoundTag()));
         }
+        if (defaultVoltageTier != null) {
+            tag.putString("defaultVoltageTier", defaultVoltageTier.name());
+        }
+        tag.putBoolean("autoEquipEnergyHatches", autoEquipEnergyHatches);
         tag.putDouble("panX", panX);
         tag.putDouble("panY", panY);
         tag.putDouble("zoom", zoom);
@@ -226,6 +286,14 @@ public class BoardPage {
         if (tag.contains("isFolderCollapsed")) page.isFolderCollapsed = tag.getBoolean("isFolderCollapsed");
         if (tag.contains("icon", net.minecraft.nbt.Tag.TAG_COMPOUND)) {
             page.representativeIcon = ItemStack.of(tag.getCompound("icon"));
+        }
+        if (tag.contains("defaultVoltageTier")) {
+            try {
+                page.defaultVoltageTier = GTVoltageTier.valueOf(tag.getString("defaultVoltageTier"));
+            } catch (Throwable ignored) {}
+        }
+        if (tag.contains("autoEquipEnergyHatches")) {
+            page.autoEquipEnergyHatches = tag.getBoolean("autoEquipEnergyHatches");
         }
         if (tag.contains("panX")) page.panX = tag.getDouble("panX");
         if (tag.contains("panY")) page.panY = tag.getDouble("panY");

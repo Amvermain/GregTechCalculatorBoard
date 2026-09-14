@@ -884,6 +884,24 @@ public class UiFormattingTest {
         Assertions.assertTrue(formatted.contains("⚠"));
         Assertions.assertFalse(formatted.contains("-4.00 B/s") || formatted.contains("-4 B/s"));
     }
+
+    @Test
+    public void testFormatMultiplier() {
+        Assertions.assertEquals("1", com.gtceu.calcboard.api.util.NumberFormatUtil.formatMultiplier(1.0));
+        Assertions.assertEquals("4", com.gtceu.calcboard.api.util.NumberFormatUtil.formatMultiplier(4.0));
+        Assertions.assertEquals("1.6", com.gtceu.calcboard.api.util.NumberFormatUtil.formatMultiplier(1.6));
+        Assertions.assertEquals("0.95", com.gtceu.calcboard.api.util.NumberFormatUtil.formatMultiplier(0.95));
+        Assertions.assertEquals("1.25", com.gtceu.calcboard.api.util.NumberFormatUtil.formatMultiplier(1.25));
+        Assertions.assertEquals("0.5", com.gtceu.calcboard.api.util.NumberFormatUtil.formatMultiplier(0.5));
+    }
+
+    @Test
+    public void testThroughputBoostingBadgeExactFormatting() {
+        com.gtceu.calcboard.api.catalog.MachineAddon boost = com.gtceu.calcboard.api.catalog.MachineAddonCatalog.getInstance().getAddon("gtceu:throughput_boosting");
+        Assertions.assertNotNull(boost);
+        String badge = com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog.formatAddonBadge(boost, null);
+        Assertions.assertEquals("§a⚡4x §b⏱1.6x §e⚡0.95x", badge);
+    }
 }
 
 

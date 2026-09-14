@@ -52,26 +52,33 @@ $$B(t) = (1-t)^3 P_0 + 3(1-t)^2 t P_1 + 3(1-t) t^2 P_2 + t^3 P_3 \quad (t \in [0
 ### 2.3 Rate-Based Wire Flow Modulation & Duty Cycle Stutter (ADR-018)
 Modulates pulse dot animations traveling across connection wires based on the supply saturation ratio ($R_e = \text{Supply} / \text{Demand}$) to visualize bottlenecks in real time:
 
-1. **Saturation Ratio ($R_e$) Formulation**:
-   $$R_e = \begin{cases} 
-   1.0 & \text{if } \text{DemandRate} \le 0.0001 \\
-   0.0 & \text{if } \text{SupplyRate} \le 0.0001 \\
-   \min\left(1.0, \, \frac{\text{SupplyRate}}{\text{DemandRate}}\right) & \text{otherwise}
-   \end{cases}$$
+#### 1. Saturation Ratio ($R_e$) Formulation
+$$
+R_e = \begin{cases} 
+1.0 & \text{if } \text{DemandRate} \le 0.0001 \\
+0.0 & \text{if } \text{SupplyRate} \le 0.0001 \\
+\min\left(1.0, \, \frac{\text{SupplyRate}}{\text{DemandRate}}\right) & \text{otherwise}
+\end{cases}
+$$
 
-2. **Duty Cycle Stutter & Stall**:
-   Global period $T = 1600\text{ ms}$, base time $\tau = (t_{\text{now}} \pmod T) / T \in [0, 1)$:
-   $$t_{\text{eff}} = \begin{cases} 
-   \frac{\tau}{R_e} & \text{if } \tau < R_e \quad (\text{Normal Flow Motion}) \\
-   1.0 & \text{if } \tau \ge R_e \quad (\text{Starvation Stall Interval})
-   \end{cases}$$
+#### 2. Duty Cycle Stutter & Stall
+Global period $T = 1600\text{ ms}$, base time $\tau = (t_{\text{now}} \pmod T) / T \in [0, 1)$:
 
-3. **Dynamic 3-Stage RGB Interpolation**:
-   $$C(R_e) = \begin{cases} 
-   (0.22, 0.74, 0.97) \quad [\text{Cyan Blue}] & \text{if } R_e \ge 1.0 \\
-   \text{Lerp}\left(\text{Amber}, \text{Cyan}, \frac{R_e - 0.5}{0.5}\right) & \text{if } 0.5 \le R_e < 1.0 \\
-   \text{Lerp}\left(\text{Crimson}, \text{Amber}, \frac{R_e}{0.5}\right) & \text{if } 0.0 < R_e < 0.5
-   \end{cases}$$
+$$
+t_{\text{eff}} = \begin{cases} 
+\frac{\tau}{R_e} & \text{if } \tau < R_e \quad (\text{Normal Flow Motion}) \\
+1.0 & \text{if } \tau \ge R_e \quad (\text{Starvation Stall Interval})
+\end{cases}
+$$
+
+#### 3. Dynamic 3-Stage RGB Interpolation
+$$
+C(R_e) = \begin{cases} 
+(0.22, 0.74, 0.97) \quad [\text{Cyan Blue}] & \text{if } R_e \ge 1.0 \\
+\text{Lerp}\left(\text{Amber}, \text{Cyan}, \frac{R_e - 0.5}{0.5}\right) & \text{if } 0.5 \le R_e < 1.0 \\
+\text{Lerp}\left(\text{Crimson}, \text{Amber}, \frac{R_e}{0.5}\right) & \text{if } 0.0 < R_e < 0.5
+\end{cases}
+$$
 
 ---
 

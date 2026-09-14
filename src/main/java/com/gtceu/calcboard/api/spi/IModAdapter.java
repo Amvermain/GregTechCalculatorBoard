@@ -11,6 +11,7 @@ import com.gtceu.calcboard.api.spi.extension.IEnergySimulationProvider;
 import com.gtceu.calcboard.api.spi.extension.IHardwareAddonProvider;
 import com.gtceu.calcboard.api.spi.extension.IModExtension;
 import com.gtceu.calcboard.api.spi.extension.IMultiblockBOMProvider;
+import com.gtceu.calcboard.api.spi.extension.IPortProjectionProvider;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 
@@ -21,7 +22,7 @@ import java.util.Set;
 /**
  * Service Provider Interface (SPI) for external mod integration.
  * Employs the Extension Object Pattern to decouple domain capabilities (hardware addons,
- * multiblock BOMs, energy simulation, compound recipes, boosters, capability matrices)
+ * multiblock BOMs, energy simulation, compound recipes, boosters, capability matrices, port projections)
  * while providing sub-interface composite inheritance for seamless backward compatibility.
  */
 public interface IModAdapter extends
@@ -30,7 +31,8 @@ public interface IModAdapter extends
         IEnergySimulationProvider,
         ICompoundRecipeProvider,
         IBoosterProvider,
-        ICapabilityMatrixProvider {
+        ICapabilityMatrixProvider,
+        IPortProjectionProvider {
 
     String getModId();
 
@@ -109,7 +111,8 @@ public interface IModAdapter extends
                 IEnergySimulationProvider.class,
                 ICompoundRecipeProvider.class,
                 IBoosterProvider.class,
-                ICapabilityMatrixProvider.class
+                ICapabilityMatrixProvider.class,
+                IPortProjectionProvider.class
         );
     }
 
@@ -137,7 +140,17 @@ public interface IModAdapter extends
         return null;
     }
 
+    default void onAttach(RecipeNode node) {
+    }
+
+    default void onDetach(RecipeNode node) {
+    }
+
     default void onMachineIconChanged(RecipeNode node, ResourceLocation oldIcon, ResourceLocation newIcon) {
+    }
+
+    default boolean hasNativePerfectOverclock(ResourceLocation machineId) {
+        return false;
     }
 
     default boolean validateNode(RecipeNode node, List<Component> warnings) {

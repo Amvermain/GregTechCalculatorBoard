@@ -175,11 +175,12 @@ public class GTCEuAddonCrawler {
     }
 
     public static void addBuiltinTraits(List<MachineAddon> list, java.util.Set<String> seenIds) {
-        MachineAddon boost = new MachineAddon("gtceu:throughput_boosting", "gui.gtcalcboard.addon.throughput_boosting", MachineAddon.Category.MULTIBLOCK_TRAIT, "gui.gtcalcboard.addon.throughput_boosting.desc", ResourceLocation.tryParse("gtceu:pyrolyse_oven"));
+        MachineAddon boost = new MachineAddon("gtceu:throughput_boosting", "gui.gtcalcboard.addon.throughput_boosting", MachineAddon.Category.MULTIBLOCK_TRAIT, "gui.gtcalcboard.addon.throughput_boosting.desc", null);
         boost.setParallelMultiplier(4);
         boost.setDurationMultiplier(1.6);
         boost.setEutMultiplier(0.95);
-        boost.setDiscoverySource("GTCEu Multiblock Trait Specification [gtceu:pyrolyse_oven]");
+        boost.setPowerConstant(true);
+        boost.setDiscoverySource("GTCEu / StarT Multiblock Trait Specification (Throughput Boosting)");
         tryAddTrait(list, seenIds, boost);
 
         MachineAddon batch = new MachineAddon("gtceu:batch_processing", "gui.gtcalcboard.addon.batch_processing", MachineAddon.Category.MULTIBLOCK_TRAIT, "gui.gtcalcboard.addon.batch_processing.desc", null);
@@ -193,6 +194,7 @@ public class GTCEuAddonCrawler {
         bulk.setParallelMultiplier(16);
         bulk.setDurationMultiplier(13.0);
         bulk.setEutMultiplier(1.0);
+        bulk.setPowerConstant(true);
         bulk.setDiscoverySource("GTCEu / StarT Multiblock Trait Specification");
         tryAddTrait(list, seenIds, bulk);
 

@@ -383,6 +383,10 @@ public class RecipeFilterDialog {
 
     public boolean charTyped(char codePoint, int modifiers) {
         if (!visible) return false;
-        return searchBox.charTyped(codePoint, modifiers);
+        return searchBox != null && searchBox.charTyped(codePoint, modifiers);
+    }
+
+    public EditBox getSearchBox() {
+        return searchBox;
     }
 }

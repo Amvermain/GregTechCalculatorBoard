@@ -537,7 +537,7 @@ public class SysteamsRecipeHandler {
         if (catId == null) return DEFAULT_SPEED_MULTIPLIER;
         String path = catId.getPath().toLowerCase(java.util.Locale.ROOT);
         String cleaned = path.replace("_fuel", "").replace("dynamo_", "").replace("_boiler", "").replace("boiler_", "").replace("dynamo", "");
-        double fallback = cleaned.contains("stirling") ? 5.0 : DEFAULT_SPEED_MULTIPLIER;
+        double fallback = "stirling".equals(cleaned) ? 5.0 : DEFAULT_SPEED_MULTIPLIER;
         return SPEED_MULTIPLIER_SUPPLIERS.computeIfAbsent(cleaned, k -> {
             String fieldName = "SPEED_" + k.toUpperCase(java.util.Locale.ROOT);
             return resolveConfigFieldSupplier(fieldName, fallback);

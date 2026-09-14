@@ -75,37 +75,51 @@ public final class GTCEuPatternScanner {
         public static final PatternScanResult EMPTY = new PatternScanResult(Set.of(), Set.of(), 0, 0, 0);
     }
 
+    private static final class ScanContext {
+        final Set<String> abilities = new HashSet<>();
+        final Set<ResourceLocation> candidateBlocks = new HashSet<>();
+        final Set<Block> coilBlocks = new HashSet<>();
+        final Set<SimplePredicate> visitedPredicates = Collections.newSetFromMap(new IdentityHashMap<>());
+        int maxEnergyHatches = 0;
+        int maxMaintenanceHatches = 0;
+        int maxParallelHatches = 0;
+    }
+
     public static PatternScanResult scanPattern(Object machineDef) {
         if (!(machineDef instanceof MultiblockMachineDefinition multiDef)) {
             return PatternScanResult.EMPTY;
         }
 
-        Set<String> abilities = new HashSet<>();
-        Set<ResourceLocation> candidateBlocks = new HashSet<>();
-        Set<Block> coilBlocks = new HashSet<>();
+        ScanContext ctx = new ScanContext();
+        scanPatternFactory(multiDef, ctx);
+        enrichFromMachineDefinition(multiDef, ctx.abilities);
 
-        scanPatternFactory(multiDef, abilities, candidateBlocks, coilBlocks);
-        enrichFromMachineDefinition(multiDef, abilities);
+        if (ctx.coilBlocks.size() > 1) {
+            ctx.abilities.add("HEATING_COILS");
+        }
 
-        if (coilBlocks.size() > 1) {
-            abilities.add("HEATING_COILS");
+        int finalMaxEnergy = ctx.maxEnergyHatches;
+        if (finalMaxEnergy == 0 && ctx.abilities.contains("INPUT_ENERGY")) {
+            finalMaxEnergy = 2;
         }
 
         return new PatternScanResult(
-                Collections.unmodifiableSet(abilities),
-                Collections.unmodifiableSet(candidateBlocks),
-                0, 0, 0
+                Collections.unmodifiableSet(ctx.abilities),
+                Collections.unmodifiableSet(ctx.candidateBlocks),
+                finalMaxEnergy,
+                ctx.maxMaintenanceHatches,
+                ctx.maxParallelHatches
         );
     }
 
-    private static void scanPatternFactory(MultiblockMachineDefinition multiDef, Set<String> abilities, Set<ResourceLocation> candidateBlocks, Set<Block> coilBlocks) {
+    private static void scanPatternFactory(MultiblockMachineDefinition multiDef, ScanContext ctx) {
         if (multiDef.getPatternFactory() == null) return;
         BlockPattern pattern = multiDef.getPatternFactory().get();
         if (pattern == null) return;
 
         TraceabilityPredicate[][][] matches = extractBlockMatches(pattern);
         if (matches != null) {
-            scanGrid(matches, abilities, candidateBlocks, coilBlocks);
+            scanGrid(matches, ctx);
         }
     }
 
@@ -118,94 +132,167 @@ public final class GTCEuPatternScanner {
         }
     }
 
-    private static void scanGrid(TraceabilityPredicate[][][] grid, Set<String> abilities, Set<ResourceLocation> candidateBlocks, Set<Block> coilBlocks) {
+    private static void scanGrid(TraceabilityPredicate[][][] grid, ScanContext ctx) {
         for (TraceabilityPredicate[][] plane : grid) {
-            if (plane != null) scanPlane(plane, abilities, candidateBlocks, coilBlocks);
+            if (plane != null) scanPlane(plane, ctx);
         }
     }
 
-    private static void scanPlane(TraceabilityPredicate[][] plane, Set<String> abilities, Set<ResourceLocation> candidateBlocks, Set<Block> coilBlocks) {
+    private static void scanPlane(TraceabilityPredicate[][] plane, ScanContext ctx) {
         for (TraceabilityPredicate[] row : plane) {
-            if (row != null) scanRow(row, abilities, candidateBlocks, coilBlocks);
+            if (row != null) scanRow(row, ctx);
         }
     }
 
-    private static void scanRow(TraceabilityPredicate[] row, Set<String> abilities, Set<ResourceLocation> candidateBlocks, Set<Block> coilBlocks) {
+    private static void scanRow(TraceabilityPredicate[] row, ScanContext ctx) {
         for (TraceabilityPredicate pred : row) {
-            if (pred != null) scanTraceabilityPredicate(pred, abilities, candidateBlocks, coilBlocks);
+            if (pred != null) scanTraceabilityPredicate(pred, ctx);
         }
     }
 
-    private static void scanTraceabilityPredicate(TraceabilityPredicate pred, Set<String> abilities, Set<ResourceLocation> candidateBlocks, Set<Block> coilBlocks) {
-        scanSimpleList(pred.common, abilities, candidateBlocks, coilBlocks);
-        scanSimpleList(pred.limited, abilities, candidateBlocks, coilBlocks);
+    private static void scanTraceabilityPredicate(TraceabilityPredicate pred, ScanContext ctx) {
+        scanSimpleList(pred.common, ctx);
+        scanSimpleList(pred.limited, ctx);
     }
 
-    private static void scanSimpleList(List<SimplePredicate> list, Set<String> abilities, Set<ResourceLocation> candidateBlocks, Set<Block> coilBlocks) {
+    private static void scanSimpleList(List<SimplePredicate> list, ScanContext ctx) {
         if (list == null) return;
         for (SimplePredicate sp : list) {
-            if (sp != null) scanSimplePredicate(sp, abilities, candidateBlocks, coilBlocks);
+            if (sp != null) scanSimplePredicate(sp, ctx);
         }
     }
 
-    private static void scanSimplePredicate(SimplePredicate sp, Set<String> abilities, Set<ResourceLocation> candidateBlocks, Set<Block> coilBlocks) {
+    private static void scanSimplePredicate(SimplePredicate sp, ScanContext ctx) {
+        if (sp == null || !ctx.visitedPredicates.add(sp)) return;
+
         if (sp.type != null && !sp.type.isBlank()) {
-            abilities.add(sp.type.toUpperCase(Locale.ROOT));
+            String typeUpper = sp.type.toUpperCase(Locale.ROOT);
+            ctx.abilities.add(typeUpper);
+            checkTypeLimit(typeUpper, sp.maxCount, ctx);
         }
 
-        if (sp instanceof PredicateBlocks pb) {
-            scanBlocksArray(pb.blocks, abilities, candidateBlocks, coilBlocks);
-            return;
-        }
-
-        if (sp instanceof PredicateStates ps) {
-            scanStatesArray(ps.states, abilities, candidateBlocks, coilBlocks);
-            return;
-        }
-
-        scanCandidatesSupplier(sp, abilities, candidateBlocks, coilBlocks);
-    }
-
-    private static void scanBlocksArray(Block[] blocks, Set<String> abilities, Set<ResourceLocation> candidateBlocks, Set<Block> coilBlocks) {
-        if (blocks == null) return;
+        List<Block> blocks = collectPredicateBlocks(sp);
         for (Block b : blocks) {
-            scanBlock(b, abilities, candidateBlocks, coilBlocks);
+            scanBlock(b, ctx);
+        }
+
+        checkBlocksLimit(blocks, sp.maxCount, ctx);
+    }
+
+    private static void checkTypeLimit(String typeUpper, int maxCount, ScanContext ctx) {
+        if (maxCount <= 0) return;
+        if (typeUpper.contains("INPUT_ENERGY") || typeUpper.equals("INPUT_LASER")) {
+            ctx.maxEnergyHatches = ctx.maxEnergyHatches == 0 ? maxCount : Math.min(ctx.maxEnergyHatches, maxCount);
+        } else if (typeUpper.equals("MAINTENANCE")) {
+            ctx.maxMaintenanceHatches = ctx.maxMaintenanceHatches == 0 ? maxCount : Math.min(ctx.maxMaintenanceHatches, maxCount);
+        } else if (typeUpper.equals("PARALLEL_HATCH")) {
+            ctx.maxParallelHatches = ctx.maxParallelHatches == 0 ? maxCount : Math.min(ctx.maxParallelHatches, maxCount);
         }
     }
 
-    private static void scanStatesArray(BlockState[] states, Set<String> abilities, Set<ResourceLocation> candidateBlocks, Set<Block> coilBlocks) {
-        if (states == null) return;
-        for (BlockState bs : states) {
-            if (bs != null) scanBlock(bs.getBlock(), abilities, candidateBlocks, coilBlocks);
+    private static void checkBlocksLimit(List<Block> blocks, int maxCount, ScanContext ctx) {
+        if (maxCount <= 0 || blocks.isEmpty()) return;
+        boolean isEnergy = false;
+        boolean isMaint = false;
+        boolean isParallel = false;
+
+        for (Block b : blocks) {
+            if (!isEnergy && isEnergyInputBlock(b)) isEnergy = true;
+            if (!isMaint && isMaintenanceBlock(b)) isMaint = true;
+            if (!isParallel && isParallelHatchBlock(b)) isParallel = true;
+        }
+
+        if (isEnergy) {
+            ctx.maxEnergyHatches = ctx.maxEnergyHatches == 0 ? maxCount : Math.min(ctx.maxEnergyHatches, maxCount);
+        }
+        if (isMaint) {
+            ctx.maxMaintenanceHatches = ctx.maxMaintenanceHatches == 0 ? maxCount : Math.min(ctx.maxMaintenanceHatches, maxCount);
+        }
+        if (isParallel) {
+            ctx.maxParallelHatches = ctx.maxParallelHatches == 0 ? maxCount : Math.min(ctx.maxParallelHatches, maxCount);
         }
     }
 
-    private static void scanCandidatesSupplier(SimplePredicate sp, Set<String> abilities, Set<ResourceLocation> candidateBlocks, Set<Block> coilBlocks) {
+    private static boolean isEnergyInputBlock(Block b) {
+        if (PART_ABILITY_IS_APPLICABLE == null || KNOWN_PART_ABILITIES.isEmpty() || b == null) return false;
+        for (Map.Entry<Object, String> entry : KNOWN_PART_ABILITIES.entrySet()) {
+            String name = entry.getValue();
+            if (name.contains("INPUT_ENERGY") || name.equals("INPUT_LASER")) {
+                try {
+                    Object res = PART_ABILITY_IS_APPLICABLE.invoke(entry.getKey(), b);
+                    if (res instanceof Boolean bool && bool) {
+                        return true;
+                    }
+                } catch (Throwable ignored) {}
+            }
+        }
+        return false;
+    }
+
+    private static boolean isMaintenanceBlock(Block b) {
+        if (PART_ABILITY_IS_APPLICABLE == null || KNOWN_PART_ABILITIES.isEmpty() || b == null) return false;
+        for (Map.Entry<Object, String> entry : KNOWN_PART_ABILITIES.entrySet()) {
+            if ("MAINTENANCE".equals(entry.getValue())) {
+                try {
+                    Object res = PART_ABILITY_IS_APPLICABLE.invoke(entry.getKey(), b);
+                    if (res instanceof Boolean bool && bool) {
+                        return true;
+                    }
+                } catch (Throwable ignored) {}
+            }
+        }
+        return false;
+    }
+
+    private static boolean isParallelHatchBlock(Block b) {
+        if (PART_ABILITY_IS_APPLICABLE == null || KNOWN_PART_ABILITIES.isEmpty() || b == null) return false;
+        for (Map.Entry<Object, String> entry : KNOWN_PART_ABILITIES.entrySet()) {
+            if ("PARALLEL_HATCH".equals(entry.getValue())) {
+                try {
+                    Object res = PART_ABILITY_IS_APPLICABLE.invoke(entry.getKey(), b);
+                    if (res instanceof Boolean bool && bool) {
+                        return true;
+                    }
+                } catch (Throwable ignored) {}
+            }
+        }
+        return false;
+    }
+
+    private static List<Block> collectPredicateBlocks(SimplePredicate sp) {
+        List<Block> list = new ArrayList<>();
+        if (sp instanceof PredicateBlocks pb && pb.blocks != null) {
+            for (Block b : pb.blocks) {
+                if (b != null) list.add(b);
+            }
+            return list;
+        }
+        if (sp instanceof PredicateStates ps && ps.states != null) {
+            for (BlockState state : ps.states) {
+                if (state != null && state.getBlock() != null) list.add(state.getBlock());
+            }
+            return list;
+        }
+        extractCandidatesSupplierBlocks(sp, list);
+        return list;
+    }
+
+    private static void extractCandidatesSupplierBlocks(SimplePredicate sp, List<Block> list) {
         if (CANDIDATES_FIELD == null) return;
         try {
             Object rawSupplier = CANDIDATES_FIELD.get(sp);
             if (!(rawSupplier instanceof Supplier<?> supplier)) return;
             Object rawInfos = supplier.get();
-            if (!(rawInfos instanceof Object[] arr)) return;
-
-            for (Object item : arr) {
-                if (item != null) scanCandidateItem(item, abilities, candidateBlocks, coilBlocks);
+            if (rawInfos instanceof Object[] arr) {
+                appendBlocksFromCandidateArray(arr, list);
             }
         } catch (Throwable ignored) {}
     }
 
-    private static void scanCandidateItem(Object item, Set<String> abilities, Set<ResourceLocation> candidateBlocks, Set<Block> coilBlocks) {
-        if (item instanceof Block b) {
-            scanBlock(b, abilities, candidateBlocks, coilBlocks);
-            return;
-        }
-        if (item instanceof BlockState bs) {
-            scanBlock(bs.getBlock(), abilities, candidateBlocks, coilBlocks);
-            return;
-        }
-        Block block = extractBlockFromCandidate(item);
-        if (block != null) {
-            scanBlock(block, abilities, candidateBlocks, coilBlocks);
+    private static void appendBlocksFromCandidateArray(Object[] arr, List<Block> list) {
+        for (Object item : arr) {
+            Block b = extractBlockFromCandidate(item);
+            if (b != null) list.add(b);
         }
     }
 
@@ -231,18 +318,18 @@ public final class GTCEuPatternScanner {
         return null;
     }
 
-    private static void scanBlock(Block b, Set<String> abilities, Set<ResourceLocation> candidateBlocks, Set<Block> coilBlocks) {
+    private static void scanBlock(Block b, ScanContext ctx) {
         if (b == null) return;
         ResourceLocation id = ForgeRegistries.BLOCKS.getKey(b);
         if (id != null && !id.getPath().equals("air")) {
-            candidateBlocks.add(id);
+            ctx.candidateBlocks.add(id);
         }
 
         if (GTCEuAPI.HEATING_COILS.containsKey(b)) {
-            coilBlocks.add(b);
+            ctx.coilBlocks.add(b);
         }
 
-        matchPartAbilities(b, abilities);
+        matchPartAbilities(b, ctx.abilities);
     }
 
     private static void matchPartAbilities(Block b, Set<String> abilities) {

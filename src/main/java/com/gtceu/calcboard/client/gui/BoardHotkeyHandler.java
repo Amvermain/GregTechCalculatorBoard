@@ -362,6 +362,12 @@ public final class BoardHotkeyHandler {
             return true;
         }
 
+        if (keyCode == GLFW.GLFW_KEY_P) {
+            closePopups(screen);
+            screen.openPageSettingsDialog();
+            return true;
+        }
+
         return false;
     }
 

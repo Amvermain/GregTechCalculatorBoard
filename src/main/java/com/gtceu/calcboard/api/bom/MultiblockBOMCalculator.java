@@ -85,7 +85,8 @@ public class MultiblockBOMCalculator {
             int machineCount = sharedFrameMasterCounts.containsKey(node.getId())
                     ? sharedFrameMasterCounts.get(node.getId())
                     : Math.max(1, (int) Math.ceil(node.getMachineCount()));
-            totalMultiblocks += machineCount;
+            int mbCount = adapter != null ? adapter.getMultiblockCount(node, machineCount) : machineCount;
+            totalMultiblocks += mbCount;
 
             ResourceLocation machineId = node.getMachineIcon();
             if (machineId == null && !node.getAvailableWorkstations().isEmpty()) {

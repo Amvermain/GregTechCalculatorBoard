@@ -154,4 +154,51 @@ public class MultiblockEnergyHatchLockTest {
                 ResourceLocation.tryParse("start_core:uev_16a_dream_link_energy_hatch"), GTVoltageTier.UEV, 16, false, false, false);
         Assertions.assertTrue(adapter.isAddonCompatible(mdNode, dreamLinkHatch));
     }
+
+    @Test
+    @DisplayName("Single energy hatch multiblock (e.g. Rock Filtrator) must enforce max 1 hatch and forbid tier skip overclock")
+    void testSingleEnergyHatchMultiblockRejectsSecondHatch() {
+        ResourceLocation rfId = ResourceLocation.tryParse("gtceu:rock_filtrator");
+        com.gtceu.calcboard.api.bom.MultiblockStructureDef rfDef = new com.gtceu.calcboard.api.bom.MultiblockStructureDef(
+                rfId,
+                "Rock Filtrator",
+                java.util.Collections.emptyList(),
+                0,
+                1,
+                1,
+                4,
+                1,
+                0,
+                1,
+                java.util.Set.of("INPUT_ENERGY", "IMPORT_ITEMS", "EXPORT_ITEMS", "IMPORT_FLUIDS", "MAINTENANCE"),
+                java.util.Collections.emptySet()
+        );
+        com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.registerManualStructure(rfDef);
+
+        RecipeNode rfNode = RecipeNode.create("Rock Filtrator (Sand)", 48.0, 60.0, GTVoltageTier.MV);
+        rfNode.setMultiblock(true);
+        rfNode.setMachineIcon(rfId);
+        rfNode.setEnergyType(EnergyType.ELECTRIC_EU);
+
+        Assertions.assertEquals(1, com.gtceu.calcboard.compat.gtceu.handler.GTEnergyHatchCalculator.getMaxAllowedEnergyHatches(rfNode));
+
+        var adapter = ModAdapterRegistry.getAdapterForNode(rfNode);
+
+        GTEnergyHatchAddon mvHatch1 = new GTEnergyHatchAddon(
+                "gtceu:mv_energy_hatch_1", "MV Energy Hatch", "",
+                ResourceLocation.tryParse("gtceu:mv_energy_hatch"), GTVoltageTier.MV, 2, false, false, false);
+        adapter.onAddonInstalled(rfNode, mvHatch1);
+
+        Assertions.assertEquals(1, rfNode.getAddons().size());
+        Assertions.assertEquals(GTVoltageTier.MV, rfNode.getTargetTier());
+
+        GTEnergyHatchAddon mvHatch2 = new GTEnergyHatchAddon(
+                "gtceu:mv_energy_hatch_2", "MV Energy Hatch", "",
+                ResourceLocation.tryParse("gtceu:mv_energy_hatch"), GTVoltageTier.MV, 2, false, false, false);
+        adapter.onAddonInstalled(rfNode, mvHatch2);
+
+        Assertions.assertEquals(1, rfNode.getAddons().size(), "Must not allow more than 1 energy hatch");
+        Assertions.assertEquals(GTVoltageTier.MV, rfNode.getTargetTier(), "Tier must not skip to HV");
+    }
 }
+

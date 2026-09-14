@@ -104,14 +104,16 @@ public final class GTCEuHardwareStatusRenderer {
                 curX += oxBtnW + gap;
             }
 
-            String cl = node.getProperties().get(GTCEuProperties.COMBUSTION_COOLANT_TYPE);
-            boolean clActive = cl != null && !cl.isEmpty() && !"none".equalsIgnoreCase(cl);
-            String clLabel = "❄ " + (clActive ? ("§b" + GTCombustionHelper.getCoolantDisplayName(cl)) : "§7Coolant: None");
-            int clBtnW = Math.max(110, font.width(clLabel) + 12);
-            coolantBtnHover = mouseX >= curX && mouseX <= curX + clBtnW && mouseY >= btnY && mouseY <= btnY + 16;
-            graphics.fill(curX, btnY, curX + clBtnW, btnY + 16, clActive ? (coolantBtnHover ? 0xFF1B3854 : 0xFF14273D) : (coolantBtnHover ? 0xFF2A3548 : 0xFF1E2430));
-            graphics.renderOutline(curX, btnY, clBtnW, 16, clActive ? 0xFF58D3FF : 0xFF3D4B60);
-            graphics.drawCenteredString(font, clLabel, curX + clBtnW / 2, btnY + 4, clActive ? 0xFF58D3FF : 0xFF8FA0B8);
+            if (GTCombustionHelper.isModularCombustionFrame(node)) {
+                String cl = GTCombustionHelper.getMCFCoolantType(node);
+                boolean clActive = cl != null && !cl.isEmpty() && !"none".equalsIgnoreCase(cl);
+                String clLabel = "❄ " + (clActive ? ("§b" + GTCombustionHelper.getCoolantDisplayName(cl)) : "§7Coolant: None");
+                int clBtnW = Math.max(110, font.width(clLabel) + 12);
+                coolantBtnHover = mouseX >= curX && mouseX <= curX + clBtnW && mouseY >= btnY && mouseY <= btnY + 16;
+                graphics.fill(curX, btnY, curX + clBtnW, btnY + 16, clActive ? (coolantBtnHover ? 0xFF1B3854 : 0xFF14273D) : (coolantBtnHover ? 0xFF2A3548 : 0xFF1E2430));
+                graphics.renderOutline(curX, btnY, clBtnW, 16, clActive ? 0xFF58D3FF : 0xFF3D4B60);
+                graphics.drawCenteredString(font, clLabel, curX + clBtnW / 2, btnY + 4, clActive ? 0xFF58D3FF : 0xFF8FA0B8);
+            }
         }
 
         if (boostBtnHover) {
@@ -131,7 +133,7 @@ public final class GTCEuHardwareStatusRenderer {
             if (!tt.isEmpty()) {
                 showTooltip(dialog, graphics, font, tt, mouseX, mouseY);
             }
-        } else if (coolantBtnHover && isStarT) {
+        } else if (coolantBtnHover && GTCombustionHelper.isModularCombustionFrame(node)) {
             List<Component> tt = new ArrayList<>();
             tt.add(Component.literal("§b❄ " + Component.translatable("gui.gtcalcboard.tooltip.coolant_boost").getString()));
             tt.add(Component.literal("§8* " + Component.translatable("gui.gtcalcboard.tooltip.click_toggle").getString()));

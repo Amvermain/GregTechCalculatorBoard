@@ -66,9 +66,7 @@ flowchart TD
 4. **`PageDurationEvaluator` & `Ae2CraftingPlanEvaluator` (DAG CPM & Streaming Pipeline)**:
    - 페이지 내 배치된 기계들 중 임계 병목 기계(최장 단위 처리 시간 또는 $T_{\text{unit}} / P_{\text{eff}}$ 최댓값)를 동적으로 탐색하여 오버클럭 틱 및 유효 병렬도 추출.
    - **스트리밍 파이프라이닝 및 크리티컬 패스(DAG CPM) 스케줄링**:
-     $$T_{\text{start}}(v) = \max_{(u, v) \in E} \left( T_{\text{start}}(u) + d_u \right)$$
-     $$T_{\text{finish}}(v) = \max \left( T_{\text{start}}(v) + D_v, \ \max_{(u, v) \in E} \left( T_{\text{finish}}(u) + d_v \right) \right)$$
-     $$\text{Total ETA} = \max_{v \in V} T_{\text{finish}}(v)$$
+     $T_{\text{start}}(v) = \max_{(u, v) \in E} \left( T_{\text{start}}(u) + d_u \right)$, $T_{\text{finish}}(v) = \max \left( T_{\text{start}}(v) + D_v, \ \max_{(u, v) \in E} \left( T_{\text{finish}}(u) + d_v \right) \right)$, $\text{Total ETA} = \max_{v \in V} T_{\text{finish}}(v)$
    - **다중 산출물 2-Pass 부산물 공제 (Byproduct Pool Deduction)**: 동일 공정/기계가 배출하는 부산물(예: 진공 동결기 헬륨-3, 원심분리기 부산물)을 선행 등록하여 하위 수요 자동 상계.
    - **설비 공유(Resource Contention) 직렬 누적**: 동일 계산기 페이지에 속한 복수 레시피는 단일 기계 공유로 인식하여 배치 직렬 누적($\sum \text{batches}$) 평가.
 5. **UI 통합, 시각적 뱃지 & 투명한 이론치 안내 (Disclaimer)**:

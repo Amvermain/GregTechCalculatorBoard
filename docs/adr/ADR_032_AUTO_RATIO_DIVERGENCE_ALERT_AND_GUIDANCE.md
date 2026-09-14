@@ -139,8 +139,7 @@ Auto-Ratio 연산 패스를 시작하기 전($t = 0$), 위상 분석을 통해 �
 1. **강결합 컴포넌트(SCC) 및 단순 사이클 추출**:
    - Tarjan SCC 알고리즘으로 크기 $\ge 2$인 순환 컴포넌트와 사이클 간선 집합을 추출.
 2. **사이클 단위 환원율 ($\rho_{\text{cycle}}$) 정적 산출**:
-   - 사이클을 구성하는 각 유향 간선 $e_i: u \to v$에 대해 $\text{stepRatio} = \frac{\text{OutRate}(u)}{\text{InRate}(v)}$을 누적 곱셈:
-     $$\rho_{\text{cycle}} = \prod_{i} \frac{\text{OutRate}(u_i)}{\text{InRate}(v_i)}$$
+   - 사이클을 구성하는 각 유향 간선 $e_i: u \to v$에 대해 $\text{stepRatio} = \frac{\text{OutRate}(u)}{\text{InRate}(v)}$을 누적 곱셈: $\rho_{\text{cycle}} = \prod_{i} \frac{\text{OutRate}(u_i)}{\text{InRate}(v_i)}$
    - $\rho_{\text{cycle}} \ge 1.0$: 자급 또는 흑자 루프(Bayer process 등, 수렴 가능).
    - $\rho_{\text{cycle}} < 1.0$: 자원 적자 폐루프(Deficit Cycle).
 3. **외부 유입선(External Feed) 결손 판정**:

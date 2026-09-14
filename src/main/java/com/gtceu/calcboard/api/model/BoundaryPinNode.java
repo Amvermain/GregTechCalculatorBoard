@@ -1,34 +1,21 @@
 package com.gtceu.calcboard.api.model;
 
+import com.gtceu.calcboard.api.model.role.BoundaryPinNodeRole;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 
-/**
- * Pure domain node representing an explicit interface boundary pin (input or output)
- * for a dedicated compound module sub-page.
- *
- * @see ModuleInputPin
- * @see ModuleOutputPin
- */
+import java.util.Objects;
+
 public abstract class BoundaryPinNode extends RecipeNode {
 
-    /**
-     * Represents the flow orientation of the boundary pin relative to the module sub-page.
-     */
     public enum PinDirection {
         INPUT,
         OUTPUT
     }
 
-    private PinDirection direction;
-    private String pinLabel;
-    private IngredientStack boundIngredient;
-    private int targetPortIndex;
-
     public BoundaryPinNode(String id, String name, PinDirection direction) {
         super(id, name, 20.0, 0.0, GTVoltageTier.LV);
-        this.direction = direction;
-        this.pinLabel = name != null ? name : "";
-        this.targetPortIndex = 0;
+        BoundaryPinNodeRole pinRole = new BoundaryPinNodeRole(direction, name != null ? name : "", 0, null);
+        setRole(pinRole);
         this.setCardWidth(32);
         this.setCardHeight(32);
     }
@@ -44,42 +31,43 @@ public abstract class BoundaryPinNode extends RecipeNode {
     }
 
     public PinDirection getDirection() {
-        return direction;
+        return asBoundaryPin().getDirection();
     }
 
     public void setDirection(PinDirection direction) {
-        this.direction = direction;
+        asBoundaryPin().setDirection(direction);
     }
 
     @Override
     public void setName(String name) {
         super.setName(name);
-        this.pinLabel = name != null ? name : "";
+        if (isBoundaryPin() && !Objects.equals(asBoundaryPin().getPinLabel(), name)) {
+            asBoundaryPin().setPinLabel(name != null ? name : "");
+        }
     }
 
     public String getPinLabel() {
-        return pinLabel;
+        return asBoundaryPin().getPinLabel();
     }
 
     public void setPinLabel(String pinLabel) {
-        this.pinLabel = pinLabel != null ? pinLabel : "";
-        super.setName(this.pinLabel);
+        asBoundaryPin().setPinLabel(pinLabel);
     }
 
     public IngredientStack getBoundIngredient() {
-        return boundIngredient;
+        return asBoundaryPin().getBoundIngredient();
     }
 
     public void setBoundIngredient(IngredientStack boundIngredient) {
-        this.boundIngredient = boundIngredient;
+        asBoundaryPin().setBoundIngredient(boundIngredient);
     }
 
     public int getTargetPortIndex() {
-        return targetPortIndex;
+        return asBoundaryPin().getTargetPortIndex();
     }
 
     public void setTargetPortIndex(int targetPortIndex) {
-        this.targetPortIndex = targetPortIndex;
+        asBoundaryPin().setTargetPortIndex(targetPortIndex);
     }
 
     @Override

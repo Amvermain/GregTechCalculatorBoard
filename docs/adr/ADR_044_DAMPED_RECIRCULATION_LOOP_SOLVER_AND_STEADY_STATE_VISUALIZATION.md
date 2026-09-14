@@ -71,22 +71,24 @@ flowchart TD
 
 강결합 컴포넌트(SCC) $C$ 내에서 순환하는 자원 $R$에 대해:
 * 루프 내 공칭 총 생산량:
-  $$P_C^{\text{nom}}(R) = \sum_{u \in C} \text{OutputRate}^{\text{nom}}(u, R)$$
+
+$$P_C^{\text{nom}}(R) = \sum_{u \in C} \text{OutputRate}^{\text{nom}}(u, R)$$
+
 * 루프 내 공칭 총 소비량:
-  $$D_C^{\text{nom}}(R) = \sum_{v \in C} \text{InputRate}^{\text{nom}}(v, R)$$
+
+$$D_C^{\text{nom}}(R) = \sum_{v \in C} \text{InputRate}^{\text{nom}}(v, R)$$
+
 * 내부 환류율(Recirculation Ratio):
-  $$r = \frac{P_C^{\text{nom}}(R)}{D_C^{\text{nom}}(R)}$$
+
+$$r = \frac{P_C^{\text{nom}}(R)}{D_C^{\text{nom}}(R)}$$
 
 #### 분류 및 연산 규칙:
-1. **$r \ge 1.0 - 10^{-4}$ (완전 자급 / 잉여 루프)**:
-   - 기존 ADR-022 불변식 보호 적용: 루프 하한선 $E_{\text{loop}} = 1.0 \times E_{\text{external\_feed}}$.
-2. **$0 < r < 1.0 - 10^{-4}$ (감쇠 순환 루프)**:
-   - 외부 공급량 집계:
-     $$S_{\text{ext}} = \sum_{e \in \text{ExternalEdges}} \text{Flow}(e)$$
-   - 무한 등비급수 정상 상태 유량:
-     $$S_{\text{steady}} = \frac{S_{\text{ext}}}{1 - r}$$
-   - 해당 소비자 노드의 정상 상태 실효 효율:
-     $$E^*(v) = \min\left(1.0, \; \frac{S_{\text{steady}}}{D_v^{\text{nom}}(R)}\right)$$
+* **$r \ge 1.0 - 10^{-4}$ (완전 자급 / 잉여 루프)**:
+  기존 ADR-022 불변식 보호 적용: 루프 하한선 $E_{\text{loop}} = 1.0 \times E_{\text{external\_feed}}$.
+* **$0 < r < 1.0 - 10^{-4}$ (감쇠 순환 루프)**:
+  * 외부 공급량 집계: $S_{\text{ext}} = \sum_{e \in \text{ExternalEdges}} \text{Flow}(e)$
+  * 무한 등비급수 정상 상태 유량: $S_{\text{steady}} = \frac{S_{\text{ext}}}{1 - r}$
+  * 해당 소비자 노드의 정상 상태 실효 효율: $E^*(v) = \min\left(1.0, \; \frac{S_{\text{steady}}}{D_v^{\text{nom}}(R)}\right)$
 
 이 해석적 해를 `FixedPointEfficiencySolver`의 사전 연산 메타(`PrecomputedDampedLoopMeta`)로 등록하여 이터레이션 시작 시 결정론적으로 주입합니다.
 

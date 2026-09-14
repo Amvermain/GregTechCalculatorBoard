@@ -79,28 +79,34 @@ flowchart TD
 
 ### 3.1 터빈 로터/블레이드 소모율 및 수명 모델링
 
-1. **초당 내구도 소모율 ($\text{Loss}_{\text{sec}}$)**:
-   $$\text{Loss}_{\text{sec}} = 20.0 \times \min\left(1.0, \frac{\text{ActualEUt}}{\text{Cap}_{\text{holder}}}\right)$$
-2. **로터 수명 시간 ($T_{\text{lifespan}}$, 시간 단위)**:
-   $$T_{\text{lifespan}} = \frac{\text{Durability}}{\text{Loss}_{\text{sec}} \times 3600}$$
-3. **가동 대수 기준 시간당 로터 교체 요구량 ($\text{Items}_{\text{hour}}$)**:
-   $$\text{Items}_{\text{hour}} = \frac{1.0}{T_{\text{lifespan}}} \times \text{MachineCount}$$
+#### 1. 초당 내구도 소모율 ($\text{Loss}_{\text{sec}}$)
+$$\text{Loss}_{\text{sec}} = 20.0 \times \min\left(1.0, \frac{\text{ActualEUt}}{\text{Cap}_{\text{holder}}}\right)$$
+
+#### 2. 로터 수명 시간 ($T_{\text{lifespan}}$, 시간 단위)
+$$T_{\text{lifespan}} = \frac{\text{Durability}}{\text{Loss}_{\text{sec}} \times 3600}$$
+
+#### 3. 가동 대수 기준 시간당 로터 교체 요구량 ($\text{Items}_{\text{hour}}$)
+$$\text{Items}_{\text{hour}} = \frac{1.0}{T_{\text{lifespan}}} \times \text{MachineCount}$$
 
 ### 3.2 독립 티어 분리 기반 대형 터빈 발전량 및 실효 병렬
 
-1. **로터 홀더 처리 한도 ($\text{Cap}_{\text{holder}}$)**:
-   $$\Delta T_{\text{holder}} = \text{ord}(T_{\text{holder}}) - \text{ord}(T_{\text{base}})$$
-   $$\text{BaseCap} = \text{TurbineBaseProd} \times 2^{\Delta T_{\text{holder}}}$$
-   $$\text{Cap}_{\text{holder}} = \left\lfloor \text{BaseCap} \times \frac{\text{RotorPower}}{100} \right\rfloor$$
-2. **다이나모/레이저 해치 출력 상한 ($\text{Cap}_{\text{dynamo}}$)**:
-   $$\text{Cap}_{\text{dynamo}} = \text{Voltage}(T_{\text{dynamo}}) \times \text{Amperage}$$
-3. **최종 가용 발전 상한 ($\text{Cap}_{\text{final}}$)**:
-   $$\text{Cap}_{\text{final}} = \min(\text{Cap}_{\text{holder}}, \text{Cap}_{\text{dynamo}})$$
-4. **터빈 실효 가동 병렬 ($P_{\text{eff}}$)**:
-   $$P_{\text{eff}} = \min\left( P_{\text{configured}}, \left\lceil \frac{\text{Cap}_{\text{final}}}{\text{RecipeEUt}} \right\rceil \right) \times \text{ModelMultiplier}$$
-5. **최종 발전 출력 ($P_{\text{gen}}$)**:
-   $$P_{\text{raw}} = \text{RecipeEUt} \times P_{\text{eff}} \times \frac{\text{TotalEfficiency}}{100}$$
-   $$P_{\text{gen}} = \min(P_{\text{raw}}, \text{Cap}_{\text{final}}) \times \text{BoostMultiplier}$$
+#### 1. 로터 홀더 처리 한도 ($\text{Cap}_{\text{holder}}$)
+$$\Delta T_{\text{holder}} = \text{ord}(T_{\text{holder}}) - \text{ord}(T_{\text{base}})$$
+$$\text{BaseCap} = \text{TurbineBaseProd} \times 2^{\Delta T_{\text{holder}}}$$
+$$\text{Cap}_{\text{holder}} = \left\lfloor \text{BaseCap} \times \frac{\text{RotorPower}}{100} \right\rfloor$$
+
+#### 2. 다이나모/레이저 해치 출력 상한 ($\text{Cap}_{\text{dynamo}}$)
+$$\text{Cap}_{\text{dynamo}} = \text{Voltage}(T_{\text{dynamo}}) \times \text{Amperage}$$
+
+#### 3. 최종 가용 발전 상한 ($\text{Cap}_{\text{final}}$)
+$$\text{Cap}_{\text{final}} = \min(\text{Cap}_{\text{holder}}, \text{Cap}_{\text{dynamo}})$$
+
+#### 4. 터빈 실효 가동 병렬 ($P_{\text{eff}}$)
+$$P_{\text{eff}} = \min\left( P_{\text{configured}}, \left\lceil \frac{\text{Cap}_{\text{final}}}{\text{RecipeEUt}} \right\rceil \right) \times \text{ModelMultiplier}$$
+
+#### 5. 최종 발전 출력 ($P_{\text{gen}}$)
+$$P_{\text{raw}} = \text{RecipeEUt} \times P_{\text{eff}} \times \frac{\text{TotalEfficiency}}{100}$$
+$$P_{\text{gen}} = \min(P_{\text{raw}}, \text{Cap}_{\text{final}}) \times \text{BoostMultiplier}$$
 
 ### 3.3 전력 소비 기계의 조건별 최대 가용 병렬 ($P_{\max}$) 도출
 

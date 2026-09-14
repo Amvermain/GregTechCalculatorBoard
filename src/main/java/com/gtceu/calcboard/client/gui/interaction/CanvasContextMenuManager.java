@@ -83,6 +83,9 @@ public class CanvasContextMenuManager {
             if (screen != null) screen.pasteSelection(canvasX, canvasY);
         }));
         this.items.add(ContextMenuItem.separator());
+        this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.page_settings", "⚙", "Alt+P", () -> {
+            if (screen != null) screen.openPageSettingsDialog();
+        }));
         this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.fit_view", "⌖", "Home", () -> {
             if (screen != null) screen.fitToView();
         }));

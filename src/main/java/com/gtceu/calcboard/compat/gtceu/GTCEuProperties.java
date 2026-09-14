@@ -72,6 +72,14 @@ public final class GTCEuProperties {
             NodePropertyKey.ofString("combustion_oxidizer_type", "none")
     );
 
+    // RFC-013: Modular Combustion Complex Properties
+    public static final NodePropertyKey<String> MCF_COOLANT_TYPE = NodeProperties.register(
+            NodePropertyKey.ofString("mcf_coolant_type", "none")
+    );
+    public static final NodePropertyKey<String> MCF_SLOTS_DATA = NodeProperties.register(
+            NodePropertyKey.ofString("mcf_slots_data", "[]")
+    );
+
     private GTCEuProperties() {}
 
     /**

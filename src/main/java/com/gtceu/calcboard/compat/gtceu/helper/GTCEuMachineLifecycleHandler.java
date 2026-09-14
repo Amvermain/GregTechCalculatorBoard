@@ -9,6 +9,7 @@ import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
+import com.gtceu.calcboard.api.type.OverclockMode;
 import com.gtceu.calcboard.api.type.SteamMode;
 import com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter;
 import com.gtceu.calcboard.compat.gtceu.GTCEuProperties;
@@ -63,6 +64,9 @@ public final class GTCEuMachineLifecycleHandler {
         }
 
         if (oldIcon != null && !oldIcon.equals(newIcon)) {
+            if (GTCombustionHelper.START_MCF.equals(oldIcon) && !GTCombustionHelper.START_MCF.equals(newIcon)) {
+                node.restoreBaseRecipe();
+            }
             purgeIncompatibleAddons(node, oldIcon, newIcon);
         }
 
@@ -137,8 +141,10 @@ public final class GTCEuMachineLifecycleHandler {
             node.getProperties().set(GTCEuProperties.COMBUSTION_OXIDIZER_TYPE, "none");
             node.getAddons().removeIf(GTAddonCompatibilityHandler::isOxidizerAddon);
         }
-        if (!GTCombustionHelper.isModularCombustionFrame(node) && !GTCombustionHelper.isStarTCombustionModule(node) && !GTCombustionHelper.isStarTRocketModule(node)) {
+        if (!GTCombustionHelper.isModularCombustionFrame(newIcon)) {
             node.getProperties().set(GTCEuProperties.COMBUSTION_COOLANT_TYPE, "none");
+            node.getProperties().set(GTCEuProperties.MCF_COOLANT_TYPE, "none");
+            node.getProperties().set(GTCEuProperties.MCF_SLOTS_DATA, "[]");
             node.getAddons().removeIf(GTAddonCompatibilityHandler::isCoolantAddon);
         }
         if (!GTCombustionHelper.isCombustionEngine(node) || !node.isMultiblock()) {
@@ -158,6 +164,8 @@ public final class GTCEuMachineLifecycleHandler {
         } else if (wasGen) {
             node.setGenerator(false);
         }
+
+        updateOverclockModeForMachine(node, oldIcon, newIcon);
 
         if (MultiblockDetector.isTurbineMachine(newIcon)) {
             node.setGenerator(true);
@@ -205,6 +213,17 @@ public final class GTCEuMachineLifecycleHandler {
         }
     }
 
+    public static void updateOverclockModeForMachine(RecipeNode node, ResourceLocation oldIcon, ResourceLocation newIcon) {
+        if (node == null || newIcon == null) return;
+        boolean isPoc = MultiblockDetector.isPerfectOverclockMachine(newIcon);
+        boolean wasPoc = oldIcon != null && MultiblockDetector.isPerfectOverclockMachine(oldIcon);
+        if (isPoc && (oldIcon == null || !wasPoc)) {
+            node.setOverclockMode(OverclockMode.PERFECT);
+        } else if (wasPoc && !isPoc && node.getOverclockMode() == OverclockMode.PERFECT) {
+            node.setOverclockMode(OverclockMode.STANDARD);
+        }
+    }
+
     private static void configureTurbineParallel(RecipeNode node, ResourceLocation oldIcon, int defPar) {
         if (oldIcon != null && MultiblockDetector.isTurbineMachine(oldIcon)) {
             if (GTTurbineHelper.hasRotorAddon(node)) {
@@ -239,25 +258,9 @@ public final class GTCEuMachineLifecycleHandler {
     }
 
     public static void onSteamModeChanged(RecipeNode node, SteamMode oldMode, SteamMode newMode) {
-        ResourceLocation steamId = ResourceLocation.tryParse("gtceu:steam");
         if (newMode != null && newMode.isSteam()) {
-            double durTicks = node.getBaseDurationTicks() * newMode.getDurationMultiplier();
-            double baseEu = (node.getBaseEUt() > 0) ? node.getBaseEUt() : 4.0;
-            double steamAmountPerBatch;
-            if (node.isMultiblock() || MultiblockDetector.isSteamMultiblock(node.getMachineIcon())) {
-                double steamRatePerTick = MultiblockDetector.getSteamMultiblockConsumption(node.getMachineIcon(), newMode);
-                int parallel = Math.max(1, node.getParallel());
-                steamAmountPerBatch = (steamRatePerTick * durTicks) / parallel;
-            } else {
-                steamAmountPerBatch = (baseEu * 2.0) * durTicks;
-            }
-
-            node.getInputs().removeIf(in -> in.isFluid() && steamId != null && steamId.equals(in.getId()));
-            node.getInputs().add(IngredientStack.fluid(steamId, "Steam", steamAmountPerBatch));
-
             updateSteamWorkstationIcon(node, newMode);
         } else if (oldMode != null && oldMode.isSteam()) {
-            node.getInputs().removeIf(in -> in.isFluid() && steamId != null && steamId.equals(in.getId()));
             if (!node.isMultiblock() && !MultiblockDetector.isSteamMultiblock(node.getMachineIcon())) {
                 ResourceLocation sbWs = node.getWorkstationForTier(node.getTargetTier());
                 if (sbWs == null) {
@@ -268,6 +271,7 @@ public final class GTCEuMachineLifecycleHandler {
                 }
             }
         }
+        node.syncProjectedPorts();
     }
 
     private static void updateSteamWorkstationIcon(RecipeNode node, SteamMode newMode) {

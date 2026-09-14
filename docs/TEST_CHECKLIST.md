@@ -121,8 +121,9 @@ This document is the official QA verification checklist for `GregTechCalculatorB
 - [ ] **Energy Hatch & Voltage Tier Deficit Gating (Gating & Operational Validation)**:
   - [ ] Verify that electric multiblock machines equipped with lower-tier energy hatches fail validation (`isOperational = false`) and halt power consumption ($0.0\text{ EU/t}$), preventing abnormal current drawing (e.g. 960A ULV on IV recipes).
   - [ ] Verify dual energy hatch installation allows $+1\text{ Tier}$ skip overclocking when both hatches have matching tiers on multiblocks supporting $2$ hatches.
+  - [ ] Verify single-energy-hatch multiblock machines (e.g. Rock Filtrator, Large Assembler) enforce a strict maximum of 1 energy hatch from structure predicates and reject additional hatches, preventing tier-skip overclocking.
   - [ ] Verify informative deficit warning banners and tooltips on tier buttons (`gui.gtcalcboard.node_warning.energy_hatch_tier_deficit` / `voltage_tier_deficit`).
-  - [ ] `EnergyHatchTierDeficitGatingTest` automated JUnit suite passes 100%.
+  - [ ] `EnergyHatchTierDeficitGatingTest` and `MultiblockEnergyHatchLockTest` automated JUnit suites pass 100%.
 
 ### 2.2 Gauss-Jordan Mass Conservation Solver (`MassBalanceSolver`)
 - [ ] **Closed-Loop Linear Formulation ($A\mathbf{x} = \mathbf{b}$)**:
@@ -158,6 +159,7 @@ This document is the official QA verification checklist for `GregTechCalculatorB
   - [ ] Shift + Right-Click or context menu action [🔄 정상 상태에 대수 맞춤] scales all loop machines to steady-state capacity in a single click.
   - [ ] Global balance dashboard displays internal recirculation breakdown for recirculating resources.
   - [ ] Multi-step recirculation loops with external supply correctly treat internal intermediates without external feed edges as active internal flows rather than unfed damped extinction (`testMultiStepBrineLoopWithExternalFeed`).
+  - [ ] Junction nodes within recirculation loops transparently collect incoming feed lines and preserve flow conservation, converging to steady state without false growth warnings or machine count explosion during Auto-Ratio (`JunctionRecirculationLoopRegressionTest`).
   - [ ] `DampedRecirculationLoopTest` automated JUnit regression suite passes 100%.
 - [ ] **Target Batch ETA & Total Resource Integration (`ProductionETACalculator`)**:
   - [ ] Compute batch duration $T_{\text{ET}} = \frac{A_{\text{target}}}{\text{Rate}_{\text{in}}}$.

@@ -3,10 +3,18 @@
 
 - **문서 번호**: RFC-046
 - **대상 버전**: `v2.3.0`
-- **상태**: `PROPOSED`
+- **상태**: `REJECTED` (2026-09-13 기각: ClientWorkspaceState는 순수 자바로 구현되어 이미 헤드리스 JUnit 테스트가 완벽히 동작 중이며, IBoardPageProvider의 List<BoardPage> 반환 강제는 TeamWorkspacePage의 원격 압축 지연 해제 아키텍처를 파괴하여 메모리 낭비를 유발하므로 영구 기각)
 - **작성일**: 2026-09-11
-- **최종 갱신일**: 2026-09-11
+- **최종 갱신일**: 2026-09-13
 - **주관 계층**: Client GUI Layer (`client.gui.dialog`, `client.gui.widget`), Client State Layer (`client.team`), API Provider Layer (`api.page`)
+
+---
+
+> [!CAUTION]
+> **RFC 기각 사유 (Rejection Rationale)**:
+> 1. **허위 전제(False Motivation)**: `ClientWorkspaceState`는 `net.minecraft.client.Minecraft` 참조가 0건이며, 이미 순수 헤드리스 환경(`MultiblockBOMTest`, `WorkspaceCollaborationSyncTest`)에서 Mocking 없이 100% 테스트되고 있습니다.
+> 2. **아키텍처 구조적 결함**: `IBoardPageProvider.getAllPages()`가 `List<BoardPage>`를 요구하여, 원격 페이지 엔티티(`TeamWorkspacePage`)가 유지하는 압축 바이트 배열(`compressedGraphData`)의 지연 로딩/압축 해제(Lazy Decompress) 체계를 파괴하고 불필요한 전체 역직렬화와 메모리 팽창을 초래합니다.
+> 3. **과잉 추상화(YAGNI)**: 이를 소비하는 UI는 `MultiblockBOMDialog` 단 1곳뿐입니다.
 
 ---
 

@@ -33,6 +33,8 @@ import com.gtceu.calcboard.integration.spi.RecipeViewerRegistry;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -395,6 +397,41 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> implements I
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
+    public GuiEventListener getActiveFocusedWidget() {
+        if (dialogManager != null) {
+            GuiEventListener w = dialogManager.getActiveFocusedWidget();
+            if (w != null) return w;
+        }
+        if (pageTabBar != null && pageTabBar.isEditing()) {
+            EditBox rb = pageTabBar.getRenameBox();
+            if (rb != null && rb.isFocused()) return rb;
+        }
+        if (pageBrowserDrawer != null && pageBrowserDrawer.isOpen()) {
+            EditBox eb = pageBrowserDrawer.getFocusedEditBox();
+            if (eb != null) return eb;
+        }
+        return null;
+    }
+
+    @Override
+    public GuiEventListener getFocused() {
+        GuiEventListener active = getActiveFocusedWidget();
+        return active != null ? active : super.getFocused();
+    }
+
+    @Override
+    public List<? extends GuiEventListener> children() {
+        GuiEventListener active = getActiveFocusedWidget();
+        if (active == null) {
+            return super.children();
+        }
+        List<GuiEventListener> all = new ArrayList<>(super.children());
+        if (!all.contains(active)) {
+            all.add(active);
+        }
+        return all;
+    }
+
     public double toCanvasX(double screenX) { return navigationHandler.toCanvasX(screenX); }
     public double toCanvasY(double screenY) { return navigationHandler.toCanvasY(screenY); }
     public double toScreenX(double canvasX) { return navigationHandler.toScreenX(canvasX); }
@@ -427,6 +464,11 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> implements I
 
     public boolean scaleLoopToSteadyState(String targetNodeId) {
         return actionHandler.scaleLoopToSteadyState(targetNodeId);
+    }
+
+    @Override
+    public void batchApplyPageTargetVoltage() {
+        actionHandler.batchApplyPageTargetVoltage();
     }
 
     public FlowGraph.ConnectionEdge findHoveredWire(double canvasMouseX, double canvasMouseY, double maxDist) {
@@ -613,6 +655,9 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> implements I
     public void openFrameEditDialog(CanvasGroupFrame frame) { dialogManager.openFrameEditDialog(frame); }
     public void openNoteEditDialog(CanvasStickyNote note) { dialogManager.openNoteEditDialog(note); }
     public void openTargetOutputRateDialog(RecipeNode node, int outputIndex) { dialogManager.openTargetOutputRateDialog(node, outputIndex); }
+    public void openPageSettingsDialog(BoardPage page) { dialogManager.openPageSettingsDialog(page); }
+    public void openPageSettingsDialog() { dialogManager.openPageSettingsDialog(com.gtceu.calcboard.api.storage.BoardManager.getInstance().getActivePage()); }
+    public PageSettingsDialog getPageSettingsDialog() { return dialogManager.getPageSettingsDialog(); }
 
     public void openModuleSubPage(RecipeNode moduleNode) { navigationHandler.openModuleSubPage(moduleNode); }
     public void returnToParentPage() { navigationHandler.returnToParentPage(); }

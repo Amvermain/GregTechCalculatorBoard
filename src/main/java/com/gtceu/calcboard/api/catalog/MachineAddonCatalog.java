@@ -78,6 +78,7 @@ public class MachineAddonCatalog {
     public synchronized void reset() {
         synchronized (allAddons) {
             allAddons.clear();
+            customAddons.clear();
             isFastLoaded = false;
             isExhaustiveScanRunning = false;
             isExhaustiveScanComplete = false;

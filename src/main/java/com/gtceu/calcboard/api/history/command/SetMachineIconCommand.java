@@ -30,15 +30,23 @@ public class SetMachineIconCommand implements BoardCommand {
     private final com.gtceu.calcboard.api.type.GTVoltageTier newTier;
     private final String oldName;
     private final String newName;
+    private final List<com.gtceu.calcboard.api.catalog.MachineAddon> oldAddons;
+    private final List<com.gtceu.calcboard.api.catalog.MachineAddon> newAddons;
 
     public SetMachineIconCommand(RecipeNode node, ResourceLocation oldIcon, ResourceLocation newIcon,
                                  boolean oldMultiblock, int oldParallel, com.gtceu.calcboard.api.type.SteamMode oldSteamMode, com.gtceu.calcboard.api.type.GTVoltageTier oldTier) {
-        this(node, oldIcon, newIcon, oldMultiblock, oldParallel, oldSteamMode, oldTier, null, null);
+        this(node, oldIcon, newIcon, oldMultiblock, oldParallel, oldSteamMode, oldTier, null, null, Collections.emptyList());
     }
 
     public SetMachineIconCommand(RecipeNode node, ResourceLocation oldIcon, ResourceLocation newIcon,
                                  boolean oldMultiblock, int oldParallel, com.gtceu.calcboard.api.type.SteamMode oldSteamMode, com.gtceu.calcboard.api.type.GTVoltageTier oldTier,
                                  String oldName, String newName) {
+        this(node, oldIcon, newIcon, oldMultiblock, oldParallel, oldSteamMode, oldTier, oldName, newName, Collections.emptyList());
+    }
+
+    public SetMachineIconCommand(RecipeNode node, ResourceLocation oldIcon, ResourceLocation newIcon,
+                                 boolean oldMultiblock, int oldParallel, com.gtceu.calcboard.api.type.SteamMode oldSteamMode, com.gtceu.calcboard.api.type.GTVoltageTier oldTier,
+                                 String oldName, String newName, List<com.gtceu.calcboard.api.catalog.MachineAddon> oldAddons) {
         this.nodeId = node.getId();
         this.oldIcon = oldIcon;
         this.newIcon = newIcon;
@@ -52,6 +60,8 @@ public class SetMachineIconCommand implements BoardCommand {
         this.newTier = node.getTargetTier();
         this.oldName = oldName;
         this.newName = newName;
+        this.oldAddons = oldAddons != null ? oldAddons.stream().map(com.gtceu.calcboard.api.catalog.MachineAddon::copy).toList() : Collections.emptyList();
+        this.newAddons = node.getAddons().stream().map(com.gtceu.calcboard.api.catalog.MachineAddon::copy).toList();
     }
 
     @Override
@@ -66,6 +76,12 @@ public class SetMachineIconCommand implements BoardCommand {
             if (oldName != null) {
                 node.setName(oldName);
             }
+            node.getAddons().clear();
+            for (com.gtceu.calcboard.api.catalog.MachineAddon a : oldAddons) {
+                node.getAddons().add(a.copy());
+            }
+            node.markOverclockDirty();
+            node.markOperationalDirty();
         }
     }
 
@@ -81,6 +97,12 @@ public class SetMachineIconCommand implements BoardCommand {
             if (newName != null) {
                 node.setName(newName);
             }
+            node.getAddons().clear();
+            for (com.gtceu.calcboard.api.catalog.MachineAddon a : newAddons) {
+                node.getAddons().add(a.copy());
+            }
+            node.markOverclockDirty();
+            node.markOperationalDirty();
         }
     }
 

@@ -1,25 +1,24 @@
 package com.gtceu.calcboard.api.storage;
 
-import com.gtceu.calcboard.api.catalog.CategoryCapability;
-import com.gtceu.calcboard.api.catalog.CategoryCapabilityMatrix;
-import com.gtceu.calcboard.api.catalog.MachineAddon;
 import com.gtceu.calcboard.api.model.BoundaryPinNode;
 import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.ModuleInputPin;
 import com.gtceu.calcboard.api.model.ModuleOutputPin;
 import com.gtceu.calcboard.api.model.RecipeNode;
-import com.gtceu.calcboard.api.type.EnergyType;
+import com.gtceu.calcboard.api.model.RecipeSpec;
+import com.gtceu.calcboard.api.model.role.INodeRole;
+import com.gtceu.calcboard.api.model.role.JunctionNodeRole;
+import com.gtceu.calcboard.api.model.role.MachineNodeRole;
+import com.gtceu.calcboard.api.model.role.NodeRoleType;
+import com.gtceu.calcboard.api.model.role.SubPageModuleNodeRole;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.extension.IPortProjectionProvider;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
-import com.gtceu.calcboard.api.type.OverclockMode;
 import com.gtceu.calcboard.api.type.SteamMode;
-
-import com.gtceu.calcboard.api.model.RecipeNode.PortOrigin;
-import com.gtceu.calcboard.api.property.NodeProperties;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
-import net.minecraft.resources.ResourceLocation;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -27,9 +26,6 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Set;
 
-/**
- * Dedicated serialization helper for RecipeNode NBT storage and blueprint exports.
- */
 public final class RecipeNodeSerializer {
 
     private RecipeNodeSerializer() {}
@@ -49,40 +45,6 @@ public final class RecipeNodeSerializer {
         if (node.hasCustomName()) {
             tag.putBoolean("hasCustomName", true);
         }
-        if (node.getMachineIcon() != null) {
-            tag.putString("icon", node.getMachineIcon().toString());
-        }
-        if (node.getBaseDurationTicks() != 0.0) {
-            tag.putDouble("baseDuration", node.getBaseDurationTicks());
-        }
-        if (node.getBaseEUt() != 0.0) {
-            tag.putDouble("baseEUt", node.getBaseEUt());
-        }
-        if (node.getRecipeTier() != null) {
-            tag.putString("recipeTier", node.getRecipeTier().name());
-            if (node.getTargetTier() != null && node.getTargetTier() != node.getRecipeTier()) {
-                tag.putString("targetTier", node.getTargetTier().name());
-            }
-        }
-        if (Math.abs(node.getMachineCount() - 1.0) > 0.0001) {
-            tag.putDouble("machineCount", node.getMachineCount());
-        }
-        if (node.getParallel() > 1) {
-            tag.putInt("parallel", node.getParallel());
-        }
-        if (node.getOverclockMode() != OverclockMode.STANDARD) {
-            tag.putString("overclockMode", node.getOverclockMode().name());
-        }
-        if (node.isBaseNode()) {
-            tag.putBoolean("isBaseNode", true);
-        }
-        if (node.isGenerator()) {
-            tag.putBoolean("isGenerator", true);
-        }
-        CompoundTag propTag = node.getProperties().serializeNBT();
-        if (!propTag.isEmpty()) {
-            tag.put("properties", propTag);
-        }
         tag.putDouble("posX", node.getPosX());
         tag.putDouble("posY", node.getPosY());
         if (node.getCardWidth() != 245) {
@@ -91,16 +53,43 @@ public final class RecipeNodeSerializer {
         if (node.getCardHeight() > 0) {
             tag.putInt("cardHeight", node.getCardHeight());
         }
-        if (node.isModule()) {
-            tag.putBoolean("isModule", true);
-            if (node.getContainedMachineCount() > 0) {
-                tag.putInt("containedMachineCount", node.getContainedMachineCount());
-            }
-            if (node.getSubGraph() != null && depth < 16 && (visitedGraphs == null || visitedGraphs.add(node.getSubGraph()))) {
-                tag.put("subGraph", node.getSubGraph().serializeNBT(0, 0, 1.0, visitedGraphs, depth + 1));
-            }
+        if (node.isFlipped()) {
+            tag.putBoolean("isFlipped", true);
+        }
+        if (node.isBaseNode()) {
+            tag.putBoolean("isBaseNode", true);
         }
 
+        CompoundTag propTag = node.getProperties().serializeNBT();
+        if (!propTag.isEmpty()) {
+            tag.put("properties", propTag);
+        }
+
+        if (node.getBaseSpec() != null) {
+            tag.put("baseSpec", node.getBaseSpec().serializeNBT());
+        }
+
+        serializePorts(node, tag);
+
+        INodeRole role = node.getRole();
+        if (role != null) {
+            tag.putString("roleType", role.getRoleType().name());
+            CompoundTag roleData = new CompoundTag();
+            role.serializeRoleNBT(roleData, copyVisitedGraphs(visitedGraphs), depth);
+            if (!roleData.isEmpty()) {
+                tag.put("roleData", roleData);
+            }
+            role.serializeRoleNBT(tag, visitedGraphs, depth);
+        }
+
+        if (node.getSteamMode() != null && node.getSteamMode() != SteamMode.NONE) {
+            tag.putString("steamMode", node.getSteamMode().name());
+        }
+
+        return tag;
+    }
+
+    private static void serializePorts(RecipeNode node, CompoundTag tag) {
         if (!node.getInputs().isEmpty()) {
             ListTag inList = new ListTag();
             for (IngredientStack in : node.getInputs()) {
@@ -117,76 +106,6 @@ public final class RecipeNodeSerializer {
             tag.put("outputs", outList);
         }
 
-        if (!node.getAddons().isEmpty()) {
-            ListTag addonList = new ListTag();
-            for (MachineAddon a : node.getAddons()) {
-                addonList.add(a.serializeNBT());
-            }
-            tag.put("addons", addonList);
-        }
-
-        if (node.getRecipeCategoryId() != null) {
-            tag.putString("recipeCategoryId", node.getRecipeCategoryId().toString());
-        }
-
-        if (!node.getAvailableWorkstations().isEmpty()) {
-            CategoryCapability cap = node.getRecipeCategoryId() != null 
-                    ? CategoryCapabilityMatrix.getInstance().getCapability(node.getRecipeCategoryId()) 
-                    : null;
-            List<ResourceLocation> capWs = (cap != null && cap.availableWorkstations() != null) ? cap.availableWorkstations() : List.of();
-            if (!node.getAvailableWorkstations().equals(capWs)) {
-                ListTag wsList = new ListTag();
-                for (ResourceLocation ws : node.getAvailableWorkstations()) {
-                    wsList.add(net.minecraft.nbt.StringTag.valueOf(ws.toString()));
-                }
-                tag.put("workstations", wsList);
-            }
-        }
-
-        if (node.getEnergyType() != null) {
-            tag.putString("energyType", node.getEnergyType().name());
-        }
-
-        if (node.getSteamMode() != null && node.getSteamMode() != SteamMode.NONE) {
-            tag.putString("steamMode", node.getSteamMode().name());
-        }
-
-        if (node.isMultiblock()) {
-            tag.putBoolean("isMultiblock", true);
-        }
-        if (node instanceof BoundaryPinNode pin) {
-            tag.putString("pinType", pin.getDirection().name());
-            tag.putString("pinLabel", pin.getPinLabel());
-            tag.putInt("targetPortIndex", pin.getTargetPortIndex());
-            if (pin.getBoundIngredient() != null) {
-                tag.put("boundIngredient", pin.getBoundIngredient().serializeNBT());
-            }
-        }
-        if (node.isModule()) {
-            tag.putBoolean("isModule", true);
-            if (node.getSubPageId() != null && !node.getSubPageId().isEmpty()) {
-                tag.putString("subPageId", node.getSubPageId());
-            }
-            if (!node.getInputPinNodeIds().isEmpty()) {
-                ListTag inPins = new ListTag();
-                for (String pid : node.getInputPinNodeIds()) inPins.add(net.minecraft.nbt.StringTag.valueOf(pid));
-                tag.put("inputPinNodeIds", inPins);
-            }
-            if (!node.getOutputPinNodeIds().isEmpty()) {
-                ListTag outPins = new ListTag();
-                for (String pid : node.getOutputPinNodeIds()) outPins.add(net.minecraft.nbt.StringTag.valueOf(pid));
-                tag.put("outputPinNodeIds", outPins);
-            }
-        }
-        if (node.isReroute()) {
-            tag.putBoolean("isReroute", true);
-        }
-        if (node.isFlipped()) {
-            tag.putBoolean("isFlipped", true);
-        }
-
-        node.getPortOriginManager().serialize(tag);
-
         if (!node.getHiddenInputIndices().isEmpty()) {
             tag.putIntArray("hiddenInputs", node.getHiddenInputIndices().stream().mapToInt(Integer::intValue).toArray());
         }
@@ -196,26 +115,6 @@ public final class RecipeNodeSerializer {
         if (!node.getVoidedOutputIndices().isEmpty()) {
             tag.putIntArray("voidedOutputs", node.getVoidedOutputIndices().stream().mapToInt(Integer::intValue).toArray());
         }
-
-        if (node.getSupplyMode() != com.gtceu.calcboard.api.type.SupplyMode.NONE) {
-            tag.putString("supplyMode", node.getSupplyMode().name());
-        }
-        if (node.getExternalSupplyRate() > 0.0) {
-            tag.putDouble("externalSupplyRate", node.getExternalSupplyRate());
-        }
-        if (node.getExternalDrainRate() > 0.0) {
-            tag.putDouble("externalDrainRate", node.getExternalDrainRate());
-        }
-        if (node.getCustomParallel() > 0) {
-            tag.putInt("customParallel", node.getCustomParallel());
-        }
-
-        CompoundTag propsTag = node.getProperties().serializeNBT();
-        if (!propsTag.isEmpty()) {
-            tag.put("properties", propsTag);
-        }
-
-        return tag;
     }
 
     public static RecipeNode deserialize(CompoundTag tag) {
@@ -226,43 +125,202 @@ public final class RecipeNodeSerializer {
         double baseDuration = tag.getDouble("baseDuration");
         double baseEUt = tag.getDouble("baseEUt");
 
+        GTVoltageTier recipeTier = resolveRecipeTier(tag, baseEUt);
+        NodeRoleType detectedRoleType = resolveRoleType(tag);
+
+        RecipeNode node = createNodeInstance(id, name, baseDuration, baseEUt, recipeTier, detectedRoleType, tag);
+
+        if (tag.contains("hasCustomName")) {
+            node.setHasCustomName(tag.getBoolean("hasCustomName"));
+        }
+        if (tag.contains("properties", Tag.TAG_COMPOUND)) {
+            node.getProperties().deserializeNBT(tag.getCompound("properties"));
+        } else if (tag.contains("threadingJson")) {
+            CompoundTag legacyProps = new CompoundTag();
+            legacyProps.putString("threadingJson", tag.getString("threadingJson"));
+            node.getProperties().deserializeNBT(legacyProps);
+        }
+
+        restoreLegacyHardwareProperties(node, tag);
+
+        if (tag.contains("isBaseNode")) {
+            node.setBaseNode(tag.getBoolean("isBaseNode"));
+        }
+        if (tag.contains("cardWidth")) {
+            node.setCardWidth(tag.getInt("cardWidth"));
+        }
+        if (tag.contains("cardHeight")) {
+            node.setCardHeight(tag.getInt("cardHeight"));
+        }
+        if (tag.contains("isFlipped")) {
+            node.setFlipped(tag.getBoolean("isFlipped"));
+        }
+        node.setPosX(tag.getDouble("posX"));
+        node.setPosY(tag.getDouble("posY"));
+
+        restorePortLists(node, tag);
+        if (tag.contains("steamMode")) {
+            try {
+                node.setSteamMode(SteamMode.valueOf(tag.getString("steamMode")));
+            } catch (Throwable ignored) {}
+        }
+
+        if (tag.contains("baseSpec", Tag.TAG_COMPOUND)) {
+            RecipeSpec spec = RecipeSpec.deserializeNBT(tag.getCompound("baseSpec"));
+            node.setBaseSpecOnly(spec);
+        } else {
+            reconstructLegacyBaseSpec(node, tag);
+        }
+        node.syncProjectedPorts();
+        restorePortVisibility(node, tag);
+
+        return node;
+    }
+
+    private static GTVoltageTier resolveRecipeTier(CompoundTag tag, double baseEUt) {
         GTVoltageTier recipeTier = null;
         if (tag.contains("recipeTier")) {
             try {
                 recipeTier = GTVoltageTier.valueOf(tag.getString("recipeTier"));
             } catch (Throwable ignored) {}
         }
-        if (recipeTier == null) {
-            recipeTier = GTVoltageTier.getTierForVoltage((long) baseEUt);
-        }
+        return recipeTier != null ? recipeTier : GTVoltageTier.getTierForVoltage((long) baseEUt);
+    }
 
-        RecipeNode node;
-        if (tag.contains("pinType")) {
-            String pType = tag.getString("pinType");
-            String pLabel = tag.getString("pinLabel");
-            IngredientStack bound = tag.contains("boundIngredient")
-                    ? IngredientStack.deserializeNBT(tag.getCompound("boundIngredient"))
-                    : null;
-            if ("INPUT".equalsIgnoreCase(pType)) {
-                ModuleInputPin inPin = new ModuleInputPin(id, pLabel, bound);
-                inPin.setTargetPortIndex(tag.getInt("targetPortIndex"));
-                node = inPin;
-            } else {
-                ModuleOutputPin outPin = new ModuleOutputPin(id, pLabel, bound);
-                outPin.setTargetPortIndex(tag.getInt("targetPortIndex"));
-                node = outPin;
+    private static NodeRoleType resolveRoleType(CompoundTag tag) {
+        if (!tag.contains("roleType")) return null;
+        try {
+            return NodeRoleType.valueOf(tag.getString("roleType"));
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static RecipeNode createNodeInstance(String id, String name, double baseDuration, double baseEUt, GTVoltageTier recipeTier, NodeRoleType roleType, CompoundTag tag) {
+        if (roleType != null) {
+            return createNodeFromRoleType(id, name, baseDuration, baseEUt, recipeTier, roleType, tag);
+        }
+        return createNodeFromLegacyTags(id, name, baseDuration, baseEUt, recipeTier, tag);
+    }
+
+    private static RecipeNode createNodeFromRoleType(String id, String name, double baseDuration, double baseEUt, GTVoltageTier recipeTier, NodeRoleType roleType, CompoundTag tag) {
+        CompoundTag roleData = tag.contains("roleData", Tag.TAG_COMPOUND) ? tag.getCompound("roleData") : null;
+        switch (roleType) {
+            case BOUNDARY_PIN -> {
+                CompoundTag pinTag = roleData != null && roleData.contains("pinType") ? roleData : tag;
+                return createLegacyBoundaryPin(id, name, pinTag);
             }
-        } else {
-            node = new RecipeNode(id, name, baseDuration, baseEUt, recipeTier);
+            case JUNCTION -> {
+                RecipeNode node = new RecipeNode(id, name != null ? name : "Reroute", 0.0, 0.0, GTVoltageTier.ULV);
+                JunctionNodeRole junctionRole = new JunctionNodeRole();
+                junctionRole.deserializeRoleNBT(tag);
+                if (roleData != null) junctionRole.deserializeRoleNBT(roleData);
+                node.setRole(junctionRole);
+                node.setCardWidth(32);
+                node.setCardHeight(32);
+                return node;
+            }
+            case MODULE -> {
+                RecipeNode node = new RecipeNode(id, name, baseDuration, baseEUt, recipeTier);
+                SubPageModuleNodeRole moduleRole = new SubPageModuleNodeRole();
+                moduleRole.deserializeRoleNBT(tag);
+                if (roleData != null) moduleRole.deserializeRoleNBT(roleData);
+                node.setRole(moduleRole);
+                return node;
+            }
+            case MACHINE -> {
+                RecipeNode node = new RecipeNode(id, name, baseDuration, baseEUt, recipeTier);
+                MachineNodeRole machineRole = new MachineNodeRole(baseDuration, baseEUt, recipeTier);
+                machineRole.deserializeRoleNBT(tag);
+                if (roleData != null) machineRole.deserializeRoleNBT(roleData);
+                node.setRole(machineRole);
+                return node;
+            }
         }
-        if (tag.contains("hasCustomName")) {
-            node.setHasCustomName(tag.getBoolean("hasCustomName"));
-        }
-        if (tag.contains("properties", Tag.TAG_COMPOUND)) {
-            node.getProperties().deserializeNBT(tag.getCompound("properties"));
-        }
+        return new RecipeNode(id, name, baseDuration, baseEUt, recipeTier);
+    }
 
-        // Backward compatibility for legacy saves and blueprints
+    private static RecipeNode createNodeFromLegacyTags(String id, String name, double baseDuration, double baseEUt, GTVoltageTier recipeTier, CompoundTag tag) {
+        if (tag.contains("pinType")) {
+            return createLegacyBoundaryPin(id, name, tag);
+        }
+        if (tag.getBoolean("isReroute")) {
+            RecipeNode node = new RecipeNode(id, name != null ? name : "Reroute", 0.0, 0.0, GTVoltageTier.ULV);
+            JunctionNodeRole junctionRole = new JunctionNodeRole();
+            junctionRole.deserializeRoleNBT(tag);
+            node.setRole(junctionRole);
+            node.setCardWidth(32);
+            node.setCardHeight(32);
+            return node;
+        }
+        if (tag.getBoolean("isModule")) {
+            RecipeNode node = new RecipeNode(id, name, baseDuration, baseEUt, recipeTier);
+            SubPageModuleNodeRole moduleRole = new SubPageModuleNodeRole();
+            moduleRole.deserializeRoleNBT(tag);
+            node.setRole(moduleRole);
+            return node;
+        }
+        RecipeNode node = new RecipeNode(id, name, baseDuration, baseEUt, recipeTier);
+        if (node.isMachine()) {
+            node.asMachine().deserializeRoleNBT(tag);
+        }
+        return node;
+    }
+
+    private static RecipeNode createLegacyBoundaryPin(String id, String name, CompoundTag tag) {
+        String pType = tag.getString("pinType");
+        String pLabel = tag.contains("pinLabel") && !tag.getString("pinLabel").isEmpty()
+                ? tag.getString("pinLabel")
+                : (name != null && !name.isEmpty() ? name : ("OUTPUT".equalsIgnoreCase(pType) ? "Output Pin" : "Input Pin"));
+        IngredientStack bound = tag.contains("boundIngredient")
+                ? IngredientStack.deserializeNBT(tag.getCompound("boundIngredient"))
+                : null;
+        BoundaryPinNode pinNode;
+        if ("OUTPUT".equalsIgnoreCase(pType)) {
+            pinNode = new ModuleOutputPin(id, pLabel, bound);
+        } else {
+            pinNode = new ModuleInputPin(id, pLabel, bound);
+        }
+        pinNode.setTargetPortIndex(tag.getInt("targetPortIndex"));
+        return pinNode;
+    }
+
+    private static void restorePortLists(RecipeNode node, CompoundTag tag) {
+        if (tag.contains("inputs", Tag.TAG_LIST)) {
+            node.getInputs().clear();
+            ListTag inList = tag.getList("inputs", Tag.TAG_COMPOUND);
+            for (int i = 0; i < inList.size(); i++) {
+                node.getInputs().add(IngredientStack.deserializeNBT(inList.getCompound(i)));
+            }
+        }
+        if (tag.contains("outputs", Tag.TAG_LIST)) {
+            node.getOutputs().clear();
+            ListTag outList = tag.getList("outputs", Tag.TAG_COMPOUND);
+            for (int i = 0; i < outList.size(); i++) {
+                node.getOutputs().add(IngredientStack.deserializeNBT(outList.getCompound(i)));
+            }
+        }
+    }
+
+    private static void restorePortVisibility(RecipeNode node, CompoundTag tag) {
+        if (tag.contains("hiddenInputs")) {
+            for (int idx : tag.getIntArray("hiddenInputs")) {
+                node.hideInputPort(idx);
+            }
+        }
+        if (tag.contains("hiddenOutputs")) {
+            for (int idx : tag.getIntArray("hiddenOutputs")) {
+                node.hideOutputPort(idx);
+            }
+        }
+        if (tag.contains("voidedOutputs")) {
+            for (int idx : tag.getIntArray("voidedOutputs")) {
+                node.setOutputPortVoided(idx, true);
+            }
+        }
+    }
+
+    private static void restoreLegacyHardwareProperties(RecipeNode node, CompoundTag tag) {
         if (tag.contains("recipeTemperature") && !node.getProperties().hasById("ebf_temperature")) {
             node.setRecipeTemperature(tag.getInt("recipeTemperature"));
         }
@@ -283,162 +341,37 @@ public final class RecipeNodeSerializer {
         } else if (tag.contains("euToStart") && !node.getProperties().hasById("fusion_start_eu")) {
             node.setEuToStart(tag.getLong("euToStart"));
         }
+    }
 
-        if (tag.contains("recipeCategoryId")) {
-            node.setRecipeCategoryId(ResourceLocation.tryParse(tag.getString("recipeCategoryId")));
+    private static void reconstructLegacyBaseSpec(RecipeNode node, CompoundTag tag) {
+        IPortProjectionProvider provider = ModAdapterRegistry.findExtension(node, IPortProjectionProvider.class).orElse(null);
+        if (provider == null) {
+            provider = ModAdapterRegistry.getAdapterForNode(node);
         }
-        if (tag.contains("workstations")) {
-            ListTag wsList = tag.getList("workstations", 8);
-            List<ResourceLocation> wsColl = new ArrayList<>();
-            for (int i = 0; i < wsList.size(); i++) {
-                ResourceLocation ws = ResourceLocation.tryParse(wsList.getString(i));
-                if (ws != null) wsColl.add(ws);
-            }
-            node.setAvailableWorkstations(wsColl);
-        } else if (node.getRecipeCategoryId() != null) {
-            CategoryCapability cap = CategoryCapabilityMatrix.getInstance().getCapability(node.getRecipeCategoryId());
-            if (cap != null && cap.availableWorkstations() != null && !cap.availableWorkstations().isEmpty()) {
-                node.setAvailableWorkstations(cap.availableWorkstations());
-            }
-        }
-        if (tag.contains("icon")) {
-            node.setMachineIcon(ResourceLocation.tryParse(tag.getString("icon")));
-        }
-        if (tag.contains("isMultiblock")) {
-            node.setMultiblock(tag.getBoolean("isMultiblock"));
-        }
-        if (tag.contains("targetTier")) {
-            node.setTargetTier(GTVoltageTier.valueOf(tag.getString("targetTier")));
-        }
-        if (tag.contains("machineCount")) {
-            node.setMachineCount(tag.getDouble("machineCount"));
-        }
-        if (tag.contains("parallel")) {
-            node.setParallel(tag.getInt("parallel"));
-        }
-        if (tag.contains("addons")) {
-            ListTag addonList = tag.getList("addons", 10);
-            for (int i = 0; i < addonList.size(); i++) {
-                MachineAddon a = MachineAddon.deserializeNBT(addonList.getCompound(i));
-                if (a != null) {
-                    node.addAddon(a);
-                }
-            }
-        }
-        if (tag.contains("overclockMode")) {
-            node.setOverclockMode(OverclockMode.valueOf(tag.getString("overclockMode")));
-        }
-        if (tag.contains("isBaseNode")) {
-            node.setBaseNode(tag.getBoolean("isBaseNode"));
-        }
-        if (tag.contains("isGenerator")) {
-            node.setGenerator(tag.getBoolean("isGenerator"));
-        }
-        if (tag.contains("cardWidth")) {
-            node.setCardWidth(tag.getInt("cardWidth"));
-        }
-        if (tag.contains("cardHeight")) {
-            node.setCardHeight(tag.getInt("cardHeight"));
-        }
-        if (tag.contains("isModule")) {
-            node.setModule(tag.getBoolean("isModule"));
-        }
-        if (tag.contains("subPageId")) {
-            node.setSubPageId(tag.getString("subPageId"));
-        }
-        if (tag.contains("inputPinNodeIds", Tag.TAG_LIST)) {
-            ListTag inPins = tag.getList("inputPinNodeIds", Tag.TAG_STRING);
-            for (int i = 0; i < inPins.size(); i++) {
-                node.getInputPinNodeIds().add(inPins.getString(i));
-            }
-        }
-        if (tag.contains("outputPinNodeIds", Tag.TAG_LIST)) {
-            ListTag outPins = tag.getList("outputPinNodeIds", Tag.TAG_STRING);
-            for (int i = 0; i < outPins.size(); i++) {
-                node.getOutputPinNodeIds().add(outPins.getString(i));
-            }
-        }
-        if (tag.contains("containedMachineCount")) {
-            node.setContainedMachineCount(tag.getInt("containedMachineCount"));
-        }
-        node.getInputs().clear();
-        if (tag.contains("inputs", Tag.TAG_LIST)) {
-            ListTag inList = tag.getList("inputs", Tag.TAG_COMPOUND);
-            for (int i = 0; i < inList.size(); i++) {
-                node.getInputs().add(IngredientStack.deserializeNBT(inList.getCompound(i)));
-            }
-        }
-        node.getOutputs().clear();
-        if (tag.contains("outputs", Tag.TAG_LIST)) {
-            ListTag outList = tag.getList("outputs", Tag.TAG_COMPOUND);
-            for (int i = 0; i < outList.size(); i++) {
-                node.getOutputs().add(IngredientStack.deserializeNBT(outList.getCompound(i)));
-            }
+        List<IngredientStack> coreInputs = provider != null
+                ? provider.sanitizeLegacyCoreInputs(node, node.getInputs())
+                : new ArrayList<>(node.getInputs());
+
+        List<IngredientStack> coreOutputs = new ArrayList<>();
+        for (IngredientStack out : node.getOutputs()) {
+            coreOutputs.add(out.copy());
         }
 
-        if (tag.contains("energyType")) {
-            try {
-                node.setEnergyType(EnergyType.valueOf(tag.getString("energyType")));
-            } catch (Throwable ignored) {}
-        }
-        if (tag.contains("steamMode")) {
-            try {
-                node.setSteamMode(SteamMode.valueOf(tag.getString("steamMode")));
-            } catch (Throwable ignored) {}
-        }
-        if (tag.contains("subGraph")) {
-            node.setSubGraph(FlowGraph.deserializeNBT(tag.getCompound("subGraph")));
-        }
-        node.setPosX(tag.getDouble("posX"));
-        node.setPosY(tag.getDouble("posY"));
+        RecipeSpec legacySpec = new RecipeSpec(
+                node.getId(),
+                node.getRecipeCategoryId(),
+                node.getBaseDurationTicks(),
+                node.getBaseEUt(),
+                coreInputs,
+                coreOutputs
+        );
+        node.setBaseSpecOnly(legacySpec);
+    }
 
-        if (tag.contains("isReroute")) {
-            node.setReroute(tag.getBoolean("isReroute"));
-        }
-        if (tag.contains("isFlipped")) {
-            node.setFlipped(tag.getBoolean("isFlipped"));
-        }
-        node.getPortOriginManager().deserialize(tag);
-
-        if (tag.contains("hiddenInputs")) {
-            for (int idx : tag.getIntArray("hiddenInputs")) {
-                node.hideInputPort(idx);
-            }
-        }
-        if (tag.contains("hiddenOutputs")) {
-            for (int idx : tag.getIntArray("hiddenOutputs")) {
-                node.hideOutputPort(idx);
-            }
-        }
-        if (tag.contains("voidedOutputs")) {
-            for (int idx : tag.getIntArray("voidedOutputs")) {
-                node.setOutputPortVoided(idx, true);
-            }
-        }
-
-        if (tag.contains("supplyMode")) {
-            try {
-                node.setSupplyMode(com.gtceu.calcboard.api.type.SupplyMode.valueOf(tag.getString("supplyMode")));
-            } catch (Throwable ignored) {}
-        }
-        if (tag.contains("externalSupplyRate")) {
-            node.setExternalSupplyRate(tag.getDouble("externalSupplyRate"));
-        }
-        if (tag.contains("externalDrainRate")) {
-            node.setExternalDrainRate(tag.getDouble("externalDrainRate"));
-        }
-        if (tag.contains("customParallel")) {
-            node.setCustomParallel(tag.getInt("customParallel"));
-        }
-
-        if (tag.contains("properties", Tag.TAG_COMPOUND)) {
-            node.getProperties().deserializeNBT(tag.getCompound("properties"));
-        } else if (tag.contains("threadingJson")) {
-            CompoundTag legacyProps = new CompoundTag();
-            legacyProps.putString("threadingJson", tag.getString("threadingJson"));
-            node.getProperties().deserializeNBT(legacyProps);
-        }
-
-        return node;
+    private static Set<FlowGraph> copyVisitedGraphs(Set<FlowGraph> visitedGraphs) {
+        if (visitedGraphs == null) return null;
+        Set<FlowGraph> copy = Collections.newSetFromMap(new IdentityHashMap<>());
+        copy.addAll(visitedGraphs);
+        return copy;
     }
 }

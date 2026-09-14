@@ -42,6 +42,14 @@ public final class SimulatedGTEnvironment {
         registerSimulatedCapabilities();
     }
 
+    public static void tearDownEnvironment() {
+        MultiblockStructureCatalog.clear();
+        CategoryCapabilityMatrix.getInstance().reset();
+        MultiblockDetector.reinitialize();
+        TestMultiblockFixtures.initTestEnvironmentDefaults();
+        com.gtceu.calcboard.api.catalog.MachineAddonCatalog.getInstance().reset();
+    }
+
     private static void registerSimulatedStructures() {
         MultiblockStructureCatalog.registerManualStructure(buildDistillationTowerDef());
         MultiblockStructureCatalog.registerManualStructure(buildLargeSteamTurbineDef());
@@ -81,7 +89,7 @@ public final class SimulatedGTEnvironment {
                 DISTILLATION_TOWER_ID,
                 "Distillation Tower",
                 parts,
-                0, 1, 0, 1, 1, 11, 1,
+                0, 2, 0, 1, 1, 11, 1,
                 abilities,
                 candidates
         );
@@ -150,7 +158,7 @@ public final class SimulatedGTEnvironment {
                 ROTOR_CASING_MACHINE_ID,
                 "Rotor Casing Machine",
                 List.of(),
-                0, 1, 1, 1, 0, 0, 1,
+                0, 2, 1, 1, 0, 0, 1,
                 Set.of("ROTOR_HOLDER", "INPUT_ENERGY", "MAINTENANCE"),
                 Set.of()
         );
@@ -162,7 +170,7 @@ public final class SimulatedGTEnvironment {
                 LFD_ID,
                 "Large Fractionating Distillery",
                 List.of(),
-                0, 1, 1, 1, 1, 1, 1,
+                0, 2, 1, 1, 1, 1, 1,
                 abilities,
                 Set.of()
         );

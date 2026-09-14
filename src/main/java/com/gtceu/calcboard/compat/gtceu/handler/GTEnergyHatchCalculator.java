@@ -1,5 +1,7 @@
 package com.gtceu.calcboard.compat.gtceu.handler;
 
+import com.gtceu.calcboard.api.bom.MultiblockStructureCatalog;
+import com.gtceu.calcboard.api.bom.MultiblockStructureDef;
 import com.gtceu.calcboard.api.catalog.MachineAddon;
 import com.gtceu.calcboard.api.catalog.MultiblockDetector;
 import com.gtceu.calcboard.api.model.RecipeNode;
@@ -25,10 +27,22 @@ public final class GTEnergyHatchCalculator {
     public static int getMaxAllowedEnergyHatches(RecipeNode node) {
         if (node == null || !node.isMultiblock()) return 1;
         if (node.isGenerator()) return 1;
-        ResourceLocation mbId = node.getMachineIcon() != null ? node.getMachineIcon() : node.getMultiblockWorkstation();
+
+        ResourceLocation mbId = node.getMachineIcon();
+        MultiblockStructureDef def = mbId != null ? MultiblockStructureCatalog.getStructure(mbId) : null;
+        if (def == null && node.getMultiblockWorkstation() != null) {
+            mbId = node.getMultiblockWorkstation();
+            def = MultiblockStructureCatalog.getStructure(mbId);
+        }
+
         if (mbId != null && MultiblockDetector.isSteamMultiblock(mbId)) {
             return 0;
         }
+
+        if (def != null && def.energyHatchSlotCount() > 0) {
+            return def.energyHatchSlotCount();
+        }
+
         return 2;
     }
 

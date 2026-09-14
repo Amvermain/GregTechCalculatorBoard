@@ -11,6 +11,36 @@
 
 ## [Unreleased]
 
+## [2.2.1] - 2026-09-13
+
+### Added
+- Added page-level target voltage tier settings and automatic machine provisioning, automatically upgrading singleblock machine tiers and equipping matching energy hatches on multiblock machines when adding recipes, with always-visible interactive tab and page browser badges, a dedicated page settings dialog, canvas context menu access, and the Alt+P shortcut.
+- Integrated Star Technology Modular Combustion Frame (MCF) and docking combustion modules into a single macro node, allowing players to configure up to 8 docked modules with quick presets, centralize coolant consumption into a single port proportional to active modules, and calculate complete multiblock frame and module materials in the BOM.
+
+### Improved
+- Machines with native Perfect Overclock (such as Large Chemical Reactor in vanilla GTCEu) now automatically default to Perfect Overclock mode upon placement or icon switching, while preserving standard overclocking in environments where coils replace native bonuses (such as Star Technology).
+- Integrated composite process module nodes into linear flow solving and auto-ratio calculations, allowing module machine counts to automatically scale to meet downstream process demand.
+- Improved machine and recipe switching so that incompatible addons (such as coils or rotors) are automatically cleared, required voltage tiers are adjusted upwards to meet recipe requirements, and machine configuration windows stay in sync in real time.
+- Enhanced recipe switching undo and redo actions to completely restore previous machine icons, multiblock states, installed addons, and custom parallel values.
+- Preserved original recipe inputs and outputs when switching machines (such as switching between standard combustion generators and modular frames), preventing recipe loss when toggling machine types or hardware addons.
+- Enhanced port tooltips for hardware-injected fluids (such as steam, cooling water, and oxidizers) with dedicated hardware auxiliary badges displaying their source addon.
+- Streamlined label text and added hover tooltips in the page settings panel to prevent label truncation on the auto-equip checkbox and batch apply button.
+
+### Fixed
+- Fixed an issue where switching a node between junction/boundary pin and machine/module roles preserved fixed dimensions, clipping the node card.
+- Fixed an issue where GregTech energy hatches could be misidentified as different voltage tiers in certain modpack naming environments.
+- Fixed an issue where Modular Combustion Frame (MCF) nodes retained previous recipe fuels (such as Rocket Fuel) upon machine conversion, dynamically calculating exact fuel consumption rates from active docked module slots and displaying real-time demand in the config panel.
+- Fixed an issue where installing hardware addons (such as oxygen boost or steam mode) shifted core recipe input slots, preventing existing wire connections from detaching or connecting to unintended ports.
+
+## [2.2.0] - 2026-09-12
+
+### Fixed
+- Fixed an issue where external recipe viewer (EMI) hotkeys intercepted text typing while the recipe search dialog is open, and prevented duplicate background caching calls during recipe reloading.
+- Fixed an issue where the Throughput Boosting multiblock trait displayed as "Pyrolyse Oven" in the machine configuration dialog and cards.
+- Fixed an issue where fractional power multipliers were rounded incorrectly on addon badges, and resolved an issue where Throughput Boosting's 4x parallel was mistakenly treated as extra power draw, preventing overclocking and causing excessive processing durations.
+- Fixed an issue where single-energy-hatch multiblock machines (such as Rock Filtrator) could be equipped with multiple energy hatches to trigger voltage tier-skip overclocking.
+- Fixed an issue where connecting a junction node in a recirculation loop could trigger false loop warnings, freeze machine rates, or cause machine counts to explode during auto-ratio calculation.
+
 ## [2.2.0-beta.4] - 2026-09-11
 
 ### Fixed

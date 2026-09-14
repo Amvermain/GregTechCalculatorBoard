@@ -52,6 +52,12 @@ public interface BoardCommand {
         }
     }
 
+    class BatchChangeTierCommand extends com.gtceu.calcboard.api.history.command.BatchChangeTierCommand {
+        public BatchChangeTierCommand(List<NodeTierSnapshot> previousSnapshots, List<NodeTierSnapshot> newSnapshots, GTVoltageTier targetTier) {
+            super(previousSnapshots, newSnapshots, targetTier);
+        }
+    }
+
     class CompoundCommand extends com.gtceu.calcboard.api.history.command.CompoundCommand {
         public CompoundCommand(List<BoardCommand> commands, String description) {
             super(commands, description);
@@ -229,6 +235,9 @@ public interface BoardCommand {
         }
         public SetMachineIconCommand(RecipeNode node, ResourceLocation oldIcon, ResourceLocation newIcon, boolean oldMultiblock, int oldParallel, com.gtceu.calcboard.api.type.SteamMode oldSteamMode, com.gtceu.calcboard.api.type.GTVoltageTier oldTier, String oldName, String newName) {
             super(node, oldIcon, newIcon, oldMultiblock, oldParallel, oldSteamMode, oldTier, oldName, newName);
+        }
+        public SetMachineIconCommand(RecipeNode node, ResourceLocation oldIcon, ResourceLocation newIcon, boolean oldMultiblock, int oldParallel, com.gtceu.calcboard.api.type.SteamMode oldSteamMode, com.gtceu.calcboard.api.type.GTVoltageTier oldTier, String oldName, String newName, List<com.gtceu.calcboard.api.catalog.MachineAddon> oldAddons) {
+            super(node, oldIcon, newIcon, oldMultiblock, oldParallel, oldSteamMode, oldTier, oldName, newName, oldAddons);
         }
     }
 

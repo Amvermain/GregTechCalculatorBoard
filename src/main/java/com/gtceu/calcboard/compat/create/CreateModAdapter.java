@@ -286,6 +286,16 @@ public class CreateModAdapter extends AbstractKineticModAdapter implements IHard
         if (ITEM_STEAM_ENGINE.equals(itemId)) return com.gtceu.calcboard.api.bom.PartCategory.CONTROLLER;
         return null;
     }
+
+    @Override
+    public void onDetach(RecipeNode node) {
+        if (node == null) return;
+        node.getProperties().remove(CreateProperties.IS_CREATE_BOILER);
+        node.getProperties().remove(CreateProperties.BOILER_HEAT_LEVEL);
+        node.getProperties().remove(CreateProperties.BOILER_SIZE_BLOCKS);
+        node.getProperties().remove(CreateProperties.BOILER_WATER_MB_TICK);
+        node.getProperties().remove(CreateProperties.BOILER_LEVEL);
+    }
 }
 
 

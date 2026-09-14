@@ -75,6 +75,27 @@ public final class NodeAddonHelper {
         return mult;
     }
 
+    public static int getPowerConsumingParallelMultiplier(List<MachineAddon> addons) {
+        int mult = 1;
+        for (MachineAddon a : addons) {
+            if (!a.isPowerConstant()) {
+                mult *= a.getParallelMultiplier();
+            }
+        }
+        return mult;
+    }
+
+    public static int getPowerConstantParallelMultiplier(List<MachineAddon> addons) {
+        if (addons == null || addons.isEmpty()) return 1;
+        int mult = 1;
+        for (MachineAddon a : addons) {
+            if (a.isPowerConstant() && a.getParallelMultiplier() > 1) {
+                mult *= a.getParallelMultiplier();
+            }
+        }
+        return mult;
+    }
+
     public static boolean hasPowerConstantAddon(List<MachineAddon> addons) {
         for (MachineAddon a : addons) {
             if (a.isPowerConstant()) return true;

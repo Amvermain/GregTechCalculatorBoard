@@ -2,6 +2,7 @@ package com.gtceu.calcboard.client.gui.widget;
 
 import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.api.storage.BoardPage;
+import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.client.gui.api.IBoardScreenContext;
 import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
 import com.gtceu.calcboard.client.gui.util.BoardScissorHelper;
@@ -110,7 +111,8 @@ public class PageTabBarWidget {
             String pageName = pageTitles.get(i);
             boolean isActive = (i == activeIdx);
             String prefix = resolveTabPrefix(i, isActive, isTeam);
-            int tabW = computeTabWidth(font, pageName, prefix, pageTitles.size());
+            GTVoltageTier vTier = resolveTabVoltageTier(i, isTeam);
+            int tabW = computeTabWidth(font, pageName, prefix, pageTitles.size(), vTier, !isTeam);
 
             double virtualMouseX = mouseX + scrollX;
             boolean hover = virtualMouseX >= curX && virtualMouseX <= curX + tabW && mouseY >= tabY && mouseY <= tabY + TAB_HEIGHT;
@@ -126,6 +128,23 @@ public class PageTabBarWidget {
                 renameBox.render(graphics, (int) virtualMouseX, mouseY, partialTicks);
             } else {
                 graphics.drawString(font, prefix + pageName, curX + 4, tabY + 5, isActive ? 0xFFFFFFFF : 0xFFAAAAAA, false);
+            }
+
+            if (!isTeam && editingPageIndex != i) {
+                int badgeW = getBadgeWidth(font, vTier);
+                boolean hasClose = pageTitles.size() > 1;
+                int badgeX = hasClose ? (curX + tabW - 14 - badgeW) : (curX + tabW - 4 - badgeW);
+                int badgeY = tabY + 3;
+                int badgeH = 12;
+
+                boolean badgeHover = virtualMouseX >= badgeX && virtualMouseX <= badgeX + badgeW && mouseY >= badgeY && mouseY <= badgeY + badgeH;
+                int badgeBg = badgeHover ? 0xCC2A364C : 0x8811151C;
+                int badgeBorder = (vTier != null) ? (vTier.getColor() | 0xFF000000) : (badgeHover ? 0xFF66AACC : 0xFF446688);
+                String badgeText = (vTier != null) ? (vTier.getFormatCode() + "⚡" + vTier.getName()) : (badgeHover ? "§b⚡Auto" : "§7⚡§fAuto");
+
+                graphics.fill(badgeX, badgeY, badgeX + badgeW, badgeY + badgeH, badgeBg);
+                graphics.renderOutline(badgeX, badgeY, badgeW, badgeH, badgeBorder);
+                graphics.drawString(font, badgeText, badgeX + 2, badgeY + 2, 0xFFFFFFFF, false);
             }
 
             if (pageTitles.size() > 1 && editingPageIndex != i) {
@@ -204,11 +223,12 @@ public class PageTabBarWidget {
             String pageName = pageTitles.get(i);
             boolean isActive = (i == activeIdx);
             String prefix = resolveTabPrefix(i, isActive, isTeam);
+            GTVoltageTier vTier = resolveTabVoltageTier(i, isTeam);
             int textW = font.width(prefix + pageName);
-            int tabW = computeTabWidth(font, pageName, prefix, pageTitles.size());
+            int tabW = computeTabWidth(font, pageName, prefix, pageTitles.size(), vTier, !isTeam);
 
             if (virtualMouseX >= curX && virtualMouseX <= curX + tabW) {
-                return handleTabItemClick(i, pageName, activeIdx, isTeam, teamState, button, virtualMouseX, curX, tabW, textW, tabY);
+                return handleTabItemClick(i, pageName, activeIdx, isTeam, teamState, button, virtualMouseX, mouseY, curX, tabW, textW, tabY, vTier);
             }
             curX += tabW + 3;
         }
@@ -300,12 +320,25 @@ public class PageTabBarWidget {
         return false;
     }
 
-    private boolean handleTabItemClick(int index, String pageName, int activeIdx, boolean isTeam, ClientWorkspaceState teamState, int button, double virtualMouseX, int curX, int tabW, int textW, int tabY) {
+    private boolean handleTabItemClick(int index, String pageName, int activeIdx, boolean isTeam, ClientWorkspaceState teamState, int button, double virtualMouseX, double mouseY, int curX, int tabW, int textW, int tabY, GTVoltageTier vTier) {
         int pageCount = isTeam ? teamState.getRemotePages().size() : BoardManager.getInstance().getOpenPages().size();
         boolean isCloseIconClicked = pageCount > 1 && virtualMouseX >= curX + tabW - 14 && virtualMouseX <= curX + tabW - 2 && button == 0;
         boolean isMiddleClicked = (button == 2);
         if (isCloseIconClicked || isMiddleClicked) {
             return handleCloseTabClick(index, pageName, isTeam, teamState);
+        }
+
+        if (!isTeam && editingPageIndex != index) {
+            Font font = Minecraft.getInstance().font;
+            int badgeW = getBadgeWidth(font, vTier);
+            boolean hasClose = pageCount > 1;
+            int badgeX = hasClose ? (curX + tabW - 14 - badgeW) : (curX + tabW - 4 - badgeW);
+            int badgeY = tabY + 3;
+            int badgeH = 12;
+
+            if (virtualMouseX >= badgeX && virtualMouseX <= badgeX + badgeW && mouseY >= badgeY && mouseY <= badgeY + badgeH) {
+                return handleBadgeClick(index, activeIdx, button, isTeam, teamState);
+            }
         }
 
         long now = System.currentTimeMillis();
@@ -321,7 +354,18 @@ public class PageTabBarWidget {
             }
         }
 
-        if (!isTeam && (isDoubleClick || isRightClick)) {
+        if (!isTeam && isRightClick) {
+            BoardManager bm = BoardManager.getInstance();
+            List<BoardPage> openPages = bm.getOpenPages();
+            if (index < openPages.size()) {
+                performTabSwitch(index, activeIdx, isTeam, teamState);
+                screen.openPageSettingsDialog(openPages.get(index));
+                playClickSound();
+                return true;
+            }
+        }
+
+        if (!isTeam && isDoubleClick) {
             startRename(index, pageName, curX + 16, tabY + 1, textW + 10);
             lastClickTime = 0;
             lastClickedTabIdx = -1;
@@ -336,6 +380,25 @@ public class PageTabBarWidget {
         }
 
         return true;
+    }
+
+    private boolean handleBadgeClick(int index, int activeIdx, int button, boolean isTeam, ClientWorkspaceState teamState) {
+        BoardManager bm = BoardManager.getInstance();
+        List<BoardPage> openPages = bm.getOpenPages();
+        if (index >= openPages.size()) return false;
+        BoardPage page = openPages.get(index);
+
+        if (button == 0) {
+            cyclePageVoltageTier(page, true);
+            playClickSound();
+            return true;
+        } else if (button == 1) {
+            performTabSwitch(index, activeIdx, isTeam, teamState);
+            screen.openPageSettingsDialog(page);
+            playClickSound();
+            return true;
+        }
+        return false;
     }
 
     private boolean handleCloseTabClick(int index, String pageName, boolean isTeam, ClientWorkspaceState teamState) {
@@ -488,7 +551,27 @@ public class PageTabBarWidget {
 
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
         int tabY = screen.getPageTabY();
-        if (mouseY >= tabY && mouseY <= tabY + TAB_HEIGHT + 2 && maxScrollX > 0) {
+        if (mouseY < tabY || mouseY > tabY + TAB_HEIGHT + 2) {
+            return false;
+        }
+
+        ClientWorkspaceState teamState = ClientWorkspaceState.getInstance();
+        boolean isTeam = teamState.isTeamMode();
+        if (!isTeam) {
+            int hoveredBadgeTabIdx = findHoveredBadgeTabIndex(mouseX, mouseY);
+            if (hoveredBadgeTabIdx >= 0) {
+                BoardManager bm = BoardManager.getInstance();
+                List<BoardPage> openPages = bm.getOpenPages();
+                if (hoveredBadgeTabIdx < openPages.size()) {
+                    BoardPage page = openPages.get(hoveredBadgeTabIdx);
+                    cyclePageVoltageTier(page, delta > 0);
+                    playClickSound();
+                    return true;
+                }
+            }
+        }
+
+        if (maxScrollX > 0) {
             commitRename();
             this.scrollX = Math.max(0, Math.min(maxScrollX, scrollX - delta * 30));
             return true;
@@ -504,6 +587,10 @@ public class PageTabBarWidget {
 
     public void setEditingForTest(boolean editing) {
         this.testEditing = editing;
+    }
+
+    public EditBox getRenameBox() {
+        return renameBox;
     }
 
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
@@ -579,7 +666,8 @@ public class PageTabBarWidget {
         int width = 0;
         for (int i = 0; i < titles.size(); i++) {
             String prefix = resolveTabPrefix(i, i == activeIdx, isTeam);
-            width += computeTabWidth(font, titles.get(i), prefix, titles.size()) + 3;
+            GTVoltageTier vTier = resolveTabVoltageTier(i, isTeam);
+            width += computeTabWidth(font, titles.get(i), prefix, titles.size(), vTier, !isTeam) + 3;
         }
         return width;
     }
@@ -595,9 +683,23 @@ public class PageTabBarWidget {
         return getTabPrefix(isAe2, isPinned, isActive);
     }
 
-    private int computeTabWidth(Font font, String pageName, String prefix, int totalTabCount) {
+    private int computeTabWidth(Font font, String pageName, String prefix, int totalTabCount, GTVoltageTier vTier, boolean showBadge) {
         int textW = font.width(prefix + pageName);
-        return textW + (totalTabCount > 1 ? 26 : 16);
+        int badgeW = showBadge ? getBadgeWidth(font, vTier) + 4 : 0;
+        return textW + badgeW + (totalTabCount > 1 ? 26 : 16);
+    }
+
+    private int getBadgeWidth(Font font, GTVoltageTier vTier) {
+        String text = (vTier != null) ? ("⚡" + vTier.getName()) : "⚡Auto";
+        return font.width(text) + 4;
+    }
+
+    private GTVoltageTier resolveTabVoltageTier(int index, boolean isTeam) {
+        if (isTeam) return null;
+        BoardManager bm = BoardManager.getInstance();
+        List<BoardPage> openPages = bm.getOpenPages();
+        if (index >= openPages.size()) return null;
+        return openPages.get(index).getDefaultVoltageTier();
     }
 
     private String getTabPrefix(boolean isAe2, boolean isPinned, boolean isActive) {
@@ -686,5 +788,72 @@ public class PageTabBarWidget {
         }
 
         return false;
+    }
+
+    private int findHoveredBadgeTabIndex(double mouseX, double mouseY) {
+        int tabY = screen.getPageTabY();
+        if (mouseY < tabY || mouseY > tabY + TAB_HEIGHT + 2) return -1;
+
+        ClientWorkspaceState teamState = ClientWorkspaceState.getInstance();
+        boolean isTeam = teamState.isTeamMode();
+        if (isTeam) return -1;
+
+        Font font = Minecraft.getInstance().font;
+        List<String> pageTitles = getPageTitles(teamState, isTeam);
+        int activeIdx = getActivePageIndex(teamState, isTeam);
+        int browserBtnW = 22;
+        int leftMargin = screen.getDynamicLeftMargin() + browserBtnW + 4;
+        double virtualMouseX = mouseX + scrollX;
+        int curX = leftMargin;
+
+        for (int i = 0; i < pageTitles.size(); i++) {
+            String pageName = pageTitles.get(i);
+            boolean isActive = (i == activeIdx);
+            String prefix = resolveTabPrefix(i, isActive, isTeam);
+            GTVoltageTier vTier = resolveTabVoltageTier(i, isTeam);
+            int tabW = computeTabWidth(font, pageName, prefix, pageTitles.size(), vTier, !isTeam);
+
+            if (editingPageIndex != i) {
+                int badgeW = getBadgeWidth(font, vTier);
+                boolean hasClose = pageTitles.size() > 1;
+                int badgeX = hasClose ? (curX + tabW - 14 - badgeW) : (curX + tabW - 4 - badgeW);
+                int badgeY = tabY + 3;
+                int badgeH = 12;
+
+                if (virtualMouseX >= badgeX && virtualMouseX <= badgeX + badgeW && mouseY >= badgeY && mouseY <= badgeY + badgeH) {
+                    return i;
+                }
+            }
+            curX += tabW + 3;
+        }
+        return -1;
+    }
+
+    private void cyclePageVoltageTier(BoardPage page, boolean forward) {
+        page.cycleVoltageTier(forward);
+        BoardManager.getInstance().saveForCurrentContext();
+        screen.rebuildBoardWidgets();
+    }
+
+    public void renderTooltips(GuiGraphics graphics, Font font, int mouseX, int mouseY) {
+        int hoveredBadgeTabIdx = findHoveredBadgeTabIndex(mouseX, mouseY);
+        if (hoveredBadgeTabIdx < 0) return;
+
+        BoardManager bm = BoardManager.getInstance();
+        List<BoardPage> openPages = bm.getOpenPages();
+        if (hoveredBadgeTabIdx >= openPages.size()) return;
+
+        BoardPage page = openPages.get(hoveredBadgeTabIdx);
+        GTVoltageTier vTier = page.getDefaultVoltageTier();
+
+        String tierText = (vTier != null) ? (vTier.getFormatCode() + vTier.getName()) : "§bAuto";
+
+        List<Component> tooltipLines = new ArrayList<>();
+        tooltipLines.add(Component.translatable("gui.gtcalcboard.page_settings.badge_tooltip_title", tierText));
+        tooltipLines.add(Component.translatable("gui.gtcalcboard.page_settings.badge_tooltip_cycle"));
+        tooltipLines.add(Component.translatable("gui.gtcalcboard.page_settings.badge_tooltip_settings"));
+        com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer.renderComponentTooltip(
+                graphics, font, tooltipLines, mouseX, mouseY, screen.getScreenWidth(), screen.getScreenHeight()
+        );
     }
 }

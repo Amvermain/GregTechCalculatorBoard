@@ -17,6 +17,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.BiPredicate;
 
@@ -227,27 +228,51 @@ public class ThermalAugmentHelper {
         return "";
     }
 
+    public static final Set<ResourceLocation> KNOWN_DYNAMO_CATEGORIES = Set.of(
+            ResourceLocation.tryParse("thermal:dynamo_stirling"),
+            ResourceLocation.tryParse("thermal:dynamo_compression"),
+            ResourceLocation.tryParse("thermal:dynamo_magmatic"),
+            ResourceLocation.tryParse("thermal:dynamo_numismatic"),
+            ResourceLocation.tryParse("thermal:dynamo_lapidary"),
+            ResourceLocation.tryParse("thermal:dynamo_disenchantment"),
+            ResourceLocation.tryParse("thermal:dynamo_gourmand"),
+            ResourceLocation.tryParse("thermal:stirling_fuel"),
+            ResourceLocation.tryParse("thermal:compression_fuel"),
+            ResourceLocation.tryParse("thermal:magmatic_fuel"),
+            ResourceLocation.tryParse("thermal:numismatic_fuel"),
+            ResourceLocation.tryParse("thermal:lapidary_fuel"),
+            ResourceLocation.tryParse("thermal:disenchantment_fuel"),
+            ResourceLocation.tryParse("thermal:gourmand_fuel"),
+            ResourceLocation.tryParse("thermal:dynamo_steam"),
+            ResourceLocation.tryParse("systeams:steam_dynamo")
+    );
+
+    public static final Set<ResourceLocation> KNOWN_DYNAMO_ICONS = Set.of(
+            ResourceLocation.tryParse("thermal:dynamo_stirling"),
+            ResourceLocation.tryParse("thermal:dynamo_compression"),
+            ResourceLocation.tryParse("thermal:dynamo_magmatic"),
+            ResourceLocation.tryParse("thermal:dynamo_numismatic"),
+            ResourceLocation.tryParse("thermal:dynamo_lapidary"),
+            ResourceLocation.tryParse("thermal:dynamo_disenchantment"),
+            ResourceLocation.tryParse("thermal:dynamo_gourmand"),
+            ResourceLocation.tryParse("thermal:dynamo_steam"),
+            ResourceLocation.tryParse("systeams:steam_dynamo")
+    );
+
     public static boolean isDynamoNode(RecipeNode node) {
         if (node == null) return false;
         if (node.isGenerator() || node.getBaseEUt() < 0) return true;
 
-        if (node.getRecipeCategoryId() != null && isDynamoKeyword(node.getRecipeCategoryId().getPath())) {
+        if (node.getRecipeCategoryId() != null && KNOWN_DYNAMO_CATEGORIES.contains(node.getRecipeCategoryId())) {
             return true;
         }
-        if (node.getMachineIcon() != null && isDynamoKeyword(node.getMachineIcon().getPath())) {
-            return true;
-        }
-        if (node.getName() != null && isDynamoKeyword(node.getName())) {
-            return true;
+        if (node.getMachineIcon() != null) {
+            ResourceLocation icon = node.getMachineIcon();
+            if (KNOWN_DYNAMO_ICONS.contains(icon) || KNOWN_DYNAMO_CATEGORIES.contains(icon) || isDynamoItem(icon)) {
+                return true;
+            }
         }
         return false;
-    }
-
-    private static boolean isDynamoKeyword(String str) {
-        String p = str.toLowerCase(Locale.ROOT);
-        return p.contains("fuel") || p.contains("dynamo") || p.contains("lapidary") || p.contains("magmatic")
-                || p.contains("numismatic") || p.contains("gourmand") || p.contains("compression")
-                || p.contains("disenchantment") || p.contains("stirling");
     }
 
     public static double extractTagRawNumber(CompoundTag tag, String... keys) {
@@ -329,15 +354,23 @@ public class ThermalAugmentHelper {
     private static boolean checkItemClassHierarchy(ResourceLocation id, String searchName) {
         if (id == null || ForgeRegistries.ITEMS == null) return false;
         Item item = ForgeRegistries.ITEMS.getValue(id);
-        if (item != null) {
-            Class<?> cur = item.getClass();
-            while (cur != null && cur != Object.class) {
-                if (cur.getSimpleName().contains(searchName) || cur.getName().contains(searchName)) return true;
-                for (Class<?> iface : cur.getInterfaces()) {
-                    if (iface.getSimpleName().contains(searchName) || iface.getName().contains(searchName)) return true;
-                }
-                cur = cur.getSuperclass();
-            }
+        if (item == null) return false;
+        return matchesClassOrInterface(item.getClass(), searchName);
+    }
+
+    private static boolean matchesClassOrInterface(Class<?> clazz, String searchName) {
+        Class<?> cur = clazz;
+        while (cur != null && cur != Object.class) {
+            if (cur.getSimpleName().contains(searchName)) return true;
+            if (interfacesContain(cur.getInterfaces(), searchName)) return true;
+            cur = cur.getSuperclass();
+        }
+        return false;
+    }
+
+    private static boolean interfacesContain(Class<?>[] ifaces, String searchName) {
+        for (Class<?> iface : ifaces) {
+            if (iface.getSimpleName().contains(searchName)) return true;
         }
         return false;
     }
@@ -366,15 +399,16 @@ public class ThermalAugmentHelper {
         Class<?> cl = backing.getClass();
         while (cl != null && cl != Object.class) {
             String name = cl.getName();
+            String simpleName = cl.getSimpleName();
             if (name.equals("cofh.thermal.lib.util.recipes.ThermalFuel") ||
                 name.equals("chiefarug.mods.systeams.recipe.SteamFuel") ||
-                name.endsWith("Fuel") || name.endsWith("FuelRecipe") ||
-                name.contains("DynamoFuel")) {
+                simpleName.endsWith("Fuel") || simpleName.endsWith("FuelRecipe") ||
+                simpleName.equals("DynamoFuel")) {
                 return true;
             }
             for (Class<?> iface : cl.getInterfaces()) {
-                String iname = iface.getName();
-                if (iname.contains("Fuel") || iname.contains("Dynamo")) {
+                String iname = iface.getSimpleName();
+                if (iname.endsWith("Fuel") || iname.endsWith("FuelRecipe") || iname.contains("Dynamo")) {
                     return true;
                 }
             }
@@ -388,9 +422,17 @@ public class ThermalAugmentHelper {
         Class<?> cl = backing.getClass();
         while (cl != null && cl != Object.class) {
             String name = cl.getName();
+            String simpleName = cl.getSimpleName();
             if (name.equals("chiefarug.mods.systeams.recipe.BoilingRecipe") ||
-                name.contains("Boil") || name.contains("Boiler")) {
+                simpleName.endsWith("Boil") || simpleName.endsWith("Boiler") ||
+                simpleName.endsWith("BoilingRecipe") || simpleName.endsWith("BoilerRecipe")) {
                 return true;
+            }
+            for (Class<?> iface : cl.getInterfaces()) {
+                String iname = iface.getSimpleName();
+                if (iname.endsWith("Boiler") || iname.endsWith("BoilingRecipe") || iname.endsWith("BoilerRecipe")) {
+                    return true;
+                }
             }
             cl = cl.getSuperclass();
         }

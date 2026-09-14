@@ -4,9 +4,12 @@ import com.gtceu.calcboard.api.model.BoundaryPinNode;
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.solver.ProductionETACalculator;
+import com.gtceu.calcboard.api.storage.BoardManager;
+import com.gtceu.calcboard.api.storage.BoardPage;
 import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.type.OverclockMode;
+import com.gtceu.calcboard.client.gui.action.BoardActionHandler;
 import com.gtceu.calcboard.client.gui.api.IBoardScreenContext;
 import com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer;
 import com.gtceu.calcboard.client.gui.render.IngredientRenderer;
@@ -36,6 +39,8 @@ public class NodeInspectorPanel {
     private final IBoardScreenContext screen;
     private NodeWidget targetWidget = null;
     private boolean visible = false;
+    private boolean pageSettingsMode = false;
+    private net.minecraft.network.chat.Component pendingTooltip = null;
     public static final int PANEL_WIDTH = 195;
 
     public NodeInspectorPanel(IBoardScreenContext screen) {
@@ -43,12 +48,30 @@ public class NodeInspectorPanel {
     }
 
     public boolean isVisible() {
+        if (pageSettingsMode) {
+            return visible;
+        }
         return visible && targetWidget != null && screen.getGraph().findNodeById(targetWidget.getNode().getId()) != null;
+    }
+
+    public boolean isPageSettingsMode() {
+        return pageSettingsMode && visible;
+    }
+
+    public void openPageSettings() {
+        boolean wasVisible = this.visible;
+        this.targetWidget = null;
+        this.pageSettingsMode = true;
+        this.visible = true;
+        if (!wasVisible) {
+            screen.onNodeInspectorOpened();
+        }
     }
 
     public void setTargetWidget(NodeWidget widget) {
         boolean wasVisible = this.visible;
         this.targetWidget = widget;
+        this.pageSettingsMode = false;
         this.visible = (widget != null);
         if (this.visible && !wasVisible) {
             screen.onNodeInspectorOpened();
@@ -61,6 +84,8 @@ public class NodeInspectorPanel {
         if (this.visible) {
             this.visible = false;
             this.targetWidget = null;
+            this.pageSettingsMode = false;
+            this.pendingTooltip = null;
             screen.onNodeInspectorClosed();
         }
     }
@@ -87,6 +112,7 @@ public class NodeInspectorPanel {
 
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
         if (!isVisible()) return;
+        this.pendingTooltip = null;
 
         Font font = Minecraft.getInstance().font;
         int screenW = screen.getScreenWidth();
@@ -102,18 +128,24 @@ public class NodeInspectorPanel {
         graphics.fill(px, py, px + PANEL_WIDTH, py + ph, 0xF5101522);
         graphics.renderOutline(px, py, PANEL_WIDTH, ph, 0xFF334155);
 
+        if (pageSettingsMode) {
+            renderPageSettingsInspector(graphics, font, px, py, ph, mouseX, mouseY);
+            graphics.pose().popPose();
+            return;
+        }
+
         // Header
         graphics.fill(px, py, px + PANEL_WIDTH, py + 22, 0xFF1E293B);
         graphics.renderOutline(px, py, PANEL_WIDTH, 22, 0xFF475569);
 
         var node = targetWidget.getNode();
-        if (node.isReroute()) {
+        if (node.isJunction()) {
             renderJunctionInspector(graphics, font, px, py, ph, node, mouseX, mouseY);
             graphics.pose().popPose();
             return;
         }
-        if (node.isBoundaryPin() && node instanceof BoundaryPinNode pin) {
-            renderBoundaryPinInspector(graphics, font, px, py, ph, pin, mouseX, mouseY);
+        if (node.isBoundaryPin()) {
+            renderBoundaryPinInspector(graphics, font, px, py, ph, node, mouseX, mouseY);
             graphics.pose().popPose();
             return;
         }
@@ -224,11 +256,15 @@ public class NodeInspectorPanel {
         int screenH = screen.getScreenHeight();
         int py = screen.getToolbarY() + 22;
         int minH = Math.max(160, screenH - py - 32);
+        if (pageSettingsMode) {
+            int neededH = 210;
+            return Math.max(neededH, Math.min(250, minH));
+        }
         if (targetWidget == null || targetWidget.getNode() == null) {
             return minH;
         }
         RecipeNode node = targetWidget.getNode();
-        if (node.isReroute() || node.isBoundaryPin()) {
+        if (node.isJunction() || node.isBoundaryPin()) {
             return minH;
         }
         int contentH = calculateContentHeight(node);
@@ -373,7 +409,7 @@ public class NodeInspectorPanel {
 
             if (hov && isEnergyHatchLocked) {
                 String hatchTierName = currentTier != null ? currentTier.getName() : "Unknown";
-                graphics.renderTooltip(font, Component.translatable("gui.gtcalcboard.inspector.tier_locked_by_energy_hatch", hatchTierName), mouseX, mouseY);
+                this.pendingTooltip = Component.translatable("gui.gtcalcboard.inspector.tier_locked_by_energy_hatch", hatchTierName);
             }
         }
     }
@@ -553,12 +589,16 @@ public class NodeInspectorPanel {
                 return true;
             }
 
+            if (pageSettingsMode) {
+                return handlePageSettingsClick(px, py, mouseX, mouseY);
+            }
+
             var node = targetWidget.getNode();
-            if (node.isReroute()) {
+            if (node.isJunction()) {
                 return handleJunctionInspectorClick(px, py, mouseX, mouseY, node);
             }
-            if (node.isBoundaryPin() && node instanceof BoundaryPinNode pin) {
-                return handleBoundaryPinInspectorClick(px, py, mouseX, mouseY, pin);
+            if (node.isBoundaryPin()) {
+                return handleBoundaryPinInspectorClick(px, py, mouseX, mouseY, node);
             }
 
             int curY = py + 28;
@@ -815,7 +855,7 @@ public class NodeInspectorPanel {
         return true;
     }
 
-    private void renderBoundaryPinInspector(GuiGraphics graphics, Font font, int px, int py, int ph, BoundaryPinNode pin, int mouseX, int mouseY) {
+    private void renderBoundaryPinInspector(GuiGraphics graphics, Font font, int px, int py, int ph, RecipeNode pin, int mouseX, int mouseY) {
         renderBoundaryPinHeader(graphics, font, px, py, pin, mouseX, mouseY);
 
         int curY = py + 28;
@@ -837,17 +877,17 @@ public class NodeInspectorPanel {
         renderBoundaryPinRenameButton(graphics, font, x, curY, contentW, mouseX, mouseY);
     }
 
-    private void renderBoundaryPinHeader(GuiGraphics graphics, Font font, int px, int py, BoundaryPinNode pin, int mouseX, int mouseY) {
+    private void renderBoundaryPinHeader(GuiGraphics graphics, Font font, int px, int py, RecipeNode pin, int mouseX, int mouseY) {
         graphics.fill(px, py, px + PANEL_WIDTH, py + 22, 0xFF1E293B);
         graphics.renderOutline(px, py, PANEL_WIDTH, 22, 0xFF475569);
 
         int titleX = px + 6;
-        IngredientStack bound = pin.getBoundIngredient();
+        IngredientStack bound = pin.asBoundaryPin().getBoundIngredient();
         if (bound != null) {
             IngredientRenderer.render(graphics, bound, px + 4, py + 3);
             titleX = px + 24;
         }
-        String title = pin.getPinLabel().isEmpty() ? pin.getName() : pin.getPinLabel();
+        String title = pin.asBoundaryPin().getPinLabel().isEmpty() ? pin.getName() : pin.asBoundaryPin().getPinLabel();
         graphics.drawString(font, font.plainSubstrByWidth(title, PANEL_WIDTH - 44), titleX, py + 7, 0xFFE2E8F0, false);
 
         int closeX = px + PANEL_WIDTH - 16;
@@ -856,8 +896,8 @@ public class NodeInspectorPanel {
         graphics.drawString(font, "✕", closeX + 1, closeY + 1, closeHov ? 0xFFEF4444 : 0xFF94A3B8, false);
     }
 
-    private void renderBoundaryPinDirectionSection(GuiGraphics graphics, Font font, int x, int y, int w, BoundaryPinNode pin) {
-        boolean isInput = pin.getDirection() == BoundaryPinNode.PinDirection.INPUT;
+    private void renderBoundaryPinDirectionSection(GuiGraphics graphics, Font font, int x, int y, int w, RecipeNode pin) {
+        boolean isInput = pin.asBoundaryPin().getDirection() == BoundaryPinNode.PinDirection.INPUT;
         graphics.drawString(font, Component.translatable("gui.gtcalcboard.boundary_pin.label").getString(), x, y, 0xFF94A3B8, false);
         int boxY = y + 12;
         graphics.fill(x, boxY, x + w, boxY + 20, isInput ? 0xFF042F2E : 0xFF331B05);
@@ -880,8 +920,8 @@ public class NodeInspectorPanel {
         graphics.drawString(font, "»", x + w - 12, y + 11, hov ? 0xFF38BDF8 : 0xFF64748B, false);
     }
 
-    private void renderBoundaryPinIngredientSection(GuiGraphics graphics, Font font, int x, int y, int w, BoundaryPinNode pin) {
-        IngredientStack bound = pin.getBoundIngredient();
+    private void renderBoundaryPinIngredientSection(GuiGraphics graphics, Font font, int x, int y, int w, RecipeNode pin) {
+        IngredientStack bound = pin.asBoundaryPin().getBoundIngredient();
         graphics.drawString(font, Component.translatable("gui.gtcalcboard.boundary_pin.bound_ingredient").getString(), x, y, 0xFF94A3B8, false);
         int boxY = y + 12;
         graphics.fill(x, boxY, x + w, boxY + 24, 0xFF0F172A);
@@ -896,12 +936,12 @@ public class NodeInspectorPanel {
         }
     }
 
-    private void renderBoundaryPinFlowSection(GuiGraphics graphics, Font font, int x, int y, int w, BoundaryPinNode pin) {
+    private void renderBoundaryPinFlowSection(GuiGraphics graphics, Font font, int x, int y, int w, RecipeNode pin) {
         graphics.fill(x, y, x + w, y + 48, 0xFF0B1120);
         graphics.renderOutline(x, y, w, 48, 0xFF1E293B);
 
-        boolean isInput = pin.getDirection() == BoundaryPinNode.PinDirection.INPUT;
-        IngredientStack bound = pin.getBoundIngredient();
+        boolean isInput = pin.asBoundaryPin().getDirection() == BoundaryPinNode.PinDirection.INPUT;
+        IngredientStack bound = pin.asBoundaryPin().getBoundIngredient();
         var graph = screen.getGraph();
         var stats = graph != null
                 ? (isInput ? graph.getOutputPortStats(pin, 0) : graph.getInputPortStats(pin, 0))
@@ -942,7 +982,7 @@ public class NodeInspectorPanel {
         graphics.drawString(font, "»", x + w - 12, y + 11, hov ? 0xFF38BDF8 : 0xFF64748B, false);
     }
 
-    private boolean handleBoundaryPinInspectorClick(int px, int py, double mouseX, double mouseY, BoundaryPinNode pin) {
+    private boolean handleBoundaryPinInspectorClick(int px, int py, double mouseX, double mouseY, RecipeNode pin) {
         int contentW = PANEL_WIDTH - 16;
         int x = px + 8;
 
@@ -971,5 +1011,188 @@ public class NodeInspectorPanel {
         }
 
         return true;
+    }
+
+    private void renderPageSettingsInspector(GuiGraphics graphics, Font font, int px, int py, int ph, int mouseX, int mouseY) {
+        BoardPage page = BoardManager.getInstance().getActivePage();
+        if (page == null) return;
+
+        String title = "📄 " + Component.translatable("gui.gtcalcboard.page_settings.title").getString();
+        graphics.drawString(font, font.plainSubstrByWidth(title, PANEL_WIDTH - 48), px + 6, py + 7, 0xFFE2E8F0, false);
+
+        int popoutX = px + PANEL_WIDTH - 30;
+        int closeX = px + PANEL_WIDTH - 16;
+        int closeY = py + 5;
+        boolean popoutHov = mouseX >= popoutX && mouseX <= popoutX + 12 && mouseY >= closeY && mouseY <= closeY + 12;
+        boolean closeHov = mouseX >= closeX && mouseX <= closeX + 12 && mouseY >= closeY && mouseY <= closeY + 12;
+        graphics.drawString(font, "↗", popoutX + 1, closeY + 1, popoutHov ? 0xFF38BDF8 : 0xFF94A3B8, false);
+        graphics.drawString(font, "✕", closeX + 1, closeY + 1, closeHov ? 0xFFEF4444 : 0xFF94A3B8, false);
+
+        int curY = py + 28;
+        int x = px + 8;
+        int contentW = PANEL_WIDTH - 16;
+
+        renderPageInfoSection(graphics, font, x, curY, contentW, page);
+        curY += 34;
+
+        graphics.drawString(font, Component.translatable("gui.gtcalcboard.page_settings.target_voltage").getString(), x, curY, 0xFF94A3B8, false);
+        curY += 12;
+
+        renderVoltageTierGrid(graphics, font, x, curY, contentW, page, mouseX, mouseY);
+        curY += 80;
+
+        renderAutoHatchCheckbox(graphics, font, x, curY, contentW, page, mouseX, mouseY);
+        curY += 22;
+
+        renderBatchApplyButton(graphics, font, x, curY, contentW, page, mouseX, mouseY);
+    }
+
+    private void renderPageInfoSection(GuiGraphics graphics, Font font, int x, int y, int w, BoardPage page) {
+        graphics.fill(x, y, x + w, y + 30, 0xFF0F172A);
+        graphics.renderOutline(x, y, w, 30, 0xFF334155);
+        graphics.drawString(font, font.plainSubstrByWidth(page.getName(), w - 12), x + 6, y + 4, 0xFFE2E8F0, false);
+        String folder = page.getFolderPath().isEmpty() ? "/" : page.getFolderPath();
+        graphics.drawString(font, "📁 " + font.plainSubstrByWidth(folder, w - 20), x + 6, y + 16, 0xFF94A3B8, false);
+    }
+
+    private void renderVoltageTierGrid(GuiGraphics graphics, Font font, int x, int y, int w, BoardPage page, int mouseX, int mouseY) {
+        int cols = 4;
+        int gap = 4;
+        int rowGap = 4;
+        int chipW = (w - gap * (cols - 1)) / cols;
+        int chipH = 16;
+        GTVoltageTier currentTier = page.getDefaultVoltageTier();
+
+        for (int i = 0; i < 16; i++) {
+            int col = i % cols;
+            int row = i / cols;
+            int cx = x + col * (chipW + gap);
+            int cy = y + row * (chipH + rowGap);
+            boolean isCur = (i == 0) ? (currentTier == null) : (currentTier == GTVoltageTier.getByIndex(i - 1));
+            boolean hov = mouseX >= cx && mouseX <= cx + chipW && mouseY >= cy && mouseY <= cy + chipH;
+
+            int bg = isCur ? 0xFF0284C7 : (hov ? 0xFF334155 : 0xFF1E293B);
+            int border = isCur ? 0xFF38BDF8 : (hov ? 0xFF64748B : 0xFF334155);
+            int textColor = isCur ? 0xFFFFFFFF : 0xFF94A3B8;
+
+            graphics.fill(cx, cy, cx + chipW, cy + chipH, bg);
+            graphics.renderOutline(cx, cy, chipW, chipH, border);
+
+            String chipLabel = (i == 0) ? "Auto" : GTVoltageTier.getByIndex(i - 1).name();
+            graphics.drawCenteredString(font, chipLabel, cx + chipW / 2, cy + 4, textColor);
+
+            if (hov) {
+                this.pendingTooltip = (i == 0)
+                        ? Component.translatable("gui.gtcalcboard.page_settings.target_voltage_auto")
+                        : Component.literal(GTVoltageTier.getByIndex(i - 1).getFormatCode() + GTVoltageTier.getByIndex(i - 1).getName() + " §7(" + String.format(Locale.ROOT, "%,d", GTVoltageTier.getByIndex(i - 1).getVoltage()) + " EU/t)");
+            }
+        }
+    }
+
+    private void renderAutoHatchCheckbox(GuiGraphics graphics, Font font, int x, int y, int w, BoardPage page, int mouseX, int mouseY) {
+        boolean autoHatch = page.isAutoEquipEnergyHatches();
+        boolean checkHov = mouseX >= x && mouseX <= x + w && mouseY >= y && mouseY <= y + 16;
+        graphics.fill(x, y + 1, x + 14, y + 15, autoHatch ? 0xFF0284C7 : (checkHov ? 0xFF334155 : 0xFF1E293B));
+        graphics.renderOutline(x, y + 1, 14, 14, autoHatch ? 0xFF38BDF8 : 0xFF475569);
+        if (autoHatch) {
+            graphics.drawString(font, "✔", x + 3, y + 4, 0xFFFFFFFF, false);
+        }
+        String toggleText = font.plainSubstrByWidth(Component.translatable("gui.gtcalcboard.page_settings.autohatch_toggle").getString(), w - 20);
+        graphics.drawString(font, toggleText, x + 18, y + 4, checkHov ? 0xFFFFFFFF : 0xFFCBD5E1, false);
+        if (checkHov) {
+            this.pendingTooltip = Component.translatable("gui.gtcalcboard.page_settings.autohatch_tooltip");
+        }
+    }
+
+    private void renderBatchApplyButton(GuiGraphics graphics, Font font, int x, int y, int w, BoardPage page, int mouseX, int mouseY) {
+        int applicableCount = BoardActionHandler.countBatchApplicableNodes(screen.getGraph(), page.getDefaultVoltageTier());
+        boolean canApply = page.getDefaultVoltageTier() != null && applicableCount > 0;
+        boolean btnHov = mouseX >= x && mouseX <= x + w && mouseY >= y && mouseY <= y + 22;
+
+        int btnBg = canApply ? (btnHov ? 0xFF0369A1 : 0xFF0C4A6E) : 0xFF1E293B;
+        int btnBorder = canApply ? (btnHov ? 0xFF38BDF8 : 0xFF0284C7) : 0xFF334155;
+        int btnTextCol = canApply ? 0xFFFFFFFF : 0xFF64748B;
+        graphics.fill(x, y, x + w, y + 22, btnBg);
+        graphics.renderOutline(x, y, w, 22, btnBorder);
+        String btnLabel = "⚡ " + Component.translatable("gui.gtcalcboard.page_settings.apply_to_existing", applicableCount).getString();
+        graphics.drawCenteredString(font, font.plainSubstrByWidth(btnLabel, w - 8), x + w / 2, y + 7, btnTextCol);
+        if (btnHov) {
+            this.pendingTooltip = Component.translatable("gui.gtcalcboard.page_settings.apply_to_existing_tooltip");
+        }
+    }
+
+    private boolean handlePageSettingsClick(int px, int py, double mouseX, double mouseY) {
+        BoardPage page = BoardManager.getInstance().getActivePage();
+        if (page == null) return false;
+
+        int popoutX = px + PANEL_WIDTH - 30;
+        int closeX = px + PANEL_WIDTH - 16;
+        int closeY = py + 5;
+        if (mouseX >= popoutX && mouseX <= popoutX + 12 && mouseY >= closeY && mouseY <= closeY + 12) {
+            close();
+            screen.openPageSettingsDialog(page);
+            Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
+            return true;
+        }
+        if (mouseX >= closeX && mouseX <= closeX + 12 && mouseY >= closeY && mouseY <= closeY + 12) {
+            close();
+            Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
+            return true;
+        }
+
+        int curY = py + 28 + 34 + 12;
+        int x = px + 8;
+        int contentW = PANEL_WIDTH - 16;
+        int cols = 4;
+        int gap = 4;
+        int rowGap = 4;
+        int chipW = (contentW - gap * (cols - 1)) / cols;
+        int chipH = 16;
+
+        for (int i = 0; i < 16; i++) {
+            int col = i % cols;
+            int row = i / cols;
+            int cx = x + col * (chipW + gap);
+            int cy = curY + row * (chipH + rowGap);
+            if (mouseX >= cx && mouseX <= cx + chipW && mouseY >= cy && mouseY <= cy + chipH) {
+                if (i == 0) {
+                    page.setDefaultVoltageTier(null);
+                } else {
+                    page.setDefaultVoltageTier(GTVoltageTier.getByIndex(i - 1));
+                }
+                BoardManager.getInstance().saveForCurrentContext();
+                screen.rebuildBoardWidgets();
+                Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
+                return true;
+            }
+        }
+        curY += 80;
+
+        if (mouseX >= x && mouseX <= x + contentW && mouseY >= curY && mouseY <= curY + 16) {
+            page.setAutoEquipEnergyHatches(!page.isAutoEquipEnergyHatches());
+            BoardManager.getInstance().saveForCurrentContext();
+            Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
+            return true;
+        }
+        curY += 22;
+
+        if (mouseX >= x && mouseX <= x + contentW && mouseY >= curY && mouseY <= curY + 22) {
+            GTVoltageTier currentTier = page.getDefaultVoltageTier();
+            int applicableCount = BoardActionHandler.countBatchApplicableNodes(screen.getGraph(), currentTier);
+            if (currentTier != null && applicableCount > 0) {
+                screen.batchApplyPageTargetVoltage();
+            }
+            return true;
+        }
+
+        return true;
+    }
+
+    public void renderTooltips(GuiGraphics graphics, Font font, int mouseX, int mouseY) {
+        if (!isVisible() || pendingTooltip == null) return;
+        com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer.renderTooltip(
+                graphics, font, pendingTooltip, mouseX, mouseY, screen.getScreenWidth(), screen.getScreenHeight()
+        );
+        pendingTooltip = null;
     }
 }

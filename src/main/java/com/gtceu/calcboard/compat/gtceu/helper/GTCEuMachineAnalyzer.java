@@ -31,7 +31,8 @@ public final class GTCEuMachineAnalyzer {
             boolean supportsLaserHatch,
             double steamDrainRate,
             int defaultParallel,
-            Set<String> allowedAbilities
+            Set<String> allowedAbilities,
+            boolean hasNativePerfectOverclock
     ) {
         public MachineCapabilities(
                 ResourceLocation id,
@@ -65,7 +66,8 @@ public final class GTCEuMachineAnalyzer {
                     supportsLaserHatch,
                     steamDrainRate,
                     defaultParallel,
-                    allowedAbilities
+                    allowedAbilities,
+                    false
             );
         }
 
@@ -162,6 +164,8 @@ public final class GTCEuMachineAnalyzer {
         if (supportsBulkProcessing) abilities.add("BULK_PROCESSING");
         if (supportsOverpressure) abilities.add("OVERPRESSURE");
 
+        boolean hasNativePerfectOverclock = GTCEuOverclockHelper.hasNativePerfectOverclock(id, def);
+
         return new MachineCapabilities(
                 id,
                 archetype,
@@ -176,7 +180,8 @@ public final class GTCEuMachineAnalyzer {
                 supportsLaserHatch,
                 steamDrainRate,
                 innatePar,
-                Collections.unmodifiableSet(abilities)
+                Collections.unmodifiableSet(abilities),
+                hasNativePerfectOverclock
         );
     }
 
@@ -263,7 +268,8 @@ public final class GTCEuMachineAnalyzer {
     private static MachineCapabilities emptyCapabilities(ResourceLocation id) {
         return new MachineCapabilities(
                 id, GTMachineArchetype.STANDARD_PROCESSING, false, null, 0.0,
-                false, false, false, false, false, false, 0.0, 1, Collections.emptySet()
+                false, false, false, false, false, false, 0.0, 1, Collections.emptySet(),
+                false
         );
     }
 }

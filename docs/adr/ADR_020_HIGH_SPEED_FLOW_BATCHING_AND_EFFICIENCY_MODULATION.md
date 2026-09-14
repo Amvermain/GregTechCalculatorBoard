@@ -100,25 +100,31 @@ $$T_{\text{anim}} = M \times t_{\text{cycle}} \quad (T_{\text{anim}} \ge 1.0\tex
 #### 2.2.3 정션 노드 고정 유량 우선 배분 (Fixed Priority Split)
 정션 노드 $J$에 입력되는 총 유량 $Q_{\text{in}}$에 대해 $K$개의 출력선 중 고정 한도 $Q_{\text{fixed}, i}$가 설정된 우선순위 선들이 존재하는 경우:
 
-1. **1단계 (우선순위 고정 라인 할당)**:
-   $$Q_{\text{alloc}, i} = \min(Q_{\text{fixed}, i}, Q_{\text{rem}}), \quad Q_{\text{rem}} \leftarrow Q_{\text{rem}} - Q_{\text{alloc}, i}$$
-2. **2단계 (잔여 유량 가변 라인 배분)**:
-   고정 한도가 없는 일반 라인 $j$들은 각 다운스트림 노드의 상대적 수요 가중치 $w_j$에 비례하여 잔여 유량 $Q_{\text{rem}}$을 분배:
-   $$Q_{\text{alloc}, j} = Q_{\text{rem}} \times \frac{w_j}{\sum_k w_k}$$
+##### 1단계 (우선순위 고정 라인 할당)
+$$Q_{\text{alloc}, i} = \min(Q_{\text{fixed}, i}, Q_{\text{rem}}), \quad Q_{\text{rem}} \leftarrow Q_{\text{rem}} - Q_{\text{alloc}, i}$$
+
+##### 2단계 (잔여 유량 가변 라인 배분)
+고정 한도가 없는 일반 라인 $j$들은 각 다운스트림 노드의 상대적 수요 가중치 $w_j$에 비례하여 잔여 유량 $Q_{\text{rem}}$을 분배:
+
+$$Q_{\text{alloc}, j} = Q_{\text{rem}} \times \frac{w_j}{\sum_k w_k}$$
 
 #### 2.2.4 정션 노드 배치 누적 버퍼 수식 모델 (Batch Accumulator Formulation)
 정션 노드 $J$가 '배치 버퍼(Accumulator)' 모드로 설정되고 유저 지정 목표 배치 크기 $B$를 가질 때:
-1. **충전 시간(Charge Duration)**:
-   $$T_{\text{charge}} = \frac{B}{Q_{\text{in}}}$$
-   - $Q_{\text{in}}$: 정션 노드로 유입되는 총 공급 유량 ($\text{items/s}$ 또는 $\text{mB/s}$).
-   - $T_{\text{charge}}$: 버퍼가 1회 방출량을 축적하는 데 소요되는 시간(초).
-2. **간헐 방출(Burst Release) 및 파티클 렌더링**:
-   - 유입 유량이 축적되는 동안 버퍼 내 누적량 $q(t) = (Q_{\text{in}} \times t) \pmod B$가 형성됩니다.
-   - 축적이 완료되는 주기 $T_{\text{charge}}$마다 $B$ 크기의 완제품 배치 묶음(배지 라벨 `Bx`)이 출력 와이어를 통해 다운스트림으로 방출됩니다.
-3. **다운스트림 가동률 및 결핍 완충 (Deficit Buffering)**:
-   - 후속 기계가 1회 가동 시 대용량 배치 $D_{\text{batch}} \le B$를 요구하는 경우, 버퍼가 존재하지 않을 때 발생하는 순간 결핍(Instantaneous Starvation)을 상쇄합니다.
-   - 다운스트림 기계의 평균 가동률은 질량 보존에 의해 결정론적으로 일치합니다:
-     $$\eta_{\text{downstream}} = \min\left(1.0, \frac{Q_{\text{in}}}{Q_{\text{demand, nominal}}}\right)$$
+
+##### 충전 시간 (Charge Duration)
+$$T_{\text{charge}} = \frac{B}{Q_{\text{in}}}$$
+
+* $Q_{\text{in}}$: 정션 노드로 유입되는 총 공급 유량 ($\text{items/s}$ 또는 $\text{mB/s}$).
+* $T_{\text{charge}}$: 버퍼가 1회 방출량을 축적하는 데 소요되는 시간(초).
+
+##### 간헐 방출 (Burst Release) 및 파티클 렌더링
+* 유입 유량이 축적되는 동안 버퍼 내 누적량 $q(t) = (Q_{\text{in}} \times t) \pmod B$가 형성됩니다.
+* 축적이 완료되는 주기 $T_{\text{charge}}$마다 $B$ 크기의 완제품 배치 묶음(배지 라벨 `Bx`)이 출력 와이어를 통해 다운스트림으로 방출됩니다.
+
+##### 다운스트림 가동률 및 결핍 완충 (Deficit Buffering)
+후속 기계가 1회 가동 시 대용량 배치 $D_{\text{batch}} \le B$를 요구하는 경우, 버퍼가 존재하지 않을 때 발생하는 순간 결핍(Instantaneous Starvation)을 상쇄합니다. 다운스트림 기계의 평균 가동률은 질량 보존에 의해 결정론적으로 일치합니다:
+
+$$\eta_{\text{downstream}} = \min\left(1.0, \frac{Q_{\text{in}}}{Q_{\text{demand, nominal}}}\right)$$
 
 ---
 

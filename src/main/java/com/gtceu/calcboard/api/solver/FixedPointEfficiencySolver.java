@@ -471,10 +471,37 @@ public final class FixedPointEfficiencySolver {
         List<FlowGraph.ConnectionEdge> extEdges = new ArrayList<>();
         for (String nodeId : scc) {
             RecipeNode node = graph.findNodeById(nodeId);
-            if (node == null || node.isReroute()) continue;
+            if (node == null) continue;
+            if (node.isReroute()) {
+                collectExternalEdgesForJunction(graph, node, scc, res, edgeIndex, extEdges);
+                continue;
+            }
             collectExternalEdgesForNode(graph, node, scc, res, edgeIndex, extEdges);
         }
         return extEdges;
+    }
+
+    private static void collectExternalEdgesForJunction(
+            FlowGraph graph,
+            RecipeNode junction,
+            Set<String> scc,
+            SelfSustainingResource res,
+            FlowEdgeAllocator.CachedEdgeIndex edgeIndex,
+            List<FlowGraph.ConnectionEdge> extEdges
+    ) {
+        IngredientStack rStack = junction.getRerouteIngredient();
+        if (rStack == null && !junction.getInputs().isEmpty()) {
+            rStack = junction.getInputs().get(0);
+        }
+        if (rStack == null || !res.matches(rStack)) {
+            return;
+        }
+        List<FlowGraph.ConnectionEdge> inEdges = findIncomingEdges(graph, junction.getId(), 0, edgeIndex);
+        for (FlowGraph.ConnectionEdge edge : inEdges) {
+            if (!scc.contains(edge.fromNodeId())) {
+                extEdges.add(edge);
+            }
+        }
     }
 
     private static void collectExternalEdgesForNode(
@@ -582,7 +609,7 @@ public final class FixedPointEfficiencySolver {
             for (FlowGraph.ConnectionEdge edge : outEdges) {
                 if (!scc.contains(edge.toNodeId())) continue;
                 RecipeNode producer = graph.findNodeById(edge.fromNodeId());
-                if (producer != null && !producer.isReroute() && edge.outputIndex() < producer.getOutputs().size()) {
+                if (producer != null && edge.outputIndex() < producer.getOutputs().size()) {
                     IngredientStack outStack = producer.getOutputs().get(edge.outputIndex());
                     SelfSustainingResource res = new SelfSustainingResource(outStack.getType(), outStack.getId());
                     prodTotals.putIfAbsent(res, 0.0);

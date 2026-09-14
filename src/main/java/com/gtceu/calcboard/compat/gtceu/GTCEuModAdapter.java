@@ -287,6 +287,13 @@ public class GTCEuModAdapter implements IModAdapter {
         GTAddonCompatibilityHandler.onAddonRemoved(node, addon);
     }
 
+    @Override
+    public void onAddonsUpdated(RecipeNode node) {
+        if (node != null && node.isMultiblock()) {
+            GTAddonCompatibilityHandler.updateNodeTierFromEnergyHatches(node);
+        }
+    }
+
     public static void updateNodeTierFromEnergyHatches(RecipeNode node) {
         GTAddonCompatibilityHandler.updateNodeTierFromEnergyHatches(node);
     }
@@ -510,6 +517,11 @@ public class GTCEuModAdapter implements IModAdapter {
     }
 
     @Override
+    public boolean hasNativePerfectOverclock(ResourceLocation machineId) {
+        return com.gtceu.calcboard.compat.gtceu.helper.GTCEuOverclockHelper.hasNativePerfectOverclock(machineId);
+    }
+
+    @Override
     public EnergyType getEnergyType(RecipeNode node) {
         return GTPowerCalculator.getEnergyType(node);
     }
@@ -551,6 +563,16 @@ public class GTCEuModAdapter implements IModAdapter {
             return GTMultiblockBOMResolver.resolveStructureParts(node, dualLowerTierEnergyHatches);
         }
         return IModAdapter.super.resolveStructureParts(node, dualLowerTierEnergyHatches);
+    }
+
+    @Override
+    public int getMultiblockCount(RecipeNode node, int baseMachineCount) {
+        if (GTCombustionHelper.isModularCombustionFrame(node)) {
+            com.gtceu.calcboard.compat.gtceu.model.mcf.MCFSlotConfiguration cfg = GTCombustionHelper.getMCFConfiguration(node);
+            int activeCount = cfg != null ? cfg.getActiveSlotCount() : 0;
+            return baseMachineCount * (1 + activeCount);
+        }
+        return baseMachineCount;
     }
 
     @Override
@@ -689,5 +711,20 @@ public class GTCEuModAdapter implements IModAdapter {
     @Override
     public void setThreadingActive(RecipeNode node, boolean active) {
         com.gtceu.calcboard.compat.start.helper.RecipeNodeThreadingHelper.setThreadingActive(node, active);
+    }
+
+    @Override
+    public List<com.gtceu.calcboard.api.model.ProjectedPort> projectInputPorts(RecipeNode node, com.gtceu.calcboard.api.model.RecipeSpec baseSpec) {
+        return com.gtceu.calcboard.compat.gtceu.projection.GTCEuPortProjector.getInstance().projectInputPorts(node, baseSpec);
+    }
+
+    @Override
+    public List<com.gtceu.calcboard.api.model.ProjectedPort> projectOutputPorts(RecipeNode node, com.gtceu.calcboard.api.model.RecipeSpec baseSpec) {
+        return com.gtceu.calcboard.compat.gtceu.projection.GTCEuPortProjector.getInstance().projectOutputPorts(node, baseSpec);
+    }
+
+    @Override
+    public List<com.gtceu.calcboard.api.model.IngredientStack> sanitizeLegacyCoreInputs(RecipeNode node, List<com.gtceu.calcboard.api.model.IngredientStack> savedInputs) {
+        return com.gtceu.calcboard.compat.gtceu.projection.GTCEuPortProjector.getInstance().sanitizeLegacyCoreInputs(node, savedInputs);
     }
 }

@@ -102,11 +102,33 @@ public final class FlowSummaryAggregator {
     private static double calculateExternalSupplyToPort(FlowGraph graph, String nodeId, int inputIndex, Set<String> scc) {
         double extSupply = 0.0;
         for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
-            if (edge.toNodeId().equals(nodeId) && edge.inputIndex() == inputIndex && !scc.contains(edge.fromNodeId())) {
+            if (!edge.toNodeId().equals(nodeId) || edge.inputIndex() != inputIndex) continue;
+            RecipeNode producer = graph.findNodeById(edge.fromNodeId());
+            if (producer == null) continue;
+
+            if (!scc.contains(producer.getId())) {
                 extSupply += FlowBalanceMatrixSolver.getEdgeAllocatedFlow(graph, edge, null);
+            } else if (producer.isReroute()) {
+                double edgeFlow = FlowBalanceMatrixSolver.getEdgeAllocatedFlow(graph, edge, null);
+                double extFraction = computeJunctionExternalFraction(graph, producer, scc);
+                extSupply += edgeFlow * extFraction;
             }
         }
         return extSupply;
+    }
+
+    private static double computeJunctionExternalFraction(FlowGraph graph, RecipeNode junction, Set<String> scc) {
+        double totalIn = 0.0;
+        double extIn = 0.0;
+        for (FlowGraph.ConnectionEdge inEdge : graph.getConnections()) {
+            if (!inEdge.toNodeId().equals(junction.getId()) || inEdge.inputIndex() != 0) continue;
+            double flow = FlowBalanceMatrixSolver.getEdgeAllocatedFlow(graph, inEdge, null);
+            totalIn += flow;
+            if (!scc.contains(inEdge.fromNodeId())) {
+                extIn += flow;
+            }
+        }
+        return totalIn > 1e-5 ? Math.min(1.0, extIn / totalIn) : 0.0;
     }
 
     public static FlowGraphSolver.PortFlowStats getOutputPortStats(FlowGraph graph, RecipeNode node, int outputIndex) {
@@ -193,8 +215,11 @@ public final class FlowSummaryAggregator {
 
     public static BalanceSummary computeSummary(FlowGraph graph, boolean recomputeEfficiencies) {
         BalanceSummary summary = computeSummaryInternal(graph, recomputeEfficiencies, 0, Collections.newSetFromMap(new IdentityHashMap<>()));
-        if (graph != null && recomputeEfficiencies) {
-            graph.setCachedSummary(summary);
+        if (graph != null) {
+            if (recomputeEfficiencies) {
+                graph.setCachedSummary(summary);
+            }
+            graph.captureSnapshot();
         }
         return summary;
     }
@@ -412,6 +437,8 @@ public final class FlowSummaryAggregator {
         double netEUt = totalConsumedEUt - totalGeneratedEUt;
         double netSU = totalGeneratedSU - totalConsumedSU;
         double netFE = totalGeneratedFE - totalConsumedFE;
+
+        graph.captureSnapshot();
         return new BalanceSummary(netEUt, netSU, netFE, highestTier, totalMachineCount, machineBreakdown, rawInputs, netOutputs, balanced, totalProduction, totalConsumption, voidedOutputs, totalFusionStartupEU, fusionTierCounts, fusionTierStartupEU);
     }
 

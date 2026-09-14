@@ -37,7 +37,16 @@ public final class NodePortTooltipRenderer {
         boolean[] hiddenRef = new boolean[]{false};
 
         List<Component> tooltipLines = new ArrayList<>();
-        tooltipLines.add(Component.literal("§b[« " + Component.translatable("gui.gtcalcboard.input").getString() + "] §f" + in.getDisplayName()));
+        RecipeNode node = widget.getNode();
+        if (node != null && node.isAuxiliaryInputPort(inIdx)) {
+            com.gtceu.calcboard.api.model.ProjectedPort proj = node.getProjectedInput(inIdx);
+            String addonText = (proj != null && proj.sourceAddonId() != null && !proj.sourceAddonId().isEmpty())
+                    ? " - " + proj.sourceAddonId()
+                    : "";
+            tooltipLines.add(Component.literal("§6[⚙ " + Component.translatable("gui.gtcalcboard.port.auxiliary_input").getString() + addonText + "] §f" + in.getDisplayName()));
+        } else {
+            tooltipLines.add(Component.literal("§b[« " + Component.translatable("gui.gtcalcboard.input").getString() + "] §f" + in.getDisplayName()));
+        }
 
         String reqDisplay = BoardTooltipRenderer.formatPortRate(stats.requiredOrProducedRate(), in, showExact, hiddenRef);
         tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.demand").getString() + ": §f" + reqDisplay));
@@ -84,7 +93,16 @@ public final class NodePortTooltipRenderer {
         boolean[] hiddenRef = new boolean[]{false};
 
         List<Component> tooltipLines = new ArrayList<>();
-        tooltipLines.add(Component.literal("§a[» " + Component.translatable("gui.gtcalcboard.output").getString() + "] §f" + out.getDisplayName()));
+        RecipeNode node = widget.getNode();
+        if (node != null && node.isAuxiliaryOutputPort(outIdx)) {
+            com.gtceu.calcboard.api.model.ProjectedPort proj = node.getProjectedOutput(outIdx);
+            String addonText = (proj != null && proj.sourceAddonId() != null && !proj.sourceAddonId().isEmpty())
+                    ? " - " + proj.sourceAddonId()
+                    : "";
+            tooltipLines.add(Component.literal("§6[⚙ " + Component.translatable("gui.gtcalcboard.port.auxiliary_output").getString() + addonText + "] §f" + out.getDisplayName()));
+        } else {
+            tooltipLines.add(Component.literal("§a[» " + Component.translatable("gui.gtcalcboard.output").getString() + "] §f" + out.getDisplayName()));
+        }
         if (widget.getNode().isOutputPortVoided(outIdx)) {
             tooltipLines.add(Component.literal("§d[∅] §d" + Component.translatable("gui.gtcalcboard.tooltip.voided_port").getString()));
         }
@@ -94,7 +112,6 @@ public final class NodePortTooltipRenderer {
 
         appendOutputPortStats(tooltipLines, stats, out, showExact, hiddenRef);
 
-        RecipeNode node = widget.getNode();
         appendOutputChanceInfo(tooltipLines, node, out, outIdx);
 
         if (BoardManager.getInstance().isShowDebugInfo()) {

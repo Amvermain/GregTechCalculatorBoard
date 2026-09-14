@@ -81,7 +81,11 @@ public final class GTAddonCompatibilityHandler {
         if (GTCombustionHelper.isCombustionFamily(node)) {
             if (node.isMultiblock()) {
                 List<AddonCategory> cats = new ArrayList<>();
-                cats.add(AddonCategory.MULTIBLOCK_TRAIT);
+                if (GTCombustionHelper.isModularCombustionFrame(node)) {
+                    cats.add(AddonCategory.MCF_MODULE);
+                } else {
+                    cats.add(AddonCategory.MULTIBLOCK_TRAIT);
+                }
                 cats.add(AddonCategory.MAINTENANCE);
                 cats.add(AddonCategory.HATCH_BUS);
                 cats.add(AddonCategory.CUSTOM);

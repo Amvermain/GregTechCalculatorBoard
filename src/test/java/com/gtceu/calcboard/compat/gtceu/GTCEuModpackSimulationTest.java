@@ -10,6 +10,7 @@ import com.gtceu.calcboard.compat.gtceu.addon.GTParallelHatchAddon;
 import com.gtceu.calcboard.compat.gtceu.handler.GTAddonCompatibilityHandler;
 import com.gtceu.calcboard.testutil.SimulatedGTEnvironment;
 import net.minecraft.resources.ResourceLocation;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -24,6 +25,11 @@ public class GTCEuModpackSimulationTest {
     @BeforeEach
     void setUp() {
         SimulatedGTEnvironment.setupFullEnvironment();
+    }
+
+    @AfterEach
+    void tearDown() {
+        SimulatedGTEnvironment.tearDownEnvironment();
     }
 
     @Test

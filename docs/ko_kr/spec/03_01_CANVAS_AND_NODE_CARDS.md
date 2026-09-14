@@ -52,26 +52,33 @@ $$B(t) = (1-t)^3 P_0 + 3(1-t)^2 t P_1 + 3(1-t) t^2 P_2 + t^3 P_3 \quad (t \in [0
 ### 2.3 처리량 포화도 기반 와이어 펄스 도트 렌더링 (Rate-Based Flow Modulation, ADR-018)
 연결선 내부를 이동하는 펄스 도트에 공급 포화율($R_e = \text{Supply} / \text{Demand}$)을 투영하여 유량 흐름 및 병목을 실시간 렌더링합니다:
 
-1. **포화율 ($R_e$) 산출**:
-   $$R_e = \begin{cases} 
-   1.0 & \text{if } \text{DemandRate} \le 0.0001 \\
-   0.0 & \text{if } \text{SupplyRate} \le 0.0001 \\
-   \min\left(1.0, \, \frac{\text{SupplyRate}}{\text{DemandRate}}\right) & \text{otherwise}
-   \end{cases}$$
+#### 1. 포화율 ($R_e$) 산출
+$$
+R_e = \begin{cases} 
+1.0 & \text{if } \text{DemandRate} \le 0.0001 \\
+0.0 & \text{if } \text{SupplyRate} \le 0.0001 \\
+\min\left(1.0, \, \frac{\text{SupplyRate}}{\text{DemandRate}}\right) & \text{otherwise}
+\end{cases}
+$$
 
-2. **듀티 사이클 간헐적 정지 (Duty Cycle Stutter)**:
-   전역 주기 $T = 1600\text{ ms}$, 기준 시간 $\tau = (t_{\text{now}} \pmod T) / T \in [0, 1)$:
-   $$t_{\text{eff}} = \begin{cases} 
-   \frac{\tau}{R_e} & \text{if } \tau < R_e \quad (\text{정상 주행 구간}) \\
-   1.0 & \text{if } \tau \ge R_e \quad (\text{원료 결핍 대기 정지 구간})
-   \end{cases}$$
+#### 2. 듀티 사이클 간헐적 정지 (Duty Cycle Stutter)
+전역 주기 $T = 1600\text{ ms}$, 기준 시간 $\tau = (t_{\text{now}} \pmod T) / T \in [0, 1)$:
 
-3. **동적 3단계 RGB 보간 (Color Interpolation)**:
-   $$C(R_e) = \begin{cases} 
-   (0.22, 0.74, 0.97) \quad [\text{Cyan Blue}] & \text{if } R_e \ge 1.0 \\
-   \text{Lerp}\left(\text{Amber}, \text{Cyan}, \frac{R_e - 0.5}{0.5}\right) & \text{if } 0.5 \le R_e < 1.0 \\
-   \text{Lerp}\left(\text{Crimson}, \text{Amber}, \frac{R_e}{0.5}\right) & \text{if } 0.0 < R_e < 0.5
-   \end{cases}$$
+$$
+t_{\text{eff}} = \begin{cases} 
+\frac{\tau}{R_e} & \text{if } \tau < R_e \quad (\text{정상 주행 구간}) \\
+1.0 & \text{if } \tau \ge R_e \quad (\text{원료 결핍 대기 정지 구간})
+\end{cases}
+$$
+
+#### 3. 동적 3단계 RGB 보간 (Color Interpolation)
+$$
+C(R_e) = \begin{cases} 
+(0.22, 0.74, 0.97) \quad [\text{Cyan Blue}] & \text{if } R_e \ge 1.0 \\
+\text{Lerp}\left(\text{Amber}, \text{Cyan}, \frac{R_e - 0.5}{0.5}\right) & \text{if } 0.5 \le R_e < 1.0 \\
+\text{Lerp}\left(\text{Crimson}, \text{Amber}, \frac{R_e}{0.5}\right) & \text{if } 0.0 < R_e < 0.5
+\end{cases}
+$$
 
 ---
 
