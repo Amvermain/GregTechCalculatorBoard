@@ -376,10 +376,7 @@ public class ToolbarWidget {
             }
         }));
         currentDropdownItems.add(new DropdownItem("▶ " + Component.translatable("gui.gtcalcboard.tutorial_btn").getString(), null, () -> {
-            com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().startTutorial(screen);
-        }));
-        currentDropdownItems.add(new DropdownItem("✦ " + Component.translatable("gui.gtcalcboard.advanced_tutorial_btn").getString(), null, () -> {
-            com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().startAdvancedTutorial(screen);
+            screen.openTutorialLauncher();
         }));
         currentDropdownItems.add(new DropdownItem("⌨ " + Component.translatable("gui.gtcalcboard.activity_bar.help").getString(), "H", () -> {
             if (screen.getHotkeyHudWidget() != null) {
@@ -484,7 +481,7 @@ public class ToolbarWidget {
     private boolean handleRightGroupClick(double mouseX, double mouseY) {
         if (isHovered(mouseX, mouseY, closeBtnX, closeBtnW)) {
             playClickSound();
-            screen.onClose();
+            screen.closeScreen();
             return true;
         }
         if (isHovered(mouseX, mouseY, redoBtnX, redoBtnW)) {

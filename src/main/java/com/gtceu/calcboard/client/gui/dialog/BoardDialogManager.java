@@ -27,6 +27,7 @@ public class BoardDialogManager {
     private final List<IBoardModal> allModals = new ArrayList<>();
 
     private final WelcomeTutorialDialog welcomeDialog = new WelcomeTutorialDialog();
+    private final TutorialLauncherDialog tutorialLauncherDialog = new TutorialLauncherDialog();
     private QuickPageSwitcherDialog quickPageSwitcherDialog;
     private TemplateCloneDialog templateCloneDialog;
     private RecipeSearchDialog searchDialog;
@@ -85,6 +86,7 @@ public class BoardDialogManager {
         if (this.targetOutputRateDialog == null) this.targetOutputRateDialog = new TargetOutputRateDialog(screen);
         if (this.pageSettingsDialog == null) this.pageSettingsDialog = new PageSettingsDialog(screen);
         this.welcomeDialog.setScreen(screen);
+        this.tutorialLauncherDialog.setScreen(screen);
 
         registerAllModals();
     }
@@ -94,6 +96,7 @@ public class BoardDialogManager {
         trackModal(quickPageSwitcherDialog);
         trackModal(templateCloneDialog);
         trackModal(welcomeDialog);
+        trackModal(tutorialLauncherDialog);
         trackModal(settingsDialog);
         trackModal(globalBalanceDialog);
         trackModal(multiblockBOMDialog);
@@ -444,6 +447,13 @@ public class BoardDialogManager {
     public JunctionSupplyDialog getJunctionSupplyDialog() { return junctionSupplyDialog; }
     public TargetOutputRateDialog getTargetOutputRateDialog() { return targetOutputRateDialog; }
     public PageSettingsDialog getPageSettingsDialog() { return pageSettingsDialog; }
+
+    public TutorialLauncherDialog getTutorialLauncherDialog() { return tutorialLauncherDialog; }
+
+    public void openTutorialLauncher() {
+        tutorialLauncherDialog.open();
+        modalStack.push(tutorialLauncherDialog);
+    }
 
     public void openPageSettingsDialog(BoardPage page) {
         if (!screen.ensureEditPermission() || page == null) return;

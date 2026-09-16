@@ -13,6 +13,7 @@ import com.gtceu.calcboard.integration.spi.IRecipeViewerAdapter;
 import dev.emi.emi.api.EmiApi;
 import dev.emi.emi.api.recipe.EmiPlayerInventory;
 import dev.emi.emi.api.recipe.EmiRecipe;
+import dev.emi.emi.api.recipe.EmiRecipeManager;
 import dev.emi.emi.api.stack.EmiIngredient;
 import dev.emi.emi.api.stack.EmiStack;
 import dev.emi.emi.config.SidebarType;
@@ -31,6 +32,17 @@ import net.minecraft.world.item.ItemStack;
 import java.util.*;
 
 public class EmiRecipeViewerAdapter implements IRecipeViewerAdapter {
+
+    private static final java.lang.reflect.Field CURRENT_PAGE_FIELD;
+
+    static {
+        java.lang.reflect.Field field = null;
+        try {
+            field = dev.emi.emi.screen.RecipeScreen.class.getDeclaredField("currentPage");
+            field.setAccessible(true);
+        } catch (Throwable ignored) {}
+        CURRENT_PAGE_FIELD = field;
+    }
 
     @Override
     public String getViewerId() {
@@ -145,20 +157,7 @@ public class EmiRecipeViewerAdapter implements IRecipeViewerAdapter {
             if (!favs.isEmpty()) {
                 var rm = EmiApi.getRecipeManager();
                 for (var fav : favs) {
-                    if (fav.getRecipe() != null && fav.getRecipe().getId() != null) {
-                        ids.add(fav.getRecipe().getId());
-                    } else if (!fav.getEmiStacks().isEmpty() && rm != null) {
-                        for (var stack : fav.getEmiStacks()) {
-                            var outRecipes = rm.getRecipesByOutput(stack);
-                            if (outRecipes != null) {
-                                for (var r : outRecipes) {
-                                    if (r != null && r.getId() != null) {
-                                        ids.add(r.getId());
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    collectFavoriteRecipeIds(fav, rm, ids);
                 }
             }
         } catch (Throwable ignored) {}
@@ -258,47 +257,7 @@ public class EmiRecipeViewerAdapter implements IRecipeViewerAdapter {
 
             List<EmiStack> outputs = r.getOutputs();
             if (outputs != null && !outputs.isEmpty()) {
-                List<EmiStack> sortedOutputs = new ArrayList<>(outputs);
-                if (matchedOutputId != null || matchedOutputName != null) {
-                    int matchIdx = -1;
-                    for (int i = 0; i < sortedOutputs.size(); i++) {
-                        EmiStack stack = sortedOutputs.get(i);
-                        if (stack == null) continue;
-                        if (matchedOutputId != null && matchedOutputId.equals(stack.getId())) {
-                            matchIdx = i;
-                            break;
-                        }
-                        if (matchedOutputName != null) {
-                            try {
-                                if (stack.getName() != null && matchedOutputName.equalsIgnoreCase(stack.getName().getString())) {
-                                    matchIdx = i;
-                                    break;
-                                }
-                            } catch (Throwable ignored) {}
-                        }
-                    }
-                    if (matchIdx > 0) {
-                        EmiStack matched = sortedOutputs.remove(matchIdx);
-                        sortedOutputs.add(0, matched);
-                    }
-                }
-
-                int maxDisplay = 3;
-                int count = Math.min(sortedOutputs.size(), maxDisplay);
-                for (int i = 0; i < count; i++) {
-                    EmiStack out = sortedOutputs.get(i);
-                    if (out != null) {
-                        out.render(graphics, currentX, rowY + 8, 0);
-                    }
-                    currentX += 18;
-                }
-
-                if (sortedOutputs.size() > maxDisplay) {
-                    int remaining = sortedOutputs.size() - maxDisplay;
-                    String badge = "+" + remaining;
-                    graphics.drawString(font, badge, currentX, rowY + 12, 0xFF94A3B8, false);
-                    currentX += font.width(badge) + 2;
-                }
+                currentX = renderEmiOutputs(graphics, font, currentX, rowY, outputs, matchedOutputId, matchedOutputName);
             }
             return currentX - listX;
         } else if (viewerRecipe instanceof RecipeNode rn) {
@@ -318,43 +277,7 @@ public class EmiRecipeViewerAdapter implements IRecipeViewerAdapter {
 
             List<IngredientStack> outputs = rn.getOutputs();
             if (outputs != null && !outputs.isEmpty()) {
-                List<IngredientStack> sortedOutputs = new ArrayList<>(outputs);
-                if (matchedOutputId != null || matchedOutputName != null) {
-                    int matchIdx = -1;
-                    for (int i = 0; i < sortedOutputs.size(); i++) {
-                        IngredientStack stack = sortedOutputs.get(i);
-                        if (stack == null) continue;
-                        if (matchedOutputId != null && matchedOutputId.equals(stack.getId())) {
-                            matchIdx = i;
-                            break;
-                        }
-                        if (matchedOutputName != null && matchedOutputName.equalsIgnoreCase(stack.getDisplayName())) {
-                            matchIdx = i;
-                            break;
-                        }
-                    }
-                    if (matchIdx > 0) {
-                        IngredientStack matched = sortedOutputs.remove(matchIdx);
-                        sortedOutputs.add(0, matched);
-                    }
-                }
-
-                int maxDisplay = rn.isGenerator() ? 2 : 3;
-                int count = Math.min(sortedOutputs.size(), maxDisplay);
-                for (int i = 0; i < count; i++) {
-                    IngredientStack out = sortedOutputs.get(i);
-                    if (out != null) {
-                        com.gtceu.calcboard.client.gui.render.IngredientRenderer.render(graphics, out, currentX, rowY + 8);
-                    }
-                    currentX += 18;
-                }
-
-                if (sortedOutputs.size() > maxDisplay) {
-                    int remaining = sortedOutputs.size() - maxDisplay;
-                    String badge = "+" + remaining;
-                    graphics.drawString(font, badge, currentX, rowY + 12, 0xFF94A3B8, false);
-                    currentX += font.width(badge) + 2;
-                }
+                currentX = renderNodeOutputs(graphics, font, currentX, rowY, outputs, rn.isGenerator(), matchedOutputId, matchedOutputName);
             }
             return currentX - listX;
         }
@@ -381,20 +304,7 @@ public class EmiRecipeViewerAdapter implements IRecipeViewerAdapter {
             if (dev.emi.emi.bom.BoM.tree != null) {
                 var recipeManager = EmiApi.getRecipeManager();
                 for (MultiblockBOMSummary.BOMItemEntry item : summary.aggregatedItems()) {
-                    ItemStack is = item.resolveItemStack();
-                    if (!is.isEmpty()) {
-                        EmiStack stack = EmiStack.of(is, 1);
-                        EmiRecipe rec = dev.emi.emi.bom.BoM.getRecipe(stack);
-                        if (rec == null && recipeManager != null) {
-                            List<EmiRecipe> recs = recipeManager.getRecipesByOutput(stack);
-                            if (recs != null && !recs.isEmpty()) {
-                                rec = recs.get(0);
-                            }
-                        }
-                        if (rec != null) {
-                            dev.emi.emi.bom.BoM.tree.addResolution(stack, rec);
-                        }
-                    }
+                    registerBomItemResolution(item, recipeManager);
                 }
 
                 dev.emi.emi.bom.BoM.tree.recalculate();
@@ -439,67 +349,237 @@ public class EmiRecipeViewerAdapter implements IRecipeViewerAdapter {
             int mX = (int) Math.round(mouseX);
             int mY = (int) Math.round(mouseY);
 
-            // 1. Try resolving directly from EmiScreenManager hovered interaction (Works on RecipeScreen, Sidebar, Favorites, and Chest/Inventory overlays)
-            try {
-                var interaction = dev.emi.emi.screen.EmiScreenManager.getHoveredStack(mX, mY, true);
-                if (interaction != null) {
-                    EmiRecipe r = interaction.getRecipeContext();
-                    if (r != null) {
-                        CalcBoardEmiPlugin.addRecipeToBoard(r, false);
-                        return true;
-                    }
-                    var ing = interaction.getStack();
-                    if (ing != null && !ing.isEmpty() && !ing.getEmiStacks().isEmpty()) {
-                        EmiStack es = ing.getEmiStacks().get(0);
-                        var rm = EmiApi.getRecipeManager();
-                        if (rm != null) {
-                            List<EmiRecipe> recipes = rm.getRecipesByOutput(es);
-                            if (recipes != null && !recipes.isEmpty()) {
-                                CalcBoardEmiPlugin.addRecipeToBoard(recipes.get(0), false);
-                                return true;
-                            }
-                        }
-                    }
-                }
-            } catch (Throwable ignored) {}
+            if (tryAddHoveredFromEmiScreenManager(mX, mY)) {
+                return true;
+            }
 
-            // 3. Fallback: inspect RecipeScreen currentPage widget groups
             if (screen instanceof dev.emi.emi.screen.RecipeScreen recipeScreen) {
-                try {
-                    var field = dev.emi.emi.screen.RecipeScreen.class.getDeclaredField("currentPage");
-                    field.setAccessible(true);
-                    Object pageObj = field.get(recipeScreen);
-                    if (pageObj instanceof List<?> list) {
-                        EmiRecipe targetRecipe = null;
-                        for (Object o : list) {
-                            if (o instanceof dev.emi.emi.screen.WidgetGroup wg && wg.recipe != null) {
-                                int x = wg.x();
-                                int y = wg.y();
-                                int w = wg.getWidth();
-                                int h = wg.getHeight();
-                                if (mX >= x && mX <= x + w && mY >= y && mY <= y + h) {
-                                    targetRecipe = wg.recipe;
-                                    break;
-                                }
-                            }
-                        }
-                        if (targetRecipe == null) {
-                            for (Object o : list) {
-                                if (o instanceof dev.emi.emi.screen.WidgetGroup wg && wg.recipe != null) {
-                                    targetRecipe = wg.recipe;
-                                    break;
-                                }
-                            }
-                        }
-                        if (targetRecipe != null) {
-                            CalcBoardEmiPlugin.addRecipeToBoard(targetRecipe, false);
-                            return true;
-                        }
-                    }
-                } catch (Throwable ignored) {}
+                return tryAddHoveredFromRecipeScreen(recipeScreen, mX, mY);
             }
         } catch (Throwable ignored) {}
         return false;
+    }
+
+    private static boolean tryAddHoveredFromEmiScreenManager(int mX, int mY) {
+        try {
+            var interaction = dev.emi.emi.screen.EmiScreenManager.getHoveredStack(mX, mY, true);
+            if (interaction == null) return false;
+
+            EmiRecipe r = interaction.getRecipeContext();
+            if (r != null) {
+                CalcBoardEmiPlugin.addRecipeToBoard(r, false);
+                return true;
+            }
+
+            return tryAddFromIngredientStack(interaction.getStack());
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private static boolean tryAddFromIngredientStack(dev.emi.emi.api.stack.EmiIngredient ing) {
+        if (ing == null || ing.isEmpty() || ing.getEmiStacks().isEmpty()) return false;
+        EmiStack es = ing.getEmiStacks().get(0);
+        var rm = EmiApi.getRecipeManager();
+        if (rm == null) return false;
+
+        List<EmiRecipe> recipes = rm.getRecipesByOutput(es);
+        if (recipes != null && !recipes.isEmpty()) {
+            CalcBoardEmiPlugin.addRecipeToBoard(recipes.get(0), false);
+            return true;
+        }
+        return false;
+    }
+
+    private static boolean tryAddHoveredFromRecipeScreen(dev.emi.emi.screen.RecipeScreen recipeScreen, int mX, int mY) {
+        try {
+            if (CURRENT_PAGE_FIELD == null) return false;
+            Object pageObj = CURRENT_PAGE_FIELD.get(recipeScreen);
+            if (pageObj instanceof List<?> list) {
+                EmiRecipe targetRecipe = findRecipeFromWidgetGroups(list, mX, mY);
+                if (targetRecipe != null) {
+                    CalcBoardEmiPlugin.addRecipeToBoard(targetRecipe, false);
+                    return true;
+                }
+            }
+        } catch (Throwable ignored) {}
+        return false;
+    }
+
+    private static EmiRecipe findRecipeFromWidgetGroups(List<?> list, int mX, int mY) {
+        for (Object o : list) {
+            if (o instanceof dev.emi.emi.screen.WidgetGroup wg && wg.recipe != null && isWidgetHovered(wg, mX, mY)) {
+                return wg.recipe;
+            }
+        }
+        for (Object o : list) {
+            if (o instanceof dev.emi.emi.screen.WidgetGroup wg && wg.recipe != null) {
+                return wg.recipe;
+            }
+        }
+        return null;
+    }
+
+    private static boolean isWidgetHovered(dev.emi.emi.screen.WidgetGroup wg, int mX, int mY) {
+        return mX >= wg.x() && mX <= wg.x() + wg.getWidth() && mY >= wg.y() && mY <= wg.y() + wg.getHeight();
+    }
+
+    private static void collectFavoriteRecipeIds(EmiFavorite fav, EmiRecipeManager rm, Set<ResourceLocation> ids) {
+        if (fav.getRecipe() != null && fav.getRecipe().getId() != null) {
+            ids.add(fav.getRecipe().getId());
+            return;
+        }
+        if (fav.getEmiStacks().isEmpty() || rm == null) return;
+        for (var stack : fav.getEmiStacks()) {
+            addOutputRecipeIds(rm, stack, ids);
+        }
+    }
+
+    private static void addOutputRecipeIds(EmiRecipeManager rm, EmiStack stack, Set<ResourceLocation> ids) {
+        var outRecipes = rm.getRecipesByOutput(stack);
+        if (outRecipes == null) return;
+        for (var r : outRecipes) {
+            if (r != null && r.getId() != null) {
+                ids.add(r.getId());
+            }
+        }
+    }
+
+    private static int renderEmiOutputs(
+            GuiGraphics graphics,
+            net.minecraft.client.gui.Font font,
+            int startX,
+            int rowY,
+            List<EmiStack> outputs,
+            ResourceLocation matchedId,
+            String matchedName
+    ) {
+        List<EmiStack> sortedOutputs = new ArrayList<>(outputs);
+        sortEmiOutputs(sortedOutputs, matchedId, matchedName);
+
+        int currentX = startX;
+        int maxDisplay = 3;
+        int count = Math.min(sortedOutputs.size(), maxDisplay);
+        for (int i = 0; i < count; i++) {
+            EmiStack out = sortedOutputs.get(i);
+            if (out != null) {
+                out.render(graphics, currentX, rowY + 8, 0);
+            }
+            currentX += 18;
+        }
+
+        if (sortedOutputs.size() > maxDisplay) {
+            int remaining = sortedOutputs.size() - maxDisplay;
+            String badge = "+" + remaining;
+            graphics.drawString(font, badge, currentX, rowY + 12, 0xFF94A3B8, false);
+            currentX += font.width(badge) + 2;
+        }
+        return currentX;
+    }
+
+    private static void sortEmiOutputs(List<EmiStack> outputs, ResourceLocation matchedId, String matchedName) {
+        if (matchedId == null && matchedName == null) return;
+        int matchIdx = findMatchingEmiOutputIndex(outputs, matchedId, matchedName);
+        if (matchIdx > 0) {
+            outputs.add(0, outputs.remove(matchIdx));
+        }
+    }
+
+    private static int findMatchingEmiOutputIndex(List<EmiStack> outputs, ResourceLocation matchedId, String matchedName) {
+        for (int i = 0; i < outputs.size(); i++) {
+            EmiStack stack = outputs.get(i);
+            if (isEmiStackMatch(stack, matchedId, matchedName)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private static boolean isEmiStackMatch(EmiStack stack, ResourceLocation matchedId, String matchedName) {
+        if (stack == null) return false;
+        if (matchedId != null && matchedId.equals(stack.getId())) return true;
+        if (matchedName != null && stack.getName() != null) {
+            return matchedName.equalsIgnoreCase(stack.getName().getString());
+        }
+        return false;
+    }
+
+    private static int renderNodeOutputs(
+            GuiGraphics graphics,
+            net.minecraft.client.gui.Font font,
+            int startX,
+            int rowY,
+            List<IngredientStack> outputs,
+            boolean isGenerator,
+            ResourceLocation matchedId,
+            String matchedName
+    ) {
+        List<IngredientStack> sortedOutputs = new ArrayList<>(outputs);
+        sortIngredientOutputs(sortedOutputs, matchedId, matchedName);
+
+        int currentX = startX;
+        int maxDisplay = isGenerator ? 2 : 3;
+        int count = Math.min(sortedOutputs.size(), maxDisplay);
+        for (int i = 0; i < count; i++) {
+            IngredientStack out = sortedOutputs.get(i);
+            if (out != null) {
+                com.gtceu.calcboard.client.gui.render.IngredientRenderer.render(graphics, out, currentX, rowY + 8);
+            }
+            currentX += 18;
+        }
+
+        if (sortedOutputs.size() > maxDisplay) {
+            int remaining = sortedOutputs.size() - maxDisplay;
+            String badge = "+" + remaining;
+            graphics.drawString(font, badge, currentX, rowY + 12, 0xFF94A3B8, false);
+            currentX += font.width(badge) + 2;
+        }
+        return currentX;
+    }
+
+    private static void sortIngredientOutputs(List<IngredientStack> outputs, ResourceLocation matchedId, String matchedName) {
+        if (matchedId == null && matchedName == null) return;
+        int matchIdx = findMatchingIngredientOutputIndex(outputs, matchedId, matchedName);
+        if (matchIdx > 0) {
+            outputs.add(0, outputs.remove(matchIdx));
+        }
+    }
+
+    private static int findMatchingIngredientOutputIndex(List<IngredientStack> outputs, ResourceLocation matchedId, String matchedName) {
+        for (int i = 0; i < outputs.size(); i++) {
+            IngredientStack stack = outputs.get(i);
+            if (isIngredientStackMatch(stack, matchedId, matchedName)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private static boolean isIngredientStackMatch(IngredientStack stack, ResourceLocation matchedId, String matchedName) {
+        if (stack == null) return false;
+        if (matchedId != null && matchedId.equals(stack.getId())) return true;
+        if (matchedName != null && matchedName.equalsIgnoreCase(stack.getDisplayName())) return true;
+        return false;
+    }
+
+    private static void registerBomItemResolution(MultiblockBOMSummary.BOMItemEntry item, EmiRecipeManager recipeManager) {
+        ItemStack is = item.resolveItemStack();
+        if (is.isEmpty()) return;
+        EmiStack stack = EmiStack.of(is, 1);
+        EmiRecipe rec = resolveRecipeForStack(stack, recipeManager);
+        if (rec != null) {
+            dev.emi.emi.bom.BoM.tree.addResolution(stack, rec);
+        }
+    }
+
+    private static EmiRecipe resolveRecipeForStack(EmiStack stack, EmiRecipeManager recipeManager) {
+        EmiRecipe rec = dev.emi.emi.bom.BoM.getRecipe(stack);
+        if (rec != null || recipeManager == null) return rec;
+        List<EmiRecipe> recs = recipeManager.getRecipesByOutput(stack);
+        if (recs != null && !recs.isEmpty()) {
+            return recs.get(0);
+        }
+        return null;
     }
 
     @Override

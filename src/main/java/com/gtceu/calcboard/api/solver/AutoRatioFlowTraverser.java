@@ -37,7 +37,7 @@ public final class AutoRatioFlowTraverser {
     }
 
     public static double calculateTotalConnectedPortDemand(FlowGraph graph, RecipeNode producer, int outputIndex, Map<String, Double> countsMap) {
-        if (producer == null || producer.isVoidSink()) return 0.0;
+        if (producer == null || producer.isVoidSink() || outputIndex < 0) return 0.0;
 
         Queue<DemandHop> queue = new ArrayDeque<>();
         Set<String> visited = new HashSet<>();
@@ -59,7 +59,7 @@ public final class AutoRatioFlowTraverser {
                 if (cNode.isReroute()) {
                     totalPortDemand += computeRerouteDrainDemand(cNode, hop);
                     processRerouteDemandHop(graph, cNode, hop, countsMap, queue, visited);
-                } else if (outEdge.inputIndex() < cNode.getInputs().size()) {
+                } else if (outEdge.inputIndex() >= 0 && outEdge.inputIndex() < cNode.getInputs().size()) {
                     totalPortDemand += computeDirectPortDemand(graph, cNode, outEdge, hop, countsMap);
                 }
             }
@@ -145,7 +145,7 @@ public final class AutoRatioFlowTraverser {
     }
 
     public static double calculateEffectiveIncomingSupply(FlowGraph graph, RecipeNode consumer, int inIdx, Map<String, Double> countsMap, boolean demandProportional) {
-        if (consumer == null) return 0.0;
+        if (consumer == null || inIdx < 0) return 0.0;
 
         Queue<SupplyHop> queue = new ArrayDeque<>();
         Set<String> visited = new HashSet<>();
@@ -167,7 +167,7 @@ public final class AutoRatioFlowTraverser {
                 if (p.isReroute()) {
                     totalIncomingSupply += computeRerouteExternalSupply(graph, p, edge.outputIndex(), hop.weight);
                     processRerouteHop(graph, p, hop, demandProportional, visited, queue);
-                } else if (edge.outputIndex() < p.getOutputs().size()) {
+                } else if (edge.outputIndex() >= 0 && edge.outputIndex() < p.getOutputs().size()) {
                     totalIncomingSupply += computeProducerIncomingSupply(graph, p, edge, consumer, inIdx, hop.weight, countsMap, demandProportional);
                 }
             }

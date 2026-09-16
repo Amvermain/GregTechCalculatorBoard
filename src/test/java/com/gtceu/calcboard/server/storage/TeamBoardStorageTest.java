@@ -1,9 +1,9 @@
 package com.gtceu.calcboard.server.storage;
 
-import com.gtceu.calcboard.server.storage.CommitLogEntry;
+import com.gtceu.calcboard.api.team.CommitLogEntry;
+import com.gtceu.calcboard.api.team.TeamWorkspacePage;
 import com.gtceu.calcboard.server.storage.TeamBoardSavedData;
 import com.gtceu.calcboard.server.storage.TeamWorkspaceData;
-import com.gtceu.calcboard.server.storage.TeamWorkspacePage;
 import net.minecraft.nbt.CompoundTag;
 import org.junit.jupiter.api.Test;
 

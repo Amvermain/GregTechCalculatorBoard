@@ -82,6 +82,11 @@ public class TutorialStepTest {
             "gui.gtcalcboard.tutorial.exit_dialog.cancel"
         };
 
+        String[] extraKeys = {
+            "gui.gtcalcboard.tutorial.continue_btn",
+            "gui.gtcalcboard.tutorial.action_completed_tag"
+        };
+
         for (var entry : langJsons.entrySet()) {
             String langFileName = entry.getKey();
             com.google.gson.JsonObject json = entry.getValue();
@@ -91,13 +96,40 @@ public class TutorialStepTest {
                 Assertions.assertTrue(json.has(step.getDescKey()), langFileName + " missing: " + step.getDescKey());
                 Assertions.assertFalse(json.get(step.getTitleKey()).getAsString().isEmpty(), langFileName + " empty value for: " + step.getTitleKey());
                 Assertions.assertFalse(json.get(step.getDescKey()).getAsString().isEmpty(), langFileName + " empty value for: " + step.getDescKey());
+                if (step.getResultKey() != null) {
+                    Assertions.assertTrue(json.has(step.getResultKey()), langFileName + " missing result key: " + step.getResultKey());
+                    Assertions.assertFalse(json.get(step.getResultKey()).getAsString().isEmpty(), langFileName + " empty value for result key: " + step.getResultKey());
+                }
             }
 
             for (String k : exitKeys) {
                 Assertions.assertTrue(json.has(k), langFileName + " missing exit key: " + k);
                 Assertions.assertFalse(json.get(k).getAsString().isEmpty(), langFileName + " empty value for exit key: " + k);
             }
+
+            for (String k : extraKeys) {
+                Assertions.assertTrue(json.has(k), langFileName + " missing extra key: " + k);
+                Assertions.assertFalse(json.get(k).getAsString().isEmpty(), langFileName + " empty value for extra key: " + k);
+            }
         }
+    }
+
+    @Test
+    public void testCanvasContinuityStep1ToStep2() {
+        com.gtceu.calcboard.client.gui.tutorial.TutorialManager mgr = com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance();
+        mgr.startTutorial(null);
+        BoardPage tutPage = mgr.getTutorialPage();
+        Assertions.assertNotNull(tutPage);
+
+        RecipeNode boiler = RecipeNode.create("My Steam Boiler", 20.0, 0.0, com.gtceu.calcboard.api.type.GTVoltageTier.LV);
+        boiler.addOutput(com.gtceu.calcboard.api.model.IngredientStack.fluid(net.minecraft.resources.ResourceLocation.tryParse("gtceu:steam"), "Steam", 500.0, 1.0));
+        tutPage.getGraph().addNode(boiler);
+        mgr.onNodeAdded(boiler);
+
+        Assertions.assertEquals(TutorialStep.STEP_2_DRAG_TO_SEARCH, mgr.getCurrentStep());
+        Assertions.assertEquals(1, tutPage.getGraph().getNodes().size(), "Canvas continuity: placed boiler must NOT be cleared");
+        Assertions.assertEquals(boiler.getId(), mgr.getBoilerNodeId(), "Placed boiler ID must be preserved as tutorial boiler");
+        mgr.stopTutorial();
     }
 
     @Test

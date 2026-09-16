@@ -239,42 +239,13 @@ public final class FlowSummaryAggregator {
             graph.invalidatePortStatsCache();
         }
 
-        double totalConsumedEUt = 0.0;
-        double totalGeneratedEUt = 0.0;
-        double totalConsumedSU = 0.0;
-        double totalGeneratedSU = 0.0;
-        double totalConsumedFE = 0.0;
-        double totalGeneratedFE = 0.0;
-        GTVoltageTier highestTier = GTVoltageTier.ULV;
-
-        int totalMachineCount = 0;
+        PowerAccumulator power = new PowerAccumulator();
+        FusionAccumulator fusion = new FusionAccumulator();
+        int[] totalMachineCountHolder = new int[1];
         Map<String, Integer> machineBreakdown = new LinkedHashMap<>();
 
-        // Pre-aggregate shared machine frames
         Set<String> sharedMachineNodeIds = new HashSet<>();
-        for (CanvasGroupFrame frame : graph.getFrames()) {
-            if (frame != null && frame.isSharedMachineFrame()) {
-                List<RecipeNode> enclosed = frame.getEnclosedNodes(graph);
-                if (!enclosed.isEmpty()) {
-                    for (RecipeNode n : enclosed) {
-                        if (n != null && !n.isReroute()) {
-                            sharedMachineNodeIds.add(n.getId());
-                        }
-                    }
-                    int sharedCount = frame.computeRequiredMachines(graph);
-                    totalMachineCount += sharedCount;
-                    String machineKey = frame.getSharedMachineName(graph);
-                    if (machineKey == null || machineKey.isBlank()) {
-                        machineKey = frame.getTitle();
-                    }
-                    machineBreakdown.put(machineKey, machineBreakdown.getOrDefault(machineKey, 0) + sharedCount);
-                }
-            }
-        }
-
-        long totalFusionStartupEU = 0L;
-        Map<Integer, Integer> fusionTierCounts = new LinkedHashMap<>();
-        Map<Integer, Long> fusionTierStartupEU = new LinkedHashMap<>();
+        aggregateSharedMachineFrames(graph, sharedMachineNodeIds, machineBreakdown, totalMachineCountHolder);
 
         Map<IngredientStack, Double> totalProduction = new HashMap<>();
         Map<IngredientStack, Double> totalConsumption = new HashMap<>();
@@ -292,82 +263,9 @@ public final class FlowSummaryAggregator {
             boolean isSharedMachine = sharedMachineNodeIds.contains(node.getId());
 
             if (!isCompoundSlave) {
-                if (!isSharedMachine) {
-                    if (node.isModule()) {
-                        int moduleCount = (int) Math.max(1, Math.ceil(node.getMachineCount() - 0.00001));
-                        if (node.getSubGraph() != null) {
-                            BalanceSummary subSummary = computeSummaryInternal(node.getSubGraph(), false, depth + 1, visitedGraphs);
-                            int subMachines = subSummary.totalMachineCount() * moduleCount;
-                            totalMachineCount += subMachines;
-                            for (Map.Entry<String, Integer> entry : subSummary.machineBreakdown().entrySet()) {
-                                machineBreakdown.put(entry.getKey(), machineBreakdown.getOrDefault(entry.getKey(), 0) + entry.getValue() * moduleCount);
-                            }
-                            totalConsumedSU += subSummary.totalSU() < 0 ? -subSummary.totalSU() * moduleCount : 0;
-                            totalGeneratedSU += subSummary.totalSU() > 0 ? subSummary.totalSU() * moduleCount : 0;
-                            totalConsumedFE += subSummary.totalFE() < 0 ? -subSummary.totalFE() * moduleCount : 0;
-                            totalGeneratedFE += subSummary.totalFE() > 0 ? subSummary.totalFE() * moduleCount : 0;
-
-                            if (subSummary.totalFusionStartupEU() > 0) {
-                                long subFusionEU = subSummary.totalFusionStartupEU() * moduleCount;
-                                totalFusionStartupEU += subFusionEU;
-                                for (Map.Entry<Integer, Integer> entry : subSummary.fusionTierCounts().entrySet()) {
-                                    fusionTierCounts.put(entry.getKey(), fusionTierCounts.getOrDefault(entry.getKey(), 0) + entry.getValue() * moduleCount);
-                                }
-                                for (Map.Entry<Integer, Long> entry : subSummary.fusionTierStartupEU().entrySet()) {
-                                    fusionTierStartupEU.put(entry.getKey(), fusionTierStartupEU.getOrDefault(entry.getKey(), 0L) + entry.getValue() * moduleCount);
-                                }
-                            }
-                        } else {
-                            int subMachines = Math.max(1, node.getContainedMachineCount()) * moduleCount;
-                            totalMachineCount += subMachines;
-                            String machineKey = node.getMachineDisplayName();
-                            machineBreakdown.put(machineKey, machineBreakdown.getOrDefault(machineKey, 0) + subMachines);
-                        }
-                    } else {
-                        int nodeMachines = (int) Math.max(1, Math.ceil(node.getMachineCount() - 0.00001));
-                        totalMachineCount += nodeMachines;
-                        String machineKey = node.getMachineDisplayName();
-                        machineBreakdown.put(machineKey, machineBreakdown.getOrDefault(machineKey, 0) + nodeMachines);
-                    }
-                }
-
-                if (node.getEuToStart() > 0 && node.isFusion()) {
-                    int fTier = node.getFusionTier();
-                    long startEU = node.getEuToStart();
-                    int nodeMachines = (int) Math.max(1, Math.ceil(node.getMachineCount() - 0.00001));
-                    long totalNodeStartEU = startEU * nodeMachines;
-                    totalFusionStartupEU += totalNodeStartEU;
-                    fusionTierCounts.put(fTier, fusionTierCounts.getOrDefault(fTier, 0) + nodeMachines);
-                    fusionTierStartupEU.put(fTier, fusionTierStartupEU.getOrDefault(fTier, 0L) + totalNodeStartEU);
-                }
-
-                double rawPower = node.getEffectiveTotalEUt();
-                EnergyType eType = node.getEnergyType();
-                if (eType == EnergyType.KINETIC_SU) {
-                    if (node.isGenerator()) {
-                        totalGeneratedSU += rawPower;
-                    } else {
-                        totalConsumedSU += rawPower;
-                    }
-                } else if (eType == EnergyType.ELECTRIC_FE) {
-                    if (node.isGenerator()) {
-                        totalGeneratedFE += rawPower;
-                        totalGeneratedEUt += rawPower / 4.0;
-                    } else {
-                        totalConsumedFE += rawPower;
-                        totalConsumedEUt += rawPower / 4.0;
-                    }
-                } else if (eType == EnergyType.ELECTRIC_EU) {
-                    if (node.isGenerator()) {
-                        totalGeneratedEUt += rawPower;
-                    } else {
-                        totalConsumedEUt += rawPower;
-                    }
-                }
-
-                if (eType == EnergyType.ELECTRIC_EU && node.getTargetTier().ordinal() > highestTier.ordinal()) {
-                    highestTier = node.getTargetTier();
-                }
+                aggregateMachineBreakdown(node, isSharedMachine, depth, visitedGraphs, machineBreakdown, totalMachineCountHolder, power, fusion);
+                fusion.addNodeFusion(node);
+                power.addNodePower(node);
             }
 
             Map<IngredientStack, Double> outRates = node.calculateEffectiveOutputRates(false);
@@ -375,32 +273,25 @@ public final class FlowSummaryAggregator {
                 mergeRate(totalProduction, entry.getKey(), entry.getValue());
             }
 
-            for (int i = 0; i < node.getOutputs().size(); i++) {
-                if (node.isOutputPortVoided(i)) {
-                    IngredientStack out = node.getOutputs().get(i);
-                    double singleRate = node.calculateSingleMachineOutputRate(out);
-                    double totalPortOut = singleRate * node.getMachineCount() * node.getEfficiency();
-                    double connectedDemand = 0.0;
-                    for (FlowGraph.ConnectionEdge outEdge : graph.getConnections()) {
-                        if (outEdge.fromNodeId().equals(node.getId()) && outEdge.outputIndex() == i) {
-                            RecipeNode c = graph.findNodeById(outEdge.toNodeId());
-                            if (c != null && !c.isVoidSink()) {
-                                connectedDemand += FlowBalanceMatrixSolver.getConnectedConsumerDemand(graph, c, outEdge.inputIndex());
-                            }
-                        }
-                    }
-                    double portVoidRate = Math.max(0.0, totalPortOut - connectedDemand);
-                    if (portVoidRate > 0.0001) {
-                        mergeRate(totalVoided, out, portVoidRate);
-                    }
-                }
-            }
+            aggregateVoidOutputs(graph, node, totalVoided);
 
             Map<IngredientStack, Double> inRates = node.calculateEffectiveInputRates(false);
             for (Map.Entry<IngredientStack, Double> entry : inRates.entrySet()) {
                 mergeRate(totalConsumption, entry.getKey(), entry.getValue());
             }
         }
+
+        int totalMachineCount = totalMachineCountHolder[0];
+        double totalConsumedEUt = power.consumedEUt;
+        double totalGeneratedEUt = power.generatedEUt;
+        double totalConsumedSU = power.consumedSU;
+        double totalGeneratedSU = power.generatedSU;
+        double totalConsumedFE = power.consumedFE;
+        double totalGeneratedFE = power.generatedFE;
+        GTVoltageTier highestTier = power.highestTier;
+        long totalFusionStartupEU = fusion.totalFusionStartupEU;
+        Map<Integer, Integer> fusionTierCounts = fusion.fusionTierCounts;
+        Map<Integer, Long> fusionTierStartupEU = fusion.fusionTierStartupEU;
 
         Map<IngredientStack, Double> rawInputs = new LinkedHashMap<>();
         Map<IngredientStack, Double> netOutputs = new LinkedHashMap<>();
@@ -449,6 +340,205 @@ public final class FlowSummaryAggregator {
 
     private static double findRate(Map<IngredientStack, Double> map, IngredientStack stack) {
         return stack != null ? map.getOrDefault(stack, 0.0) : 0.0;
+    }
+
+    private static void aggregateSharedMachineFrames(FlowGraph graph, Set<String> sharedMachineNodeIds, Map<String, Integer> machineBreakdown, int[] totalMachineCountHolder) {
+        for (CanvasGroupFrame frame : graph.getFrames()) {
+            aggregateSingleSharedMachineFrame(frame, graph, sharedMachineNodeIds, machineBreakdown, totalMachineCountHolder);
+        }
+    }
+
+    private static void aggregateSingleSharedMachineFrame(CanvasGroupFrame frame, FlowGraph graph, Set<String> sharedMachineNodeIds, Map<String, Integer> machineBreakdown, int[] totalMachineCountHolder) {
+        if (frame == null || !frame.isSharedMachineFrame()) return;
+        List<RecipeNode> enclosed = frame.getEnclosedNodes(graph);
+        if (enclosed.isEmpty()) return;
+
+        for (RecipeNode n : enclosed) {
+            if (n != null && !n.isReroute()) {
+                sharedMachineNodeIds.add(n.getId());
+            }
+        }
+        int sharedCount = frame.computeRequiredMachines(graph);
+        totalMachineCountHolder[0] += sharedCount;
+        String machineKey = frame.getSharedMachineName(graph);
+        if (machineKey == null || machineKey.isBlank()) {
+            machineKey = frame.getTitle();
+        }
+        machineBreakdown.put(machineKey, machineBreakdown.getOrDefault(machineKey, 0) + sharedCount);
+    }
+
+    private static void aggregateMachineBreakdown(
+            RecipeNode node,
+            boolean isSharedMachine,
+            int depth,
+            Set<FlowGraph> visitedGraphs,
+            Map<String, Integer> machineBreakdown,
+            int[] totalMachineCountHolder,
+            PowerAccumulator power,
+            FusionAccumulator fusion
+    ) {
+        if (isSharedMachine) return;
+        if (node.isModule()) {
+            aggregateModuleNode(node, depth, visitedGraphs, machineBreakdown, totalMachineCountHolder, power, fusion);
+            return;
+        }
+        int nodeMachines = (int) Math.max(1, Math.ceil(node.getMachineCount() - 0.00001));
+        totalMachineCountHolder[0] += nodeMachines;
+        String machineKey = node.getMachineDisplayName();
+        machineBreakdown.put(machineKey, machineBreakdown.getOrDefault(machineKey, 0) + nodeMachines);
+    }
+
+    private static void aggregateModuleNode(
+            RecipeNode node,
+            int depth,
+            Set<FlowGraph> visitedGraphs,
+            Map<String, Integer> machineBreakdown,
+            int[] totalMachineCountHolder,
+            PowerAccumulator power,
+            FusionAccumulator fusion
+    ) {
+        int moduleCount = (int) Math.max(1, Math.ceil(node.getMachineCount() - 0.00001));
+        if (node.getSubGraph() != null) {
+            aggregateSubGraphModule(node.getSubGraph(), moduleCount, depth, visitedGraphs, machineBreakdown, totalMachineCountHolder, power, fusion);
+            return;
+        }
+        int subMachines = Math.max(1, node.getContainedMachineCount()) * moduleCount;
+        totalMachineCountHolder[0] += subMachines;
+        String machineKey = node.getMachineDisplayName();
+        machineBreakdown.put(machineKey, machineBreakdown.getOrDefault(machineKey, 0) + subMachines);
+    }
+
+    private static void aggregateSubGraphModule(
+            FlowGraph subGraph,
+            int moduleCount,
+            int depth,
+            Set<FlowGraph> visitedGraphs,
+            Map<String, Integer> machineBreakdown,
+            int[] totalMachineCountHolder,
+            PowerAccumulator power,
+            FusionAccumulator fusion
+    ) {
+        BalanceSummary subSummary = computeSummaryInternal(subGraph, false, depth + 1, visitedGraphs);
+        int subMachines = subSummary.totalMachineCount() * moduleCount;
+        totalMachineCountHolder[0] += subMachines;
+        for (Map.Entry<String, Integer> entry : subSummary.machineBreakdown().entrySet()) {
+            machineBreakdown.put(entry.getKey(), machineBreakdown.getOrDefault(entry.getKey(), 0) + entry.getValue() * moduleCount);
+        }
+        power.addSubSummaryPower(subSummary, moduleCount);
+        fusion.mergeSubSummaryFusion(subSummary, moduleCount);
+    }
+
+    private static void aggregateVoidOutputs(FlowGraph graph, RecipeNode node, Map<IngredientStack, Double> totalVoided) {
+        for (int i = 0; i < node.getOutputs().size(); i++) {
+            if (!node.isOutputPortVoided(i)) continue;
+            double portVoidRate = calculatePortVoidRate(graph, node, i);
+            if (portVoidRate > 0.0001) {
+                mergeRate(totalVoided, node.getOutputs().get(i), portVoidRate);
+            }
+        }
+    }
+
+    private static double calculatePortVoidRate(FlowGraph graph, RecipeNode node, int portIndex) {
+        IngredientStack out = node.getOutputs().get(portIndex);
+        double singleRate = node.calculateSingleMachineOutputRate(out);
+        double totalPortOut = singleRate * node.getMachineCount() * node.getEfficiency();
+        double connectedDemand = 0.0;
+        for (FlowGraph.ConnectionEdge outEdge : graph.getConnections()) {
+            if (!outEdge.fromNodeId().equals(node.getId()) || outEdge.outputIndex() != portIndex) {
+                continue;
+            }
+            RecipeNode c = graph.findNodeById(outEdge.toNodeId());
+            if (c != null && !c.isVoidSink()) {
+                connectedDemand += FlowBalanceMatrixSolver.getConnectedConsumerDemand(graph, c, outEdge.inputIndex());
+            }
+        }
+        return Math.max(0.0, totalPortOut - connectedDemand);
+    }
+
+    private static final class PowerAccumulator {
+        double consumedEUt;
+        double generatedEUt;
+        double consumedSU;
+        double generatedSU;
+        double consumedFE;
+        double generatedFE;
+        GTVoltageTier highestTier = GTVoltageTier.ULV;
+
+        void addSubSummaryPower(BalanceSummary subSummary, int moduleCount) {
+            consumedSU += subSummary.totalSU() < 0 ? -subSummary.totalSU() * moduleCount : 0;
+            generatedSU += subSummary.totalSU() > 0 ? subSummary.totalSU() * moduleCount : 0;
+            consumedFE += subSummary.totalFE() < 0 ? -subSummary.totalFE() * moduleCount : 0;
+            generatedFE += subSummary.totalFE() > 0 ? subSummary.totalFE() * moduleCount : 0;
+        }
+
+        void addNodePower(RecipeNode node) {
+            double rawPower = node.getEffectiveTotalEUt();
+            EnergyType eType = node.getEnergyType();
+            if (eType == EnergyType.KINETIC_SU) {
+                accumulateKineticPower(node, rawPower);
+            } else if (eType == EnergyType.ELECTRIC_FE) {
+                accumulateFePower(node, rawPower);
+            } else if (eType == EnergyType.ELECTRIC_EU) {
+                accumulateEuPower(node, rawPower);
+            }
+        }
+
+        private void accumulateKineticPower(RecipeNode node, double rawPower) {
+            if (node.isGenerator()) {
+                generatedSU += rawPower;
+            } else {
+                consumedSU += rawPower;
+            }
+        }
+
+        private void accumulateFePower(RecipeNode node, double rawPower) {
+            if (node.isGenerator()) {
+                generatedFE += rawPower;
+                generatedEUt += rawPower / 4.0;
+            } else {
+                consumedFE += rawPower;
+                consumedEUt += rawPower / 4.0;
+            }
+        }
+
+        private void accumulateEuPower(RecipeNode node, double rawPower) {
+            if (node.isGenerator()) {
+                generatedEUt += rawPower;
+            } else {
+                consumedEUt += rawPower;
+            }
+            if (node.getTargetTier().ordinal() > highestTier.ordinal()) {
+                highestTier = node.getTargetTier();
+            }
+        }
+    }
+
+    private static final class FusionAccumulator {
+        long totalFusionStartupEU = 0L;
+        final Map<Integer, Integer> fusionTierCounts = new LinkedHashMap<>();
+        final Map<Integer, Long> fusionTierStartupEU = new LinkedHashMap<>();
+
+        void mergeSubSummaryFusion(BalanceSummary subSummary, int moduleCount) {
+            if (subSummary.totalFusionStartupEU() <= 0) return;
+            totalFusionStartupEU += subSummary.totalFusionStartupEU() * moduleCount;
+            for (Map.Entry<Integer, Integer> entry : subSummary.fusionTierCounts().entrySet()) {
+                fusionTierCounts.put(entry.getKey(), fusionTierCounts.getOrDefault(entry.getKey(), 0) + entry.getValue() * moduleCount);
+            }
+            for (Map.Entry<Integer, Long> entry : subSummary.fusionTierStartupEU().entrySet()) {
+                fusionTierStartupEU.put(entry.getKey(), fusionTierStartupEU.getOrDefault(entry.getKey(), 0L) + entry.getValue() * moduleCount);
+            }
+        }
+
+        void addNodeFusion(RecipeNode node) {
+            if (node.getEuToStart() <= 0 || !node.isFusion()) return;
+            int fTier = node.getFusionTier();
+            long startEU = node.getEuToStart();
+            int nodeMachines = (int) Math.max(1, Math.ceil(node.getMachineCount() - 0.00001));
+            long totalNodeStartEU = startEU * nodeMachines;
+            totalFusionStartupEU += totalNodeStartEU;
+            fusionTierCounts.put(fTier, fusionTierCounts.getOrDefault(fTier, 0) + nodeMachines);
+            fusionTierStartupEU.put(fTier, fusionTierStartupEU.getOrDefault(fTier, 0L) + totalNodeStartEU);
+        }
     }
 
     public static FlowGraphSolver.PortFlowStats getBatchInputPortStats(FlowGraph graph, RecipeNode node, int inputIndex) {
@@ -531,37 +621,68 @@ public final class FlowSummaryAggregator {
         if (producer == null || outputIndex < 0 || !visited.add(producer.getId())) {
             return 0.0;
         }
-        if (!producer.isReroute()) {
-            if (outputIndex >= producer.getOutputs().size()) return 0.0;
-            IngredientStack s = producer.getOutputs().get(outputIndex);
-            return s.getAmount() * s.getChance();
-        }
-        double totalIncoming = 0.0;
-        for (FlowGraph.ConnectionEdge inEdge : graph.getConnections()) {
-            if (inEdge.toNodeId().equals(producer.getId()) && inEdge.inputIndex() == 0) {
-                RecipeNode p = graph.findNodeById(inEdge.fromNodeId());
-                totalIncoming += getEffectiveProducerBatchAmount(graph, p, inEdge.outputIndex(), visited);
+        try {
+            if (!producer.isReroute()) {
+                if (outputIndex >= producer.getOutputs().size()) return 0.0;
+                IngredientStack s = producer.getOutputs().get(outputIndex);
+                return s.getAmount() * s.getChance();
             }
+
+            boolean hasIncoming = false;
+            double totalIncoming = 0.0;
+            for (FlowGraph.ConnectionEdge inEdge : graph.getConnections()) {
+                if (inEdge.toNodeId().equals(producer.getId()) && inEdge.inputIndex() == 0) {
+                    hasIncoming = true;
+                    RecipeNode p = graph.findNodeById(inEdge.fromNodeId());
+                    totalIncoming += getEffectiveProducerBatchAmount(graph, p, inEdge.outputIndex(), visited);
+                }
+            }
+
+            if (producer.isInfiniteSupply()) {
+                return calculateTotalBatchPortDemand(graph, producer, outputIndex);
+            }
+
+            if (producer.isExternalSupply() && producer.getExternalSupplyRate() > 0.0) {
+                return totalIncoming + producer.getExternalSupplyRate();
+            }
+
+            if (producer.isFixedDrain() && producer.getExternalDrainRate() > 0.0) {
+                return Math.max(0.0, totalIncoming - producer.getExternalDrainRate());
+            }
+
+            if (!hasIncoming) {
+                return calculateTotalBatchPortDemand(graph, producer, outputIndex);
+            }
+
+            return totalIncoming;
+        } finally {
+            visited.remove(producer.getId());
         }
-        return totalIncoming;
     }
 
     private static double getEffectiveConsumerBatchAmount(FlowGraph graph, RecipeNode consumer, int inputIndex, Set<String> visited) {
         if (consumer == null || inputIndex < 0 || !visited.add(consumer.getId())) {
             return 0.0;
         }
-        if (!consumer.isReroute()) {
-            if (inputIndex >= consumer.getInputs().size()) return 0.0;
-            return consumer.getInputs().get(inputIndex).getAmount();
-        }
-        double totalOutgoing = 0.0;
-        for (FlowGraph.ConnectionEdge outEdge : graph.getConnections()) {
-            if (outEdge.fromNodeId().equals(consumer.getId()) && outEdge.outputIndex() == 0) {
-                RecipeNode c = graph.findNodeById(outEdge.toNodeId());
-                totalOutgoing += getEffectiveConsumerBatchAmount(graph, c, outEdge.inputIndex(), visited);
+        try {
+            if (!consumer.isReroute()) {
+                if (inputIndex >= consumer.getInputs().size()) return 0.0;
+                return consumer.getInputs().get(inputIndex).getAmount();
             }
+            if (consumer.isVoidSink()) {
+                return calculateTotalBatchPortSupply(graph, consumer, inputIndex);
+            }
+            double totalOutgoing = 0.0;
+            for (FlowGraph.ConnectionEdge outEdge : graph.getConnections()) {
+                if (outEdge.fromNodeId().equals(consumer.getId()) && outEdge.outputIndex() == 0) {
+                    RecipeNode c = graph.findNodeById(outEdge.toNodeId());
+                    totalOutgoing += getEffectiveConsumerBatchAmount(graph, c, outEdge.inputIndex(), visited);
+                }
+            }
+            return totalOutgoing;
+        } finally {
+            visited.remove(consumer.getId());
         }
-        return totalOutgoing;
     }
 
     private static double calculateTotalBatchPortDemand(FlowGraph graph, RecipeNode producer, int outputIndex) {

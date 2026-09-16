@@ -79,6 +79,9 @@ public final class NodeBadgeRegistry {
             if (hasUnfedDampedLoop(effectiveGraph, node)) {
                 return List.of(createDampedLoopBadge(node, store));
             }
+            if (hasSteadyStateRecirculatingLoop(effectiveGraph, node)) {
+                return List.of(createSteadyStateLoopBadge(node, effectiveGraph));
+            }
             return List.of();
         });
     }
@@ -169,6 +172,34 @@ public final class NodeBadgeRegistry {
                 net.minecraft.network.chat.Component.literal("§7" + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.node_badge.damped_loop_action").getString())
         );
         return new NodeBadge(badgeText, 0xFFF59E0B, 0xEE451A03, 0xFFD97706, tooltip, true, () -> {});
+    }
+
+    private static boolean hasSteadyStateRecirculatingLoop(FlowGraph graph, RecipeNode node) {
+        if (graph == null || node == null || node.isReroute()) return false;
+        var meta = com.gtceu.calcboard.api.solver.FlowBalanceMatrixSolver.findDampedLoopMetaForNode(graph, node);
+        if (meta == null) return false;
+        double targetEff = meta.computeSteadyStateEfficiency(graph, null, null);
+        return targetEff > 0.0001 && targetEff < 0.9999;
+    }
+
+    private static NodeBadge createSteadyStateLoopBadge(RecipeNode node, FlowGraph graph) {
+        String badgeText = net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.node_badge.steady_state_loop").getString();
+        List<net.minecraft.network.chat.Component> tooltip = List.of(
+                net.minecraft.network.chat.Component.literal("§b§l[🔄 " + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.node_badge.steady_state_loop_title").getString() + "]"),
+                net.minecraft.network.chat.Component.literal("§7" + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.node_badge.steady_state_loop_desc").getString()),
+                net.minecraft.network.chat.Component.literal("§b§n[" + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.node_badge.steady_state_loop_action").getString() + "]")
+        );
+        return new NodeBadge(badgeText, 0xFF38BDF8, 0xEE082F49, 0xFF0284C7, tooltip, false, () -> executeSteadyStateScale(node, graph));
+    }
+
+    private static void executeSteadyStateScale(RecipeNode node, FlowGraph graph) {
+        if (node == null || graph == null) return;
+        com.gtceu.calcboard.api.solver.FlowBalanceMatrixSolver.scaleLoopToSteadyState(graph, node.getId());
+        try {
+            Class<?> clazz = Class.forName("com.gtceu.calcboard.client.gui.tutorial.TutorialManager");
+            Object instance = clazz.getMethod("getInstance").invoke(null);
+            clazz.getMethod("onLoopScaled").invoke(instance);
+        } catch (Throwable ignored) {}
     }
 
     private static net.minecraft.network.chat.Component resolveHint2(RecipeNode node, String defaultKey) {

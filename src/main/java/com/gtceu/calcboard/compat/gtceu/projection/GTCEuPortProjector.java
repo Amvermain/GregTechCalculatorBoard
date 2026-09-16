@@ -41,6 +41,9 @@ public final class GTCEuPortProjector implements IPortProjectionProvider {
     @Override
     public List<ProjectedPort> projectInputPorts(RecipeNode node, RecipeSpec baseSpec) {
         if (node == null) return Collections.emptyList();
+        if (com.gtceu.calcboard.compat.tfg.TFGBoilerPhysics.isTFGLargeBoiler(node)) {
+            return com.gtceu.calcboard.compat.tfg.TFGBoilerPortProjectionProvider.getInstance().projectInputPorts(node, baseSpec);
+        }
         if (GTCombustionHelper.isModularCombustionFrame(node)) {
             return projectMCFInputs(node);
         }
@@ -54,6 +57,10 @@ public final class GTCEuPortProjector implements IPortProjectionProvider {
 
     @Override
     public List<ProjectedPort> projectOutputPorts(RecipeNode node, RecipeSpec baseSpec) {
+        if (node == null) return Collections.emptyList();
+        if (com.gtceu.calcboard.compat.tfg.TFGBoilerPhysics.isTFGLargeBoiler(node)) {
+            return com.gtceu.calcboard.compat.tfg.TFGBoilerPortProjectionProvider.getInstance().projectOutputPorts(node, baseSpec);
+        }
         if (baseSpec == null || baseSpec.baseOutputs() == null) {
             return Collections.emptyList();
         }
@@ -203,6 +210,9 @@ public final class GTCEuPortProjector implements IPortProjectionProvider {
     @Override
     public List<IngredientStack> sanitizeLegacyCoreInputs(RecipeNode node, List<IngredientStack> savedInputs) {
         if (savedInputs == null) return Collections.emptyList();
+        if (com.gtceu.calcboard.compat.tfg.TFGBoilerPhysics.isTFGLargeBoiler(node)) {
+            return com.gtceu.calcboard.compat.tfg.TFGBoilerPortProjectionProvider.getInstance().sanitizeLegacyCoreInputs(node, savedInputs);
+        }
         List<IngredientStack> result = new ArrayList<>();
         boolean isSteam = node != null && node.getSteamMode() != null && node.getSteamMode().isSteam();
 

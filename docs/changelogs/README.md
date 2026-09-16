@@ -14,6 +14,7 @@ For the active release line and upcoming changes, see the root [Changelog](../..
 
 | Version Series | Release Period | English Archive | Korean Archive | Release Count |
 | :--- | :--- | :--- | :--- | :--- |
+| **v2.2.x** | 2026-09-05 ~ 2026-09-13 | [CHANGELOG_v2.2.md](CHANGELOG_v2.2.md) | [CHANGELOG_v2.2_KR.md](CHANGELOG_v2.2_KR.md) | 9 releases |
 | **v2.1.x** | 2026-08-31 ~ 2026-09-04 | [CHANGELOG_v2.1.md](CHANGELOG_v2.1.md) | [CHANGELOG_v2.1_KR.md](CHANGELOG_v2.1_KR.md) | 8 releases |
 | **v2.0.x** | 2026-08-20 ~ 2026-08-31 | [CHANGELOG_v2.0.md](CHANGELOG_v2.0.md) | [CHANGELOG_v2.0_KR.md](CHANGELOG_v2.0_KR.md) | 16 releases |
 | **v1.0.x** | 2026-08-17 ~ 2026-08-20 | [CHANGELOG_v1.0.md](CHANGELOG_v1.0.md) | [CHANGELOG_v1.0_KR.md](CHANGELOG_v1.0_KR.md) | 9 releases |

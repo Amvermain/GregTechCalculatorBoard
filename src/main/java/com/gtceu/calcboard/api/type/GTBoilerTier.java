@@ -102,6 +102,12 @@ public enum GTBoilerTier {
         }
         EXACT_MAP.put(ResourceLocation.tryParse("gtceu:lp_steam_solar_boiler"), LP_BRONZE);
         EXACT_MAP.put(ResourceLocation.tryParse("gtceu:hp_steam_solar_boiler"), HP_STEEL);
+        EXACT_MAP.put(ResourceLocation.tryParse("gtceu:large_bronze_boiler"), LARGE_BRONZE);
+        EXACT_MAP.put(ResourceLocation.tryParse("gtceu:large_steel_boiler"), LARGE_STEEL);
+        EXACT_MAP.put(ResourceLocation.tryParse("gtceu:large_titanium_boiler"), LARGE_TITANIUM);
+        EXACT_MAP.put(ResourceLocation.tryParse("gtceu:large_tungstensteel_boiler"), LARGE_TUNGSTENSTEEL);
+        EXACT_MAP.put(ResourceLocation.tryParse("tfg:large_bronze_boiler"), LARGE_BRONZE);
+        EXACT_MAP.put(ResourceLocation.tryParse("tfg:large_steel_boiler"), LARGE_STEEL);
     }
 
     public static GTBoilerTier getBoilerTier(RecipeNode node) {

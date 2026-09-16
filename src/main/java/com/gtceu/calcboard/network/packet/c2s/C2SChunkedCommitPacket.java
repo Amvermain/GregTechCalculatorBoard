@@ -3,6 +3,8 @@ package com.gtceu.calcboard.network.packet.c2s;
 import com.gtceu.calcboard.network.NetworkHandler;
 import com.gtceu.calcboard.network.packet.s2c.S2CLockResultPacket;
 import com.gtceu.calcboard.network.packet.s2c.S2CWorkspaceErrorPacket;
+import com.gtceu.calcboard.api.team.CommitLogEntry;
+import com.gtceu.calcboard.api.team.TeamWorkspacePage;
 import com.gtceu.calcboard.server.storage.*;
 import com.gtceu.calcboard.server.team.TeamProviderRegistry;
 import net.minecraft.network.FriendlyByteBuf;
@@ -133,22 +135,31 @@ public class C2SChunkedCommitPacket {
             ServerPlayer player = ctx.getSender();
             if (player == null) return;
 
-            byte[] completeNBT = ServerChunkedPayloadAssembler.appendChunk(transferId, chunkIndex, totalChunks, chunkData);
-            if (completeNBT == null) {
-                // Pending more chunks to arrive
+            if (!ServerChunkedPayloadAssembler.validateChunkParameters(transferId, chunkIndex, totalChunks, chunkData)) {
+                ServerChunkedPayloadAssembler.dropTransfer(transferId, "Invalid chunk parameters");
+                NetworkHandler.sendToPlayer(player, new S2CWorkspaceErrorPacket(400, "gui.gtcalcboard.error.generic"));
                 return;
             }
 
             UUID playerTeamId = TeamProviderRegistry.getInstance().getPlayerTeamId(player);
-            if (playerTeamId == null || !TeamProviderRegistry.getInstance().canPlayerEdit(player, playerTeamId)) {
+            if (playerTeamId == null || !teamId.equals(playerTeamId) || !TeamProviderRegistry.getInstance().canPlayerEdit(player, playerTeamId)) {
+                ServerChunkedPayloadAssembler.dropTransfer(transferId, "Access denied");
                 NetworkHandler.sendToPlayer(player, new S2CWorkspaceErrorPacket(403, "gui.gtcalcboard.error.access_denied"));
                 return;
             }
 
-            // 1. Lock ownership verification (RFC-003)
             WorkspaceLockManager lockMgr = WorkspaceLockManager.getInstance();
             if (!lockMgr.canCommit(playerTeamId, pageId, player.getUUID())) {
+                ServerChunkedPayloadAssembler.dropTransfer(transferId, "Locked by other");
                 NetworkHandler.sendToPlayer(player, new S2CWorkspaceErrorPacket(423, "gui.gtcalcboard.error.locked_by_other"));
+                return;
+            }
+
+            byte[] completeNBT = ServerChunkedPayloadAssembler.appendChunk(transferId, chunkIndex, totalChunks, chunkData);
+            if (completeNBT == null) {
+                if (!ServerChunkedPayloadAssembler.hasActiveTransfer(transferId)) {
+                    NetworkHandler.sendToPlayer(player, new S2CWorkspaceErrorPacket(503, "gui.gtcalcboard.error.generic"));
+                }
                 return;
             }
 

@@ -1,6 +1,8 @@
-package com.gtceu.calcboard.server.storage;
+package com.gtceu.calcboard.api.team;
 
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.FriendlyByteBuf;
+
 import java.util.UUID;
 
 /**
@@ -28,6 +30,18 @@ public class CommitLogEntry {
         this.addedNodes = addedNodes;
         this.modifiedNodes = modifiedNodes;
         this.deletedNodes = deletedNodes;
+    }
+
+    public CommitLogEntry(FriendlyByteBuf buf) {
+        this.revision = buf.readVarInt();
+        this.authorUUID = buf.readBoolean() ? buf.readUUID() : null;
+        this.authorName = buf.readUtf(256);
+        this.timestamp = buf.readLong();
+        this.pageId = buf.readUtf(256);
+        this.message = buf.readUtf(1024);
+        this.addedNodes = buf.readVarInt();
+        this.modifiedNodes = buf.readVarInt();
+        this.deletedNodes = buf.readVarInt();
     }
 
     public int getRevision() {
@@ -82,7 +96,7 @@ public class CommitLogEntry {
         return tag;
     }
 
-    public void encode(net.minecraft.network.FriendlyByteBuf buf) {
+    public void encode(FriendlyByteBuf buf) {
         buf.writeVarInt(revision);
         buf.writeBoolean(authorUUID != null);
         if (authorUUID != null) {
@@ -95,18 +109,6 @@ public class CommitLogEntry {
         buf.writeVarInt(addedNodes);
         buf.writeVarInt(modifiedNodes);
         buf.writeVarInt(deletedNodes);
-    }
-
-    public CommitLogEntry(net.minecraft.network.FriendlyByteBuf buf) {
-        this.revision = buf.readVarInt();
-        this.authorUUID = buf.readBoolean() ? buf.readUUID() : null;
-        this.authorName = buf.readUtf(256);
-        this.timestamp = buf.readLong();
-        this.pageId = buf.readUtf(256);
-        this.message = buf.readUtf(1024);
-        this.addedNodes = buf.readVarInt();
-        this.modifiedNodes = buf.readVarInt();
-        this.deletedNodes = buf.readVarInt();
     }
 
     public static CommitLogEntry fromNBT(CompoundTag tag) {

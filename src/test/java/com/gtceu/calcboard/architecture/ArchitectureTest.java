@@ -47,7 +47,8 @@ public class ArchitectureTest {
             "com.gtceu.calcboard.compat.create..",
             "com.gtceu.calcboard.compat.createnewage..",
             "com.gtceu.calcboard.compat.thermal..",
-            "com.gtceu.calcboard.compat.systeams.."
+            "com.gtceu.calcboard.compat.systeams..",
+            "com.gtceu.calcboard.compat.tfg.."
         )
         .because("RecipeNode and FlowGraph are pure domain entities and must delegate mod-specific physics via SPI.");
 
@@ -81,4 +82,13 @@ public class ArchitectureTest {
         )
         .should().dependOnClassesThat().resideInAPackage("com.gtceu.calcboard.client.gui..")
         .because("Physics simulation and multiblock calculation submodules must run headlessly on both dedicated server and client.");
+
+    /**
+     * Rule 6: Client UI & State Layer must NOT depend on Server Layer (RFC-051 Clean Layer Separation).
+     */
+    @ArchTest
+    public static final ArchRule client_layer_should_not_depend_on_server =
+        noClasses().that().resideInAPackage("com.gtceu.calcboard.client..")
+            .should().dependOnClassesThat().resideInAPackage("com.gtceu.calcboard.server..")
+            .because("Client UI and state layer must only depend on common API/DTOs and must not directly reference server storage or managers.");
 }

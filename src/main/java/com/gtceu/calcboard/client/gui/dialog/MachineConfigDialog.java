@@ -66,6 +66,7 @@ public class MachineConfigDialog implements IBoardModal {
 
     // Top Base Parallel EditBox
     private EditBox parallelBox;
+    private boolean isSyncingParallelBox = false;
 
     private boolean wasReady = false;
     private boolean wasExhaustiveComplete = false;
@@ -138,6 +139,10 @@ public class MachineConfigDialog implements IBoardModal {
 
     public void setDeferredTooltip(List<Component> tooltip) {
         this.deferredTooltip = tooltip;
+    }
+
+    public List<Component> getDeferredTooltip() {
+        return deferredTooltip;
     }
 
     private Runnable onCloseCallback = null;
@@ -230,8 +235,13 @@ public class MachineConfigDialog implements IBoardModal {
             node.setCustomParallel(0);
         }
         int effectiveParallel = isCombustion ? 1 : Math.max(1, node.getParallel());
-        parallelBox.setValue(String.valueOf(effectiveParallel));
-        parallelBox.setEditable(!isCombustion);
+        isSyncingParallelBox = true;
+        try {
+            parallelBox.setValue(String.valueOf(effectiveParallel));
+        } finally {
+            isSyncingParallelBox = false;
+        }
+        parallelBox.setEditable(!isCombustion && !node.isMultiblock());
     }
 
     private void initParallelBox() {
@@ -240,7 +250,8 @@ public class MachineConfigDialog implements IBoardModal {
         this.parallelBox = new EditBox(mc.font, 0, 0, 48, 16, Component.translatable("gui.gtcalcboard.config.parallel"));
         this.parallelBox.setMaxLength(6);
         this.parallelBox.setResponder(text -> {
-            if (this.node == null) return;
+            if (this.isSyncingParallelBox || this.node == null) return;
+            if (this.node.isMultiblock()) return;
             boolean combustionNow = com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isCombustionEngine(this.node);
             if (combustionNow) return;
             try {
@@ -756,9 +767,7 @@ public class MachineConfigDialog implements IBoardModal {
                     // Alt / Shift Click: If preset exists, reapply to this node. If not, set default.
                     if (hasPreset) {
                         CategoryMachinePresetManager.getInstance().getPreset(catId).applyTo(node);
-                        if (parallelBox != null) {
-                            parallelBox.setValue(String.valueOf(node.getParallel()));
-                        }
+                        syncParallelBox();
                         invalidateFilteredCatalog();
                         if (parent != null) parent.markSummaryDirty();
                         BoardToast.show(Component.literal("§a✔ ").append(Component.translatable("message.gtcalcboard.preset_reapplied", catDisplayName)));

@@ -2,7 +2,7 @@ package com.gtceu.calcboard.network.packet.c2s;
 
 import com.gtceu.calcboard.network.NetworkHandler;
 import com.gtceu.calcboard.network.packet.s2c.S2CSyncCommitHistoryPacket;
-import com.gtceu.calcboard.server.storage.CommitLogEntry;
+import com.gtceu.calcboard.api.team.CommitLogEntry;
 import com.gtceu.calcboard.server.storage.TeamBoardSavedData;
 import com.gtceu.calcboard.server.storage.TeamWorkspaceData;
 import com.gtceu.calcboard.server.team.TeamProviderRegistry;

@@ -442,6 +442,9 @@ public class MachineNodeRole implements INodeRole {
     }
 
     public int getTotalParallel() {
+        if (owner != null && owner.isMultiblock() && (customParallel <= 1 || NodeAddonHelper.getCombinedParallelMultiplier(owner.getAddons()) > 1)) {
+            customParallel = 0;
+        }
         if (customParallel > 0) return customParallel;
         if (cachedTotalParallel < 1 && owner != null) {
             cachedTotalParallel = NodePerformanceHelper.computeTotalParallel(owner);
@@ -555,13 +558,14 @@ public class MachineNodeRole implements INodeRole {
             this.targetTier = this.recipeTier;
         }
         if (tag.contains("machineCount")) {
-            this.machineCount = tag.getDouble("machineCount");
+            double count = tag.getDouble("machineCount");
+            this.machineCount = Double.isFinite(count) ? Math.max(0.01, count) : 1.0;
         }
         if (tag.contains("parallel")) {
-            this.parallel = tag.getInt("parallel");
+            this.parallel = Math.max(1, tag.getInt("parallel"));
         }
         if (tag.contains("customParallel")) {
-            this.customParallel = tag.getInt("customParallel");
+            this.customParallel = Math.max(0, tag.getInt("customParallel"));
         }
         if (tag.contains("overclockMode")) {
             try {
@@ -661,5 +665,29 @@ public class MachineNodeRole implements INodeRole {
             effInChances,
             effOutChances
         );
+    }
+
+    @Override
+    public MachineNodeRole copy(Set<FlowGraph> visitedGraphs, int depth) {
+        MachineNodeRole cp = new MachineNodeRole(this.baseDurationTicks, this.baseEUt, this.recipeTier);
+        cp.machineIcon = this.machineIcon;
+        cp.recipeCategoryId = this.recipeCategoryId;
+        cp.availableWorkstations.addAll(this.availableWorkstations);
+        cp.targetTier = this.targetTier;
+        cp.machineCount = this.machineCount;
+        cp.parallel = this.parallel;
+        cp.customParallel = this.customParallel;
+        cp.overclockMode = this.overclockMode;
+        cp.isGenerator = this.isGenerator;
+        cp.efficiency = this.efficiency;
+        cp.energyType = this.energyType;
+        cp.isMultiblock = this.isMultiblock;
+        for (MachineAddon addon : this.addons) {
+            if (addon != null) {
+                cp.addons.add(addon.copy());
+            }
+        }
+        cp.markDirty();
+        return cp;
     }
 }

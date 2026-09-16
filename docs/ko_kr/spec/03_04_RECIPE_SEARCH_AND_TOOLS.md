@@ -362,37 +362,80 @@
 
 ---
 
-## 6. 인터랙티브 온보딩 튜토리얼 (`tutorial/*`)
+## 6. 3-트랙 모듈형 아카데미 및 맥락형 튜토리얼 시스템 (`tutorial/*`, ADR-056)
 
-신규 사용자가 계산기 보드의 핵심 기능(노드 생성, 와이어 배선, 비율 맞춤, 모듈화, 기계 전환, 공유 기계 풀)을 쉽게 익힐 수 있도록 단계별 가이드 말풍선과 UI 하이라이트 글로우(Glow) 효과를 제공합니다.
+구형 단일 선형 튜토리얼의 한계를 극복하고, 신규 유저의 빠른 온보딩과 심화 기능 학습을 지원하기 위해 3-트랙 모듈형 아키텍처로 전면 개편되었습니다.
 
-* **`TutorialManager`**: 싱글톤 튜토리얼 상태 관리자. 단계별 목표 달성 감지(`TutorialStep`).
-* **`TutorialOverlay`**: 타겟 노드, 버튼, 포트 주변에 펄스 애니메이션 테두리와 안내 가이드 팝업 렌더링.
+```mermaid
+flowchart TD
+    subgraph UI_Layer ["튜토리얼 인터랙션 계층"]
+        Launcher["TutorialLauncherDialog<br/>(런처 대화상자)"]
+        Overlay["TutorialOverlay<br/>(타겟 글로우 & 안내 팝업)"]
+        NudgeToast["ContextualNudgeToast<br/>(인게임 맥락형 플로팅 토스트)"]
+    end
 
-### 6.1 14단계 대화형 튜토리얼 시퀀스 (14-Step Tutorial Progression Sequence)
+    subgraph Engine_Layer ["튜토리얼 코어 엔진"]
+        Mgr["TutorialManager<br/>(FSM 상태 관리자)"]
+        Registry["TutorialTrackRegistry<br/>(트랙/챕터 메타데이터)"]
+        NudgeMgr["ContextualNudgeManager<br/>(캔버스 상황 감지기)"]
+    end
 
-온보딩 튜토리얼은 신규 사용자를 위한 기본 튜토리얼(1~9단계)과 파워 유저를 위한 고급 튜토리얼(10~13단계)의 14단계 체계(`TutorialStep`)로 구성됩니다:
+    Launcher --> Registry
+    Launcher --> Mgr
+    Mgr --> Overlay
+    NudgeMgr --> NudgeToast
 
-| 단계 (Step) | 식별자 (Identifier) | 코스 구분 | 학습 내용 및 완료 조건 |
-| :---: | :--- | :---: | :--- |
-| **Step 1** | `STEP_1_ADD_RECIPE` | 기본 | 툴바 레시피 추가 버튼 클릭 및 캔버스에 노드 배치 |
-| **Step 2** | `STEP_2_DRAG_TO_SEARCH` | 기본 | 보일러 출력 포트에서 드래그하여 증기 터빈 입력 포트와 배선 연결 |
-| **Step 3** | `STEP_3_JUNCTION` | 기본 | 증기 배선 와이어를 클릭하여 분기점(Junction) 노드 자동 삽입 |
-| **Step 4** | `STEP_4_SHIFT_WIRING` | 기본 | `Shift + 드래그` 배선으로 1:1 유량 비율 자동 정합(Auto-Ratio) 실습 |
-| **Step 5** | `STEP_5_JUNCTION_ETA` | 기본 | 분기점 하단 뱃지 클릭 ➔ 목표 배치 수량(1,000 mB) 지정 및 실시간 예상 생산 완료 시간(`ET: xx.xs`) 확인 |
-| **Step 6** | `STEP_6_MACHINE_SELECTOR` | 기본 | 기계 카드 아이콘 클릭 ➔ `MachineSelectorDialog`에서 전기로 ➔ EBF 기계 전환 및 능력 뱃지 확인 |
-| **Step 7** | `STEP_7_MACHINE_CONFIG` | 기본 | 기계 설정 모달(`C` 키)을 열어 전압 티어, 가열 코일, 오버클럭 사양 확인 |
-| **Step 8** | `STEP_8_GROUP_FRAME` | 기본 | 마우스 드래그로 노드들을 다중 선택하고 프레임 그룹 생성 |
-| **Step 9** | `STEP_9_COMPOUND_MODULE`| 기본 | 프레임 접기 버튼 클릭으로 복합 모듈 축약 및 전개 실습 (기본 튜토리얼 완료) |
-| **Step 10** | `STEP_10_SHARED_MACHINE` | 고급 | 절단기 3대를 공유 머신 풀 프레임으로 묶어 통합 물리 기계 대수 및 가동률 점유율(`Total Duty %`) 확인 |
-| **Step 11** | `STEP_11_BOM_INSPECTION` | 고급 | 툴바 `[📦 BOM]` 버튼을 클릭하여 공유 기계 풀이 정수 올림 처리된 멀티블록 자재 청구서 확인 |
-| **Step 12** | `STEP_12_JUNCTION_SUPPLY` | 고급 | 분기점 노드 우클릭 ➔ 외부 공급 모드(무한 공급 $\infty$ / 고정 유량 한도) 지정 및 투입 원자재 고갈 시간(`DT: xx.xs`) 확인 |
-| **Step 13** | `STEP_13_FOLDER_BROWSER` | 고급 | 툴바 `[📁]` 버튼을 클릭하여 좌측 계층형 페이지 탐색기 드로어를 열고 페이지 구조 관리 실습 (고급 튜토리얼 완료) |
-| **Step 14** | `COMPLETED` | 완료 | 모든 실습 완료 및 튜토리얼 완주 배지 획득 |
+    Registry --> T1["Track 1: 45초 Fast-Track 스타터"]
+    Registry --> T2["Track 2: 4대 독립 아카데미 챕터"]
+    NudgeMgr --> T3["Track 3: 5대 맥락형 인게임 넛지"]
+```
+
+### 6.1 Track 1: 45초 초고속 스타터 (Fast-Track)
+계산기 보드의 핵심 조작과 핵심 가치(가치 흐름)를 45초 이내에 빠르게 실습하는 4단계 입문 트랙입니다:
+
+| 단계 | 명칭 | 유저 조작 | 자동 검증 및 전이 조건 |
+| :---: | :--- | :--- | :--- |
+| **1** | 레시피 노드 배치 | `Space` 또는 검색창을 눌러 보일러 노드 배치 | 노드 1개 캔버스 추가 시 전이 |
+| **2** | 드래그 검색 배선 | 보일러의 증기 포트에서 드래그하여 증기 터빈 노드 연결 | 보일러 ➔ 터빈 간 와이어 연결 시 전이 |
+| **3** | 전체 자동 비율 맞춤 | `Alt + R` 키를 눌러 터빈 대수 자동 계산 | `onAutoRatioTriggered()` 수신 시 전이 |
+| **4** | 속도 단위 전환 및 완료 | `T` 키를 눌러 초당(/s) ➔ 분당(/min) 전환 | `onRateUnitToggled()` 시 완료 화면 표시 |
+
+### 6.2 Track 2: 4대 독립 아카데미 챕터 (`ITutorialChapter`)
+선행 단계 강제 없이 관심 있는 고급 주제를 선택하여 독립적으로 실습할 수 있는 모듈형 아카데미입니다:
+
+1. **챕터 1: 비율 계산과 솔버 (`ch1_solver`)**:
+   - 스텝 1: 최종 노드 우클릭 ➔ `⌖ 기준 앵커(Anchor)` 지정 (`onAnchorConfigured()`).
+   - 스텝 2: `Alt + Shift + R` 조화 정수 비율 최적화 (`onIntegerRatioTriggered()`).
+   - 스텝 3: `⚠ Damped` 루프 경고 확인 및 `Shift + 우클릭` 정상 상태 스케일링 (`onLoopScaled()`).
+2. **챕터 2: 배선과 정션 미세 제어 (`ch2_wiring`)**:
+   - 스텝 1: 연결선 더블클릭 정션 삽입 (`onJunctionInserted()`).
+   - 스텝 2: 연결선 마우스 휠 굴림으로 우선순위 `[1]`, `[2]` 지정 (`onWirePriorityChanged()`).
+   - 스텝 3: 출력 포트 `Shift + 우클릭` 부산물 보이드 설정 (`onPortVoidConfigured()`).
+   - 스텝 4: 입력 포트 마우스 휠 굴림 대체 재료(Tag) 순환 (`onPortTagCycled()`).
+3. **챕터 3: 공장 모듈화와 BOM (`ch3_packaging`)**:
+   - 스텝 1: 저가동률 노드 선택 후 `Ctrl + Shift + S` 공유 기계 풀 병합 (`onSharedMachineFramed()`).
+   - 스텝 2: 프레임 선택 후 `Ctrl + Shift + G` 복합 모듈 압축 (`onModuleGrouped()`).
+   - 스텝 3: 모듈 카드 더블클릭 1:1 서브페이지 진입 및 바운더리 핀 확인 후 Esc 복귀 (`onSubpageExited()`).
+   - 스텝 4: `Shift + B` 자재 명세서(BOM) 중복 없는 1대분 집계 확인 (`onBOMOpened()`).
+4. **챕터 4: 프로젝트 및 워크스페이스 관리 (`ch4_workspace`)**:
+   - 스텝 1: `Alt + P` 목표 전압 HV 및 에너지 해치 자동 장착 설정 (`onPageSettingsConfigured()`).
+   - 스텝 2: `Tab` 키로 계층형 폴더 브라우저 열기 (`onFolderBrowserOpened()`).
+   - 스텝 3: `B` 키로 글로벌 밸런스 대시보드 열람 (`onGlobalBalanceOpened()`).
+
+### 6.3 Track 3: 인게임 맥락형 넛지 (`ContextualNudgeManager`)
+캔버스 조작 중 특정 상황이 감지되면 화면 우측 하단에 5초간 플로팅 미니 토스트(`ContextualNudgeToast`)를 통해 1회성 조작 팁을 제공합니다:
+
+| 넛지 ID | 트리거 조건 | 안내 내용 | 단축키 / 액션 |
+| :--- | :--- | :--- | :--- |
+| `nudge_auto_connect` | 2개 이상의 노드가 배치되었으나 배선이 없을 때 | 인접 노드 일괄 자동 연결 안내 | `Shift + C` |
+| `nudge_wire_reroute` | 연결선 길이가 250px 이상 길어질 때 | 배선 정리를 위한 분기점 삽입 안내 | 연결선 더블클릭 |
+| `nudge_loop_damped` | 감쇠 루프(`⚠ Damped`) 형성 감지 시 | 정상 상태 닫힌 형태 유량 스케일링 안내 | `Shift + 우클릭` |
+| `nudge_byproduct_void`| 출력 포트에 소비되지 않는 잉여 유량이 남을 때 | 부산물 영구 폐기 지정 안내 | 포트 `Shift + 우클릭` |
+| `nudge_module_subpage` | 복합 모듈 카드가 캔버스에 존재할 때 | 1:1 전용 서브페이지 진입 안내 | 모듈 카드 더블클릭 |
 
 ---
 
-## 7. 계층형 페이지 탐색기 드로어 (`PageBrowserDrawer`) (ADR-012)
+## 7. 계층형 페이지 탐색기 드로어 (`PageBrowserDrawer`) (ADR-007)
 
 화면 좌측에서 슬라이드 인/아웃되는 계층형 디렉터리 사이드바로, 수백 개의 캔버스 페이지를 폴더 트리 구조로 탐색하고 관리합니다.
 
@@ -402,7 +445,7 @@
 
 ---
 
-## 8. 키보드 퀵 페이지 스위처 (`QuickPageSwitcherDialog`) (ADR-012)
+## 8. 키보드 퀵 페이지 스위처 (`QuickPageSwitcherDialog`) (ADR-007)
 
 단축키 `Ctrl + K`로 호출되는 IDE 스타일의 경량 팝업 모달로, 페이지 이름 및 폴더 경로를 퍼지(Fuzzy) 검색하여 원하는 캔버스 페이지로 즉시 점프합니다.
 
@@ -411,7 +454,7 @@
 
 ---
 
-## 9. 실시간 렌더링/연산 성능 프로파일러 HUD (`RenderProfiler`, F3) (ADR-031)
+## 9. 실시간 렌더링/연산 성능 프로파일러 HUD (`RenderProfiler`, F3)
 
 대규모 공정 캔버스 렌더링 및 유량 솔버 연산 부하를 실시간으로 진단하기 위한 인게임 성능 프로파일러 오버레이입니다:
 
@@ -427,7 +470,7 @@
 
 ---
 
-## 10. 인게임 모드 버전 업데이트 알림 및 원격 릴리즈 확인 (`ClientUpdateNotifier`) (ADR-035)
+## 10. 인게임 모드 버전 업데이트 알림 및 원격 릴리즈 확인 (`ClientUpdateNotifier`)
 
 사용자가 최신 기능과 버그 수정을 놓치지 않도록 안전한 백그라운드 비동기 버전 확인을 수행합니다:
 

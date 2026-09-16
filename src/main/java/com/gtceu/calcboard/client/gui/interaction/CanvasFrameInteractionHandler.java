@@ -134,7 +134,10 @@ public class CanvasFrameInteractionHandler {
             return true;
         }
         if (action == CanvasGroupFrameRenderer.FrameAction.AUTO_RATIO && button == 0) {
-            return executeSharedPoolAutoRatio(frame, screen);
+            if (frame.isSharedMachineFrame()) {
+                return executeSharedPoolAutoRatio(frame, screen);
+            }
+            return executeGroupFrameAutoRatio(frame, screen);
         }
         return false;
     }
@@ -154,6 +157,26 @@ public class CanvasFrameInteractionHandler {
 
         recordAutoRatioHistory(graph, frame, oldCounts, mode, screen);
         notifySuccessPool(frame, changed, mode);
+        screen.markSummaryDirty();
+        screen.rebuildWidgets();
+        return true;
+    }
+
+    private boolean executeGroupFrameAutoRatio(CanvasGroupFrame frame, BoardScreen screen) {
+        FlowGraph graph = screen.getGraph();
+        if (graph == null || frame == null) return false;
+
+        AutoRatioMode mode = resolveAutoRatioMode();
+        Map<String, Double> oldCounts = snapshotMachineCounts(graph);
+
+        int changed = FlowGraphSolver.autoRatioFromGroupFrame(graph, frame, mode);
+        if (changed <= 0) {
+            notifyEmptyGroupAutoRatio();
+            return true;
+        }
+
+        recordGroupAutoRatioHistory(graph, frame, oldCounts, mode, screen);
+        notifySuccessGroupAutoRatio(frame, changed, mode);
         screen.markSummaryDirty();
         screen.rebuildWidgets();
         return true;
@@ -213,6 +236,42 @@ public class CanvasFrameInteractionHandler {
 
     private void notifyEmptyPool() {
         BoardToast.show(Component.literal("§c✕ ").append(Component.translatable("message.gtcalcboard.pool_auto_ratio_empty")));
+        Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 0.8F));
+    }
+
+    private void recordGroupAutoRatioHistory(FlowGraph graph, CanvasGroupFrame frame, Map<String, Double> oldCounts, AutoRatioMode mode, BoardScreen screen) {
+        List<BoardCommand> subCmds = new ArrayList<>();
+        for (RecipeNode n : graph.getNodes()) {
+            double oldC = oldCounts.getOrDefault(n.getId(), 1.0);
+            double newC = n.getMachineCount();
+            if (Math.abs(oldC - newC) > 0.0001) {
+                subCmds.add(BoardCommand.ModifyPropertyCommand.machineCount(n.getId(), oldC, newC));
+            }
+        }
+        if (subCmds.isEmpty()) return;
+
+        String modeTag = switch (mode) {
+            case FRACTIONAL -> " (Fractional)";
+            case HARMONIZED -> " (Harmonized)";
+            case INTEGER_CEIL -> "";
+        };
+        String actionName = "Group Auto Ratio: " + frame.getTitle() + modeTag;
+        screen.recordCommand(new BoardCommand.CompoundCommand(subCmds, actionName));
+    }
+
+    private void notifySuccessGroupAutoRatio(CanvasGroupFrame frame, int changedCount, AutoRatioMode mode) {
+        String icon = switch (mode) {
+            case FRACTIONAL -> "§b⚡ ";
+            case HARMONIZED -> "§6✨ ";
+            case INTEGER_CEIL -> "§a⚖ ";
+        };
+        BoardToast.show(Component.literal(icon).append(Component.translatable("message.gtcalcboard.group_auto_ratio_success", changedCount, frame.getTitle())));
+        SoundEvent sound = (mode == AutoRatioMode.HARMONIZED) ? SoundEvents.PLAYER_LEVELUP : SoundEvents.EXPERIENCE_ORB_PICKUP;
+        Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(sound, 1.2F));
+    }
+
+    private void notifyEmptyGroupAutoRatio() {
+        BoardToast.show(Component.literal("§c✕ ").append(Component.translatable("message.gtcalcboard.group_auto_ratio_empty")));
         Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 0.8F));
     }
 

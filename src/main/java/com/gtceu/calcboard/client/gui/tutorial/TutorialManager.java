@@ -8,6 +8,9 @@ import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.client.gui.api.IBoardScreenContext;
+import com.gtceu.calcboard.client.gui.tutorial.model.ITutorialChapter;
+import com.gtceu.calcboard.client.gui.tutorial.model.TutorialChapterStepDef;
+import com.gtceu.calcboard.client.gui.tutorial.model.TutorialTrackType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.resources.ResourceLocation;
@@ -37,6 +40,12 @@ public class TutorialManager {
     private IBoardScreenContext currentScreen = null;
     private String tutorialPageId = null;
 
+    private TutorialTrackType trackType = null;
+    private boolean fastTrackActive = false;
+    private int fastTrackStepIndex = 0;
+    private String activeChapterId = null;
+    private int activeChapterStepIndex = 0;
+
     // Track user actions for step transitions
     private boolean pannedOrZoomed = false;
     private String practiceNodeId = null;
@@ -44,12 +53,37 @@ public class TutorialManager {
     private String turbineNodeId = null;
     private String selectorNodeId = null;
 
+    private boolean stepActionCompleted = false;
+    private String stepResultDescKey = null;
+
     public static TutorialManager getInstance() {
         return INSTANCE;
     }
 
     public boolean isActive() {
         return active;
+    }
+
+    public boolean isStepActionCompleted() {
+        return stepActionCompleted;
+    }
+
+    public String getStepResultDescKey() {
+        return stepResultDescKey;
+    }
+
+    public void markStepActionCompleted(String resultDescKey) {
+        if (!active || stepActionCompleted) return;
+        if (currentScreen == null) {
+            nextStep();
+            return;
+        }
+        this.stepActionCompleted = true;
+        this.stepResultDescKey = resultDescKey;
+        playUiSound(1, 1.2f);
+        if (currentScreen != null) {
+            currentScreen.rebuildBoardWidgets();
+        }
     }
 
     public TutorialStep getCurrentStep() {
@@ -98,9 +132,16 @@ public class TutorialManager {
     public void startTutorial(IBoardScreenContext screen, TutorialMode mode) {
         this.currentScreen = screen;
         this.active = true;
+        this.trackType = null;
+        this.fastTrackActive = false;
+        this.fastTrackStepIndex = 0;
+        this.activeChapterId = null;
+        this.activeChapterStepIndex = 0;
         this.mode = mode;
         this.currentStep = (mode == TutorialMode.ADVANCED) ? TutorialStep.STEP_10_SHARED_MACHINE : TutorialStep.STEP_1_ADD_RECIPE;
         this.pannedOrZoomed = false;
+        this.stepActionCompleted = false;
+        this.stepResultDescKey = null;
 
         // Always create a dedicated new page for tutorial to protect user's existing work 100%!
         String pageName = (mode == TutorialMode.ADVANCED) ? "Advanced Tutorial" : "Tutorial";
@@ -123,8 +164,77 @@ public class TutorialManager {
         onStepEnter(this.currentStep);
     }
 
+    public void startFastTrack(IBoardScreenContext screen) {
+        this.currentScreen = screen;
+        this.active = true;
+        this.trackType = TutorialTrackType.FAST_TRACK;
+        this.fastTrackActive = true;
+        this.fastTrackStepIndex = 0;
+        this.activeChapterId = null;
+        this.activeChapterStepIndex = 0;
+        this.mode = TutorialMode.BASIC;
+        this.currentStep = TutorialStep.STEP_1_ADD_RECIPE;
+        this.pannedOrZoomed = false;
+        this.stepActionCompleted = false;
+        this.stepResultDescKey = null;
+
+        String pageName = "Fast-Track Tutorial";
+        try {
+            pageName = net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.tutorial.fast_track.page_name").getString();
+        } catch (Throwable ignored) {}
+        com.gtceu.calcboard.api.storage.BoardPage newPage = com.gtceu.calcboard.api.storage.BoardManager.getInstance().addPage(pageName);
+        this.tutorialPageId = newPage.getId();
+
+        if (screen != null) {
+            screen.getSummaryOverlay().setCollapsed(true);
+            screen.setPanX(screen.getScreenWidth() / 2.0);
+            screen.setPanY(screen.getScreenHeight() / 2.0);
+            screen.setZoom(1.0);
+            screen.rebuildBoardWidgets();
+        }
+
+        playUiSound(0, 1.0f);
+        setupFastTrackStep(0);
+    }
+
+    public void startChapter(IBoardScreenContext screen, String chapterId) {
+        this.currentScreen = screen;
+        this.active = true;
+        this.trackType = TutorialTrackType.ACADEMY_CHAPTER;
+        this.fastTrackActive = false;
+        this.fastTrackStepIndex = 0;
+        this.activeChapterId = chapterId;
+        this.activeChapterStepIndex = 0;
+        this.mode = TutorialMode.BASIC;
+        this.currentStep = TutorialStep.STEP_1_ADD_RECIPE;
+        this.pannedOrZoomed = false;
+        this.stepActionCompleted = false;
+        this.stepResultDescKey = null;
+
+        ITutorialChapter chapter = TutorialTrackRegistry.getInstance().getChapter(chapterId);
+        String pageName = chapter != null ? chapter.getTitle().getString() : "Academy Chapter";
+        com.gtceu.calcboard.api.storage.BoardPage newPage = com.gtceu.calcboard.api.storage.BoardManager.getInstance().addPage(pageName);
+        this.tutorialPageId = newPage.getId();
+
+        if (screen != null) {
+            screen.getSummaryOverlay().setCollapsed(true);
+            screen.setPanX(screen.getScreenWidth() / 2.0);
+            screen.setPanY(screen.getScreenHeight() / 2.0);
+            screen.setZoom(1.0);
+            screen.rebuildBoardWidgets();
+        }
+
+        playUiSound(0, 1.0f);
+        setupChapterStep(chapterId, 0);
+    }
+
     public void stopTutorial() {
         this.active = false;
+        this.trackType = null;
+        this.fastTrackActive = false;
+        this.fastTrackStepIndex = 0;
+        this.activeChapterId = null;
+        this.activeChapterStepIndex = 0;
         this.mode = TutorialMode.BASIC;
         this.currentStep = TutorialStep.STEP_1_ADD_RECIPE;
         this.practiceNodeId = null;
@@ -132,9 +242,37 @@ public class TutorialManager {
         this.turbineNodeId = null;
         this.selectorNodeId = null;
         this.tutorialPageId = null;
+        this.stepActionCompleted = false;
+        this.stepResultDescKey = null;
     }
 
     public void nextStep() {
+        this.stepActionCompleted = false;
+        this.stepResultDescKey = null;
+
+        if (fastTrackActive) {
+            fastTrackStepIndex++;
+            if (fastTrackStepIndex >= TutorialTrackRegistry.getInstance().getFastTrackSteps().size()) {
+                completeTutorial();
+            } else {
+                playUiSound(1, 1.2f);
+                setupFastTrackStep(fastTrackStepIndex);
+            }
+            return;
+        }
+
+        if (activeChapterId != null) {
+            activeChapterStepIndex++;
+            var steps = TutorialTrackRegistry.getInstance().getChapterSteps(activeChapterId);
+            if (activeChapterStepIndex >= steps.size()) {
+                completeTutorial();
+            } else {
+                playUiSound(1, 1.2f);
+                setupChapterStep(activeChapterId, activeChapterStepIndex);
+            }
+            return;
+        }
+
         if (mode == TutorialMode.BASIC && currentStep == TutorialStep.STEP_9_COMPOUND_MODULE) {
             completeTutorial();
             return;
@@ -156,6 +294,12 @@ public class TutorialManager {
 
     public boolean hasPreviousStep() {
         if (!active || currentStep == TutorialStep.COMPLETED) return false;
+        if (fastTrackActive) {
+            return fastTrackStepIndex > 0;
+        }
+        if (activeChapterId != null) {
+            return activeChapterStepIndex > 0;
+        }
         if (mode == TutorialMode.ADVANCED) {
             return currentStep.ordinal() > TutorialStep.STEP_10_SHARED_MACHINE.ordinal();
         }
@@ -164,6 +308,21 @@ public class TutorialManager {
 
     public void previousStep() {
         if (!hasPreviousStep()) return;
+        this.stepActionCompleted = false;
+        this.stepResultDescKey = null;
+
+        if (fastTrackActive) {
+            fastTrackStepIndex--;
+            playUiSound(1, 0.9f);
+            setupFastTrackStep(fastTrackStepIndex);
+            return;
+        }
+        if (activeChapterId != null) {
+            activeChapterStepIndex--;
+            playUiSound(1, 0.9f);
+            setupChapterStep(activeChapterId, activeChapterStepIndex);
+            return;
+        }
         int prevOrdinal = currentStep.ordinal() - 1;
         if (prevOrdinal >= 0) {
             currentStep = TutorialStep.values()[prevOrdinal];
@@ -173,8 +332,34 @@ public class TutorialManager {
     }
 
     public void completeTutorial() {
+        this.stepActionCompleted = false;
+        this.stepResultDescKey = null;
         currentStep = TutorialStep.COMPLETED;
         playUiSound(2, 1.0f);
+    }
+
+    private void setupFastTrackStep(int index) {
+        com.gtceu.calcboard.api.storage.BoardPage tutPage = getTutorialPage();
+        if (tutPage == null) return;
+        var steps = TutorialTrackRegistry.getInstance().getFastTrackSteps();
+        if (index >= 0 && index < steps.size()) {
+            steps.get(index).setupAction().accept(tutPage);
+            if (currentScreen != null) {
+                currentScreen.rebuildBoardWidgets();
+            }
+        }
+    }
+
+    private void setupChapterStep(String chapterId, int index) {
+        com.gtceu.calcboard.api.storage.BoardPage tutPage = getTutorialPage();
+        if (tutPage == null) return;
+        var steps = TutorialTrackRegistry.getInstance().getChapterSteps(chapterId);
+        if (index >= 0 && index < steps.size()) {
+            steps.get(index).setupAction().accept(tutPage);
+            if (currentScreen != null) {
+                currentScreen.rebuildBoardWidgets();
+            }
+        }
     }
 
     private void onStepEnter(TutorialStep step) {
@@ -218,17 +403,30 @@ public class TutorialManager {
     }
 
     private void setupStep2Exercise(com.gtceu.calcboard.api.storage.BoardPage tutPage) {
-        tutPage.getGraph().clear();
+        if (tutPage == null) return;
+        RecipeNode existingBoiler = boilerNodeId != null ? tutPage.getGraph().findNodeById(boilerNodeId) : null;
+        if (existingBoiler == null) {
+            existingBoiler = tutPage.getGraph().getNodes().stream()
+                    .filter(n -> !n.isReroute() && n.getOutputs().stream().anyMatch(out -> "Steam".equalsIgnoreCase(out.getDisplayName()) || (out.getId() != null && "steam".equals(out.getId().getPath()))))
+                    .findFirst()
+                    .orElse(null);
+        }
+        if (existingBoiler == null && !tutPage.getGraph().getNodes().isEmpty()) {
+            existingBoiler = tutPage.getGraph().getNodes().get(0);
+        }
 
-        // 1. Boiler: produces Steam 500 mB/s
-        RecipeNode boiler = RecipeNode.create("Boiler (Tutorial)", 20.0, 0.0, GTVoltageTier.LV);
-        boiler.setEnergyType(com.gtceu.calcboard.api.type.EnergyType.HEAT_OR_SELF);
-        boiler.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:steam"), "Steam", 500.0, 1.0));
-        boiler.setPosX(-180);
-        boiler.setPosY(-50);
-        boiler.setMachineCount(1.0);
-        this.boilerNodeId = boiler.getId();
-        tutPage.getGraph().addNode(boiler);
+        if (existingBoiler == null) {
+            RecipeNode boiler = RecipeNode.create("Boiler (Tutorial)", 20.0, 0.0, GTVoltageTier.LV);
+            boiler.setEnergyType(com.gtceu.calcboard.api.type.EnergyType.HEAT_OR_SELF);
+            boiler.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:steam"), "Steam", 500.0, 1.0));
+            boiler.setPosX(-180);
+            boiler.setPosY(-50);
+            boiler.setMachineCount(1.0);
+            this.boilerNodeId = boiler.getId();
+            tutPage.getGraph().addNode(boiler);
+        } else {
+            this.boilerNodeId = existingBoiler.getId();
+        }
 
         if (currentScreen != null) currentScreen.rebuildBoardWidgets();
     }
@@ -515,17 +713,21 @@ public class TutorialManager {
     }
 
     public void onNodeAdded(RecipeNode node) {
-        if (!active) return;
+        if (!active || stepActionCompleted) return;
+        if (fastTrackActive && fastTrackStepIndex == 0) {
+            markStepActionCompleted("gui.gtcalcboard.tutorial.fast_track.step1_result");
+            return;
+        }
         if (currentStep == TutorialStep.STEP_1_ADD_RECIPE) {
             this.practiceNodeId = node != null ? node.getId() : null;
-            nextStep();
+            markStepActionCompleted("gui.gtcalcboard.tutorial.step1_result");
         } else if (currentStep == TutorialStep.STEP_2_DRAG_TO_SEARCH) {
             if (node != null && !node.getId().equals(boilerNodeId)) {
                 this.turbineNodeId = node.getId();
             }
         } else if (currentStep == TutorialStep.STEP_3_JUNCTION) {
             if (node != null && node.isReroute()) {
-                nextStep();
+                markStepActionCompleted("gui.gtcalcboard.tutorial.step3_result");
             }
         }
     }
@@ -540,11 +742,15 @@ public class TutorialManager {
     }
 
     public void onWireConnected(boolean shiftDown) {
-        if (!active) return;
+        if (!active || stepActionCompleted) return;
+        if (fastTrackActive && fastTrackStepIndex == 1) {
+            markStepActionCompleted("gui.gtcalcboard.tutorial.fast_track.step2_result");
+            return;
+        }
         if (currentStep == TutorialStep.STEP_2_DRAG_TO_SEARCH) {
-            nextStep(); // Advance to Step 3 (Junction)
+            markStepActionCompleted("gui.gtcalcboard.tutorial.step2_result");
         } else if (currentStep == TutorialStep.STEP_4_SHIFT_WIRING) {
-            nextStep(); // Advance to Step 5 (Junction ETA)
+            markStepActionCompleted("gui.gtcalcboard.tutorial.step4_result");
         }
     }
 
@@ -556,9 +762,13 @@ public class TutorialManager {
     }
 
     public void onJunctionInserted() {
-        if (!active) return;
+        if (!active || stepActionCompleted) return;
+        if ("ch2_wiring".equals(activeChapterId) && activeChapterStepIndex == 0) {
+            markStepActionCompleted("gui.gtcalcboard.tutorial.chapter.ch2.step1_result");
+            return;
+        }
         if (currentStep == TutorialStep.STEP_3_JUNCTION) {
-            nextStep(); // Advance to Step 4 (Shift Wiring)
+            markStepActionCompleted("gui.gtcalcboard.tutorial.step3_result");
         }
     }
 
@@ -608,39 +818,137 @@ public class TutorialManager {
     }
 
     public void onAutoRatioTriggered() {
-        if (!active) return;
+        if (!active || stepActionCompleted) return;
+        if (fastTrackActive && fastTrackStepIndex == 2) {
+            markStepActionCompleted("gui.gtcalcboard.tutorial.fast_track.step3_result");
+            return;
+        }
+        if ("ch1_solver".equals(activeChapterId)) {
+            if (activeChapterStepIndex == 1) {
+                markStepActionCompleted("gui.gtcalcboard.tutorial.chapter.ch1.step2_result");
+                return;
+            }
+            if (activeChapterStepIndex == 3) {
+                markStepActionCompleted("gui.gtcalcboard.tutorial.chapter.ch1.step4_result");
+                return;
+            }
+        }
         if (currentStep == TutorialStep.STEP_4_SHIFT_WIRING) {
-            nextStep(); // Advance to Step 5 (Junction ETA)
+            markStepActionCompleted("gui.gtcalcboard.tutorial.step4_result");
+        }
+    }
+
+    public void onRateUnitToggled() {
+        if (!active || stepActionCompleted) return;
+        if (fastTrackActive && fastTrackStepIndex == 3) {
+            markStepActionCompleted("gui.gtcalcboard.tutorial.fast_track.step4_result");
+        }
+    }
+
+    public void onIntegerRatioTriggered() {
+        if (!active || stepActionCompleted) return;
+        if ("ch1_solver".equals(activeChapterId) && activeChapterStepIndex == 2) {
+            markStepActionCompleted("gui.gtcalcboard.tutorial.chapter.ch1.step3_result");
+        }
+    }
+
+    public void onFractionalRatioTriggered() {
+        if (!active || stepActionCompleted) return;
+        if ("ch1_solver".equals(activeChapterId)) {
+            if (activeChapterStepIndex == 2) {
+                markStepActionCompleted("gui.gtcalcboard.tutorial.chapter.ch1.step3_result");
+            } else if (activeChapterStepIndex == 3) {
+                markStepActionCompleted("gui.gtcalcboard.tutorial.chapter.ch1.step4_result");
+            }
+        }
+    }
+
+    public void onAnchorConfigured() {
+        if (!active || stepActionCompleted) return;
+        if ("ch1_solver".equals(activeChapterId) && activeChapterStepIndex == 0) {
+            markStepActionCompleted("gui.gtcalcboard.tutorial.chapter.ch1.step1_result");
+        }
+    }
+
+    public void onLoopScaled() {
+        if (!active || stepActionCompleted) return;
+        if ("ch1_solver".equals(activeChapterId) && activeChapterStepIndex == 3) {
+            markStepActionCompleted("gui.gtcalcboard.tutorial.chapter.ch1.step4_result");
+        }
+    }
+
+    public void onWirePriorityChanged(com.gtceu.calcboard.api.model.FlowGraph.ConnectionEdge edge, int priority) {
+        if (!active || stepActionCompleted) return;
+        if ("ch2_wiring".equals(activeChapterId) && activeChapterStepIndex == 1) {
+            markStepActionCompleted("gui.gtcalcboard.tutorial.chapter.ch2.step2_result");
+        }
+    }
+
+    public void onPortVoidConfigured() {
+        if (!active || stepActionCompleted) return;
+        if ("ch2_wiring".equals(activeChapterId) && activeChapterStepIndex == 2) {
+            markStepActionCompleted("gui.gtcalcboard.tutorial.chapter.ch2.step3_result");
+        }
+    }
+
+    public void onPortTagCycled() {
+        if (!active || stepActionCompleted) return;
+        if ("ch2_wiring".equals(activeChapterId) && activeChapterStepIndex == 3) {
+            markStepActionCompleted("gui.gtcalcboard.tutorial.chapter.ch2.step4_result");
+        }
+    }
+
+    public void onSubpageEntered() {
+    }
+
+    public void onSubpageExited() {
+        if (!active || stepActionCompleted) return;
+        if ("ch3_packaging".equals(activeChapterId) && activeChapterStepIndex == 2) {
+            markStepActionCompleted("gui.gtcalcboard.tutorial.chapter.ch3.step3_result");
+        }
+    }
+
+    public void onPageSettingsConfigured() {
+        if (!active || stepActionCompleted) return;
+        if ("ch4_workspace".equals(activeChapterId) && activeChapterStepIndex == 0) {
+            markStepActionCompleted("gui.gtcalcboard.tutorial.chapter.ch4.step1_result");
+        }
+    }
+
+    public void onGlobalBalanceOpened() {
+        if (!active || stepActionCompleted) return;
+        if ("ch4_workspace".equals(activeChapterId) && activeChapterStepIndex == 2) {
+            markStepActionCompleted("gui.gtcalcboard.tutorial.chapter.ch4.step3_result");
         }
     }
 
     public void onTargetBatchConfigured(RecipeNode node, double amount) {
-        if (!active) return;
+        if (!active || stepActionCompleted) return;
         if (currentStep == TutorialStep.STEP_5_JUNCTION_ETA) {
-            nextStep(); // Advance to Step 6 (Machine Selector)
+            markStepActionCompleted("gui.gtcalcboard.tutorial.step5_junction_result");
         }
     }
 
     public void onMachineSwitched(RecipeNode node, ResourceLocation newWs) {
-        if (!active) return;
+        if (!active || stepActionCompleted) return;
         if (currentStep == TutorialStep.STEP_6_MACHINE_SELECTOR) {
             if (node != null && (node.isMultiblock() || ELECTRIC_BLAST_FURNACE_ID.equals(newWs))) {
-                nextStep(); // Advance to Step 7 (Machine Config)
+                markStepActionCompleted("gui.gtcalcboard.tutorial.step5_selector_result");
             }
         }
     }
 
     public void onMachineConfigOpened() {
-        if (!active) return;
+        if (!active || stepActionCompleted) return;
         if (currentStep == TutorialStep.STEP_7_MACHINE_CONFIG) {
-            nextStep(); // Advance to Step 8 (Group Frame)
+            markStepActionCompleted("gui.gtcalcboard.tutorial.step5_result");
         }
     }
 
     public void onGroupFramed() {
-        if (!active) return;
+        if (!active || stepActionCompleted) return;
         if (currentStep == TutorialStep.STEP_8_GROUP_FRAME) {
-            nextStep(); // Advance to Step 9 (Compound Module)
+            markStepActionCompleted("gui.gtcalcboard.tutorial.step6_result");
         }
     }
 
@@ -660,53 +968,105 @@ public class TutorialManager {
     }
 
     public void onModuleGrouped() {
-        if (!active) return;
+        if (!active || stepActionCompleted) return;
+        if ("ch3_packaging".equals(activeChapterId) && activeChapterStepIndex == 1) {
+            markStepActionCompleted("gui.gtcalcboard.tutorial.chapter.ch3.step2_result");
+            return;
+        }
         if (currentStep == TutorialStep.STEP_9_COMPOUND_MODULE) {
-            nextStep();
+            markStepActionCompleted("gui.gtcalcboard.tutorial.step7_result");
         }
     }
 
     public void onModuleExpanded() {
-        if (!active) return;
+        if (!active || stepActionCompleted) return;
         if (currentStep == TutorialStep.STEP_9_COMPOUND_MODULE) {
-            nextStep();
+            markStepActionCompleted("gui.gtcalcboard.tutorial.step7_result");
         }
     }
 
     public void onSharedMachineFramed() {
-        if (!active) return;
+        if (!active || stepActionCompleted) return;
+        if ("ch3_packaging".equals(activeChapterId) && activeChapterStepIndex == 0) {
+            markStepActionCompleted("gui.gtcalcboard.tutorial.chapter.ch3.step1_result");
+            return;
+        }
         if (currentStep == TutorialStep.STEP_10_SHARED_MACHINE) {
-            nextStep();
+            markStepActionCompleted("gui.gtcalcboard.tutorial.step8_result");
         }
     }
 
     public void onBOMOpened() {
-        if (!active) return;
+        if (!active || stepActionCompleted) return;
+        if ("ch3_packaging".equals(activeChapterId) && activeChapterStepIndex == 3) {
+            markStepActionCompleted("gui.gtcalcboard.tutorial.chapter.ch3.step4_result");
+            return;
+        }
         if (currentStep == TutorialStep.STEP_11_BOM_INSPECTION) {
-            nextStep();
+            markStepActionCompleted("gui.gtcalcboard.tutorial.step9_result");
         }
     }
 
     public void onJunctionSupplyConfigured() {
-        if (!active) return;
+        if (!active || stepActionCompleted) return;
         if (currentStep == TutorialStep.STEP_12_JUNCTION_SUPPLY) {
-            nextStep();
+            markStepActionCompleted("gui.gtcalcboard.tutorial.step10_result");
         }
     }
 
     public void onFolderBrowserOpened() {
-        if (!active) return;
-        if (currentStep == TutorialStep.STEP_13_FOLDER_BROWSER) {
-            completeTutorial();
+        if (!active || stepActionCompleted) return;
+        if ("ch4_workspace".equals(activeChapterId) && activeChapterStepIndex == 1) {
+            markStepActionCompleted("gui.gtcalcboard.tutorial.chapter.ch4.step2_result");
+            return;
         }
+        if (currentStep == TutorialStep.STEP_13_FOLDER_BROWSER) {
+            markStepActionCompleted("gui.gtcalcboard.tutorial.step11_result");
+        }
+    }
+
+    public boolean isFastTrackActive() {
+        return active && fastTrackActive;
+    }
+
+    public boolean isChapterActive() {
+        return active && activeChapterId != null;
+    }
+
+    public int getFastTrackStepIndex() {
+        return fastTrackStepIndex;
+    }
+
+    public int getActiveChapterStepIndex() {
+        return activeChapterStepIndex;
+    }
+
+    public String getActiveChapterId() {
+        return activeChapterId;
+    }
+
+    public ITutorialChapter getActiveChapter() {
+        return activeChapterId != null ? TutorialTrackRegistry.getInstance().getChapter(activeChapterId) : null;
+    }
+
+    public TutorialTrackType getTrackType() {
+        return trackType;
     }
 
     public String getBoilerNodeId() {
         return boilerNodeId;
     }
 
+    public void setBoilerNodeId(String id) {
+        this.boilerNodeId = id;
+    }
+
     public String getTurbineNodeId() {
         return turbineNodeId;
+    }
+
+    public void setTurbineNodeId(String id) {
+        this.turbineNodeId = id;
     }
 
     public String getPracticeNodeId() {
@@ -720,11 +1080,23 @@ public class TutorialManager {
     // --- Dynamic Widget Glowing Helpers ---
 
     public boolean isToolbarButtonGlowing(String buttonKey) {
-        if (!active) return false;
-        if (currentStep == TutorialStep.STEP_1_ADD_RECIPE && "add_recipe".equals(buttonKey)) {
+        if (!active || stepActionCompleted) return false;
+        if (currentStep == TutorialStep.STEP_1_ADD_RECIPE && "add_recipe".equals(buttonKey) && !fastTrackActive && activeChapterId == null) {
+            return true;
+        }
+        if (fastTrackActive && fastTrackStepIndex == 0 && "add_recipe".equals(buttonKey)) {
+            return true;
+        }
+        if (fastTrackActive && fastTrackStepIndex == 2 && "auto_ratio".equals(buttonKey)) {
+            return true;
+        }
+        if ("ch1_solver".equals(activeChapterId) && (activeChapterStepIndex == 1 || activeChapterStepIndex == 2) && "auto_ratio".equals(buttonKey)) {
             return true;
         }
         if (currentStep == TutorialStep.STEP_13_FOLDER_BROWSER && "page_browser".equals(buttonKey)) {
+            return true;
+        }
+        if ("ch4_workspace".equals(activeChapterId) && activeChapterStepIndex == 1 && "page_browser".equals(buttonKey)) {
             return true;
         }
         return false;
@@ -735,11 +1107,22 @@ public class TutorialManager {
     }
 
     public boolean isNodeBaseTargetButtonGlowing(String nodeId) {
+        if (!active || stepActionCompleted || nodeId == null) return false;
+        if ("ch1_solver".equals(activeChapterId) && activeChapterStepIndex == 0) {
+            com.gtceu.calcboard.api.storage.BoardPage tutPage = getTutorialPage();
+            if (tutPage != null) {
+                RecipeNode target = tutPage.getGraph().getNodes().stream()
+                        .filter(n -> !n.isReroute() && "Plate Bender".equals(n.getName()))
+                        .findFirst()
+                        .orElse(null);
+                return target != null && target.getId().equals(nodeId);
+            }
+        }
         return false;
     }
 
     public boolean isMachineIconGlowing(String nodeId) {
-        if (!active) return false;
+        if (!active || stepActionCompleted) return false;
         if (currentStep == TutorialStep.STEP_6_MACHINE_SELECTOR) {
             return selectorNodeId != null && selectorNodeId.equals(nodeId);
         }
@@ -747,7 +1130,7 @@ public class TutorialManager {
     }
 
     public boolean isMachineSelectorRowGlowing(ResourceLocation machineId) {
-        if (!active || machineId == null) return false;
+        if (!active || stepActionCompleted || machineId == null) return false;
         if (currentStep == TutorialStep.STEP_6_MACHINE_SELECTOR) {
             return ELECTRIC_BLAST_FURNACE_ID.equals(machineId);
         }
@@ -755,7 +1138,7 @@ public class TutorialManager {
     }
 
     public boolean isNodeConfigButtonGlowing(String nodeId) {
-        if (!active) return false;
+        if (!active || stepActionCompleted) return false;
         if (currentStep == TutorialStep.STEP_7_MACHINE_CONFIG) {
             return turbineNodeId != null && turbineNodeId.equals(nodeId);
         }
@@ -767,7 +1150,7 @@ public class TutorialManager {
     }
 
     public boolean isJunctionGlowing(String nodeId) {
-        if (!active || nodeId == null) return false;
+        if (!active || stepActionCompleted || nodeId == null) return false;
         if (currentStep == TutorialStep.STEP_12_JUNCTION_SUPPLY) {
             com.gtceu.calcboard.api.storage.BoardPage tutPage = getTutorialPage();
             if (tutPage != null) {
@@ -779,12 +1162,18 @@ public class TutorialManager {
     }
 
     public boolean isFrameCollapseButtonGlowing(String frameId) {
-        if (!active) return false;
+        if (!active || stepActionCompleted) return false;
         return currentStep == TutorialStep.STEP_9_COMPOUND_MODULE;
     }
 
     public boolean isWireGlowing(String fromNodeId, String toNodeId) {
-        if (!active) return false;
+        if (!active || stepActionCompleted) return false;
+        if (fastTrackActive && (fastTrackStepIndex == 2 || fastTrackStepIndex == 3)) {
+            return true;
+        }
+        if ("ch2_wiring".equals(activeChapterId) && (activeChapterStepIndex == 0 || activeChapterStepIndex == 1)) {
+            return true;
+        }
         if (currentStep == TutorialStep.STEP_3_JUNCTION) {
             return (boilerNodeId != null && boilerNodeId.equals(fromNodeId))
                     || (turbineNodeId != null && turbineNodeId.equals(toNodeId));
@@ -796,23 +1185,74 @@ public class TutorialManager {
     }
 
     public boolean isPortGlowing(String nodeId, boolean isInput, int portIdx) {
-        if (!active) return false;
-        if (currentStep == TutorialStep.STEP_2_DRAG_TO_SEARCH) {
-            if (!isInput && portIdx == 0 && boilerNodeId != null && boilerNodeId.equals(nodeId)) {
-                return true;
-            }
-        } else if (currentStep == TutorialStep.STEP_4_SHIFT_WIRING) {
-            com.gtceu.calcboard.api.storage.BoardPage tutPage = getTutorialPage();
-            RecipeNode junction = tutPage != null ? tutPage.getGraph().getNodes().stream().filter(RecipeNode::isReroute).findFirst().orElse(null) : null;
-            String sourceId = junction != null ? junction.getId() : boilerNodeId;
-            if (!isInput && portIdx == 0 && sourceId != null && sourceId.equals(nodeId)) {
-                return true;
-            }
-            if (isInput && portIdx == 0 && turbineNodeId != null && turbineNodeId.equals(nodeId)) {
-                return true;
-            }
+        if (!active || stepActionCompleted || nodeId == null) return false;
+        if (isFastTrackPortGlowing(nodeId, isInput, portIdx)) return true;
+        if (isChapter1PortGlowing(nodeId, isInput, portIdx)) return true;
+        if (isChapter2PortGlowing(nodeId, isInput, portIdx)) return true;
+        if (isLegacyStep2PortGlowing(nodeId, isInput, portIdx)) return true;
+        return isLegacyStep4PortGlowing(nodeId, isInput, portIdx);
+    }
+
+    private boolean isChapter1PortGlowing(String nodeId, boolean isInput, int portIdx) {
+        if (!"ch1_solver".equals(activeChapterId) || activeChapterStepIndex != 3) return false;
+        com.gtceu.calcboard.api.storage.BoardPage tutPage = getTutorialPage();
+        if (tutPage == null) return false;
+
+        RecipeNode bath = findNodeByName(tutPage, "Chemical Bath");
+        RecipeNode feed = findNodeByName(tutPage, "Acid Supply Tank");
+        if (bath == null || feed == null) return false;
+
+        boolean feedConnected = tutPage.getGraph().getConnections().stream()
+                .anyMatch(c -> c.fromNodeId().equals(feed.getId()) && c.toNodeId().equals(bath.getId()));
+
+        if (!feedConnected) {
+            if (!isInput && portIdx == 0 && feed.getId().equals(nodeId)) return true;
+            return isInput && portIdx == 0 && bath.getId().equals(nodeId);
+        }
+        return isInput && portIdx == 0 && bath.getId().equals(nodeId);
+    }
+
+    private RecipeNode findNodeByName(com.gtceu.calcboard.api.storage.BoardPage tutPage, String name) {
+        return tutPage.getGraph().getNodes().stream()
+                .filter(n -> !n.isReroute() && name.equals(n.getName()))
+                .findFirst().orElse(null);
+    }
+
+    private boolean isFastTrackPortGlowing(String nodeId, boolean isInput, int portIdx) {
+        return fastTrackActive && fastTrackStepIndex == 1 && !isInput && portIdx == 0 && nodeId.equals(boilerNodeId);
+    }
+
+    private boolean isChapter2PortGlowing(String nodeId, boolean isInput, int portIdx) {
+        if (!"ch2_wiring".equals(activeChapterId)) return false;
+        com.gtceu.calcboard.api.storage.BoardPage tutPage = getTutorialPage();
+        if (tutPage == null) return false;
+
+        if (activeChapterStepIndex == 2 && !isInput && portIdx == 1) {
+            RecipeNode separator = tutPage.getGraph().getNodes().stream()
+                    .filter(n -> "Air Separator".equals(n.getName()))
+                    .findFirst().orElse(null);
+            return separator != null && separator.getId().equals(nodeId);
+        }
+        if (activeChapterStepIndex == 3 && isInput && portIdx == 0) {
+            RecipeNode extruder = tutPage.getGraph().getNodes().stream()
+                    .filter(n -> "Plate Extruder".equals(n.getName()))
+                    .findFirst().orElse(null);
+            return extruder != null && extruder.getId().equals(nodeId);
         }
         return false;
+    }
+
+    private boolean isLegacyStep2PortGlowing(String nodeId, boolean isInput, int portIdx) {
+        return currentStep == TutorialStep.STEP_2_DRAG_TO_SEARCH && !isInput && portIdx == 0 && nodeId.equals(boilerNodeId);
+    }
+
+    private boolean isLegacyStep4PortGlowing(String nodeId, boolean isInput, int portIdx) {
+        if (currentStep != TutorialStep.STEP_4_SHIFT_WIRING) return false;
+        com.gtceu.calcboard.api.storage.BoardPage tutPage = getTutorialPage();
+        RecipeNode junction = tutPage != null ? tutPage.getGraph().getNodes().stream().filter(RecipeNode::isReroute).findFirst().orElse(null) : null;
+        String sourceId = junction != null ? junction.getId() : boilerNodeId;
+        if (!isInput && portIdx == 0 && nodeId.equals(sourceId)) return true;
+        return isInput && portIdx == 0 && nodeId.equals(turbineNodeId);
     }
 
     public static int getGlowBorderColor(int defaultBorder) {

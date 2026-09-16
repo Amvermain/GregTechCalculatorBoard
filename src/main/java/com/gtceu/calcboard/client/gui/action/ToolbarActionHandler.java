@@ -311,6 +311,13 @@ public class ToolbarActionHandler {
         recordAutoRatioHistory(graph, baseNode, oldCounts, harmonized, fractional);
 
         refreshWidgetsAfterAutoRatio();
+        if (harmonized) {
+            TutorialManager.getInstance().onIntegerRatioTriggered();
+        } else if (fractional) {
+            TutorialManager.getInstance().onFractionalRatioTriggered();
+        } else {
+            TutorialManager.getInstance().onAutoRatioTriggered();
+        }
         notifyAutoRatioResult(baseNode, harmonized, fractional, result);
     }
 
@@ -367,7 +374,6 @@ public class ToolbarActionHandler {
             w.invalidateCache();
         }
         screen.markSummaryDirty();
-        TutorialManager.getInstance().onAutoRatioTriggered();
     }
 
     private void notifyAutoRatioResult(RecipeNode baseNode, boolean harmonized, boolean fractional, AutoRatioResult result) {

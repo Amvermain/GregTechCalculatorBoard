@@ -103,8 +103,8 @@ public class WelcomeTutorialDialog implements IBoardModal {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        int w = screen != null ? screen.width : Minecraft.getInstance().getWindow().getGuiScaledWidth();
-        int h = screen != null ? screen.height : Minecraft.getInstance().getWindow().getGuiScaledHeight();
+        int w = screen != null ? screen.width : (Minecraft.getInstance() != null && Minecraft.getInstance().getWindow() != null ? Minecraft.getInstance().getWindow().getGuiScaledWidth() : 800);
+        int h = screen != null ? screen.height : (Minecraft.getInstance() != null && Minecraft.getInstance().getWindow() != null ? Minecraft.getInstance().getWindow().getGuiScaledHeight() : 600);
         return mouseClicked(mouseX, mouseY, button, w, h);
     }
 
@@ -131,7 +131,7 @@ public class WelcomeTutorialDialog implements IBoardModal {
 
         if (mouseX >= startBtnX && mouseX <= startBtnX + btnW && mouseY >= startBtnY && mouseY <= startBtnY + btnH) {
             hide();
-            TutorialManager.getInstance().startTutorial(screen);
+            TutorialManager.getInstance().startFastTrack(screen);
             return true;
         }
 

@@ -107,4 +107,70 @@ public class StoichiometricBatchViewTest {
         Assertions.assertEquals(2000.0, reactorStats.connectedRate(), 0.001);
         Assertions.assertTrue(reactorStats.isBalanced());
     }
+
+    @Test
+    public void testBatchInputPortWithInfiniteSupplyJunction() {
+        FlowGraph graph = new FlowGraph();
+
+        RecipeNode reroute = RecipeNode.createReroute(100.0, 100.0);
+        reroute.setSupplyMode(com.gtceu.calcboard.api.type.SupplyMode.INFINITE);
+        graph.addNode(reroute);
+
+        RecipeNode reactor = RecipeNode.create("Reactor", 30.0, 30.0, GTVoltageTier.LV);
+        reactor.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:hydrogen"), "Hydrogen", 2000.0, 1.0));
+        graph.addNode(reactor);
+
+        graph.addConnection(reroute.getId(), 0, reactor.getId(), 0);
+
+        FlowGraphSolver.PortFlowStats reactorStats = graph.getBatchInputPortStats(reactor, 0);
+        Assertions.assertTrue(reactorStats.isConnected());
+        Assertions.assertEquals(2000.0, reactorStats.requiredOrProducedRate(), 0.001);
+        Assertions.assertEquals(2000.0, reactorStats.connectedRate(), 0.001);
+        Assertions.assertTrue(reactorStats.isBalanced());
+        Assertions.assertFalse(reactorStats.isInputDeficit());
+    }
+
+    @Test
+    public void testBatchInputPortWithFixedRateSupplyJunction() {
+        FlowGraph graph = new FlowGraph();
+
+        RecipeNode reroute = RecipeNode.createReroute(100.0, 100.0);
+        reroute.setSupplyMode(com.gtceu.calcboard.api.type.SupplyMode.FIXED_RATE);
+        reroute.setExternalSupplyRate(2000.0);
+        graph.addNode(reroute);
+
+        RecipeNode reactor = RecipeNode.create("Reactor", 30.0, 30.0, GTVoltageTier.LV);
+        reactor.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:hydrogen"), "Hydrogen", 2000.0, 1.0));
+        graph.addNode(reactor);
+
+        graph.addConnection(reroute.getId(), 0, reactor.getId(), 0);
+
+        FlowGraphSolver.PortFlowStats reactorStats = graph.getBatchInputPortStats(reactor, 0);
+        Assertions.assertTrue(reactorStats.isConnected());
+        Assertions.assertEquals(2000.0, reactorStats.requiredOrProducedRate(), 0.001);
+        Assertions.assertEquals(2000.0, reactorStats.connectedRate(), 0.001);
+        Assertions.assertTrue(reactorStats.isBalanced());
+        Assertions.assertFalse(reactorStats.isInputDeficit());
+    }
+
+    @Test
+    public void testBatchInputPortWithRawInflowJunction() {
+        FlowGraph graph = new FlowGraph();
+
+        RecipeNode reroute = RecipeNode.createReroute(100.0, 100.0);
+        graph.addNode(reroute);
+
+        RecipeNode reactor = RecipeNode.create("Reactor", 30.0, 30.0, GTVoltageTier.LV);
+        reactor.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:hydrogen"), "Hydrogen", 2000.0, 1.0));
+        graph.addNode(reactor);
+
+        graph.addConnection(reroute.getId(), 0, reactor.getId(), 0);
+
+        FlowGraphSolver.PortFlowStats reactorStats = graph.getBatchInputPortStats(reactor, 0);
+        Assertions.assertTrue(reactorStats.isConnected());
+        Assertions.assertEquals(2000.0, reactorStats.requiredOrProducedRate(), 0.001);
+        Assertions.assertEquals(2000.0, reactorStats.connectedRate(), 0.001);
+        Assertions.assertTrue(reactorStats.isBalanced());
+        Assertions.assertFalse(reactorStats.isInputDeficit());
+    }
 }

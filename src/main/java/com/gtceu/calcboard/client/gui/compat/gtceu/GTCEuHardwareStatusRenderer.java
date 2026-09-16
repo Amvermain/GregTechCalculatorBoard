@@ -143,6 +143,10 @@ public final class GTCEuHardwareStatusRenderer {
 
     public static void renderBoilerDialogHeader(MachineConfigDialog dialog, GuiGraphics graphics, Font font, RecipeNode node,
                                                 int x, int y, int dialogW, int mouseX, int mouseY) {
+        if (com.gtceu.calcboard.compat.tfg.TFGBoilerPhysics.isTFGLargeBoiler(node)) {
+            com.gtceu.calcboard.client.gui.compat.tfg.TFGBoilerDialogRenderer.renderBoilerDialogHeader(dialog, graphics, font, node, x, y, dialogW, mouseX, mouseY);
+            return;
+        }
         graphics.drawString(font, "§6♨ " + Component.translatable("gui.gtcalcboard.boiler_type_title").getString(), x + 10, y + 30, 0xFFFFFFFF, false);
         GTBoilerTier curTier = GTBoilerTier.getBoilerTier(node);
 

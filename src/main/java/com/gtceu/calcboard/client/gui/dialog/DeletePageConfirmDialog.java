@@ -187,10 +187,10 @@ public class DeletePageConfirmDialog implements IBoardModal {
             UUID teamId = com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance().getCurrentTeamId();
             com.gtceu.calcboard.network.NetworkHandler.sendToServer(new com.gtceu.calcboard.network.packet.c2s.C2SDeleteTeamPagePacket(teamId, targetPageId));
         } else if (targetMultiplePageIds != null && !targetMultiplePageIds.isEmpty()) {
-            BoardManager.getInstance().getPages().removeIf(p -> targetMultiplePageIds.contains(p.getId()));
-            if (BoardManager.getInstance().getPages().isEmpty()) {
-                BoardManager.getInstance().addPage("Page 1");
+            for (String pid : targetMultiplePageIds) {
+                BoardManager.getInstance().removePage(pid);
             }
+            BoardManager.getInstance().cleanupOrphanSubpages();
             int activeIdx = Math.max(0, Math.min(BoardManager.getInstance().getActivePageIndex(), BoardManager.getInstance().getPages().size() - 1));
             BoardManager.getInstance().switchPage(activeIdx);
             syncCameraToActivePage();

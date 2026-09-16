@@ -1,7 +1,7 @@
 package com.gtceu.calcboard.server.lock;
 
 import com.gtceu.calcboard.server.storage.TeamWorkspaceData;
-import com.gtceu.calcboard.server.storage.TeamWorkspacePage;
+import com.gtceu.calcboard.api.team.TeamWorkspacePage;
 import com.gtceu.calcboard.server.storage.WorkspaceLockManager;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;

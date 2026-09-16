@@ -18,6 +18,12 @@ public class NodePropertyStore {
 
     public NodePropertyStore() {}
 
+    public NodePropertyStore(NodePropertyStore other) {
+        if (other != null) {
+            this.values.putAll(other.values);
+        }
+    }
+
     public void setChangeListener(Runnable changeListener) {
         this.changeListener = changeListener;
     }

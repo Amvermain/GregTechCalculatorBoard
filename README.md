@@ -32,8 +32,8 @@ An in-game node graph calculator and flowchart editor for GregTech CEu Modern, E
 ### 2. Deep GregTech & Multi-Mod Calculation Engine
 - **GregTech CEu Modern**: Full ULV~MAX voltage tiers, Standard/Perfect/Lossless overclocking, subtick CPS batching, and dual energy hatch support.
 - **Hardware Addons & Multiblocks**: Deductive calculation for heating coils (temperature & duration bonuses), parallel hatches, configurable maintenance hatches, and turbine rotors.
-- **Multi-Mod Energy Systems**: Kinetic calculations for **Create** & **Create: New Age** (SU, RPM, generator coils), RF/t dynamos & tier kits for **Thermal Series**, and steam consumption modeling for **Systeams** / Boilers.
-- **Master Anchor & Auto-Ratio Sizing**: Designate bottleneck machines as Base Anchors to automatically scale all upstream production chains backwards using integer ceiling.
+- **Multi-Mod Energy Systems**: Kinetic calculations for **Create** & **Create: New Age** (SU, RPM, generator coils), RF/t dynamos & tier kits for **Thermal Series**, steam consumption modeling for **Systeams** / Boilers, and **TerraFirmaGreg (TFG)** Large Bronze and Steel Boilers with 9 booster fluids and dual-fuel Super Boiler mode.
+- **Master Anchor & Auto-Ratio Sizing**: Designate bottleneck machines as Base Anchors to automatically scale all upstream production chains backwards using integer ceiling, with full support for expanded group frames and steady-state recirculation balancing.
 
 ### 3. Factory Multiblock BOM & Shared Machine Pools
 - **Automated Multiblock Bill of Materials (BOM)**: Aggregates all multiblock and singleblock construction requirements (casings, coils, hatches, controllers) across pages, frames, and compound modules (`B` hotkey). Export shopping lists directly to EMI Recipe Tree, JEI++, or clipboard.
@@ -52,6 +52,8 @@ An in-game node graph calculator and flowchart editor for GregTech CEu Modern, E
 
 ### 6. Advanced Flow Analytics & Responsive UX
 - **Flow Saturation Wire Modulation**: Dynamically modulates wire pulse animation speeds, stalls (duty cycle stutter), and RGB colors (Cyan -> Amber -> Crimson) based on real-time supply saturation ratios ($R = \text{Supply} / \text{Demand}$), with pulsing glow outlines indicating starved bottleneck machines.
+- **Full-Flow PNG Clipboard Export**: One-click clipboard copy (`Share / I/O` menu) of the active canvas page as a clear, high-resolution image regardless of viewport position or zoom level.
+- **Interactive 3-Track Tutorial & Academy**: 45-second starter tutorial, 4 specialized academy chapters (ratio solving, wiring, module subpages, workspace management), and contextual in-game design tips.
 - **Junction Void Sink & Port-Level Voiding**: Configure Junction nodes into infinite void sinks (`SupplyMode.VOID_SINK`) or `Alt + Right-Click` output ports to absorb surplus byproducts and exclude them from net production summaries without severing topology.
 - **Responsive Toolbar & Adaptive UI**: Adaptive toolbar contracts title and collapses overflow buttons on compact screens, high-density addon list view (`[▦ / ☰]`), 5-level UI font scaling (`[Aa 1.0x]`), and Level-of-Detail (LOD) rendering for large graphs (1,200+ nodes).
 
@@ -157,6 +159,17 @@ GregTech Calculator Board is completely optional on both client and server sides
 
 ---
 
+## Recommended Modpacks (Community Tested)
+
+GregTech Calculator Board is an ideal companion for modern GregTech ecosystems. While **not officially affiliated with or bundled in these packs**, players and server administrators can freely add this mod to their **client or dedicated server** to enable both personal factory planning and real-time multiplayer team collaboration:
+
+- **[Star Technology](https://www.curseforge.com/minecraft/modpacks/star-technology)**: Tested & Compatible (Supports GTCEu Modern, Create, and Thermal production lines)
+- **[TerraFirmaGreg](https://www.curseforge.com/minecraft/modpacks/terrafirmagreg)**: Tested & Compatible (Large Bronze and Steel Boiler support)
+
+> *Disclaimer: These modpacks do not officially endorse, bundle, or maintain this mod. It is an optional third-party addition supported on both client and server sides. If you encounter any calculation issues or conflicts while playing, please report them directly to our GitHub Issues tracker, not to the modpack authors.*
+
+---
+
 ## Building from Source
 
 ```bash
@@ -164,7 +177,7 @@ git clone https://github.com/Amvermain/GregTechCalculatorBoard.git
 cd GregTechCalculatorBoard
 ./gradlew build
 ```
-The compiled jar will be located in `build/libs/gtcalcboard-1.20.1-2.2.1.jar`.
+The compiled jar will be located in `build/libs/gtcalcboard-1.20.1-2.3.0.jar`.
 
 ---
 
@@ -187,6 +200,7 @@ The compiled jar will be located in `build/libs/gtcalcboard-1.20.1-2.2.1.jar`.
 
 ## Special Thanks
 
+- **SirEdvin** - For contributing the high-resolution full-flow PNG clipboard export feature (#9).
 - **The Reel One** - For providing UX/UI feedback, design suggestions, and community testing.
 - **rafaelpnsm** - For providing UX/UI feedback, design suggestions, and community testing.
 - **GenerusWeebius** - For thorough testing, meticulous bug reporting, and mathematical verification.

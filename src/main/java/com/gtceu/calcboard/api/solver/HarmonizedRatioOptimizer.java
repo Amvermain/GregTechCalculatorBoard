@@ -73,7 +73,7 @@ public final class HarmonizedRatioOptimizer {
     public static double calculateConsumerMatchCount(FlowGraph graph, RecipeNode producer, int outPortIdx, RecipeNode consumer, int inPortIdx) {
         if (graph == null || producer == null || consumer == null) return 1.0;
         if (consumer.isReroute() || consumer.isBoundaryPin()) return 1.0;
-        if (outPortIdx >= producer.getOutputs().size() || inPortIdx >= consumer.getInputs().size()) return 1.0;
+        if (outPortIdx < 0 || outPortIdx >= producer.getOutputs().size() || inPortIdx < 0 || inPortIdx >= consumer.getInputs().size()) return 1.0;
 
         double producedRate;
         if (producer.isReroute()) {
@@ -98,7 +98,7 @@ public final class HarmonizedRatioOptimizer {
     public static double calculateProducerMatchCount(FlowGraph graph, RecipeNode producer, int outPortIdx, RecipeNode consumer, int inPortIdx) {
         if (graph == null || producer == null || consumer == null) return 1.0;
         if (producer.isReroute() || producer.isBoundaryPin()) return 1.0;
-        if (outPortIdx >= producer.getOutputs().size() || inPortIdx >= consumer.getInputs().size()) return 1.0;
+        if (outPortIdx < 0 || outPortIdx >= producer.getOutputs().size() || inPortIdx < 0 || inPortIdx >= consumer.getInputs().size()) return 1.0;
 
         double totalDemand;
         if (consumer.isReroute()) {
@@ -126,7 +126,7 @@ public final class HarmonizedRatioOptimizer {
             if (edge.fromNodeId().equals(excludedProducerId)) continue;
 
             RecipeNode otherProd = graph.findNodeById(edge.fromNodeId());
-            if (otherProd == null || edge.outputIndex() >= otherProd.getOutputs().size()) continue;
+            if (otherProd == null || edge.outputIndex() < 0 || edge.outputIndex() >= otherProd.getOutputs().size()) continue;
 
             double pRate = FlowEdgeAllocator.getEffectiveProducerOutputRate(graph, otherProd, edge.outputIndex(), null);
             int outDegree = countPortOutDegree(graph, otherProd.getId(), edge.outputIndex());

@@ -114,7 +114,7 @@ public class CanvasGroupFrameRenderer {
         String prefix = frame.isSharedMachineFrame() ? "↔ " : (frame.isCompoundFrame() ? "▦ " : "");
         String displayTitle = prefix + title;
 
-        int btnCount = 4 + (frame.isSharedMachineFrame() ? 2 : 0);
+        int btnCount = frame.isSharedMachineFrame() ? 6 : 5;
         int rightButtonsBoundary = x + w - (BTN_SIZE * btnCount + BTN_SPACING * (btnCount - 1) + 8);
 
         // Shared Machine Frame Load Badge & Incompatible Warning
@@ -202,12 +202,15 @@ public class CanvasGroupFrameRenderer {
         boolean colorHover = isMouseOver(mouseX, mouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE);
         drawColorCycleButton(graphics, curBtnX, btnY, BTN_SIZE, BTN_SIZE, colorHover, color);
 
-        // [⚙ Configure Shared Machine Hardware]
         if (frame.isSharedMachineFrame()) {
             curBtnX -= (BTN_SIZE + BTN_SPACING);
             boolean cfgHover = isMouseOver(mouseX, mouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE);
             drawIconButton(graphics, font, "⚙", curBtnX, btnY, BTN_SIZE, BTN_SIZE, cfgHover, 0xFFFCD34D, 0x55F59E0B);
 
+            curBtnX -= (BTN_SIZE + BTN_SPACING);
+            boolean ratioHover = isMouseOver(mouseX, mouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE);
+            drawIconButton(graphics, font, "⚖", curBtnX, btnY, BTN_SIZE, BTN_SIZE, ratioHover, 0xFF60A5FA, 0x553B82F6);
+        } else {
             curBtnX -= (BTN_SIZE + BTN_SPACING);
             boolean ratioHover = isMouseOver(mouseX, mouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE);
             drawIconButton(graphics, font, "⚖", curBtnX, btnY, BTN_SIZE, BTN_SIZE, ratioHover, 0xFF60A5FA, 0x553B82F6);
@@ -317,6 +320,12 @@ public class CanvasGroupFrameRenderer {
         if (frame.isSharedMachineFrame()) {
             return renderSharedHeaderButtonsTooltip(graphics, font, frame, canvasMouseX, canvasMouseY, curBtnX, btnY, mouseX, mouseY);
         }
+
+        int ratioBtnX = curBtnX - (BTN_SIZE + BTN_SPACING);
+        if (isMouseOver(canvasMouseX, canvasMouseY, ratioBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
+            BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal("§b⚖ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_group_auto_ratio")), mouseX, mouseY);
+            return true;
+        }
         return false;
     }
 
@@ -423,7 +432,9 @@ public class CanvasGroupFrameRenderer {
         if (mouseY >= y && mouseY <= y + headerH && mouseX >= x && mouseX <= x + w) {
             double btnY = y + 4;
             double rightEdge = x + w - 5;
-            if (mouseX >= rightEdge - 65 && mouseX <= rightEdge && mouseY >= btnY && mouseY <= btnY + BTN_SIZE) {
+            int btnCount = frame.isSharedMachineFrame() ? 6 : 5;
+            double btnsWidth = btnCount * BTN_SIZE + (btnCount - 1) * BTN_SPACING;
+            if (mouseX >= rightEdge - btnsWidth && mouseX <= rightEdge && mouseY >= btnY && mouseY <= btnY + BTN_SIZE) {
                 return ResizeDirection.NONE;
             }
         }
@@ -507,6 +518,11 @@ public class CanvasGroupFrameRenderer {
                 if (isMouseOver(mouseX, mouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
                     return FrameAction.CONFIG;
                 }
+                curBtnX -= (BTN_SIZE + BTN_SPACING);
+                if (isMouseOver(mouseX, mouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
+                    return FrameAction.AUTO_RATIO;
+                }
+            } else {
                 curBtnX -= (BTN_SIZE + BTN_SPACING);
                 if (isMouseOver(mouseX, mouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
                     return FrameAction.AUTO_RATIO;

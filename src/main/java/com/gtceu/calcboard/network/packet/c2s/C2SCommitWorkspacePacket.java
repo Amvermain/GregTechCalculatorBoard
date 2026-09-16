@@ -4,6 +4,8 @@ import com.gtceu.calcboard.network.NetworkHandler;
 import com.gtceu.calcboard.network.packet.s2c.S2CLockResultPacket;
 import com.gtceu.calcboard.network.packet.s2c.S2CSyncWorkspacePacket;
 import com.gtceu.calcboard.network.packet.s2c.S2CWorkspaceErrorPacket;
+import com.gtceu.calcboard.api.team.CommitLogEntry;
+import com.gtceu.calcboard.api.team.TeamWorkspacePage;
 import com.gtceu.calcboard.server.storage.*;
 import com.gtceu.calcboard.server.team.TeamProviderRegistry;
 import net.minecraft.network.FriendlyByteBuf;

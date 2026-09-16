@@ -45,6 +45,17 @@ You can make this directly in-game:
 
 ***
 
+## Recommended Modpacks
+
+Looking for a modern GregTech pack to play with GTCB? While **not officially bundled**, players and server owners can freely add GTCB to their **client or dedicated server** (supporting both solo planning & real-time multiplayer team collaboration):
+
+*   **[Star Technology](https://www.curseforge.com/minecraft/modpacks/star-technology)** (Tested & Compatible)
+*   **[TerraFirmaGreg](https://www.curseforge.com/minecraft/modpacks/terrafirmagreg)** (Tested & Compatible - Large Boiler support)
+
+*(Note: GTCB is an optional third-party addition for both client and server. Please report any issues to our GitHub tracker, not to the modpack authors.)*
+
+***
+
 ## Community & Support
 
 *   **Discord**: [Join our Discord Server](https://discord.gg/NaJWk3UjJN) - Discuss factory blueprints, ask questions, and chat with the community!
@@ -55,6 +66,7 @@ You can make this directly in-game:
 
 ## Special Thanks
 
+*   **SirEdvin** - For contributing the high-resolution full-flow PNG clipboard export feature (#9).
 *   **The Reel One** - For providing UX/UI feedback, design suggestions, and community testing.
 *   **rafaelpnsm** - For providing UX/UI feedback, design suggestions, and community testing.
 *   **GenerusWeebius** - For thorough testing, meticulous bug reporting, and mathematical verification.

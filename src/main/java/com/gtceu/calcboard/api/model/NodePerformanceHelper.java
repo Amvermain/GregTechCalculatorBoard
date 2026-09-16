@@ -18,6 +18,9 @@ public final class NodePerformanceHelper {
     }
 
     public static int computeTotalParallel(RecipeNode node) {
+        if (node.isMultiblock() && (node.getCustomParallel() <= 1 || NodeAddonHelper.getCombinedParallelMultiplier(node.getAddons()) > 1)) {
+            node.setCustomParallel(0);
+        }
         if (node.getCustomParallel() > 0) {
             return node.getCustomParallel();
         }

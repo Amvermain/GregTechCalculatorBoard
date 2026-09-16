@@ -55,6 +55,13 @@ public final class BoardHotkeyHandler {
                 screen.getWelcomeDialog().hide();
                 return true;
             }
+            if (screen.getDialogManager() != null && screen.getDialogManager().handleKeyPressed(keyCode, scanCode, modifiers)) {
+                return true;
+            }
+            if (BoardManager.getInstance().getActivePage() != null && BoardManager.getInstance().getActivePage().isModuleSubPage()) {
+                screen.returnToParentPage();
+                return true;
+            }
             if (TutorialManager.getInstance().isActive()) {
                 TutorialManager.getInstance().stopTutorial();
                 return true;
@@ -72,13 +79,6 @@ public final class BoardHotkeyHandler {
         for (NodeWidget w : screen.getNodeWidgets()) {
             if (w.isAnyEditorActive()) {
                 w.keyPressed(keyCode, scanCode, modifiers);
-                return true;
-            }
-        }
-
-        if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
-            if (BoardManager.getInstance().getActivePage() != null && BoardManager.getInstance().getActivePage().isModuleSubPage()) {
-                screen.returnToParentPage();
                 return true;
             }
         }
@@ -214,6 +214,7 @@ public final class BoardHotkeyHandler {
                 BoardToast.show(net.minecraft.network.chat.Component.literal("§e⏱ ").append(
                     net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.toast.time_unit_changed", next.getSuffix(), net.minecraft.network.chat.Component.translatable(next.getTranslationKey()).getString())
                 ));
+                TutorialManager.getInstance().onRateUnitToggled();
             }
             playUiSound(SoundEvents.UI_BUTTON_CLICK, 1.0F);
             screen.markSummaryDirty();

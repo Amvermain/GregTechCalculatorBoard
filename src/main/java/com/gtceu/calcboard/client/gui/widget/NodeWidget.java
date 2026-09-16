@@ -357,6 +357,9 @@ public class NodeWidget {
         boolean currentlyVoided = node.isOutputPortVoided(portIndex);
         node.setOutputPortVoided(portIndex, !currentlyVoided);
         invalidateCache();
+        if (!currentlyVoided) {
+            TutorialManager.getInstance().onPortVoidConfigured();
+        }
         if (parent != null) {
             parent.markSummaryDirty();
         }

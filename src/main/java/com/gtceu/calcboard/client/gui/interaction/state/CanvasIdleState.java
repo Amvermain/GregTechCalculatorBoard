@@ -10,6 +10,7 @@ import com.gtceu.calcboard.api.type.SupplyMode;
 import com.gtceu.calcboard.client.gui.BoardScreen;
 import com.gtceu.calcboard.client.gui.widget.BoardToast;
 import com.gtceu.calcboard.client.gui.widget.NodeWidget;
+import com.gtceu.calcboard.client.util.ClientSafetyHelper;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
@@ -286,7 +287,7 @@ public final class CanvasIdleState implements CanvasInteractionState {
     private void handleNodeSelectionClick(CanvasInteractionContext ctx, NodeWidget widget) {
         BoardScreen screen = ctx.getScreen();
         if (screen == null || !screen.ensureEditPermission()) return;
-        boolean shift = Screen.hasShiftDown();
+        boolean shift = isShiftDown();
         if (shift) {
             screen.toggleSelectNode(widget.getNode().getId());
         } else if (!screen.isNodeSelected(widget.getNode().getId())) {
@@ -345,9 +346,26 @@ public final class CanvasIdleState implements CanvasInteractionState {
     private void commitActiveNodeWidgetEdits(CanvasInteractionContext ctx) {
         BoardScreen screen = ctx.getScreen();
         if (screen == null) return;
-        for (NodeWidget w : screen.getNodeWidgets()) {
-            w.commitCountEdit();
+
+        while (true) {
+            NodeWidget activeWidget = findActiveEditingWidget(screen);
+            if (activeWidget == null) {
+                break;
+            }
+            activeWidget.commitCountEdit();
+            if (activeWidget.isAnyEditorActive()) {
+                break;
+            }
         }
+    }
+
+    private NodeWidget findActiveEditingWidget(BoardScreen screen) {
+        for (NodeWidget w : screen.getNodeWidgets()) {
+            if (w.isAnyEditorActive()) {
+                return w;
+            }
+        }
+        return null;
     }
 
     private boolean handleQuickAddButtonsClick(CanvasInteractionContext ctx, double canvasX, double canvasY, int button) {
@@ -554,7 +572,7 @@ public final class CanvasIdleState implements CanvasInteractionState {
     private boolean handleEmptySpaceClick(CanvasInteractionContext ctx, double canvasX, double canvasY) {
         ctx.getQuickAddMarkerHandler().clearQuickAddMarker();
         ctx.getSelectionHandler().startBoxSelection(canvasX, canvasY);
-        if (!Screen.hasShiftDown() && ctx.getScreen() != null) {
+        if (!isShiftDown() && ctx.getScreen() != null) {
             ctx.getScreen().clearSelection();
             if (ctx.getScreen().getNodeInspectorPanel() != null) {
                 ctx.getScreen().getNodeInspectorPanel().openPageSettings();
@@ -562,5 +580,9 @@ public final class CanvasIdleState implements CanvasInteractionState {
         }
         ctx.getStateMachine().transitionTo(new CanvasBoxSelectingState());
         return true;
+    }
+
+    private static boolean isShiftDown() {
+        return ClientSafetyHelper.isShiftDown();
     }
 }

@@ -99,6 +99,7 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> implements I
     private boolean summaryDirty = true;
     private double lastMouseX, lastMouseY;
     private boolean summaryAutoCollapsedForInspector = false;
+    private int nudgeScanTicks = 0;
 
     public BoardScreen() {
         this(new BoardMenu(0, Minecraft.getInstance() != null && Minecraft.getInstance().player != null ? Minecraft.getInstance().player.getInventory() : null));
@@ -255,6 +256,10 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> implements I
         }
         super.containerTick();
         teamSyncCoordinator.tick();
+        dialogManager.tick();
+        if (++nudgeScanTicks % 20 == 0) {
+            com.gtceu.calcboard.client.gui.tutorial.ContextualNudgeManager.getInstance().checkTriggers(com.gtceu.calcboard.api.storage.BoardManager.getInstance().getActivePage());
+        }
     }
 
     @Override
@@ -321,6 +326,7 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> implements I
             getGraph().cleanupInvalidConnections();
             cachedSummary = FlowGraphSolver.computeSummary(getGraph());
             summaryDirty = false;
+            com.gtceu.calcboard.client.gui.tutorial.ContextualNudgeManager.getInstance().checkTriggers(com.gtceu.calcboard.api.storage.BoardManager.getInstance().getActivePage());
         }
     }
 
@@ -421,12 +427,9 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> implements I
 
     @Override
     public List<? extends GuiEventListener> children() {
-        GuiEventListener active = getActiveFocusedWidget();
-        if (active == null) {
-            return super.children();
-        }
         List<GuiEventListener> all = new ArrayList<>(super.children());
-        if (!all.contains(active)) {
+        GuiEventListener active = getActiveFocusedWidget();
+        if (active != null && !all.contains(active)) {
             all.add(active);
         }
         return all;
@@ -658,9 +661,42 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> implements I
     public void openPageSettingsDialog(BoardPage page) { dialogManager.openPageSettingsDialog(page); }
     public void openPageSettingsDialog() { dialogManager.openPageSettingsDialog(com.gtceu.calcboard.api.storage.BoardManager.getInstance().getActivePage()); }
     public PageSettingsDialog getPageSettingsDialog() { return dialogManager.getPageSettingsDialog(); }
+    @Override
+    public void openTutorialLauncher() { dialogManager.openTutorialLauncher(); }
 
     public void openModuleSubPage(RecipeNode moduleNode) { navigationHandler.openModuleSubPage(moduleNode); }
     public void returnToParentPage() { navigationHandler.returnToParentPage(); }
+
+    public void openPage(String pageId) {
+        if (pageId == null || pageId.isEmpty()) return;
+        if (this.canvasHandler != null) {
+            this.canvasHandler.getStateMachine().returnToIdle();
+            this.canvasHandler.getWireHandler().cancelWireDrag();
+        }
+        BoardManager bm = BoardManager.getInstance();
+        BoardPage cur = bm.getActivePage();
+        if (cur != null) {
+            cur.setPanX(this.panX);
+            cur.setPanY(this.panY);
+            cur.setZoom(this.zoom);
+        }
+        if (bm.openPage(pageId)) {
+            BoardPage next = bm.getActivePage();
+            if (next != null) {
+                this.panX = next.getPanX();
+                this.panY = next.getPanY();
+                this.zoom = next.getZoom();
+            }
+            rebuildBoardWidgets();
+            markSummaryDirty();
+        }
+    }
+
+    public void openPage(UUID pageId) {
+        if (pageId != null) {
+            openPage(pageId.toString());
+        }
+    }
 
     public double getPanX() { return panX; }
     public void setPanX(double panX) {
@@ -703,6 +739,11 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> implements I
         lastBoardScreenActiveTime = 0;
         GregTechCalcBoard.LOGGER.info("[GTCalcBoard] [UI] BoardScreen closed. State saved.");
         super.onClose();
+    }
+
+    @Override
+    public void closeScreen() {
+        this.onClose();
     }
 
     @Override

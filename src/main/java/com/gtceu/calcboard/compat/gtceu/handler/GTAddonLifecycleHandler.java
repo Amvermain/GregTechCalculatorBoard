@@ -75,6 +75,7 @@ public final class GTAddonLifecycleHandler {
         if (addon.getCategory() == MachineAddon.Category.PARALLEL) {
             node.getAddons().removeIf(a -> a.getCategory() == MachineAddon.Category.PARALLEL);
             node.getAddons().add(addon);
+            node.setCustomParallel(0);
             return;
         }
         if (addon.getCategory() == MachineAddon.Category.ENERGY_HATCH) {
@@ -113,7 +114,9 @@ public final class GTAddonLifecycleHandler {
 
     public static void onAddonRemoved(RecipeNode node, MachineAddon addon) {
         if (node == null || addon == null) return;
-        if (addon.getCategory() == MachineAddon.Category.ENERGY_HATCH) {
+        if (addon.getCategory() == MachineAddon.Category.PARALLEL) {
+            node.setCustomParallel(0);
+        } else if (addon.getCategory() == MachineAddon.Category.ENERGY_HATCH) {
             GTEnergyHatchCalculator.updateNodeTierFromEnergyHatches(node);
             if (GTTurbineHelper.isTurbine(node)) {
                 List<GTEnergyHatchAddon> remaining = node.getAddons().stream()

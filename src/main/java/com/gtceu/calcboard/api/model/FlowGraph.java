@@ -633,6 +633,10 @@ public class FlowGraph {
         return FlowGraphSolver.autoRatioFromSharedPool(this, poolFrame, targetMachines, mode);
     }
 
+    public int autoRatioFromGroupFrame(CanvasGroupFrame frame, com.gtceu.calcboard.api.solver.AutoRatioMode mode) {
+        return FlowGraphSolver.autoRatioFromGroupFrame(this, frame, mode);
+    }
+
     public Map<String, Double> computeNodeEfficiencies() {
         return FlowGraphSolver.computeNodeEfficiencies(this);
     }
@@ -780,8 +784,25 @@ public class FlowGraph {
     }
 
     public FlowGraph copy() {
-        CompoundTag tag = serializeNBT(0, 0, 1.0);
-        return FlowGraph.deserializeNBT(tag);
+        return copy(Collections.newSetFromMap(new IdentityHashMap<>()), 0);
+    }
+
+    public FlowGraph copy(Set<FlowGraph> visitedGraphs, int depth) {
+        if (depth >= 10 || (visitedGraphs != null && !visitedGraphs.add(this))) {
+            return null;
+        }
+        FlowGraph graph = new FlowGraph();
+        for (RecipeNode n : this.nodes) {
+            graph.addNode(n.copy(n.getId(), visitedGraphs, depth));
+        }
+        graph.connections.addAll(this.connections);
+        for (CanvasGroupFrame f : this.frames) {
+            graph.frames.add(f.copy());
+        }
+        for (CanvasStickyNote sn : this.stickyNotes) {
+            graph.stickyNotes.add(sn.copy());
+        }
+        return graph;
     }
 
     /**

@@ -189,4 +189,10 @@ public class BoundaryPinNodeRole implements INodeRole {
             inRates, outRates, Map.of(), Map.of()
         );
     }
+
+    @Override
+    public BoundaryPinNodeRole copy(Set<FlowGraph> visitedGraphs, int depth) {
+        BoundaryPinNodeRole cp = new BoundaryPinNodeRole(this.direction, this.pinLabel, this.targetPortIndex, this.boundIngredient != null ? this.boundIngredient.copy() : null);
+        return cp;
+    }
 }

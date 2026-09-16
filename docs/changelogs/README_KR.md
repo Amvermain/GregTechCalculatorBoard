@@ -14,6 +14,7 @@
 
 | 버전 라인 | 릴리즈 기간 | 영문 아카이브 | 한국어 아카이브 | 릴리즈 수 |
 | :--- | :--- | :--- | :--- | :--- |
+| **v2.2.x** | 2026-09-05 ~ 2026-09-13 | [CHANGELOG_v2.2.md](CHANGELOG_v2.2.md) | [CHANGELOG_v2.2_KR.md](CHANGELOG_v2.2_KR.md) | 9개 릴리즈 |
 | **v2.1.x** | 2026-08-31 ~ 2026-09-04 | [CHANGELOG_v2.1.md](CHANGELOG_v2.1.md) | [CHANGELOG_v2.1_KR.md](CHANGELOG_v2.1_KR.md) | 8개 릴리즈 |
 | **v2.0.x** | 2026-08-20 ~ 2026-08-31 | [CHANGELOG_v2.0.md](CHANGELOG_v2.0.md) | [CHANGELOG_v2.0_KR.md](CHANGELOG_v2.0_KR.md) | 16개 릴리즈 |
 | **v1.0.x** | 2026-08-17 ~ 2026-08-20 | [CHANGELOG_v1.0.md](CHANGELOG_v1.0.md) | [CHANGELOG_v1.0_KR.md](CHANGELOG_v1.0_KR.md) | 9개 릴리즈 |

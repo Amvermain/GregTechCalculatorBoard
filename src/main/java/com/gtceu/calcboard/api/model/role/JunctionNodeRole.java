@@ -299,4 +299,14 @@ public class JunctionNodeRole implements INodeRole {
             inRates, outRates, Map.of(), Map.of()
         );
     }
+
+    @Override
+    public JunctionNodeRole copy(Set<FlowGraph> visitedGraphs, int depth) {
+        JunctionNodeRole cp = new JunctionNodeRole(this.getSupplyMode(), this.getExternalSupplyRate(), this.getExternalDrainRate());
+        cp.isBuffer = this.isBuffer();
+        cp.bufferSize = this.getBufferSize();
+        cp.splitMode = this.getSplitMode();
+        cp.boundIngredient = this.getBoundIngredient() != null ? this.getBoundIngredient().copy() : null;
+        return cp;
+    }
 }

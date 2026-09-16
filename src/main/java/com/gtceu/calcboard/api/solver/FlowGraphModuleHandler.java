@@ -107,6 +107,36 @@ public final class FlowGraphModuleHandler {
         return moduleNode;
     }
 
+    public static RecipeNode compressToVirtualModule(FlowGraph graph, Set<String> targetNodeIds, String moduleName) {
+        if (graph == null || targetNodeIds == null || targetNodeIds.isEmpty()) {
+            return null;
+        }
+
+        List<RecipeNode> selectedNodes = new ArrayList<>();
+        for (RecipeNode n : graph.getNodes()) {
+            if (targetNodeIds.contains(n.getId())) {
+                selectedNodes.add(n);
+            }
+        }
+        if (selectedNodes.isEmpty()) {
+            return null;
+        }
+
+        FlowGraphSolver.computeSummary(graph);
+
+        Set<String> selectedIdSet = new HashSet<>(targetNodeIds);
+        FlowGraph subGraph = buildSubGraph(selectedNodes, graph.getConnections(), selectedIdSet);
+        BalanceSummary summary = FlowGraphSolver.computeSummaryPreservingEfficiencies(subGraph);
+
+        RecipeNode moduleNode = createModuleNode(selectedNodes, summary, moduleName, subGraph);
+
+        List<FlowGraph.ConnectionEdge> externalEdges = new ArrayList<>();
+        allocateModulePortsAndRewireEdges(graph, subGraph, selectedNodes, selectedIdSet, summary, moduleNode, externalEdges);
+
+        updateGraphWithModule(graph, selectedNodes, moduleNode, externalEdges);
+        return moduleNode;
+    }
+
     private record PortKey(String nodeId, int portIndex) {}
 
     private static FlowGraph buildSubGraph(List<RecipeNode> selectedNodes, List<FlowGraph.ConnectionEdge> edges, Set<String> selectedIdSet) {
@@ -349,7 +379,8 @@ public final class FlowGraphModuleHandler {
         }
         var stats = FlowGraphSolver.getInputPortStats(subGraph, targetNode, edge.inputIndex());
         double suppliedInternally = stats != null ? stats.connectedRate() : 0.0;
-        return Math.max(0.0, targetNode.getInputSlotRate(edge.inputIndex(), true) - suppliedInternally);
+        double totalDemand = targetNode.getInputSlotRate(edge.inputIndex(), false);
+        return Math.max(0.0, totalDemand - suppliedInternally);
     }
 
     private static void allocateOutgoingBoundaryPorts(
@@ -373,8 +404,8 @@ public final class FlowGraphModuleHandler {
                         IngredientStack orig = sourceNode.getOutputs().get(edge.outputIndex());
                         double prodRate = determineOutgoingBoundaryRate(graph, subGraph, sourceNode, edge);
                         IngredientStack portStack = orig.isFluid()
-                                ? IngredientStack.fluid(orig.getId(), orig.getDisplayName(), prodRate, 1.0)
-                                : IngredientStack.item(orig.getId(), orig.getDisplayName(), prodRate, 1.0);
+                                 ? IngredientStack.fluid(orig.getId(), orig.getDisplayName(), prodRate, 1.0)
+                                 : IngredientStack.item(orig.getId(), orig.getDisplayName(), prodRate, 1.0);
                         modulePortIdx = moduleNode.getOutputs().size();
                         moduleNode.addOutput(portStack);
                         moduleNode.getModuleOutputOrigins().add(new ArrayList<>(List.of(
@@ -407,7 +438,8 @@ public final class FlowGraphModuleHandler {
         }
         var stats = FlowGraphSolver.getOutputPortStats(subGraph, sourceNode, edge.outputIndex());
         double demandedInternally = stats != null ? stats.connectedRate() : 0.0;
-        return Math.max(0.0, sourceNode.getOutputSlotRate(edge.outputIndex(), true) - demandedInternally);
+        double totalProduction = sourceNode.getOutputSlotRate(edge.outputIndex(), false);
+        return Math.max(0.0, totalProduction - demandedInternally);
     }
 
     private static void allocateUnconnectedNetInputs(
@@ -427,7 +459,7 @@ public final class FlowGraphModuleHandler {
                 if (inPortMap.containsKey(key)) continue;
 
                 IngredientStack orig = sn.getInputs().get(pInIdx);
-                double req = sn.getInputSlotRate(pInIdx, true);
+                double req = sn.getInputSlotRate(pInIdx, false);
                 var stats = FlowGraphSolver.getInputPortStats(subGraph, sn, pInIdx);
                 double suppliedInternally = stats != null ? stats.connectedRate() : 0.0;
                 double remainingDemand = Math.max(0.0, req - suppliedInternally);
@@ -479,7 +511,7 @@ public final class FlowGraphModuleHandler {
                 if (sn.isOutputPortVoided(pOutIdx)) continue;
 
                 IngredientStack orig = sn.getOutputs().get(pOutIdx);
-                double prod = sn.getOutputSlotRate(pOutIdx, true);
+                double prod = sn.getOutputSlotRate(pOutIdx, false);
                 var stats = FlowGraphSolver.getOutputPortStats(subGraph, sn, pOutIdx);
                 double demandedInternally = stats != null ? stats.connectedRate() : 0.0;
                 double remainingSurplus = Math.max(0.0, prod - demandedInternally);

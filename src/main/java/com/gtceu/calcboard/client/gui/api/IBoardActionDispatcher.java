@@ -37,7 +37,7 @@ public interface IBoardActionDispatcher {
 
     boolean isAnyModalOpen();
 
-    void onClose();
+    void closeScreen();
 
     void addNode(RecipeNode node);
 

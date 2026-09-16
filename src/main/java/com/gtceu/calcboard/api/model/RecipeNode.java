@@ -98,8 +98,81 @@ public class RecipeNode {
         return node;
     }
 
+    public RecipeNode(RecipeNode other) {
+        this(other, UUID.randomUUID().toString());
+    }
+
+    public RecipeNode(RecipeNode other, String newId) {
+        this(other, newId, Collections.newSetFromMap(new IdentityHashMap<>()), 0);
+    }
+
+    public RecipeNode(RecipeNode other, String newId, Set<FlowGraph> visitedGraphs, int depth) {
+        Objects.requireNonNull(other, "other node cannot be null");
+        this.id = newId != null ? newId : UUID.randomUUID().toString();
+        copyFieldsFrom(other, visitedGraphs, depth);
+    }
+
+    protected void copyFieldsFrom(RecipeNode other, Set<FlowGraph> visitedGraphs, int depth) {
+        this.posX = other.posX;
+        this.posY = other.posY;
+        this.isFlipped = other.isFlipped;
+        this.isBaseNode = other.isBaseNode;
+        this.baseSpec = other.baseSpec;
+
+        if (other.role != null) {
+            setRole(other.role.copy(visitedGraphs, depth));
+        }
+        this.name = other.name;
+        this.hasCustomName = other.hasCustomName;
+        this.cardWidth = other.cardWidth;
+        this.cardHeight = other.cardHeight;
+
+        this.inputs.clear();
+        for (IngredientStack stack : other.inputs) {
+            if (stack != null) {
+                this.inputs.add(stack.copy());
+            }
+        }
+        this.outputs.clear();
+        for (IngredientStack stack : other.outputs) {
+            if (stack != null) {
+                this.outputs.add(stack.copy());
+            }
+        }
+
+        this.portVisibility.copyFrom(other.portVisibility);
+        this.properties.copyFrom(other.properties);
+        this.properties.setChangeListener(() -> {
+            markPortsDirty();
+            markOverclockDirty();
+        });
+
+        markPortsDirty();
+        markOverclockDirty();
+        syncProjectedPorts();
+    }
+
     public RecipeNode copy() {
-        return deserializeNBT(serializeNBT());
+        return copy(UUID.randomUUID().toString());
+    }
+
+    public RecipeNode copy(String newId) {
+        return copy(newId, Collections.newSetFromMap(new IdentityHashMap<>()), 0);
+    }
+
+    public RecipeNode copy(Set<FlowGraph> visitedGraphs, int depth) {
+        return copy(UUID.randomUUID().toString(), visitedGraphs, depth);
+    }
+
+    public RecipeNode copy(String newId, Set<FlowGraph> visitedGraphs, int depth) {
+        if (this instanceof BoundaryPinNode pin) {
+            BoundaryPinNode cp = pin.getDirection() == BoundaryPinNode.PinDirection.OUTPUT
+                    ? new ModuleOutputPin(newId, pin.getPinLabel(), pin.getBoundIngredient())
+                    : new ModuleInputPin(newId, pin.getPinLabel(), pin.getBoundIngredient());
+            cp.copyFieldsFrom(this, visitedGraphs, depth);
+            return cp;
+        }
+        return new RecipeNode(this, newId, visitedGraphs, depth);
     }
 
     public INodeRole getRole() {

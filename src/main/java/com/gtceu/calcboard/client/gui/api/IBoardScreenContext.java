@@ -83,6 +83,12 @@ public interface IBoardScreenContext extends IBoardViewportAccessor, IBoardSelec
 
     void openPageSettingsDialog();
 
+    default void openPage(String pageId) {}
+
+    default void openPage(java.util.UUID pageId) {}
+
+    void openTutorialLauncher();
+
     void onNodeInspectorOpened();
 
     void onNodeInspectorClosed();

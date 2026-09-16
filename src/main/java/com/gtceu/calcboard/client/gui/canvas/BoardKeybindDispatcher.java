@@ -2,9 +2,11 @@ package com.gtceu.calcboard.client.gui.canvas;
 
 import com.gtceu.calcboard.client.gui.BoardHotkeyHandler;
 import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
 import com.gtceu.calcboard.client.gui.widget.NodeWidget;
 import com.gtceu.calcboard.integration.spi.RecipeViewerRegistry;
 import net.minecraft.client.Minecraft;
+import org.lwjgl.glfw.GLFW;
 
 /**
  * Handles keyboard event dispatching, shortcut routing, and dialog input focus prioritization.
@@ -13,6 +15,9 @@ public class BoardKeybindDispatcher {
 
     public static boolean handleKeyPressed(BoardScreen screen, int keyCode, int scanCode, int modifiers, int lastMouseX, int lastMouseY) {
         if (screen.getDialogManager() != null && screen.getDialogManager().handleKeyPressed(keyCode, scanCode, modifiers)) {
+            return true;
+        }
+        if (screen.isAnyModalOpen()) {
             return true;
         }
         if (screen.getPageTabBar() != null && screen.getPageTabBar().isEditing()) {
@@ -29,6 +34,13 @@ public class BoardKeybindDispatcher {
         if (RecipeViewerRegistry.isAnySearchFocused()) {
             return false;
         }
+        TutorialManager tutMgr = TutorialManager.getInstance();
+        if (tutMgr.isActive() && tutMgr.isStepActionCompleted()) {
+            if (keyCode == GLFW.GLFW_KEY_SPACE || keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER) {
+                tutMgr.nextStep();
+                return true;
+            }
+        }
         if (BoardHotkeyHandler.handleKeyPressed(screen, keyCode, scanCode, modifiers, lastMouseX, lastMouseY)) {
             return true;
         }
@@ -41,6 +53,9 @@ public class BoardKeybindDispatcher {
 
     public static boolean handleCharTyped(BoardScreen screen, char codePoint, int modifiers) {
         if (screen.getDialogManager() != null && screen.getDialogManager().handleCharTyped(codePoint, modifiers)) {
+            return true;
+        }
+        if (screen.isAnyModalOpen()) {
             return true;
         }
         if (screen.getPageTabBar() != null && screen.getPageTabBar().isEditing()) {

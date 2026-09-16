@@ -20,6 +20,7 @@ public class PageBrowserTreeModelTest {
     public void testModuleSubPageIsolationInTree() {
         BoardPage modulePage = new BoardPage("sub_epoxy", "Epoxy Module", new com.gtceu.calcboard.api.model.FlowGraph());
         modulePage.setPageType(PageType.MODULE);
+        modulePage.setParentPageId(BoardManager.getInstance().getActivePage().getId());
         BoardManager.getInstance().getPageManager().addPage(modulePage);
 
         PageBrowserTreeModel.FolderTreeNode tree = PageBrowserTreeModel.buildFolderTree("");

@@ -10,7 +10,9 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -343,5 +345,34 @@ public class SubPageModuleNodeRole implements INodeRole {
             effInChances,
             effOutChances
         );
+    }
+
+    @Override
+    public SubPageModuleNodeRole copy(Set<FlowGraph> visitedGraphs, int depth) {
+        SubPageModuleNodeRole cp = new SubPageModuleNodeRole(this.subPageId);
+        cp.containedMachineCount = this.containedMachineCount;
+        cp.scaleMultiplier = this.scaleMultiplier;
+        cp.efficiency = this.efficiency;
+        cp.baseEUt = this.baseEUt;
+        cp.baseDurationTicks = this.baseDurationTicks;
+        cp.targetTier = this.targetTier;
+        cp.isGenerator = this.isGenerator;
+        cp.energyType = this.energyType;
+        cp.inputPinNodeIds.addAll(this.inputPinNodeIds);
+        cp.outputPinNodeIds.addAll(this.outputPinNodeIds);
+        cp.portOriginManager.copyFrom(this.portOriginManager);
+
+        if (this.subGraph != null && depth < 10) {
+            cp.subGraph = this.subGraph.copy(copyVisitedGraphs(visitedGraphs), depth + 1);
+        }
+        return cp;
+    }
+
+    private static Set<FlowGraph> copyVisitedGraphs(Set<FlowGraph> src) {
+        Set<FlowGraph> copy = Collections.newSetFromMap(new IdentityHashMap<>());
+        if (src != null) {
+            copy.addAll(src);
+        }
+        return copy;
     }
 }

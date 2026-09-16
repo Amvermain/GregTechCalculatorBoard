@@ -21,6 +21,7 @@ public final class NodeMultiblockHelper {
 
     public static void configureMultiblock(RecipeNode node, boolean multiblock) {
         if (multiblock) {
+            node.setCustomParallel(0);
             if (node.getSteamMode().isSteam()) {
                 node.setSteamMode(SteamMode.NONE);
             }
@@ -47,6 +48,7 @@ public final class NodeMultiblockHelper {
                 }
             }
             node.setParallel(1);
+            node.setCustomParallel(0);
             node.getAddons().removeIf(a -> a.getCategory() == MachineAddon.Category.COIL
                     || a.getCategory() == MachineAddon.Category.MULTIBLOCK_TRAIT
                     || a.getCategory() == MachineAddon.Category.THREADING

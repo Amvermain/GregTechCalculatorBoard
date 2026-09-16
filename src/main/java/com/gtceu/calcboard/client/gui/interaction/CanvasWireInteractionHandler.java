@@ -15,6 +15,8 @@ import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraftforge.common.MinecraftForge;
+import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
+import com.gtceu.calcboard.client.util.ClientSafetyHelper;
 
 public class CanvasWireInteractionHandler {
 
@@ -92,8 +94,8 @@ public class CanvasWireInteractionHandler {
 
         if (button != 0) return false;
 
-        boolean ctrl = Screen.hasControlDown();
-        boolean shift = Screen.hasShiftDown();
+        boolean ctrl = ClientSafetyHelper.isControlDown();
+        boolean shift = ClientSafetyHelper.isShiftDown();
         String nodeId = widget.getNode().getId();
 
         if (ctrl) {
@@ -120,14 +122,17 @@ public class CanvasWireInteractionHandler {
         if (!screen.ensureEditPermission()) return true;
 
         if (button == 1) {
+            if (ClientSafetyHelper.isShiftDown()) {
+                return scaleLoopOnShiftClick(widget, inPortIdx, screen);
+            }
             widget.hidePortAndDisconnectWires(true, inPortIdx);
             return true;
         }
 
         if (button != 0) return false;
 
-        boolean ctrl = Screen.hasControlDown();
-        boolean shift = Screen.hasShiftDown();
+        boolean ctrl = ClientSafetyHelper.isControlDown();
+        boolean shift = ClientSafetyHelper.isShiftDown();
         String nodeId = widget.getNode().getId();
 
         if (ctrl) {
@@ -270,6 +275,7 @@ public class CanvasWireInteractionHandler {
             if (screen.getWireRenderer() != null) {
                 screen.getWireRenderer().markDirty();
             }
+            TutorialManager.getInstance().onWirePriorityChanged(hoveredEdge, newPri);
             playPriorityChangeFeedback(newPri);
         }
         return true;
@@ -345,5 +351,22 @@ public class CanvasWireInteractionHandler {
             }
             ConnectionRenderer.renderBezier(graphics, (float) startX, (float) startY, (float) canvasMouseX, (float) canvasMouseY, wireColor, 2.5F);
         }
+    }
+
+    private boolean scaleLoopOnShiftClick(NodeWidget widget, int inPortIdx, BoardScreen screen) {
+        if (screen == null || screen.getGraph() == null || widget == null) {
+            return true;
+        }
+        var stats = screen.getGraph().getInputPortStats(widget.getNode(), inPortIdx);
+        if (stats != null && stats.isSteadyStateRecirculating()) {
+            screen.scaleLoopToSteadyState(widget.getNode().getId());
+            return true;
+        }
+        var meta = com.gtceu.calcboard.api.solver.FlowBalanceMatrixSolver.findDampedLoopMetaForNode(screen.getGraph(), widget.getNode());
+        if (meta != null) {
+            screen.scaleLoopToSteadyState(widget.getNode().getId());
+            return true;
+        }
+        return true;
     }
 }

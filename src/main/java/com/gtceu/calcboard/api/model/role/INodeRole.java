@@ -50,4 +50,10 @@ public interface INodeRole {
     void deserializeRoleNBT(CompoundTag tag);
 
     NodeCalculationSnapshot captureSnapshot(FlowGraph graph);
+
+    default INodeRole copy() {
+        return copy(Collections.newSetFromMap(new IdentityHashMap<>()), 0);
+    }
+
+    INodeRole copy(Set<FlowGraph> visitedGraphs, int depth);
 }

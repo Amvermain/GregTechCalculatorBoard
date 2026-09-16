@@ -7,7 +7,7 @@
 > 📘 **Detailed Technical Specification Series**:
 > * 🇰🇷 **Korean Edition**: [docs/ko_kr/CODE_SPECIFICATION.md](ko_kr/CODE_SPECIFICATION.md)
 > * 🇺🇸 **English Edition**: [docs/en_us/CODE_SPECIFICATION.md](en_us/CODE_SPECIFICATION.md)
-> The complete v2.2.1 architecture specifications, 5 graph algorithms, Gauss-Jordan mass balance linear solver, `CategoryCapabilityMatrix`, and 2-tier on-demand streaming protocol are documented in the links above.
+> The complete v2.3.0 architecture specifications, 5 graph algorithms, Gauss-Jordan mass balance linear solver, `CategoryCapabilityMatrix`, and 2-tier on-demand streaming protocol are documented in the links above.
 
 This document describes the internal architecture, mathematical solver engine, canvas rendering pipeline, and multi-mod compatibility layer (SPI) of **GregTech Calculator Board**.
 
@@ -60,6 +60,7 @@ graph TD
             TH["thermal (AugmentData, Tier Kits, Dynamos, RF/t)"]
             SY["systeams (Boilers, Steam Dynamos, Steam mB/s)"]
             ST["start (StarTReflectionBridge, Plasma Turbines, Threading Helix Structures, SPT/NPT Traits)"]
+            TFG["tfg (TerraFirmaGreg Large Boilers, physics.TFGBoilerPhysics, Booster Fluids)"]
             VN["vanilla (Passive Unpowered Fallback)"]
         end
         SPI --> Adapters
@@ -202,6 +203,38 @@ The Core Domain Engine (`com.gtceu.calcboard.api`) and Common Mod Adapters (`com
 ### 2.23 Star Technology Modular Combustion Complex (MCF) Integration (ADR-013)
 * **Single Macro Node Model**: Models Star Technology's Modular Combustion Frame and up to 8 docked combustion/rocket modules within a unified macro node.
 * **Centralized Coolant Consumption**: Derives common coolant demand proportionally across active module slots into a single external port, while aggregating complete frame and module blocks in the Multiblock BOM.
+
+### 2.24 Team Workspace Common Domain Models & Layer Inversion Resolution (ADR-051)
+* **API Domain Common DTOs**: Relocated `TeamWorkspacePage` and `CommitLogEntry` to `com.gtceu.calcboard.api.team`, eliminating reverse dependencies from Client GUI classes to Server Storage.
+* **Strict Unidirectional Layer Boundaries**: Enforces `Client -> API/Team/Net`, `Server -> API/Team`, and `Network -> API/Team` contracts with zero direct client-server cross-coupling.
+
+### 2.25 Chunked Payload Reception Upper-Bound Guard & DoS Defense (ADR-052)
+* **Payload Size & Chunk Bounds**: `ServerChunkedPayloadAssembler` enforces a hard upper bound of 128 chunks (64MB total payload) per assembly session to prevent server memory exhaustion.
+* **Defensive Assembly State Guards**: Rejects out-of-order chunk sequences, negative indices, and oversize fragments with early error returns and session eviction.
+
+### 2.26 NodeInspectorPanel SRP Decomposition into 4 Sub-Inspectors (ADR-053)
+* **Single Responsibility Decomposition**: Refactored the monolithic 1,199-line inspector panel into a lightweight host container (170 lines) delegating to 4 focused sub-inspectors: `MachineNodeInspector`, `JunctionNodeInspector`, `BoundaryPinInspector`, and `PageSettingsInspector`.
+* **Isolated Sub-Component State**: Encapsulates widget lifecycles, chip grids, and input validation within independent component boundaries.
+
+### 2.27 Solver Control Flow Flattening & Guard Clauses (ADR-054)
+* **Flattened Nesting**: Flattened deep loop and conditional nesting across `FlowSummaryAggregator` and `MassBalanceSolver` to a maximum depth of 2, enforcing early guard returns.
+* **Shallow Mathematical Helpers**: Extracted complex equation solvers and balance checks into shallow, self-describing private utility methods.
+
+### 2.28 RecipeNode Direct Memory Copy Constructor Optimization (ADR-055)
+* **Zero-Serialization Direct Copying**: Replaced legacy `deserializeNBT(serializeNBT())` clipboard cloning with a dedicated copy constructor `RecipeNode(RecipeNode other, String newId, Set<FlowGraph> visitedGraphs, int depth)`.
+* **Cycle Guard & Role Polymorphism**: Preserves immutable `baseSpec` references, performs polymorphic `INodeRole.copy()`, and prevents graph recursion through cycle detection sets and depth clamping.
+
+### 2.29 3-Track Modular Academy & Contextual Tutorial Architecture (ADR-056)
+* **3-Track Progressive Onboarding**: Structures onboarding into a 45-second beginner starter tutorial, 4 independent academy chapters (ratio solving, wiring, module subpages, workspace collaboration), and non-intrusive contextual nudges.
+* **Step Result Feedback & Persistence**: Introduces step completion result states allowing players to review canvas outcomes, while persisting placed machines and connections across tutorial stages.
+
+### 2.30 TerraFirmaGreg (TFG) Large Boiler Booster Mechanism & Non-Linear Physics (ADR-057)
+* **Dedicated TFG Physical Model**: Simulates TFG Large Bronze (480PU) and Steel Boilers (1280PU) with 9 booster catalyst fluids and dual-fuel Super Boiler secondary mode.
+* **Non-Linear Water Consumption Curve**: Implements non-linear water consumption scaling with a 1.5-power exponent above 480PU, preventing under-allocation and in-game boiler explosions.
+
+### 2.31 Canvas Defensive State Copying & Modal Hotkey Isolation (ADR-058)
+* **Defensive Element Snapshotting**: Canvas container returns defensive copies of child collections to prevent concurrent modification during page transitions and graph mutation.
+* **Modal Hotkey Interception**: Blocks background canvas shortcut routing (Delete, Backspace, Ctrl+Z) while modal dialogs or configuration panels are active.
 
 ---
 

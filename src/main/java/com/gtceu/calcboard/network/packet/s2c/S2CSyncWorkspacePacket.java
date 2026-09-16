@@ -1,8 +1,8 @@
 package com.gtceu.calcboard.network.packet.s2c;
 
-import com.gtceu.calcboard.server.storage.CommitLogEntry;
+import com.gtceu.calcboard.api.team.CommitLogEntry;
+import com.gtceu.calcboard.api.team.TeamWorkspacePage;
 import com.gtceu.calcboard.server.storage.TeamWorkspaceData;
-import com.gtceu.calcboard.server.storage.TeamWorkspacePage;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.fml.DistExecutor;

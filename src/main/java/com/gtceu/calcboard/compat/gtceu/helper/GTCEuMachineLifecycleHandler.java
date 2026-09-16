@@ -58,6 +58,7 @@ public final class GTCEuMachineLifecycleHandler {
             }
         } else {
             node.setMultiblock(false);
+            node.setCustomParallel(0);
             if (node.getParallel() > 1 && oldIcon != null && MultiblockDetector.isMultiblock(oldIcon)) {
                 node.setParallel(1);
             }
@@ -325,6 +326,9 @@ public final class GTCEuMachineLifecycleHandler {
     }
 
     public static double computeEffectiveIngredientRate(RecipeNode node, IngredientStack stack, boolean isInput, double defaultRate) {
+        if (com.gtceu.calcboard.compat.tfg.TFGBoilerPhysics.isTFGLargeBoiler(node)) {
+            return com.gtceu.calcboard.compat.tfg.TFGBoilerPhysics.computeEffectiveIngredientRate(node, stack, isInput, defaultRate);
+        }
         if (!isInput || stack == null || !stack.isFluid() || stack.getId() == null) {
             return defaultRate;
         }
@@ -346,6 +350,9 @@ public final class GTCEuMachineLifecycleHandler {
     }
 
     public static double computeSingleMachineIngredientRate(RecipeNode node, IngredientStack stack, boolean isInput, double defaultRate) {
+        if (com.gtceu.calcboard.compat.tfg.TFGBoilerPhysics.isTFGLargeBoiler(node)) {
+            return com.gtceu.calcboard.compat.tfg.TFGBoilerPhysics.computeSingleMachineIngredientRate(node, stack, isInput, defaultRate);
+        }
         if (!isInput || stack == null || !stack.isFluid() || stack.getId() == null) {
             return defaultRate;
         }

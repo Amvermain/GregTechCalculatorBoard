@@ -59,6 +59,10 @@ public final class FlowGraphSolver {
             return getRatio() * 100.0;
         }
 
+        public double surplusRate() {
+            return Math.max(0.0, requiredOrProducedRate - connectedRate);
+        }
+
         public boolean isBalanced() {
             return isConnected && Math.abs(connectedRate - requiredOrProducedRate) <= 0.001;
         }
@@ -116,6 +120,10 @@ public final class FlowGraphSolver {
 
     public static int autoRatioFromSharedPool(FlowGraph graph, CanvasGroupFrame poolFrame, double targetMachines, AutoRatioMode mode) {
         return FlowBalanceMatrixSolver.autoRatioFromSharedPool(graph, poolFrame, targetMachines, mode);
+    }
+
+    public static int autoRatioFromGroupFrame(FlowGraph graph, CanvasGroupFrame frame, AutoRatioMode mode) {
+        return GroupAutoRatioEngine.executeGroupAutoRatio(graph, frame, mode);
     }
 
     /**

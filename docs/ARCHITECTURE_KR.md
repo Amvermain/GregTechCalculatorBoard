@@ -7,7 +7,7 @@
 > 📘 **상세 코드 명세서 시리즈**:
 > * 🇰🇷 **한국어 에디션**: [docs/ko_kr/CODE_SPECIFICATION.md](ko_kr/CODE_SPECIFICATION.md)
 > * 🇺🇸 **영문 에디션**: [docs/en_us/CODE_SPECIFICATION.md](en_us/CODE_SPECIFICATION.md)
-> 전체 v2.2.1 아키텍처 명세서, 5대 그래프 알고리즘, 폐루프 질량 보존 가우스-요르단 선형 솔버, `CategoryCapabilityMatrix`, 및 2계층 온디맨드 멀티플레이어 스트리밍 프로토콜은 위 링크에서 확인할 수 있습니다.
+> 전체 v2.3.0 아키텍처 명세서, 5대 그래프 알고리즘, 폐루프 질량 보존 가우스-요르단 선형 솔버, `CategoryCapabilityMatrix`, 및 2계층 온디맨드 멀티플레이어 스트리밍 프로토콜은 위 링크에서 확인할 수 있습니다.
 
 본 문서는 **GregTech Calculator Board (그렉텍 계산기 보드)**의 내부 시스템 아키텍처, 수학적 솔버 엔진, 캔버스 렌더링 파이프라인, 및 멀티 모드 호환성 계층(SPI)을 설명합니다.
 
@@ -60,6 +60,7 @@ graph TD
             TH["thermal (AugmentData, 티어 키트, 다이나모, RF/t)"]
             SY["systeams (보일러, 증기 다이나모, 증기 mB/s)"]
             ST["start (StarTReflectionBridge, 플라즈마 터빈, 스레딩 헬릭스 구조체, SPT/NPT 특성)"]
+            TFG["tfg (TerraFirmaGreg 대형 보일러, physics.TFGBoilerPhysics, 부스터 유체)"]
             VN["vanilla (무전력 패시브 폴백)"]
         end
         SPI --> Adapters
@@ -202,6 +203,38 @@ graph TD
 ### 2.23 Star Technology 모듈러 연소 복합체(MCF) 매크로 노드 통합 (ADR-013)
 * **단일 매크로 노드 모델**: Star Technology의 모듈러 연소 프레임과 최대 8대의 결합 모듈을 단일 노드로 통합 모델링했습니다.
 * **중앙 냉각수 단일 포트 소모**: 활성 모듈 수에 비례한 공통 냉각수 요구량을 단일 외부 포트로 도출하고, 프레임 및 결합 모듈의 전체 건축 자재(BOM)를 일괄 산출합니다.
+
+### 2.24 팀 워크스페이스 공통 도메인 모델 분리 및 계층 역전 해소 (ADR-051)
+* **API 도메인 공통 DTO 이전**: `TeamWorkspacePage`와 `CommitLogEntry`를 `com.gtceu.calcboard.api.team`으로 이전하여 클라이언트 GUI 클래스가 서버 스토리지 패키지를 역참조하던 아키텍처 위반을 해소했습니다.
+* **단방향 계층 경계 확립**: `Client -> API/Team/Net`, `Server -> API/Team`, `Network -> API/Team` 계약을 확립하여 클라이언트와 서버 간 직접 결합도를 0%로 격리했습니다.
+
+### 2.25 청크 페이로드 수신 상한 가드 및 서버 메모리 DoS 방어 (ADR-052)
+* **페이로드 크기 및 청크 상한선**: `ServerChunkedPayloadAssembler`에 세션당 최대 128청크(총 64MB)의 엄격한 상한선을 설정하여 악의적이거나 비정상적인 대용량 업로드로부터 서버 힙 메모리를 보호합니다.
+* **방어적 수신 상태 가드**: 비정상적인 청크 순서, 음수 인덱스, 규격 초과 조각을 조기에 감지하여 오류 응답 및 세션 즉시 퇴출을 수행합니다.
+
+### 2.26 NodeInspectorPanel 단일 책임 원칙(SRP) 기반 4대 서브 컴포넌트 분해 (ADR-053)
+* **단일 책임 분해**: 1,199줄의 거대 인스펙터 패널을 경량 호스트 컨테이너(170줄)와 4대 서브 인스펙터(`MachineNodeInspector`, `JunctionNodeInspector`, `BoundaryPinInspector`, `PageSettingsInspector`)로 분해했습니다.
+* **컴포넌트별 상태 캡슐화**: 위젯 생명주기, 티어 칩 그리드, 입력 유효성 검증 로직을 독립된 서브 컴포넌트 내부로 안전하게 격리했습니다.
+
+### 2.27 솔버 및 어댑터 제어 흐름 평탄화 및 Rule 1 준수 (ADR-054)
+* **중첩 평탄화**: `FlowSummaryAggregator` 및 `MassBalanceSolver` 전반의 루프 및 조건문 중첩 깊이를 최대 2단계 이하로 평탄화하고 조기 가드 반환을 철저히 적용했습니다.
+* **단일 책임 수학 헬퍼**: 복잡한 연립방정식 및 유량 수지 검사를 서술적인 얕은 헬퍼 메서드로 분리하여 코드 가독성을 극대화했습니다.
+
+### 2.28 RecipeNode 직접 메모리 복제 생성자 최적화 (ADR-055)
+* **직렬화 없는 직접 복제**: 기존의 `deserializeNBT(serializeNBT())` 왕복 I/O 및 GC 부하를 제거하고 전용 복제 생성자 `RecipeNode(RecipeNode other, String newId, Set<FlowGraph> visitedGraphs, int depth)`를 도입했습니다.
+* **순환 참조 가드 및 역할 다형성**: 불변 `baseSpec` 참조 공유, `INodeRole.copy()` 다형성 복제 및 순환 그래프 방문 가드 세트를 통해 도메인 불변식을 보장합니다.
+
+### 2.29 3-트랙 모듈형 아카데미 및 맥락형 튜토리얼 아키텍처 (ADR-056)
+* **3-트랙 점진적 온보딩**: 45초 기초 스타터 튜토리얼, 4대 독립 아카데미 챕터(비율 연산, 배선 제어, 복합 모듈, 워크스페이스 협업), 인게임 맥락형 팁으로 구조화했습니다.
+* **단계별 피드백 및 결과 연속성**: 조작 완료 시 캔버스 변경 결과를 확인할 수 있는 안내 상태를 도입하고, 단계 전환 시 기존에 배치한 기계와 배선이 자연스럽게 유지되도록 개선했습니다.
+
+### 2.30 TerraFirmaGreg(TFG) 대형 보일러 부스터 메커니즘 및 비선형 물리 모델 (ADR-057)
+* **독립 TFG 물리 모델**: TFG 대형 청동 보일러(480PU) 및 대형 강철 보일러(1280PU)의 9종 부스터 촉매 유체와 수퍼 보일러(Dual Fuel) 모드를 완벽히 지원합니다.
+* **비선형 물 소모 곡선**: 480PU 초과 구간에서 물 소모량이 1.5승으로 비선형 급증하는 수식을 정확히 시뮬레이션하여 보일러 폭발 위험을 예방합니다.
+
+### 2.31 캔버스 방어 복사 및 모달 활성 시 핫키 격리 (ADR-058)
+* **자식 요소 방어 복사본 반환**: 페이지 전환이나 동적 노드 추가/삭제 중 동시 수정 오류를 방지하기 위해 캔버스 컨테이너가 자식 컬렉션의 안전한 방어 복사본을 반환합니다.
+* **모달 핫키 차단**: 설정 창이나 다이얼로그가 열려 있을 때 캔버스 배경 노드가 단축키(Delete, Backspace, Ctrl+Z)에 반응하지 않도록 완벽히 격리했습니다.
 
 ---
 

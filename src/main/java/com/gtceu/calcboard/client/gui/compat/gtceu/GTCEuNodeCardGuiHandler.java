@@ -32,6 +32,7 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -108,16 +109,20 @@ public class GTCEuNodeCardGuiHandler {
 
         int nextRelX = 6;
         if (isBoiler(node)) {
-            GTBoilerTier boilerTier = GTBoilerTier.getBoilerTier(node);
-            String boilerText = boilerTier.getDisplayName();
-            if (boilerTier.isMultiblock() && node.getBoilerThrottle() < 100) {
-                boilerText += " (" + node.getBoilerThrottle() + "%)";
+            if (com.gtceu.calcboard.compat.tfg.TFGBoilerPhysics.isTFGLargeBoiler(node)) {
+                nextRelX = populateTFGBoilerButtons(widget, font, node, cardW, isOperational, nextRelX, buttons);
+            } else {
+                GTBoilerTier boilerTier = GTBoilerTier.getBoilerTier(node);
+                String boilerText = boilerTier.getDisplayName();
+                if (boilerTier.isMultiblock() && node.getBoilerThrottle() < 100) {
+                    boilerText += " (" + node.getBoilerThrottle() + "%)";
+                }
+                int textW = font.width(boilerText);
+                int tierBtnW = Math.max(54, textW + 8);
+                int boilerColor = !isOperational ? 0xFFFF8888 : boilerTier.getColor();
+                buttons.add(new com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button(nextRelX, tierBtnW, boilerText, textW, boilerColor, !isOperational, false, com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button.ButtonRole.TIER, null));
+                nextRelX += tierBtnW + 4;
             }
-            int textW = font.width(boilerText);
-            int tierBtnW = Math.max(54, textW + 8);
-            int boilerColor = !isOperational ? 0xFFFF8888 : boilerTier.getColor();
-            buttons.add(new com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button(nextRelX, tierBtnW, boilerText, textW, boilerColor, !isOperational, false, com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button.ButtonRole.TIER, null));
-            nextRelX += tierBtnW + 4;
         } else if (!node.isMultiblock() && node.getSteamMode() != null && node.getSteamMode().isSteam()) {
             String steamText = node.getSteamMode().getDisplayName();
             int textW = font.width(steamText);
@@ -237,6 +242,74 @@ public class GTCEuNodeCardGuiHandler {
         int parW = Math.max(46, (cardW - 6) - nextRelX);
         int configColor = !node.getAddons().isEmpty() ? 0xFF55FFFF : 0xFF58D3FF;
         buttons.add(new com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button(nextRelX, parW, parLabel, parTextW, configColor, !isOperational, false, com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button.ButtonRole.CONFIG, null));
+    }
+
+    private int populateTFGBoilerButtons(NodeWidget widget, Font font, RecipeNode node, int cardW, boolean isOperational, int nextRelX, List<com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button> buttons) {
+        boolean isSteel = com.gtceu.calcboard.compat.tfg.TFGBoilerPhysics.isSteelBoiler(node);
+        String tierText = isSteel ? "★ L-Steel (1280PU)" : "♨ L-Bronze (480PU)";
+        int textW = font.width(tierText);
+        int tierBtnW = Math.max(54, textW + 8);
+        int tierColor = !isOperational ? 0xFFFF8888 : (isSteel ? 0xFFAAAAAA : 0xFFD28C38);
+        buttons.add(new com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button(nextRelX, tierBtnW, tierText, textW, tierColor, !isOperational, false, com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button.ButtonRole.TIER, null));
+        nextRelX += tierBtnW + 4;
+
+        int throttle = node.getBoilerThrottle();
+        String thrText = throttle + "% Thr";
+        int thrW = font.width(thrText);
+        int thrBtnW = thrW + 8;
+        if (nextRelX + thrBtnW <= cardW - 10) {
+            List<Component> thrTooltip = List.of(
+                    Component.literal("§e⚡ Throttle: §f" + throttle + "%"),
+                    Component.literal("§8Click to cycle presets (25%, 50%, 75%, 100%)")
+            );
+            buttons.add(new com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button(nextRelX, thrBtnW, thrText, thrW, 0xFF58D3FF, false, false, com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button.ButtonRole.BADGE, new NodeBadge(thrText, 0xFF58D3FF, 0xAA1E222D, 0xFF353C4D, thrTooltip, false, () -> cycleThrottle(widget, node))));
+            nextRelX += thrBtnW + 4;
+        }
+
+        var booster = com.gtceu.calcboard.compat.tfg.TFGBoilerPhysics.getActiveBooster(node);
+        String boosterText = booster.index() > 0 ? ("🚀 " + com.gtceu.calcboard.compat.tfg.TFGBoilerPhysics.resolveBoosterName(booster) + " (+" + booster.pressureBonus() + "PU)") : "🚀 None";
+        int bTextW = font.width(boosterText);
+        int bBtnW = bTextW + 8;
+        if (nextRelX + bBtnW <= cardW - 10) {
+            List<Component> bTooltip = new ArrayList<>();
+            com.gtceu.calcboard.compat.tfg.TFGBoilerPhysics.buildBoosterTooltip(node, bTooltip);
+            buttons.add(new com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button(nextRelX, bBtnW, boosterText, bTextW, booster.index() > 0 ? 0xFFFFD700 : 0xFFCCCCCC, false, false, com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button.ButtonRole.BADGE, new NodeBadge(boosterText, booster.index() > 0 ? 0xFFFFD700 : 0xFFCCCCCC, 0xAA1E222D, booster.index() > 0 ? 0xFF58D3FF : 0xFF353C4D, bTooltip, false, () -> {
+                com.gtceu.calcboard.compat.tfg.TFGBoilerPhysics.cycleBooster(node, 1);
+                refreshWidgetAndFrame(widget, node);
+            })));
+            nextRelX += bBtnW + 4;
+        }
+
+        int waterTier = node.getProperties().get(com.gtceu.calcboard.compat.tfg.TFGBoilerProperties.WATER_TIER);
+        String wText = waterTier == 1 ? "💧 Purified" : "💧 Standard";
+        int wTextW = font.width(wText);
+        int wBtnW = wTextW + 8;
+        if (nextRelX + wBtnW <= cardW - 10) {
+            List<Component> wTooltip = List.of(
+                    Component.literal("§b💧 Water Quality: §f" + (waterTier == 1 ? "Distilled Water (1.5x Boost)" : "River Water (1.0x)")),
+                    Component.literal("§8Click to toggle between Standard and Distilled Water")
+            );
+            buttons.add(new com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button(nextRelX, wBtnW, wText, wTextW, waterTier == 1 ? 0xFF38BDF8 : 0xFF88AAFF, false, false, com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button.ButtonRole.BADGE, new NodeBadge(wText, waterTier == 1 ? 0xFF38BDF8 : 0xFF88AAFF, 0xAA1E222D, waterTier == 1 ? 0xFF38BDF8 : 0xFF353C4D, wTooltip, false, () -> {
+                com.gtceu.calcboard.compat.tfg.TFGBoilerPhysics.cycleWaterTier(node);
+                refreshWidgetAndFrame(widget, node);
+            })));
+            nextRelX += wBtnW + 4;
+        }
+
+        return nextRelX;
+    }
+
+    private void cycleThrottle(NodeWidget widget, RecipeNode node) {
+        int cur = node.getBoilerThrottle();
+        int next = switch (cur) {
+            case 25 -> 50;
+            case 50 -> 75;
+            case 75 -> 100;
+            default -> 25;
+        };
+        node.setBoilerThrottle(next);
+        com.gtceu.calcboard.compat.tfg.TFGBoilerPhysics.syncDynamicPorts(node);
+        refreshWidgetAndFrame(widget, node);
     }
 
     public boolean handleControlClick(NodeWidget widget, RecipeNode node, double mouseX, double mouseY, int button) {

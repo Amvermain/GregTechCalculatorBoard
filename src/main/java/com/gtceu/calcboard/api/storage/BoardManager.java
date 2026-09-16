@@ -253,6 +253,7 @@ public class BoardManager {
     public void removePageLifecycleListener(IPageLifecycleListener listener) { pageManager.removePageLifecycleListener(listener); }
     public void setPageRemovalListener(Consumer<BoardPage> listener) { pageManager.setPageRemovalListener(listener); }
     public void notifyFolderCreated(String folderPath) { pageManager.notifyFolderCreated(folderPath); }
+    public void cleanupOrphanSubpages() { pageManager.cleanupOrphanSubpages(); }
 
     // Persistence & File I/O
     public boolean saveToFile(File file) {

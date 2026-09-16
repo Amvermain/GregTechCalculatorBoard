@@ -89,6 +89,7 @@ public class CategoryMachinePreset {
         }
 
         // 4. Parallel & Overclock Mode
+        node.setCustomParallel(0);
         if (this.parallel > 1) {
             node.setParallel(this.parallel);
         }

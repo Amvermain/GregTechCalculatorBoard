@@ -27,7 +27,7 @@ import com.gtceu.calcboard.client.gui.dialog.modal.ModalRenderContext;
 
 import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.client.team.ClientWorkspaceState;
-import com.gtceu.calcboard.server.storage.TeamWorkspacePage;
+import com.gtceu.calcboard.api.team.TeamWorkspacePage;
 
 import java.util.*;
 

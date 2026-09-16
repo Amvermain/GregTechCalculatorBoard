@@ -18,16 +18,19 @@ public final class GTBoilerPhysics {
     public static final net.minecraft.resources.ResourceLocation LARGE_BOILER_RECIPE = net.minecraft.resources.ResourceLocation.tryParse("gtceu:large_boiler");
     public static final net.minecraft.resources.ResourceLocation SYSTEAMS_BOILING_RECIPE = net.minecraft.resources.ResourceLocation.tryParse("systeams:boiling");
     public static final net.minecraft.resources.ResourceLocation SYSTEAMS_STEAM_BOILER_RECIPE = net.minecraft.resources.ResourceLocation.tryParse("systeams:steam_boiler");
+    public static final net.minecraft.resources.ResourceLocation SUPER_BOILER_RECIPE = net.minecraft.resources.ResourceLocation.tryParse("gtceu:super_boiler");
 
     private static final java.util.Set<net.minecraft.resources.ResourceLocation> BOILER_CATEGORIES = java.util.Set.of(
             STEAM_BOILER_RECIPE,
             LARGE_BOILER_RECIPE,
             SYSTEAMS_BOILING_RECIPE,
-            SYSTEAMS_STEAM_BOILER_RECIPE
+            SYSTEAMS_STEAM_BOILER_RECIPE,
+            SUPER_BOILER_RECIPE
     );
 
     private static final java.util.Set<net.minecraft.resources.ResourceLocation> LARGE_BOILER_CATEGORIES = java.util.Set.of(
-            LARGE_BOILER_RECIPE
+            LARGE_BOILER_RECIPE,
+            SUPER_BOILER_RECIPE
     );
 
     private static final java.util.Set<net.minecraft.resources.ResourceLocation> BOILER_MACHINES = java.util.Set.of(
@@ -43,6 +46,8 @@ public final class GTBoilerPhysics {
             net.minecraft.resources.ResourceLocation.tryParse("gtceu:large_steel_boiler"),
             net.minecraft.resources.ResourceLocation.tryParse("gtceu:large_titanium_boiler"),
             net.minecraft.resources.ResourceLocation.tryParse("gtceu:large_tungstensteel_boiler"),
+            net.minecraft.resources.ResourceLocation.tryParse("tfg:large_bronze_boiler"),
+            net.minecraft.resources.ResourceLocation.tryParse("tfg:large_steel_boiler"),
             net.minecraft.resources.ResourceLocation.tryParse("systeams:lapidary_boiler"),
             net.minecraft.resources.ResourceLocation.tryParse("systeams:stirling_boiler"),
             net.minecraft.resources.ResourceLocation.tryParse("systeams:compression_boiler"),
@@ -56,7 +61,9 @@ public final class GTBoilerPhysics {
             net.minecraft.resources.ResourceLocation.tryParse("gtceu:large_bronze_boiler"),
             net.minecraft.resources.ResourceLocation.tryParse("gtceu:large_steel_boiler"),
             net.minecraft.resources.ResourceLocation.tryParse("gtceu:large_titanium_boiler"),
-            net.minecraft.resources.ResourceLocation.tryParse("gtceu:large_tungstensteel_boiler")
+            net.minecraft.resources.ResourceLocation.tryParse("gtceu:large_tungstensteel_boiler"),
+            net.minecraft.resources.ResourceLocation.tryParse("tfg:large_bronze_boiler"),
+            net.minecraft.resources.ResourceLocation.tryParse("tfg:large_steel_boiler")
     );
 
     private static final java.util.Set<net.minecraft.resources.ResourceLocation> LIQUID_BOILER_MACHINES = java.util.Set.of(
@@ -115,6 +122,9 @@ public final class GTBoilerPhysics {
 
     public static double getBoilerSpeedMultiplier(RecipeNode node) {
         if (node == null) return 1.0;
+        if (com.gtceu.calcboard.compat.tfg.TFGBoilerPhysics.isTFGLargeBoiler(node)) {
+            return com.gtceu.calcboard.compat.tfg.TFGBoilerPhysics.getBoilerSpeedMultiplier(node);
+        }
         GTBoilerTier bt = GTBoilerTier.getBoilerTier(node);
         boolean isLiquid = isLiquidBoilerRecipe(node);
         boolean isLargeBoiler = isLargeBoilerRecipe(node);

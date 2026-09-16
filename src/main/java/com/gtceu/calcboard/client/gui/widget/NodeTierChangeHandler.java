@@ -63,6 +63,12 @@ public final class NodeTierChangeHandler {
     }
 
     private static boolean changeBoilerTier(NodeWidget widget, RecipeNode node, IBoardScreenContext parent, int direction) {
+        if (com.gtceu.calcboard.compat.tfg.TFGBoilerPhysics.isTFGLargeBoiler(node)) {
+            com.gtceu.calcboard.compat.tfg.TFGBoilerPhysics.toggleBoilerTier(node);
+            if (parent != null) parent.markSummaryDirty();
+            widget.invalidateCache();
+            return true;
+        }
         GTBoilerTier curTier = GTBoilerTier.getBoilerTier(node);
         GTBoilerTier[] vals = GTBoilerTier.values();
         int newIdx = (curTier.ordinal() + direction + vals.length) % vals.length;

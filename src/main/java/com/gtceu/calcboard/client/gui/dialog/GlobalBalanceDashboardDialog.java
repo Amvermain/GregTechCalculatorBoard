@@ -12,6 +12,7 @@ import com.gtceu.calcboard.client.gui.render.NodeCardRenderer;
 import com.gtceu.calcboard.client.gui.util.BoardScissorHelper;
 import com.gtceu.calcboard.client.gui.util.FormatUtil;
 import com.gtceu.calcboard.client.gui.widget.ItemContributionPopup;
+import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -101,6 +102,7 @@ public class GlobalBalanceDashboardDialog implements IBoardModal {
         }
         searchBox.setValue("");
         this.searchQuery = "";
+        TutorialManager.getInstance().onGlobalBalanceOpened();
     }
 
     public void close() {

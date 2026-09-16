@@ -7,6 +7,7 @@ import net.minecraft.nbt.Tag;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -43,7 +44,19 @@ public class BoardPageManager {
         if (pages.isEmpty()) {
             pages.add(BoardPage.createDefault("Page 1"));
         }
+        if (hasAnyModuleSubPage()) {
+            cleanupOrphanSubpages();
+        }
         return pages;
+    }
+
+    private boolean hasAnyModuleSubPage() {
+        for (BoardPage p : pages) {
+            if (p.isModuleSubPage()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public int getActivePageIndex() {
@@ -111,40 +124,149 @@ public class BoardPageManager {
     }
 
     public boolean removePage(int index) {
+        if (index < 0 || index >= pages.size()) {
+            return false;
+        }
         if (pages.size() <= 1) {
+            if (pages.get(0).isModuleSubPage()) {
+                cleanupOrphanSubpages();
+                return true;
+            }
             pages.get(0).getGraph().clear();
             return false;
         }
-        if (index >= 0 && index < pages.size()) {
-            BoardPage removed = pages.remove(index);
-            openPageIds.remove(removed.getId());
-            if (activePageIndex >= pages.size()) {
-                activePageIndex = pages.size() - 1;
-            }
-            if (removed.isModuleSubPage() && removed.getParentPageId() != null) {
-                getPage(removed.getParentPageId()).ifPresent(parent -> {
-                    int pIdx = pages.indexOf(parent);
-                    if (pIdx >= 0) {
-                        activePageIndex = pIdx;
-                    }
-                });
-            }
-            if (openPageIds.isEmpty() && !pages.isEmpty()) {
-                openPageIds.add(getActivePage().getId());
-            }
-            if (pageRemovalListener != null) {
-                pageRemovalListener.accept(removed);
-            }
-            for (IPageLifecycleListener l : pageLifecycleListeners) {
-                try {
-                    l.onPageRemoved(removed, index);
-                } catch (Throwable t) {
-                    t.printStackTrace();
-                }
-            }
-            return true;
+
+        BoardPage removed = pages.remove(index);
+        openPageIds.remove(removed.getId());
+        if (activePageIndex >= pages.size()) {
+            activePageIndex = pages.size() - 1;
         }
-        return false;
+        if (removed.isModuleSubPage() && removed.getParentPageId() != null) {
+            getPage(removed.getParentPageId()).ifPresent(parent -> {
+                int pIdx = pages.indexOf(parent);
+                if (pIdx >= 0) {
+                    activePageIndex = pIdx;
+                }
+            });
+        }
+        if (openPageIds.isEmpty() && !pages.isEmpty()) {
+            openPageIds.add(getActivePage().getId());
+        }
+        if (pageRemovalListener != null) {
+            pageRemovalListener.accept(removed);
+        }
+        for (IPageLifecycleListener l : pageLifecycleListeners) {
+            dispatchPageRemoved(l, removed, index);
+        }
+
+        cleanupOrphanSubpages();
+        return true;
+    }
+
+    public void cleanupOrphanSubpages() {
+        if (pages.isEmpty()) {
+            resetToDefault();
+            return;
+        }
+        Set<String> validPageIds = collectValidPageIds();
+        pruneOrphanSubpages(validPageIds);
+        ensureMainPageInvariant();
+        sanitizeActivePageAndTabs();
+    }
+
+    private Set<String> collectValidPageIds() {
+        Set<String> validPageIds = new HashSet<>();
+        for (BoardPage p : pages) {
+            if (!p.isModuleSubPage()) {
+                validPageIds.add(p.getId());
+            }
+        }
+        boolean changed = true;
+        while (changed) {
+            changed = expandValidSubPageIds(validPageIds);
+        }
+        return validPageIds;
+    }
+
+    private boolean expandValidSubPageIds(Set<String> validPageIds) {
+        boolean expanded = false;
+        for (BoardPage p : pages) {
+            if (!p.isModuleSubPage() || validPageIds.contains(p.getId())) {
+                continue;
+            }
+            String parentId = p.getParentPageId();
+            if (parentId != null && !parentId.isEmpty() && validPageIds.contains(parentId)) {
+                validPageIds.add(p.getId());
+                expanded = true;
+            }
+        }
+        return expanded;
+    }
+
+    private void pruneOrphanSubpages(Set<String> validPageIds) {
+        List<BoardPage> orphans = new ArrayList<>();
+        for (BoardPage p : pages) {
+            if (p.isModuleSubPage() && !validPageIds.contains(p.getId())) {
+                orphans.add(p);
+            }
+        }
+        for (BoardPage orphan : orphans) {
+            removeOrphanPage(orphan);
+        }
+    }
+
+    private void removeOrphanPage(BoardPage orphan) {
+        int idx = pages.indexOf(orphan);
+        pages.remove(orphan);
+        openPageIds.remove(orphan.getId());
+        if (pageRemovalListener != null) {
+            pageRemovalListener.accept(orphan);
+        }
+        for (IPageLifecycleListener l : pageLifecycleListeners) {
+            dispatchPageRemoved(l, orphan, idx);
+        }
+    }
+
+    private void dispatchPageRemoved(IPageLifecycleListener listener, BoardPage removed, int index) {
+        try {
+            listener.onPageRemoved(removed, index);
+        } catch (Throwable t) {
+            t.printStackTrace();
+        }
+    }
+
+    private void ensureMainPageInvariant() {
+        boolean hasMainPage = false;
+        for (BoardPage p : pages) {
+            if (!p.isModuleSubPage()) {
+                hasMainPage = true;
+                break;
+            }
+        }
+        if (hasMainPage) return;
+
+        for (BoardPage sub : new ArrayList<>(pages)) {
+            openPageIds.remove(sub.getId());
+            if (pageRemovalListener != null) {
+                pageRemovalListener.accept(sub);
+            }
+        }
+        pages.clear();
+        BoardPage defaultPage = BoardPage.createDefault("Page 1");
+        pages.add(defaultPage);
+        activePageIndex = 0;
+        openPageIds.clear();
+        openPageIds.add(defaultPage.getId());
+    }
+
+    private void sanitizeActivePageAndTabs() {
+        if (activePageIndex < 0 || activePageIndex >= pages.size()) {
+            activePageIndex = 0;
+        }
+        openPageIds.removeIf(id -> getPage(id).isEmpty());
+        if (openPageIds.isEmpty() && !pages.isEmpty()) {
+            openPageIds.add(getActivePage().getId());
+        }
     }
 
     public boolean removePage(String pageId) {
@@ -487,6 +609,7 @@ public class BoardPageManager {
                 }
             }
         }
+        cleanupOrphanSubpages();
         if (this.openPageIds.isEmpty() && !this.pages.isEmpty()) {
             this.openPageIds.add(getActivePage().getId());
         }

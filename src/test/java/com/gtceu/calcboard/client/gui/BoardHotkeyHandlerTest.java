@@ -3,7 +3,10 @@ package com.gtceu.calcboard.client.gui;
 import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.storage.BoardManager;
+import com.gtceu.calcboard.api.storage.BoardPage;
+import com.gtceu.calcboard.api.storage.PageType;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
+import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
 import com.gtceu.calcboard.client.gui.widget.NodeWidget;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -16,6 +19,7 @@ public class BoardHotkeyHandlerTest {
     @BeforeEach
     @AfterEach
     public void cleanup() {
+        TutorialManager.getInstance().stopTutorial();
         BoardManager.getInstance().resetToDefault();
     }
 
@@ -139,5 +143,43 @@ public class BoardHotkeyHandlerTest {
             com.gtceu.calcboard.integration.spi.RecipeViewerRegistry.unregister("mock_focused_viewer");
             com.gtceu.calcboard.integration.spi.RecipeViewerRegistry.reset();
         }
+    }
+
+    @Test
+    public void testEscapeInSubpageDuringTutorialReturnsToParentPage() {
+        BoardScreen screen = new BoardScreen();
+        TutorialManager.getInstance().startChapter(screen, "ch3_packaging");
+        Assertions.assertTrue(TutorialManager.getInstance().isActive());
+
+        BoardPage chapterPage = TutorialManager.getInstance().getTutorialPage();
+        Assertions.assertNotNull(chapterPage);
+
+        BoardPage subPage = BoardManager.getInstance().addPage("Sub Module Page");
+        subPage.setPageType(PageType.MODULE);
+        subPage.setParentPageId(chapterPage.getId());
+        BoardManager.getInstance().openPage(subPage.getId());
+        Assertions.assertTrue(BoardManager.getInstance().getActivePage().isModuleSubPage());
+
+        boolean handled = BoardHotkeyHandler.handleKeyPressed(screen, GLFW.GLFW_KEY_ESCAPE, 0, 0, 0, 0);
+        Assertions.assertTrue(handled);
+
+        Assertions.assertFalse(BoardManager.getInstance().getActivePage().isModuleSubPage());
+        Assertions.assertEquals(chapterPage.getId(), BoardManager.getInstance().getActivePage().getId());
+        Assertions.assertTrue(TutorialManager.getInstance().isActive());
+
+        TutorialManager.getInstance().stopTutorial();
+    }
+
+    @Test
+    public void testEscapeOnRootPageStopsTutorial() {
+        BoardScreen screen = new BoardScreen();
+        TutorialManager.getInstance().startChapter(screen, "ch1_basics");
+        Assertions.assertTrue(TutorialManager.getInstance().isActive());
+        Assertions.assertFalse(BoardManager.getInstance().getActivePage().isModuleSubPage());
+
+        boolean handled = BoardHotkeyHandler.handleKeyPressed(screen, GLFW.GLFW_KEY_ESCAPE, 0, 0, 0, 0);
+        Assertions.assertTrue(handled);
+
+        Assertions.assertFalse(TutorialManager.getInstance().isActive());
     }
 }

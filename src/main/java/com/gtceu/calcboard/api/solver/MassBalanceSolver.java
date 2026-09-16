@@ -61,7 +61,7 @@ public final class MassBalanceSolver {
             List<ResolvedEdge> resolvedList = resolveReroutes(graph, edge);
             for (ResolvedEdge re : resolvedList) {
                 if (re.producer.isReroute() || re.consumer.isReroute()) continue;
-                if (re.outputIndex < re.producer.getOutputs().size() && re.inputIndex < re.consumer.getInputs().size()) {
+                if (re.outputIndex >= 0 && re.outputIndex < re.producer.getOutputs().size() && re.inputIndex >= 0 && re.inputIndex < re.consumer.getInputs().size()) {
                     IngredientStack outStack = re.producer.getOutputs().get(re.outputIndex);
                     String matKey = getMaterialKey(outStack);
                     connectedMaterialKeys.add(matKey);
@@ -85,24 +85,8 @@ public final class MassBalanceSolver {
 
             for (int j = 0; j < n; j++) {
                 RecipeNode node = activeNodes.get(j);
-                // Production contribution
-                double prodRate = 0.0;
-                for (int oIdx = 0; oIdx < node.getOutputs().size(); oIdx++) {
-                    IngredientStack out = node.getOutputs().get(oIdx);
-                    if (getMaterialKey(out).equals(matKey) && isPortConnected(graph, node.getId(), oIdx, true)) {
-                        prodRate += node.calculateSingleMachineOutputRate(out);
-                    }
-                }
-
-                // Consumption contribution
-                double consRate = 0.0;
-                for (int iIdx = 0; iIdx < node.getInputs().size(); iIdx++) {
-                    IngredientStack in = node.getInputs().get(iIdx);
-                    if (getMaterialKey(in).equals(matKey) && isPortConnected(graph, node.getId(), iIdx, false)) {
-                        consRate += node.calculateSingleMachineInputRate(in);
-                    }
-                }
-
+                double prodRate = calculateProductionContribution(graph, node, matKey);
+                double consRate = calculateConsumptionContribution(graph, node, matKey);
                 matrix[k][j] = prodRate - consRate;
             }
             matrix[k][n] = 0.0; // b[k] = 0 (balanced intermediate flow)
@@ -123,38 +107,12 @@ public final class MassBalanceSolver {
         boolean[] hasRowForVar = new boolean[n];
 
         for (int r = 0; r < totalRows; r++) {
-            int leadCol = -1;
-            for (int c = 0; c < n; c++) {
-                if (Math.abs(matrix[r][c] - 1.0) < 1e-5) {
-                    boolean allOtherZero = true;
-                    for (int c2 = 0; c2 < n; c2++) {
-                        if (c2 != c && Math.abs(matrix[r][c2]) > 1e-5) {
-                            allOtherZero = false;
-                            break;
-                        }
-                    }
-                    if (allOtherZero) {
-                        leadCol = c;
-                        break;
-                    }
-                }
-            }
-
+            int leadCol = findLeadingVariableColumn(matrix, r, n);
             if (leadCol >= 0) {
                 x[leadCol] = matrix[r][n];
                 hasRowForVar[leadCol] = true;
-            } else {
-                // Check if inconsistency (0 == non-zero)
-                boolean allZeros = true;
-                for (int c = 0; c < n; c++) {
-                    if (Math.abs(matrix[r][c]) > EPSILON) {
-                        allZeros = false;
-                        break;
-                    }
-                }
-                if (allZeros && Math.abs(matrix[r][n]) > 1e-4) {
-                    return null; // Inconsistent system
-                }
+            } else if (isRowInconsistent(matrix, r, n)) {
+                return null; // Inconsistent system
             }
         }
 
@@ -211,12 +169,7 @@ public final class MassBalanceSolver {
             // Eliminate column c in all other rows
             for (int i = 0; i < rows; i++) {
                 if (i != r) {
-                    double factor = a[i][c];
-                    if (Math.abs(factor) > EPSILON) {
-                        for (int j = c; j <= cols; j++) {
-                            a[i][j] -= factor * a[r][j];
-                        }
-                    }
+                    eliminateRow(a, i, r, c, cols);
                 }
             }
 
@@ -289,18 +242,14 @@ public final class MassBalanceSolver {
         while (!queue.isEmpty()) {
             String currId = queue.poll();
             for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
-                if (edge.toNodeId().equals(currId)) {
-                    RecipeNode src = graph.findNodeById(edge.fromNodeId());
-                    if (src != null) {
-                        if (src.isReroute()) {
-                            if (visited.add(src.getId())) {
-                                queue.add(src.getId());
-                            }
-                        } else {
-                            producers.add(src);
-                            outIndices.add(edge.outputIndex());
-                        }
-                    }
+                if (!edge.toNodeId().equals(currId)) continue;
+                RecipeNode src = graph.findNodeById(edge.fromNodeId());
+                if (src == null) continue;
+                if (src.isReroute() && visited.add(src.getId())) {
+                    queue.add(src.getId());
+                } else if (!src.isReroute()) {
+                    producers.add(src);
+                    outIndices.add(edge.outputIndex());
                 }
             }
         }
@@ -315,20 +264,73 @@ public final class MassBalanceSolver {
         while (!queue.isEmpty()) {
             String currId = queue.poll();
             for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
-                if (edge.fromNodeId().equals(currId)) {
-                    RecipeNode dst = graph.findNodeById(edge.toNodeId());
-                    if (dst != null) {
-                        if (dst.isReroute()) {
-                            if (visited.add(dst.getId())) {
-                                queue.add(dst.getId());
-                            }
-                        } else {
-                            consumers.add(dst);
-                            inIndices.add(edge.inputIndex());
-                        }
-                    }
+                if (!edge.fromNodeId().equals(currId)) continue;
+                RecipeNode dst = graph.findNodeById(edge.toNodeId());
+                if (dst == null) continue;
+                if (dst.isReroute() && visited.add(dst.getId())) {
+                    queue.add(dst.getId());
+                } else if (!dst.isReroute()) {
+                    consumers.add(dst);
+                    inIndices.add(edge.inputIndex());
                 }
             }
+        }
+    }
+
+    private static double calculateProductionContribution(FlowGraph graph, RecipeNode node, String matKey) {
+        double prodRate = 0.0;
+        for (int oIdx = 0; oIdx < node.getOutputs().size(); oIdx++) {
+            IngredientStack out = node.getOutputs().get(oIdx);
+            if (getMaterialKey(out).equals(matKey) && isPortConnected(graph, node.getId(), oIdx, true)) {
+                prodRate += node.calculateSingleMachineOutputRate(out);
+            }
+        }
+        return prodRate;
+    }
+
+    private static double calculateConsumptionContribution(FlowGraph graph, RecipeNode node, String matKey) {
+        double consRate = 0.0;
+        for (int iIdx = 0; iIdx < node.getInputs().size(); iIdx++) {
+            IngredientStack in = node.getInputs().get(iIdx);
+            if (getMaterialKey(in).equals(matKey) && isPortConnected(graph, node.getId(), iIdx, false)) {
+                consRate += node.calculateSingleMachineInputRate(in);
+            }
+        }
+        return consRate;
+    }
+
+    private static int findLeadingVariableColumn(double[][] matrix, int r, int n) {
+        for (int c = 0; c < n; c++) {
+            if (Math.abs(matrix[r][c] - 1.0) < 1e-5 && areAllOtherColumnsZero(matrix, r, n, c)) {
+                return c;
+            }
+        }
+        return -1;
+    }
+
+    private static boolean areAllOtherColumnsZero(double[][] matrix, int r, int n, int excludeCol) {
+        for (int c2 = 0; c2 < n; c2++) {
+            if (c2 != excludeCol && Math.abs(matrix[r][c2]) > 1e-5) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean isRowInconsistent(double[][] matrix, int r, int n) {
+        for (int c = 0; c < n; c++) {
+            if (Math.abs(matrix[r][c]) > EPSILON) {
+                return false;
+            }
+        }
+        return Math.abs(matrix[r][n]) > 1e-4;
+    }
+
+    private static void eliminateRow(double[][] a, int targetRow, int pivotRow, int col, int cols) {
+        double factor = a[targetRow][col];
+        if (Math.abs(factor) <= EPSILON) return;
+        for (int j = col; j <= cols; j++) {
+            a[targetRow][j] -= factor * a[pivotRow][j];
         }
     }
 }

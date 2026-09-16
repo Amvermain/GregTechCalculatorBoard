@@ -10,6 +10,7 @@ import com.gtceu.calcboard.client.gui.BoardScreen;
 import com.gtceu.calcboard.client.gui.editor.NodeCountEditor;
 import com.gtceu.calcboard.client.gui.widget.BoardToast;
 import com.gtceu.calcboard.client.gui.widget.NodeWidget;
+import com.gtceu.calcboard.client.util.ClientSafetyHelper;
 import com.gtceu.calcboard.compat.systeams.SysteamsRecipeHandler;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
@@ -63,6 +64,7 @@ public final class CanvasSingleWireHandler {
             FlowGraph graph,
             BoardScreen screen
     ) {
+        if (wireStartPortIdx < 0) return false;
         if (!wireStartIsInput) {
             int inPortIdx = targetWidget.getHoveredInputPortIndex(canvasMouseX, canvasMouseY);
             if (inPortIdx >= 0) {
@@ -80,6 +82,7 @@ public final class CanvasSingleWireHandler {
     }
 
     private static void handleForwardWireConnect(NodeWidget wireStartNode, int wireStartPortIdx, NodeWidget targetWidget, FlowGraph graph, int inPortIdx, BoardScreen screen) {
+        if (wireStartPortIdx < 0 || inPortIdx < 0) return;
         RecipeNode fromNode = wireStartNode.getNode();
         RecipeNode toNode = targetWidget.getNode();
 
@@ -89,11 +92,11 @@ public final class CanvasSingleWireHandler {
         FlowGraph.ConnectionEdge newEdge = new FlowGraph.ConnectionEdge(fromNode.getId(), wireStartPortIdx, toNode.getId(), inPortIdx);
         graph.addConnection(fromNode.getId(), wireStartPortIdx, toNode.getId(), inPortIdx);
 
-        boolean shiftDown = Screen.hasShiftDown();
+        boolean shiftDown = ClientSafetyHelper.isShiftDown();
         Double oldMachineCount = shiftDown ? toNode.getMachineCount() : null;
         Double newMachineCount = null;
 
-        if (shiftDown && wireStartPortIdx < fromNode.getOutputs().size() && inPortIdx < toNode.getInputs().size()) {
+        if (shiftDown && wireStartPortIdx >= 0 && wireStartPortIdx < fromNode.getOutputs().size() && inPortIdx >= 0 && inPortIdx < toNode.getInputs().size()) {
             double matchedCount = FlowGraphSolver.calculateConsumerMatchCount(graph, fromNode, wireStartPortIdx, toNode, inPortIdx);
             newMachineCount = matchedCount;
             toNode.setMachineCount(matchedCount);
@@ -103,11 +106,11 @@ public final class CanvasSingleWireHandler {
             BoardToast.show(Component.literal("§a✔ ").append(
                     Component.translatable("message.gtcalcboard.shift_connect_matched", toNode.getName(), NodeCountEditor.formatCount(matchedCount))
             ));
-            Minecraft.getInstance().getSoundManager().play(
+            ClientSafetyHelper.playSoundSafely(
                     SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.2F)
             );
         } else {
-            Minecraft.getInstance().getSoundManager().play(
+            ClientSafetyHelper.playSoundSafely(
                     SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F)
             );
         }
@@ -118,6 +121,7 @@ public final class CanvasSingleWireHandler {
     }
 
     private static void handleReverseWireConnect(NodeWidget wireStartNode, int wireStartPortIdx, NodeWidget targetWidget, FlowGraph graph, int outPortIdx, BoardScreen screen) {
+        if (wireStartPortIdx < 0 || outPortIdx < 0) return;
         RecipeNode fromNode = targetWidget.getNode();
         RecipeNode toNode = wireStartNode.getNode();
 
@@ -127,11 +131,11 @@ public final class CanvasSingleWireHandler {
         FlowGraph.ConnectionEdge newEdge = new FlowGraph.ConnectionEdge(fromNode.getId(), outPortIdx, toNode.getId(), wireStartPortIdx);
         graph.addConnection(fromNode.getId(), outPortIdx, toNode.getId(), wireStartPortIdx);
 
-        boolean shiftDown = Screen.hasShiftDown();
+        boolean shiftDown = ClientSafetyHelper.isShiftDown();
         Double oldMachineCount = shiftDown ? fromNode.getMachineCount() : null;
         Double newMachineCount = null;
 
-        if (shiftDown && outPortIdx < fromNode.getOutputs().size() && wireStartPortIdx < toNode.getInputs().size()) {
+        if (shiftDown && outPortIdx >= 0 && outPortIdx < fromNode.getOutputs().size() && wireStartPortIdx >= 0 && wireStartPortIdx < toNode.getInputs().size()) {
             double matchedCount = FlowGraphSolver.calculateProducerMatchCount(graph, fromNode, outPortIdx, toNode, wireStartPortIdx);
             newMachineCount = matchedCount;
             fromNode.setMachineCount(matchedCount);
@@ -141,11 +145,11 @@ public final class CanvasSingleWireHandler {
             BoardToast.show(Component.literal("§a✔ ").append(
                     Component.translatable("message.gtcalcboard.shift_connect_matched", fromNode.getName(), NodeCountEditor.formatCount(matchedCount))
             ));
-            Minecraft.getInstance().getSoundManager().play(
+            ClientSafetyHelper.playSoundSafely(
                     SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.2F)
             );
         } else {
-            Minecraft.getInstance().getSoundManager().play(
+            ClientSafetyHelper.playSoundSafely(
                     SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F)
             );
         }
@@ -156,9 +160,9 @@ public final class CanvasSingleWireHandler {
     }
 
     private static void bindRerouteStacks(RecipeNode fromNode, RecipeNode toNode, int outIdx, int inIdx) {
-        if (fromNode.isReroute() && inIdx < toNode.getInputs().size()) {
+        if (fromNode.isReroute() && inIdx >= 0 && inIdx < toNode.getInputs().size()) {
             fromNode.bindRerouteIngredient(toNode.getInputs().get(inIdx));
-        } else if (toNode.isReroute() && outIdx < fromNode.getOutputs().size()) {
+        } else if (toNode.isReroute() && outIdx >= 0 && outIdx < fromNode.getOutputs().size()) {
             toNode.bindRerouteIngredient(fromNode.getOutputs().get(outIdx));
         }
     }
@@ -171,7 +175,7 @@ public final class CanvasSingleWireHandler {
             NodeWidget w1,
             NodeWidget w2
     ) {
-        if (outIdx >= fromNode.getOutputs().size() || inIdx >= toNode.getInputs().size()) return;
+        if (outIdx < 0 || outIdx >= fromNode.getOutputs().size() || inIdx < 0 || inIdx >= toNode.getInputs().size()) return;
 
         IngredientStack outStack = fromNode.getOutputs().get(outIdx);
         IngredientStack inStack = toNode.getInputs().get(inIdx);
@@ -204,7 +208,7 @@ public final class CanvasSingleWireHandler {
 
         if (dragDist >= 15.0) {
             RecipeNode srcNode = wireStartNode.getNode();
-            boolean shiftDown = Screen.hasShiftDown();
+            boolean shiftDown = ClientSafetyHelper.isShiftDown();
             IngredientStack stack = extractWireStartStack(wireStartNode, wireStartPortIdx, wireStartIsInput, srcNode);
             quickAddMarkerHandler.triggerContextualMarker(canvasMouseX, canvasMouseY, srcNode, wireStartPortIdx, wireStartIsInput, stack, shiftDown);
         }

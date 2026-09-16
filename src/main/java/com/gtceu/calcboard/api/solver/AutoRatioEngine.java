@@ -89,6 +89,7 @@ public final class AutoRatioEngine {
         if (linearResult.successful() && !linearResult.underDetermined() && !linearResult.machineCounts().isEmpty()) {
             boolean hasClamp = applyLinearCountsAndCheckClamping(graph, linearResult.machineCounts(), divergenceContext);
             anchor.setMachineCount(targetAnchorCount);
+            optimizeDampedLoopsToSteadyState(graph, integerCounts);
             if (hasClamp) {
                 ProcessStabilityAnalyzer.applyDivergenceWarnings(graph, divergenceContext);
             }
@@ -127,6 +128,7 @@ public final class AutoRatioEngine {
         AutoRatioRelaxationSolver.normalizeNodeCounts(graph, anchor, targetAnchorCount, integerCounts);
 
         ProcessStabilityAnalyzer.reconcileLoopDivergences(graph, anchor, divergenceContext, integerCounts);
+        optimizeDampedLoopsToSteadyState(graph, integerCounts);
         ProcessStabilityAnalyzer.applyDivergenceWarnings(graph, divergenceContext);
         postSolveEvent(graph);
 
@@ -236,7 +238,7 @@ public final class AutoRatioEngine {
         if (producer.getId().equals(anchor.getId())) return;
         if (allowedUpstreamNodes != null && !allowedUpstreamNodes.contains(producer.getId())) return;
 
-        if (edge.outputIndex() < producer.getOutputs().size()) {
+        if (edge.outputIndex() >= 0 && edge.outputIndex() < producer.getOutputs().size()) {
             scaleUpstreamProducerNode(graph, producer, edge.outputIndex(), countsMap, integerCounts, upVisitCounts, upQueue, divergenceContext);
         }
     }
@@ -412,5 +414,35 @@ public final class AutoRatioEngine {
         try {
             MinecraftForge.EVENT_BUS.post(new FlowGraphEvent.PostSolve(graph));
         } catch (Throwable ignored) {}
+    }
+
+    private static void optimizeDampedLoopsToSteadyState(FlowGraph graph, boolean integerCounts) {
+        if (graph == null || graph.getNodes().isEmpty()) return;
+        List<FixedPointEfficiencySolver.PrecomputedDampedLoopMeta> dampedMetas =
+                FixedPointEfficiencySolver.precomputeDampedLoopMetas(graph, null);
+        if (dampedMetas.isEmpty()) return;
+
+        Set<String> processedSccs = new java.util.HashSet<>();
+        for (FixedPointEfficiencySolver.PrecomputedDampedLoopMeta meta : dampedMetas) {
+            String sccKey = meta.scc().toString();
+            if (!processedSccs.add(sccKey)) continue;
+
+            double targetEff = meta.computeSteadyStateEfficiency(graph, null, null);
+            if (targetEff <= 0.0001 || targetEff >= 0.9999) continue;
+
+            scaleSccNodesToSteadyState(graph, meta.scc(), targetEff, integerCounts);
+        }
+    }
+
+    private static void scaleSccNodesToSteadyState(FlowGraph graph, Set<String> scc, double targetEff, boolean integerCounts) {
+        for (String nodeId : scc) {
+            RecipeNode n = graph.findNodeById(nodeId);
+            if (n == null || n.isReroute() || n.isBaseNode()) continue;
+            double scaledCount = n.getMachineCount() * targetEff;
+            double newCount = integerCounts
+                    ? quantizeMachineCount(graph, n, scaledCount, FlowBalanceMatrixSolver.CountRoundingMode.CEIL, true)
+                    : Math.max(0.0001, Math.round(scaledCount * 10000.0) / 10000.0);
+            n.setMachineCount(newCount);
+        }
     }
 }

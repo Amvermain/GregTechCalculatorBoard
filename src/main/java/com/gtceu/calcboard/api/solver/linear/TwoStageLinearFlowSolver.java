@@ -82,7 +82,7 @@ public final class TwoStageLinearFlowSolver {
 
             for (ProducerPort pp : net.producers) {
                 RecipeNode p = graph.findNodeById(pp.nodeId);
-                if (p == null || pp.outputIndex >= p.getOutputs().size()) continue;
+                if (p == null || pp.outputIndex < 0 || pp.outputIndex >= p.getOutputs().size()) continue;
                 IngredientStack outStack = p.getOutputs().get(pp.outputIndex);
                 double singleRate = p.calculateSingleMachineOutputRate(outStack);
                 coeffs.merge(p.getId(), singleRate, Double::sum);
@@ -90,7 +90,7 @@ public final class TwoStageLinearFlowSolver {
 
             for (ConsumerPort cp : net.consumers) {
                 RecipeNode c = graph.findNodeById(cp.nodeId);
-                if (c == null || cp.inputIndex >= c.getInputs().size()) continue;
+                if (c == null || cp.inputIndex < 0 || cp.inputIndex >= c.getInputs().size()) continue;
                 IngredientStack inStack = c.getInputs().get(cp.inputIndex);
                 double singleRate = c.calculateSingleMachineInputRate(inStack);
                 coeffs.merge(c.getId(), -singleRate, Double::sum);
@@ -223,6 +223,7 @@ public final class TwoStageLinearFlowSolver {
         PortDisjointSet dsu = new PortDisjointSet();
 
         for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+            if (edge.outputIndex() < 0 || edge.inputIndex() < 0) continue;
             PortRef srcPort = new PortRef(edge.fromNodeId(), true, edge.outputIndex());
             PortRef dstPort = new PortRef(edge.toNodeId(), false, edge.inputIndex());
             dsu.union(srcPort, dstPort);
@@ -239,6 +240,7 @@ public final class TwoStageLinearFlowSolver {
         Map<PortRef, ResourceNet> netMap = new LinkedHashMap<>();
 
         for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+            if (edge.outputIndex() < 0 || edge.inputIndex() < 0) continue;
             RecipeNode src = graph.findNodeById(edge.fromNodeId());
             RecipeNode dst = graph.findNodeById(edge.toNodeId());
             if (src == null || dst == null) continue;
@@ -268,11 +270,11 @@ public final class TwoStageLinearFlowSolver {
     }
 
     private static String resolveEdgeResourceKey(RecipeNode src, int outIdx, RecipeNode dst, int inIdx) {
-        if (!src.isReroute() && outIdx < src.getOutputs().size()) {
+        if (!src.isReroute() && outIdx >= 0 && outIdx < src.getOutputs().size()) {
             IngredientStack stack = src.getOutputs().get(outIdx);
             return stack.getType() + ":" + stack.getId();
         }
-        if (!dst.isReroute() && inIdx < dst.getInputs().size()) {
+        if (!dst.isReroute() && inIdx >= 0 && inIdx < dst.getInputs().size()) {
             IngredientStack stack = dst.getInputs().get(inIdx);
             return stack.getType() + ":" + stack.getId();
         }

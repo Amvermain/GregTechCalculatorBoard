@@ -191,9 +191,8 @@ public class NodeClipboard {
             RecipeNode origNode = RecipeNode.deserializeNBT(nodeList.getCompound(i));
             String oldId = origNode.getId();
 
-            RecipeNode newNode = RecipeNode.deserializeNBT(origNode.serializeNBT());
             String newId = UUID.randomUUID().toString();
-            newNode.setId(newId);
+            RecipeNode newNode = origNode.copy(newId);
             newNode.setPos(origNode.getPosX() + offsetX, origNode.getPosY() + offsetY);
 
             if (origNode.isCompoundNode()) {

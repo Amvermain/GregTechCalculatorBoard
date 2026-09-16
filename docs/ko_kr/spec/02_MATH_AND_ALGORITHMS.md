@@ -137,14 +137,64 @@ $$\text{Single Machine Expected Output Rate (per sec)} = \text{Amount} \times \t
 
 ---
 
-### 1.6 증기 보일러 및 쓰로틀 ($\theta \in [0.25, 1.0]$) 공식
+### 1.6 증기 보일러 물리 및 TFG 대형 보일러 비선형 모델 (ADR-057)
 
+#### 1. 표준 GTCEu 증기 보일러 및 쓰로틀 ($\theta \in [0.25, 1.0]$)
 - **소형 보일러 (Small Boilers)**: LP Bronze ($120\text{ L/s} = 6\text{ mB/t}$), HP Steel ($360\text{ L/s} = 18\text{ mB/t}$)
 - **대형 멀티블록 보일러 (Large Boilers)**: Bronze ($16\text{k/s}$), Steel ($36\text{k/s}$), Titanium ($64\text{k/s}$), Tungstensteel ($128\text{k/s}$)
 
 $$\text{Effective Speed Multiplier} = \text{TierSpeedMultiplier} \times \theta$$
 $$\text{Steam Rate (mB/t)} = \text{BaseSteamRate} \times \text{Effective Speed Multiplier}$$
 $$\text{Water Rate (mB/t)} = \frac{\text{Steam Rate (mB/t)}}{160.0} \quad (1\text{mB 물} \rightarrow 160\text{mB 증기})$$
+
+#### 2. TFG 대형 보일러 비선형 물리 모델 (TerraFirmaGreg, ADR-057)
+TFG 환경에서는 GTCEu 표준 보일러 대신 압력 단위 PU ($1\text{ PU} = 1\text{ mB/t Steam}$) 기반의 대형 청동 보일러(LBB, $480\text{ PU}$) 및 대형 강철 보일러(LSB, $1280\text{ PU}$)가 운용되며, 부스터 유체, 수질 계층 및 비선형 소비 곡선이 적용됩니다.
+
+##### 기본 보일러 규격
+| 보일러 명칭 | 블록 ID | 기본 정격 압력 ($P_{\text{base}}$) | 가열 속도 | 기본 증기 생산량 ($R_{\text{steam, base}}$) | 지원 모드 |
+| :--- | :--- | :---: | :---: | :---: | :--- |
+| **Large Bronze Boiler (LBB)** | `tfg:large_bronze_boiler` | $480\text{ PU}$ | $1\text{ PU/t}$ | $480\text{ mB/t}$ ($9,600\text{ mB/s}$) | 단일 모드 (연료 연소) |
+| **Large Steel Boiler (LSB)** | `tfg:large_steel_boiler` | $1280\text{ PU}$ | $1\text{ PU/t}$ | $1280\text{ mB/t}$ ($25,600\text{ mB/s}$) | 듀얼 모드 (표준 / Super Boiler) |
+
+##### 9대 부스터 유체 규격 매트릭스
+| 부스터 유체 | Fluid ID | 소모량 ($R_{\text{booster}}$) | 압력 보너스 ($\Delta P$) | 최소 요구 압력 ($P_{\text{min}}$) | 제한 사항 |
+| :--- | :--- | :---: | :---: | :---: | :--- |
+| 크레오소트 | `gtceu:creosote` | $32\text{ mB/s}$ | $+300\text{ PU}$ | $0\text{ PU}$ | 전 티어 공용 |
+| 침엽수 수지 | `tfg:conifer_pitch` | $5\text{ mB/s}$ | $+300\text{ PU}$ | $0\text{ PU}$ | 전 티어 공용 |
+| 단풍나무 수액 | `afc:maple_sap` | $5\text{ mB/s}$ | $+300\text{ PU}$ | $0\text{ PU}$ | 전 티어 공용 |
+| 자작나무 수액 | `afc:birch_sap` | $5\text{ mB/s}$ | $+300\text{ PU}$ | $0\text{ PU}$ | 전 티어 공용 |
+| 목재 가스 | `gtceu:wood_gas` | $52\text{ mB/s}$ | $+600\text{ PU}$ | $0\text{ PU}$ | 전 티어 공용 |
+| 올리브유 | `tfc:olive_oil` | $1\text{ mB/s}$ | $+600\text{ PU}$ | $0\text{ PU}$ | 전 티어 공용 |
+| 원유 방향족 혼합물 | `tfg:raw_aromatic_mix` | $300\text{ mB/s}$ | $+1200\text{ PU}$ | $1280\text{ PU}$ | **LSB 전용** ($P_{\text{base}} \ge 1280$) |
+| 로켓 연료 | `gtceu:rocket_fuel` | $200\text{ mB/s}$ | $+5000\text{ PU}$ | $1280\text{ PU}$ | **LSB 전용** ($P_{\text{base}} \ge 1280$) |
+| 방사성 폐액 | `tfg:radioactive_effluent` | $2\text{ mB/s}$ | $+16000\text{ PU}$ | $1280\text{ PU}$ | **LSB 전용** ($P_{\text{base}} \ge 1280$) |
+
+##### 수질 계층 규격
+- **일반 담수 (Standard Water)**: `tfg:water_boiler` (`minecraft:water`), 증기 출력 승수 $M_{\text{water}} = 1.0\times$
+- **증류수/정제수 (Distilled Water)**: `tfg:water_boiler_t2` (`gtceu:distilled_water`), 증기 출력 승수 $M_{\text{water}} = 1.5\times$ (물 소모량 변동 없이 증기 $50\%$ 증폭)
+
+##### 비선형 유효 압력 및 열역학 수식
+1. **유효 압력 ($P_{\text{eff}}$)**:
+   $$P_{\text{eff}} = P_{\text{base}} + \Delta P_{\text{booster}}$$
+2. **증기 생산율 ($R_{\text{steam}}$)**:
+   $$R_{\text{steam, sec}} = 20 \times P_{\text{eff}} \times \left(\frac{\theta}{100}\right) \times M_{\text{water}} \quad (\text{mB/s})$$
+3. **비선형 물 소모 페널티 계수 ($\text{tempFactor}$)**:
+   $480\text{ PU}$ 초과 시 기화 손실 모사를 위해 $1.5$승 거듭제곱 페널티가 적용됩니다:
+   $$\text{tempFactor} = \begin{cases} 1.0 & (P_{\text{eff}} \le 480\text{ PU}) \\ 1.0 + 0.035 \times \left(\frac{P_{\text{eff}} - 480}{100}\right)^{1.5} & (P_{\text{eff}} > 480\text{ PU}) \end{cases}$$
+   $$R_{\text{water, sec}} = \frac{20 \times P_{\text{eff}} \times (\theta / 100)}{160} \times \text{tempFactor} \quad (\text{mB/s})$$
+4. **비선형 연료 연소 주기 단축 및 연소율 가속 ($\mu_{\text{temp}}$)**:
+   $480\text{ PU}$ 초과 시 지수 감쇠에 따라 연료 연소 주기가 단축됩니다:
+   $$\text{reduction} = \begin{cases} 0.0 & (P_{\text{eff}} \le 480\text{ PU}) \\ 0.6 \times \left(1.0 - e^{-0.8 \times \frac{P_{\text{eff}} - 480}{1000}}\right) & (P_{\text{eff}} > 480\text{ PU}) \end{cases}$$
+   $$\mu_{\text{temp}} = 1.0 - \text{reduction} \quad (\mu_{\text{temp}} \ge 0.4)$$
+   $$\text{Duration (ticks)} = \text{round}\left(\frac{\text{BaseDuration}}{\theta / 100.0} \times \mu_{\text{temp}}\right)$$
+   (최대 연소 가속 배율: $1 / 0.4 = 2.5\times$)
+
+##### LSB Super Boiler (복합 연료 연소 모드)
+- **카테고리 ID**: `gtceu:super_boiler`
+- **전용 설비**: 대형 강철 보일러(LSB) 전용
+- **연소 입력 구성**: 고체 바인더/석탄(1 Item) + 액체 연료(1 Fluid, $20,000\sim 80,000\text{ mB}$)
+- **사용 가능 액체 연료**: 합성가스(`tfg:syngas`), 경유(`gtceu:light_fuel`), 중유(`gtceu:heavy_fuel`), 나프타(`gtceu:naphtha`)
+- **물리 연동**: Super Boiler 모드에서도 $P_{\text{eff}}$, 쓰로틀 및 $\mu_{\text{temp}}$ 감쇠 공식이 동일하게 적용되어 고압 운전 시 150초 기본 주기가 비례 단축됩니다.
 
 ---
 
@@ -361,7 +411,7 @@ $$\Delta(s) = P(s) - C(s) - V(s)$$
 
 ---
 
-### [알고리즘 10] 공유 기계 풀 용량 기반 자동 비율 맞춤 (`CanvasGroupFrame`, `HarmonizedRatioOptimizer`) (ADR-031)
+### [알고리즘 10] 공유 기계 풀 용량 기반 자동 비율 맞춤 (`CanvasGroupFrame`, `HarmonizedRatioOptimizer`) (ADR-042)
 
 동일한 물리적 단일 기계에서 여러 공정을 순차 또는 시분할 가동하는 공유 기계 풀(Shared Machine Pool) 프레임에 대해, 목표 기계 대수에 맞춘 공정 비례 스케일링을 수행합니다:
 
@@ -381,7 +431,7 @@ $$S = \frac{M_{\text{target}}}{D_{\text{current}}}$$
 
 ---
 
-### [알고리즘 11] 공정 발산 감지 및 포괄적 안정성 방어 매트릭스 (`ProcessStabilityAnalyzer`) (ADR-032, ADR-033)
+### [알고리즘 11] 공정 발산 감지 및 포괄적 안정성 방어 매트릭스 (`ProcessStabilityAnalyzer`) (ADR-033)
 
 재순환 루프 및 외부 피드 제약 조건 하에서 발생할 수 있는 7대 공정 발산 시나리오를 감지하여 연산 폭주를 차단하고 진단 메타데이터를 등록합니다:
 

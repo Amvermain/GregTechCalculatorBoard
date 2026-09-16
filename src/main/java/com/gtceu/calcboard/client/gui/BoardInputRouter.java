@@ -19,6 +19,7 @@ public class BoardInputRouter {
         double vy = screen.getViewportTransform().toVirtualY(mouseY);
         if (screen.getDialogManager().handleMouseClicked(vx, vy, button, screen.width, screen.height)) return true;
         if (TutorialOverlay.mouseClicked(screen, screen.width, screen.height, vx, vy, button)) return true;
+        if (com.gtceu.calcboard.client.gui.tutorial.ContextualNudgeToast.mouseClicked(screen, screen.width, screen.height, vx, vy, button)) return true;
         if (screen.getPageBrowserDrawer() != null && screen.getPageBrowserDrawer().isOpen() && screen.getPageBrowserDrawer().mouseClicked(vx, vy, button)) return true;
         if (screen.getLeftActivityBar().mouseClicked(vx, vy, button)) return true;
         if (screen.getWorkspaceTabBar().mouseClicked(vx, vy, button)) return true;

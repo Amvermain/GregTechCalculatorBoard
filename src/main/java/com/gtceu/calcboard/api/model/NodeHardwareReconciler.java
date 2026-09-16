@@ -189,6 +189,9 @@ public final class NodeHardwareReconciler {
         }
 
         int parallelFromAddons = NodeAddonHelper.getCombinedParallelMultiplier(node.getAddons());
+        if (parallelFromAddons > 1 && node.getCustomParallel() <= 1) {
+            node.setCustomParallel(0);
+        }
         if (node.getCustomParallel() > 0) {
             node.setParallel(Math.max(1, node.getCustomParallel()));
         } else if (parallelFromAddons > 1) {

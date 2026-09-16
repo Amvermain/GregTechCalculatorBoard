@@ -46,65 +46,141 @@ public class IngredientStack {
 
 ---
 
-### 1.3 `RecipeNode` (순수 도메인 노드 모델)
-캔버스에 배치되는 기계 카드, 발전기, 또는 복합 모듈의 전체 상태를 보유하며, 모드 특화 규칙은 `IModAdapter`로 위임합니다.
+### 1.3 `RecipeNode` 및 `INodeRole` 역할 컴포지션 객체 모델 (ADR-045, ADR-050)
+
+`RecipeNode`는 캔버스에 배치되는 순수 그래프 도메인 엔티티(좌표, 카드 크기, 공통 속성, 불변 레시피 명세)로 경량화되었으며, 기계 가동, 분기 정션, 복합 모듈, 경계 핀 등 노드별 고유 동작은 `INodeRole` 컴포지션을 통해 전담합니다. 또한 불변 `RecipeSpec`과 `IPortProjectionProvider`를 통해 하드웨어 애드온에 따른 보조 포트를 지연 투영(Lazy Dynamic Projection)합니다.
 
 ```mermaid
 classDiagram
     class RecipeNode {
-        +String id
-        +double posX, posY
-        +String name
-        +List~IngredientStack~ inputs
-        +List~IngredientStack~ outputs
+        -String id
+        -String name
+        -boolean hasCustomName
+        -double posX, posY
+        -int cardWidth, cardHeight
+        -boolean isFlipped
+        -boolean isBaseNode
+        -List~IngredientStack~ inputs
+        -List~IngredientStack~ outputs
+        -NodePortVisibility portVisibility
+        -NodePropertyStore properties
+        -FlowGraph parentGraph
+        -INodeRole role
+        -RecipeSpec baseSpec
+        -List~ProjectedPort~ projectedInputs
+        -List~ProjectedPort~ projectedOutputs
+        +getRole() INodeRole
+        +setRole(INodeRole) void
+        +getRole(Class~T~) Optional~T~
+        +isMachine() boolean
+        +isModule() boolean
+        +isJunction() boolean
+        +isBoundaryPin() boolean
+        +asMachine() MachineNodeRole
+        +asModule() SubPageModuleNodeRole
+        +asJunction() JunctionNodeRole
+        +asBoundaryPin() BoundaryPinNodeRole
+        +getBaseSpec() RecipeSpec
+        +setBaseSpec(RecipeSpec) void
+        +getProjectedInputs() List~ProjectedPort~
+        +getProjectedOutputs() List~ProjectedPort~
+        +markPortsDirty() void
+    }
+
+    class INodeRole {
+        <<interface>>
+        +getRoleType() NodeRoleType
+        +attach(RecipeNode) void
+        +detach() void
+        +getOwner() RecipeNode
+        +serializeRoleNBT() CompoundTag
+        +deserializeRoleNBT(CompoundTag) void
+        +copy() INodeRole
+    }
+
+    class MachineNodeRole {
+        -double baseDurationTicks
+        -double baseEUt
+        -GTVoltageTier recipeTier
+        -GTVoltageTier targetTier
+        -OverclockMode overclockMode
+        -double machineCount
+        -int parallel
+        -int customParallel
+        -boolean isMultiblock
+        -boolean isGenerator
+        -SteamMode steamMode
+        -List~MachineAddon~ addons
+        -ResourceLocation machineIcon
+        -ResourceLocation recipeCategoryId
+        -List~ResourceLocation~ availableWorkstations
+        -double efficiency
+    }
+
+    class JunctionNodeRole {
+        -SupplyMode supplyMode
+        -double externalSupplyRate
+        -double fixedFlowLimit
+        -FlowSplitMode splitMode
+        -Set~Integer~ voidedOutputIndices
+    }
+
+    class SubPageModuleNodeRole {
+        -String subPageId
+        -FlowGraph subGraph
+        -List~String~ inputPinNodeIds
+        -List~String~ outputPinNodeIds
+        -int containedMachineCount
+        -double scaleMultiplier
+        -double efficiency
+        -NodePortOriginManager portOriginManager
+    }
+
+    class BoundaryPinNodeRole {
+        -PinDirection direction
+        -String pinLabel
+        -int targetPortIndex
+        -IngredientStack boundIngredient
+    }
+
+    class RecipeSpec {
+        <<record>>
+        +String recipeId
+        +ResourceLocation categoryId
         +double baseDurationTicks
         +double baseEUt
-        +GTVoltageTier recipeTier
-        +GTVoltageTier targetTier
-        +OverclockMode overclockMode
-        +double machineCount
-        +int parallel
-        +boolean isMultiblock
-        +boolean isGenerator
-        +boolean isFlipped
-        +SteamMode steamMode
-        +List~MachineAddon~ addons
-        +ResourceLocation machineIcon
-        +ResourceLocation recipeCategoryId
-        +List~ResourceLocation~ availableWorkstations
-        +NodePropertyStore properties
-        +double efficiency
-        +Set~Integer~ hiddenInputIndices
-        +Set~Integer~ hiddenOutputIndices
-        +Set~Integer~ voidedOutputIndices
-        +SupplyMode supplyMode
-        +hideInputPort(int) void
-        +unhideInputPort(int) void
-        +hideOutputPort(int) void
-        +unhideOutputPort(int) void
-        +isOutputPortVoided(int) boolean
-        +setOutputPortVoided(int, boolean) void
-        +isVoidSink() boolean
-        +getVisibleInputIndices() List~Integer~
-        +getVisibleOutputIndices() List~Integer~
-        +getTotalHiddenCount() int
-        +setMachineIcon(icon) void
-        +getEnergyType() EnergyType
-        +getOverclockResult() OverclockResult
-        +getSingleMachineEUt() double
-        +getTotalEUt() double
-        +getCyclesPerSecond() double
+        +List~IngredientStack~ baseInputs
+        +List~IngredientStack~ baseOutputs
     }
+
+    RecipeNode *-- INodeRole : role
+    RecipeNode *-- RecipeSpec : baseSpec
+    INodeRole <|.. MachineNodeRole : 구현
+    INodeRole <|.. JunctionNodeRole : 구현
+    INodeRole <|.. SubPageModuleNodeRole : 구현
+    INodeRole <|.. BoundaryPinNodeRole : 구현
 ```
 
+* **역할 컴포지션 아키텍처 (`INodeRole`, ADR-045)**:
+  - `RecipeNode`는 좌표, 크기, 반전 여부, 속성 저장소, 입출력 포트 등의 순수 그래프 메타데이터만을 보유합니다.
+  - 4대 고유 역할 컴포넌트:
+    1. **`MachineNodeRole`**: 일반 가공 기계, 멀티블록, 발전기, 보일러의 오버클록, 병렬 수, 애드온, 전력(EU/t) 및 가동률($\eta$) 관리.
+    2. **`JunctionNodeRole`**: 분기점, 무한/고정 외부 공급원, 보이드 싱크(`VOID_SINK`), 우선순위 선로 분배 관리.
+    3. **`SubPageModuleNodeRole`**: 1:1 전용 서브페이지(`PageType.MODULE`)를 캡슐화한 복합 공정 모듈. 내부 서브그래프의 기계 수량 집계 및 복합 전력 적분.
+    4. **`BoundaryPinNodeRole`**: 전용 서브페이지 내부와 상위 모듈 카드 포트 간의 물리적 I/O 인터페이스를 계약하는 경계 핀.
+  - **듀얼 라이트 NBT 역호환성**: 신규 역할별 태그(`RoleTag`)와 기존 레거시 필드 태그를 동시 기록(Dual-Write)하여 구버전 세이브 및 청사진(Blueprint)과의 100% 무손실 상호 호환성을 유지합니다.
+* **불변 레시피 명세 및 동적 포트 투영 (`RecipeSpec`, `IPortProjectionProvider`, ADR-050)**:
+  - **불변 원본 명세 (`RecipeSpec`)**: 레시피의 고유 ID, 카테고리, 기본 가동 시간, 기본 EU/t, 기본 원자재 입출력 목록을 `record`로 불변 캡슐화하여, 기계 변경이나 애드온 장착 시 원본 데이터 손실을 방지합니다.
+  - **지연 동적 포트 투영 (`ProjectedPort`)**: 기본 레시피 포트(Core Ports, 0..N-1) 뒤에 하드웨어 애드온(증기 보일러 부스터, 산화제, 냉각수 등)에 의해 생성되는 보조 포트(Auxiliary Ports)를 `IPortProjectionProvider`를 통해 순수 함수 형태로 지연 투영합니다.
+  - 기존 연결선(`ConnectionEdge`)의 코어 포트 인덱스가 보조 포트 추가/제거에 영향을 받지 않도록 격리하여 토폴로지 무결성을 보장합니다.
+* **불변 계산 스냅샷 (`NodeCalculationSnapshot`, ADR-045)**:
+  - 백그라운드 솔버 연산 결과(가동률, CPS, 실효 EU/t, 유량)를 락-프리 불변 스냅샷 레코드로 캡처하여 클라이언트 UI 렌더링 스레드로 전달함으로써 화면 깜빡임과 동시성 데이터 레이스를 방지합니다.
 * **클린 아키텍처 및 SPI 위임 (Pure Domain Model)**:
-  - `RecipeNode`는 모든 모드(Create, Thermal, GTCEu, Vanilla 등)를 아우르는 **순수 계산 도메인 데이터 엔티티**입니다.
-  - 특정 모드 전용 필드나 하드코딩된 분기를 일체 보유하지 않으며, 머신 아이콘 변경 이벤트(`setMachineIcon`), 물리적 에너지 형태 결정(`getEnergyType`), 단일 기계 소비/발전량 연산(`computeSingleMachinePower`), 노드 가동 유효성 검증(`validateNode`), 멀티블록 BOM 산출(`buildMultiblockBOM`) 등 모드 특화 동작은 `ModAdapterRegistry.getAdapterForNode(this)`를 통해 동적으로 위임됩니다.
-* **`hiddenInputIndices` / `hiddenOutputIndices`**: 사용자가 카드의 복잡도를 줄이기 위해 비활성화/숨김 처리한 입출력 포트의 인덱스 집합. `RecipeNodeSerializer`를 통해 직렬화/역직렬화되며, 렌더러와 와이어 솔버는 `getVisibleInputIndices()` / `getVisibleOutputIndices()`를 참조하여 가시 포트만 배선 및 렌더링.
-* **`voidedOutputIndices` & `isVoidSink()` (ADR-019)**: 순 생산품 결산에서 제외할 출력 포트 인덱스 세트 및 정션 노드의 보이드 싱크(`SupplyMode.VOID_SINK`) 판별 메서드. 유량 수지 솔버(`FlowBalanceMatrixSolver`, `FlowSummaryAggregator`)와 연동되어 다운스트림 정상 기계의 실수요 충족 후 남은 순 잉여 부산물을 결산에서 폐기 처리.
+  - 머신 아이콘 변경 이벤트(`setMachineIcon`), 물리적 에너지 형태 결정(`getEnergyType`), 단일 기계 소비/발전량 연산(`computeSingleMachinePower`), 노드 가동 유효성 검증(`validateNode`), 멀티블록 BOM 산출(`buildMultiblockBOM`) 등 모드 특화 동작은 `ModAdapterRegistry.getAdapterForNode(this)`를 통해 동적으로 위임됩니다.
+* **포트 가시성 및 결산 제어**:
+  - `NodePortVisibility`: 비활성화/숨김 처리된 입출력 포트 인덱스를 관리하며 가시 포트만 배선 및 렌더링.
+  - `voidedOutputIndices` & `isVoidSink()`: 순 생산품 결산에서 제외할 출력 포트 인덱스 및 정션 노드의 보이드 싱크(`SupplyMode.VOID_SINK`) 판별. 다운스트림 정상 기계의 실수요 충족 후 남은 순 잉여 부산물을 결산에서 폐기 처리.
 * **`isFlipped`**: 노드의 입력(좌)/출력(우) 포트 렌더링 방향을 좌우 수평 반전하여 복잡한 플로우차트의 배선 교차 최소화.
-* **`efficiency` ($\eta \in [0.0, 1.0]$)**: 솔버(`FlowGraphSolver`, `MassBalanceSolver`)에 의해 상류 원자재 공급 제약 및 폐루프 순환 밸런스 하에서 계산된 기계의 실제 가동률.
-* **`calculateEffectiveOutputRates()`**: 기계 대수, 병렬치, 오버클럭, 서브틱, 애드온 승수 및 티어 부산물 확률 부스트가 합성된 1초당 아이템/유체 생산 유량을 계산.
 
 ---
 
@@ -287,30 +363,53 @@ flowchart LR
 
 ---
 
-## 3. 복합 모듈 및 순차 조립 시스템 (`FlowGraphModuleHandler`, `CompoundRecipeBuilder`)
+## 3. 전용 서브페이지 기반 복합 공정 모듈 및 경계 I/O 핀 규격 (`SubPageModuleNodeRole`, `BoundaryPinNodeRole`, ADR-043)
 
-다수의 복잡한 노드 그래프를 단일 복합 모듈 카드(`RecipeNode`)로 패키징(`Ctrl+G`)하거나 원래 서브그래프로 복원(`펼치기`)하며, Create 순차 조립 공정을 체인 카드로 합성합니다.
+복합 공정을 1:1 독립 서브페이지(`PageType.MODULE`)로 격리 캡슐화하고 경계 I/O 인터페이스를 엄격히 규격화합니다.
 
 ```mermaid
 flowchart LR
-    subgraph Expanded["전개된 하위 그래프 (Sub-Graph)"]
-        M1["기계 1 (원자재 처리)"] --> M2["기계 2 (중간 반응)"]
-        M2 --> M3["기계 3 (정제)"]
-        M3 -->|재활용 부산물| M1
+    subgraph ParentCanvas["상위 캔버스 페이지 (PageType.NORMAL)"]
+        M1["상류 공급 기계"] -->|원자재 유입| PIN_IN_OUTER["[모듈 카드 입력 포트 #0]"]
+        subgraph SubPageCard["복합 모듈 카드 (SubPageModuleNodeRole)"]
+            PIN_IN_OUTER -.->|더블클릭 서브페이지 진입| SUB_PAGE
+            SUB_PAGE -.->|Esc 상위 복귀| PIN_OUT_OUTER
+        end
+        PIN_OUT_OUTER["[모듈 카드 출력 포트 #0]"] -->|완제품 배출| M2["하류 소비 기계"]
     end
-    
-    subgraph Collapsed["단일 복합 모듈 카드 (Compound Module)"]
-        CM["[모듈] 석유 정제 라인\nNet EU/t: -4,800 (EV)\n기계 12대 | 입력 2 | 출력 3"]
+
+    subgraph SUB_PAGE["1:1 전용 서브페이지 (PageType.MODULE)"]
+        direction TB
+        PIN_IN["경계 입력 핀 (BoundaryPinNodeRole)\n[InputPin: 원유 #0]"] --> SM1["탈황 증류탑"]
+        SM1 --> SM2["접촉 분해 공정"]
+        SM2 --> PIN_OUT["경계 출력 핀 (BoundaryPinNodeRole)\n[OutputPin: 에틸렌 #0]"]
     end
-    
-    Expanded -- "그룹화 (Ctrl+G)" --> Collapsed
-    Collapsed -- "펼치기 (Ctrl+G)" --> Expanded
 ```
 
-1. **경계 I/O 자동 승격 (Boundary I/O Promotion)**: 내부 노드 간의 중간 연결선은 은닉되고, 외부와 연결된 원자재/최종 제품만 모듈 외곽 포트로 자동 승격.
-2. **와이어 리매핑 (Wire Remapping)**: 외부에서 연결되어 있던 와이어의 `ConnectionEdge`가 신규 모듈 카드 포트로 재배선.
-3. **비례 스케일링 (Proportional Scaling)**: 모듈 카드의 기계 대수를 변경하면 내부 하위 그래프의 모든 기계 대수와 유량이 동일 비율로 연동 스케일링.
-4. **순차 조립 단계별 기계 아이콘 추출 (`CompoundRecipeBuilder.LayerSpec`)**: Create 순차 조립(Sequenced Assembly) 공정의 각 단계(Deployer, Spout, Mechanical Press, Mechanical Saw)별 독립 머신 아이콘을 추출하여 계층 카드에 개별 렌더링.
+### 3.1 서브페이지 격리 및 탐색 라이프사이클
+1. **1:1 전용 서브페이지 (`PageType.MODULE`)**:
+   - 상위 페이지에서 복수의 노드를 그룹화(`Ctrl+G`)하면 독립된 서브페이지가 생성되고, 상위 페이지에는 슬림한 복합 모듈 카드(`SubPageModuleNodeRole`) 1장이 배치됩니다.
+   - 서브페이지는 탭 바에 노출되지 않고 모듈 카드와 1:1로 결합되어 관리됩니다.
+2. **비파괴 내비게이션**:
+   - 모듈 카드 더블클릭 시 해당 서브페이지 캔버스로 매끄럽게 진입하며, 화면 좌측 상단에 빵부스러기(Breadcrumb) 내비게이션 바가 표시됩니다.
+   - `Esc` 키 또는 상단 브레드크럼의 상위 페이지 링크 클릭 시 상위 캔버스의 원래 좌표 및 줌 배율로 즉시 복귀합니다.
+
+### 3.2 경계 I/O 핀 인터페이스 계약 (`BoundaryPinNodeRole`)
+- **명시적 경계 핀 (`BoundaryPinNode`)**:
+  - 서브페이지 내부에는 외부와의 원자재 인터페이스를 담당하는 전용 경계 핀 노드가 배치됩니다.
+  - `direction = INPUT`: 상위 모듈 카드의 입력 포트로부터 유입되는 자원을 내부 서브그래프로 분배.
+  - `direction = OUTPUT`: 내부 서브그래프에서 생산된 최종 산출물을 상위 모듈 카드의 출력 포트로 집계 배출.
+- **포트 인덱스 1:1 바인딩 (`targetPortIndex`)**:
+  - 각 경계 핀의 `targetPortIndex`와 `boundIngredient`는 상위 모듈 카드의 입출력 슬롯 인덱스와 정확히 1:1로 대응됩니다.
+  - 모듈 외부에서 와이어를 연결하면 상위 모듈 카드의 해당 슬롯을 거쳐 내부 서브그래프의 경계 핀으로 유량이 보존되어 전달됩니다.
+
+### 3.3 복합 모듈 수학적 특성 및 집계
+- **기계 대수 및 복합 전력 적분**:
+  - 서브페이지 내부에 포함된 전체 기계 대수($N_{\text{total}}$)와 총 소비/발전 전력(Net EU/t)을 자동으로 합산하여 모듈 카드 헤더에 표시합니다.
+- **비례 스케일링 (`scaleMultiplier`)**:
+  - 상위 모듈 카드의 기계 대수를 $k$배로 조정하면, 서브페이지 내부의 모든 하위 기계 대수 및 경계 핀 유량이 동일하게 $k$배로 비례 스케일링됩니다.
+- **순차 조립 레이어 카드 (`CompoundRecipeBuilder.LayerSpec`)**:
+  - Create 순차 조립(Sequenced Assembly) 공정의 단계별(Deployer, Spout, Press, Saw) 독립 머신 아이콘 및 가동 사양을 계층 카드에 추출하여 렌더링합니다.
 
 ---
 
@@ -449,7 +548,7 @@ public class MachineHardwareTemplate {
 
 ---
 
-## 12. 공정 제어 및 목표 수량 앵커 도메인 모델 (`TargetAnchor`, `SharedMachinePool`) (ADR-030, ADR-032)
+## 12. 공정 제어 및 목표 수량 앵커 도메인 모델 (`TargetAnchor`, `SharedMachinePool`) (ADR-034, ADR-042)
 
 ### 12.1 정션 및 노드 유량 앵커 (`TargetAnchor`)
 복잡한 순환 공정 및 단말 배치 계산에서 유량 스케일링의 기준이 되는 고정점(Anchor) 모델입니다:

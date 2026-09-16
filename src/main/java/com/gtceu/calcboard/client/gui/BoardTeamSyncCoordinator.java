@@ -6,7 +6,7 @@ import com.gtceu.calcboard.network.NetworkHandler;
 import com.gtceu.calcboard.network.packet.c2s.C2SAcquireLockPacket;
 import com.gtceu.calcboard.network.packet.c2s.C2SPingPresencePacket;
 import com.gtceu.calcboard.network.packet.c2s.C2SRequestWorkspacePacket;
-import com.gtceu.calcboard.server.storage.TeamWorkspacePage;
+import com.gtceu.calcboard.api.team.TeamWorkspacePage;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.Component;

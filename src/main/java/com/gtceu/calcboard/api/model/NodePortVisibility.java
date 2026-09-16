@@ -48,6 +48,17 @@ public class NodePortVisibility {
         hiddenOutputIndices.clear();
     }
 
+    public void copyFrom(NodePortVisibility other) {
+        this.hiddenInputIndices.clear();
+        this.hiddenOutputIndices.clear();
+        this.voidedOutputIndices.clear();
+        if (other != null) {
+            this.hiddenInputIndices.addAll(other.getHiddenInputIndices());
+            this.hiddenOutputIndices.addAll(other.getHiddenOutputIndices());
+            this.voidedOutputIndices.addAll(other.getVoidedOutputIndices());
+        }
+    }
+
     public boolean isOutputPortVoided(int index) {
         return voidedOutputIndices.contains(index);
     }

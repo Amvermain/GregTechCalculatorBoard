@@ -9,6 +9,7 @@ import com.gtceu.calcboard.client.gui.action.BoardActionHandler;
 import com.gtceu.calcboard.client.gui.dialog.modal.IBoardModal;
 import com.gtceu.calcboard.client.gui.dialog.modal.ModalRenderContext;
 import com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer;
+import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -234,6 +235,7 @@ public class PageSettingsDialog implements IBoardModal {
                 }
                 BoardManager.getInstance().saveForCurrentContext();
                 parent.rebuildBoardWidgets();
+                TutorialManager.getInstance().onPageSettingsConfigured();
                 playClickSound();
                 return true;
             }
@@ -245,6 +247,7 @@ public class PageSettingsDialog implements IBoardModal {
         if (mouseX >= x && mouseX <= x + w && mouseY >= y && mouseY <= y + 16) {
             targetPage.setAutoEquipEnergyHatches(!targetPage.isAutoEquipEnergyHatches());
             BoardManager.getInstance().saveForCurrentContext();
+            TutorialManager.getInstance().onPageSettingsConfigured();
             playClickSound();
             return true;
         }
@@ -257,6 +260,7 @@ public class PageSettingsDialog implements IBoardModal {
             int applicableCount = BoardActionHandler.countBatchApplicableNodes(parent.getGraph(), currentTier);
             if (currentTier != null && applicableCount > 0) {
                 parent.batchApplyPageTargetVoltage();
+                TutorialManager.getInstance().onPageSettingsConfigured();
             }
             return true;
         }

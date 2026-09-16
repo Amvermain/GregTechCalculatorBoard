@@ -9,7 +9,8 @@ import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.api.storage.BoardPage;
 import com.gtceu.calcboard.api.storage.BlueprintCodec;
 import com.gtceu.calcboard.client.team.ClientWorkspaceState;
-import com.gtceu.calcboard.server.storage.CommitLogEntry;
+import com.gtceu.calcboard.api.team.CommitLogEntry;
+import com.gtceu.calcboard.api.team.TeamWorkspacePage;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -201,7 +202,7 @@ public class RecentSavesDialog implements IBoardModal {
         ClientWorkspaceState state = ClientWorkspaceState.getInstance();
         BoardManager bm = BoardManager.getInstance();
 
-        com.gtceu.calcboard.server.storage.TeamWorkspacePage remotePage = state.getRemotePage(entry.getPageId());
+        TeamWorkspacePage remotePage = state.getRemotePage(entry.getPageId());
         String baseTitle = (remotePage != null && remotePage.getTitle() != null && !remotePage.getTitle().trim().isEmpty())
                 ? remotePage.getTitle() : "Team Design";
         String newPageName = baseTitle + " (Rev#" + entry.getRevision() + ")";

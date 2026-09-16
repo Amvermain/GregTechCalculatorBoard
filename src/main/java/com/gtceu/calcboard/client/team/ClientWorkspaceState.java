@@ -5,8 +5,8 @@ import com.gtceu.calcboard.client.gui.BoardScreen;
 import com.gtceu.calcboard.api.storage.BlueprintCodec;
 import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.network.packet.s2c.S2CBroadcastPresencePacket;
-import com.gtceu.calcboard.server.storage.CommitLogEntry;
-import com.gtceu.calcboard.server.storage.TeamWorkspacePage;
+import com.gtceu.calcboard.api.team.CommitLogEntry;
+import com.gtceu.calcboard.api.team.TeamWorkspacePage;
 import net.minecraft.nbt.CompoundTag;
 
 import java.util.*;

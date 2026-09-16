@@ -1383,7 +1383,7 @@ public class MultiblockBOMTest {
         teamState.setCurrentTeamName("Engineers Guild");
 
         String teamPageId = "page_team_processing";
-        com.gtceu.calcboard.server.storage.TeamWorkspacePage teamPage = new com.gtceu.calcboard.server.storage.TeamWorkspacePage(teamPageId, "Ore Processing");
+        com.gtceu.calcboard.api.team.TeamWorkspacePage teamPage = new com.gtceu.calcboard.api.team.TeamWorkspacePage(teamPageId, "Ore Processing");
         teamState.updateRemotePages(List.of(teamPage));
 
         com.gtceu.calcboard.api.model.FlowGraph teamGraph = teamState.getTeamGraph(teamPageId);

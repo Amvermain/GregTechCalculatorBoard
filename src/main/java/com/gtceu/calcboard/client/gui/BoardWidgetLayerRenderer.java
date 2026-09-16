@@ -77,6 +77,7 @@ public class BoardWidgetLayerRenderer {
             screen.getCanvasHandler().getContextMenuManager().render(graphics, screen.getMinecraftFont(), mouseX, mouseY);
         }
         TutorialOverlay.render(graphics, screen.getMinecraftFont(), screen, screen.width, screen.height, mouseX, mouseY);
+        com.gtceu.calcboard.client.gui.tutorial.ContextualNudgeToast.render(graphics, screen.getMinecraftFont(), screen.width, screen.height, mouseX, mouseY);
         BoardToast.render(graphics, screen.getMinecraftFont(), screen.width, screen.height);
     }
 }

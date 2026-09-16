@@ -1,4 +1,4 @@
-package com.gtceu.calcboard.server.storage;
+package com.gtceu.calcboard.api.team;
 
 import net.minecraft.nbt.CompoundTag;
 import java.util.UUID;

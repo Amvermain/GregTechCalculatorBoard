@@ -41,6 +41,13 @@ public class ModCompatHelper {
         return isModLoaded("start_core") || isModLoaded("gtceu_start") || isModLoaded("start");
     }
 
+    public static boolean isTFGLoaded() {
+        if (TEST_OVERRIDES.containsKey("tfg")) {
+            return Boolean.TRUE.equals(TEST_OVERRIDES.get("tfg"));
+        }
+        return isModLoaded("tfg") || isModLoaded("terrafirmagreg");
+    }
+
     public static boolean isCreateLoaded() {
         return isModLoaded("create");
     }

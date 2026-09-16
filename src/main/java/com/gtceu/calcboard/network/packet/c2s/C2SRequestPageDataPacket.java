@@ -5,7 +5,7 @@ import com.gtceu.calcboard.network.packet.s2c.S2CWorkspaceErrorPacket;
 import com.gtceu.calcboard.server.storage.ChunkedStreamHelper;
 import com.gtceu.calcboard.server.storage.TeamBoardSavedData;
 import com.gtceu.calcboard.server.storage.TeamWorkspaceData;
-import com.gtceu.calcboard.server.storage.TeamWorkspacePage;
+import com.gtceu.calcboard.api.team.TeamWorkspacePage;
 import com.gtceu.calcboard.server.team.TeamProviderRegistry;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;

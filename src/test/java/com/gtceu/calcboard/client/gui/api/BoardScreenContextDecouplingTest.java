@@ -155,7 +155,7 @@ public class BoardScreenContextDecouplingTest {
         @Override public void showToast(Component message) { dispatchedToasts.add(message); }
         @Override public boolean ensureEditPermission() { return true; }
         @Override public boolean isAnyModalOpen() { return false; }
-        @Override public void onClose() {}
+        @Override public void closeScreen() {}
         @Override public void addNode(RecipeNode node) {}
         @Override public void removeNode(NodeWidget widget) {}
         @Override public void flipSelectedNodes() {}
@@ -188,6 +188,7 @@ public class BoardScreenContextDecouplingTest {
         @Override public void openTutorialExitDialog(int targetPageIndex) {}
         @Override public void openTutorialExitDialogForNewPage() {}
         @Override public void openTutorialExitDialogForTeamPage(String teamPageId) {}
+        @Override public void openTutorialLauncher() {}
         @Override public void openExportFolderDialog(String folderPath) {}
         @Override public void openImportFolderDialog() {}
         @Override public void openImportFolderDialog(FolderBlueprintPackage pkg) {}

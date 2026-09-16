@@ -68,11 +68,11 @@ public class WorkspaceCollaborationSyncTest {
 
     @Test
     public void testPageRevisionPreservedIndependentlyFromGlobalRevision() {
-        com.gtceu.calcboard.server.storage.TeamWorkspacePage page = new com.gtceu.calcboard.server.storage.TeamWorkspacePage("page_sub", "Sub Factory", 7, new byte[0]);
+        com.gtceu.calcboard.api.team.TeamWorkspacePage page = new com.gtceu.calcboard.api.team.TeamWorkspacePage("page_sub", "Sub Factory", 7, new byte[0]);
         state.updateRemotePages(java.util.List.of(page));
         state.setGlobalRevision(24);
 
-        com.gtceu.calcboard.server.storage.TeamWorkspacePage remotePage = state.getRemotePage("page_sub");
+        com.gtceu.calcboard.api.team.TeamWorkspacePage remotePage = state.getRemotePage("page_sub");
         assertNotNull(remotePage);
         assertEquals(7, remotePage.getPageRevision(), "Page revision should remain independent of global revision");
         assertEquals(24, state.getGlobalRevision());

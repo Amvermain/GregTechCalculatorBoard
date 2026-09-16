@@ -24,6 +24,8 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
+import com.gtceu.calcboard.compat.tfg.TFGBoilerPhysics;
+import com.gtceu.calcboard.client.gui.compat.tfg.TFGBoilerDialogRenderer;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -229,7 +231,7 @@ public class GTCEuMachineDialogHeaderHandler {
             return handleTurbineHeaderClick(dialog, node, x, y, dialogW, mouseX, mouseY, button, parallelBox, parent);
         }
         if (node.isLiquidBoilerRecipe() || (ModAdapterRegistry.getAdapterForNode(node) != null && ModAdapterRegistry.getAdapterForNode(node).isBoilerRecipe(node))) {
-            return handleBoilerHeaderClick(node, x, y, dialogW, mouseX, mouseY, parent);
+            return handleBoilerHeaderClick(dialog, node, x, y, dialogW, mouseX, mouseY, button, parent);
         }
         if (!node.isMultiblock()) {
             return handleSingleBlockHeaderClick(node, x, y, mouseX, mouseY, parent);
@@ -307,8 +309,11 @@ public class GTCEuMachineDialogHeaderHandler {
         return false;
     }
 
-    private boolean handleBoilerHeaderClick(RecipeNode node, int x, int y, int dialogW,
-                                            double mouseX, double mouseY, BoardScreen parent) {
+    private boolean handleBoilerHeaderClick(MachineConfigDialog dialog, RecipeNode node, int x, int y, int dialogW,
+                                            double mouseX, double mouseY, int button, BoardScreen parent) {
+        if (TFGBoilerPhysics.isTFGLargeBoiler(node)) {
+            return TFGBoilerDialogRenderer.handleBoilerHeaderClick(dialog, node, x, y, dialogW, mouseX, mouseY, button, parent);
+        }
         var curTier = com.gtceu.calcboard.api.type.GTBoilerTier.getBoilerTier(node);
         if (curTier.isMultiblock()) {
             if (handleBoilerThrottleClick(node, x, y, dialogW, mouseX, mouseY, parent)) {

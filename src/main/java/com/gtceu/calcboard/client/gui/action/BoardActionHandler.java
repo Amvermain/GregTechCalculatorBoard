@@ -714,6 +714,7 @@ public class BoardActionHandler {
             screen.recordCommand(new BoardCommand.CompoundCommand(subCmds, "Scale loop to steady state"));
             screen.rebuildWidgets();
             screen.markSummaryDirty();
+            TutorialManager.getInstance().onLoopScaled();
             double sampleCount = Math.max(0.001, Math.round(targetNode.getMachineCount() * 1000.0) / 1000.0);
             String countStr = FormatUtil.formatCompactNumber(sampleCount);
             BoardToast.show(Component.literal("§b🔄 ").append(Component.translatable("message.gtcalcboard.steady_state_scaled", String.valueOf(changedCount), countStr)));

@@ -727,4 +727,38 @@ public class GTCEuModAdapter implements IModAdapter {
     public List<com.gtceu.calcboard.api.model.IngredientStack> sanitizeLegacyCoreInputs(RecipeNode node, List<com.gtceu.calcboard.api.model.IngredientStack> savedInputs) {
         return com.gtceu.calcboard.compat.gtceu.projection.GTCEuPortProjector.getInstance().sanitizeLegacyCoreInputs(node, savedInputs);
     }
+
+    @Override
+    public boolean supportsBoosterControl(RecipeNode node) {
+        return com.gtceu.calcboard.compat.tfg.TFGBoilerPhysics.isTFGLargeBoiler(node);
+    }
+
+    @Override
+    public Component getBoosterDisplayComponent(RecipeNode node) {
+        if (com.gtceu.calcboard.compat.tfg.TFGBoilerPhysics.isTFGLargeBoiler(node)) {
+            return com.gtceu.calcboard.compat.tfg.TFGBoilerBoosterProvider.getInstance().getBoosterDisplayComponent(node);
+        }
+        return null;
+    }
+
+    @Override
+    public void cycleBooster(RecipeNode node, int direction) {
+        if (com.gtceu.calcboard.compat.tfg.TFGBoilerPhysics.isTFGLargeBoiler(node)) {
+            com.gtceu.calcboard.compat.tfg.TFGBoilerBoosterProvider.getInstance().cycleBooster(node, direction);
+        }
+    }
+
+    @Override
+    public void syncBoosterInputs(RecipeNode node) {
+        if (com.gtceu.calcboard.compat.tfg.TFGBoilerPhysics.isTFGLargeBoiler(node)) {
+            com.gtceu.calcboard.compat.tfg.TFGBoilerBoosterProvider.getInstance().syncBoosterInputs(node);
+        }
+    }
+
+    @Override
+    public void buildBoosterTooltip(RecipeNode node, List<Component> tooltip) {
+        if (com.gtceu.calcboard.compat.tfg.TFGBoilerPhysics.isTFGLargeBoiler(node)) {
+            com.gtceu.calcboard.compat.tfg.TFGBoilerBoosterProvider.getInstance().buildBoosterTooltip(node, tooltip);
+        }
+    }
 }

@@ -7,7 +7,7 @@ import com.gtceu.calcboard.client.gui.api.IBoardScreenContext;
 import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
 import com.gtceu.calcboard.client.gui.util.BoardScissorHelper;
 import com.gtceu.calcboard.client.team.ClientWorkspaceState;
-import com.gtceu.calcboard.server.storage.TeamWorkspacePage;
+import com.gtceu.calcboard.api.team.TeamWorkspacePage;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -15,6 +15,7 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import org.lwjgl.glfw.GLFW;
+import com.gtceu.calcboard.client.util.ClientSafetyHelper;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -55,6 +56,11 @@ public class PageTabBarWidget {
 
         BoardPage activePage = BoardManager.getInstance().getActivePage();
         if (!isTeam && activePage != null && activePage.isModuleSubPage()) {
+            if (activePage.getParentPageId().isEmpty() || BoardManager.getInstance().getPage(activePage.getParentPageId()).isEmpty()) {
+                BoardManager.getInstance().cleanupOrphanSubpages();
+                screen.rebuildBoardWidgets();
+                return;
+            }
             renderBreadcrumbBar(graphics, font, activePage, mouseX, mouseY, tabY, browserBtnW);
             return;
         }
@@ -198,10 +204,15 @@ public class PageTabBarWidget {
 
         BoardPage activePage = BoardManager.getInstance().getActivePage();
         if (!isTeam && activePage != null && activePage.isModuleSubPage()) {
+            if (activePage.getParentPageId().isEmpty() || BoardManager.getInstance().getPage(activePage.getParentPageId()).isEmpty()) {
+                BoardManager.getInstance().cleanupOrphanSubpages();
+                screen.rebuildBoardWidgets();
+                return true;
+            }
             return handleBreadcrumbClick(activePage, mouseX, mouseY, button, tabY, browserBtnW);
         }
 
-        Font font = Minecraft.getInstance().font;
+        Font font = Minecraft.getInstance() != null ? Minecraft.getInstance().font : null;
         List<String> pageTitles = getPageTitles(teamState, isTeam);
         int activeIdx = getActivePageIndex(teamState, isTeam);
 
@@ -224,7 +235,7 @@ public class PageTabBarWidget {
             boolean isActive = (i == activeIdx);
             String prefix = resolveTabPrefix(i, isActive, isTeam);
             GTVoltageTier vTier = resolveTabVoltageTier(i, isTeam);
-            int textW = font.width(prefix + pageName);
+            int textW = ClientSafetyHelper.getStringWidth(font, prefix + pageName);
             int tabW = computeTabWidth(font, pageName, prefix, pageTitles.size(), vTier, !isTeam);
 
             if (virtualMouseX >= curX && virtualMouseX <= curX + tabW) {
@@ -240,6 +251,7 @@ public class PageTabBarWidget {
 
         if (maxScrollX > 0 && mouseX <= (curX + addW + 20) && (button == 0 || button == 2)) {
             commitRename();
+            resetCanvasInteraction();
             this.isDraggingTabBar = true;
             this.dragStartX = mouseX;
             this.initialScrollX = this.scrollX;
@@ -271,7 +283,9 @@ public class PageTabBarWidget {
     private int getActivePageIndex(ClientWorkspaceState teamState, boolean isTeam) {
         if (!isTeam) {
             BoardManager bm = BoardManager.getInstance();
-            String activeId = bm.getActivePage().getId();
+            BoardPage activePage = bm.getActivePage();
+            String activeId = (activePage != null) ? activePage.getId() : null;
+            if (activeId == null) return 0;
             List<BoardPage> openPages = bm.getOpenPages();
             for (int i = 0; i < openPages.size(); i++) {
                 if (openPages.get(i).getId().equals(activeId)) {
@@ -329,7 +343,7 @@ public class PageTabBarWidget {
         }
 
         if (!isTeam && editingPageIndex != index) {
-            Font font = Minecraft.getInstance().font;
+            Font font = Minecraft.getInstance() != null ? Minecraft.getInstance().font : null;
             int badgeW = getBadgeWidth(font, vTier);
             boolean hasClose = pageCount > 1;
             int badgeX = hasClose ? (curX + tabW - 14 - badgeW) : (curX + tabW - 4 - badgeW);
@@ -345,7 +359,7 @@ public class PageTabBarWidget {
         boolean isDoubleClick = (now - lastClickTime < 350 && lastClickedTabIdx == index && button == 0);
         boolean isRightClick = (button == 1);
 
-        if (!isTeam && isRightClick && net.minecraft.client.gui.screens.Screen.hasShiftDown()) {
+        if (!isTeam && isRightClick && ClientSafetyHelper.isShiftDown()) {
             BoardManager bm = BoardManager.getInstance();
             List<BoardPage> openPages = bm.getOpenPages();
             if (index < openPages.size()) {
@@ -417,13 +431,15 @@ public class PageTabBarWidget {
         if (index >= openPages.size()) return false;
         BoardPage targetPage = openPages.get(index);
 
-        if (net.minecraft.client.gui.screens.Screen.hasShiftDown()) {
+        if (ClientSafetyHelper.isShiftDown()) {
             int actualPageIndex = bm.getPages().indexOf(targetPage);
             if (actualPageIndex >= 0) {
                 screen.openDeletePageDialog(actualPageIndex, pageName);
             }
             return true;
         }
+
+        resetCanvasInteraction();
 
         bm.closeTab(targetPage.getId());
         BoardPage active = bm.getActivePage();
@@ -437,7 +453,16 @@ public class PageTabBarWidget {
         return true;
     }
 
+    private void resetCanvasInteraction() {
+        if (screen.getCanvasHandler() != null) {
+            screen.getCanvasHandler().getStateMachine().returnToIdle();
+            screen.getCanvasHandler().getWireHandler().cancelWireDrag();
+        }
+    }
+
     private boolean performTabSwitch(int index, int activeIdx, boolean isTeam, ClientWorkspaceState teamState) {
+        resetCanvasInteraction();
+
         if (TutorialManager.getInstance().isActive() && index != activeIdx) {
             if (isTeam) {
                 List<TeamWorkspacePage> teamPages = new ArrayList<>(teamState.getRemotePages());
@@ -452,19 +477,19 @@ public class PageTabBarWidget {
 
         if (isTeam) {
             List<TeamWorkspacePage> teamPages = new ArrayList<>(teamState.getRemotePages());
-            if (index < teamPages.size()) {
-                String newPageId = teamPages.get(index).getPageId();
-                if (!newPageId.equals(teamState.getActiveTeamPageId())) {
-                    teamState.autoCommitAndRelease(screen, teamState.getActiveTeamPageId());
-                    teamState.setActiveTeamPageId(newPageId);
-                    com.gtceu.calcboard.network.NetworkHandler.sendToServer(
-                        new com.gtceu.calcboard.network.packet.c2s.C2SPingPresencePacket(teamState.getCurrentTeamId(), newPageId, true)
-                    );
-                    screen.rebuildBoardWidgets();
-                    screen.markSummaryDirty();
-                    playClickSound();
-                }
-            }
+            if (index >= teamPages.size()) return true;
+            String newPageId = teamPages.get(index).getPageId();
+            if (newPageId.equals(teamState.getActiveTeamPageId())) return true;
+
+            resetCanvasInteraction();
+            teamState.autoCommitAndRelease(screen, teamState.getActiveTeamPageId());
+            teamState.setActiveTeamPageId(newPageId);
+            com.gtceu.calcboard.network.NetworkHandler.sendToServer(
+                new com.gtceu.calcboard.network.packet.c2s.C2SPingPresencePacket(teamState.getCurrentTeamId(), newPageId, true)
+            );
+            screen.rebuildBoardWidgets();
+            screen.markSummaryDirty();
+            playClickSound();
             return true;
         }
 
@@ -472,22 +497,10 @@ public class PageTabBarWidget {
         List<BoardPage> openPages = bm.getOpenPages();
         if (index < openPages.size()) {
             BoardPage targetPage = openPages.get(index);
-            if (!targetPage.getId().equals(bm.getActivePage().getId())) {
-                BoardPage cur = bm.getActivePage();
-                if (cur != null) {
-                    cur.setPanX(screen.getPanX());
-                    cur.setPanY(screen.getPanY());
-                    cur.setZoom(screen.getZoom());
-                }
-                bm.openPage(targetPage.getId());
-                BoardPage next = bm.getActivePage();
-                if (next != null) {
-                    screen.setPanX(next.getPanX());
-                    screen.setPanY(next.getPanY());
-                    screen.setZoom(next.getZoom());
-                }
-                screen.rebuildBoardWidgets();
-                screen.markSummaryDirty();
+            BoardPage activePage = bm.getActivePage();
+            String activeId = (activePage != null) ? activePage.getId() : null;
+            if (!targetPage.getId().equals(activeId)) {
+                screen.openPage(targetPage.getId());
                 playClickSound();
             }
         }
@@ -508,6 +521,8 @@ public class PageTabBarWidget {
             playClickSound();
             return true;
         }
+
+        resetCanvasInteraction();
 
         BoardManager bm = BoardManager.getInstance();
         BoardPage cur = bm.getActivePage();
@@ -684,14 +699,14 @@ public class PageTabBarWidget {
     }
 
     private int computeTabWidth(Font font, String pageName, String prefix, int totalTabCount, GTVoltageTier vTier, boolean showBadge) {
-        int textW = font.width(prefix + pageName);
+        int textW = ClientSafetyHelper.getStringWidth(font, prefix + pageName);
         int badgeW = showBadge ? getBadgeWidth(font, vTier) + 4 : 0;
         return textW + badgeW + (totalTabCount > 1 ? 26 : 16);
     }
 
     private int getBadgeWidth(Font font, GTVoltageTier vTier) {
         String text = (vTier != null) ? ("⚡" + vTier.getName()) : "⚡Auto";
-        return font.width(text) + 4;
+        return ClientSafetyHelper.getStringWidth(font, text) + 4;
     }
 
     private GTVoltageTier resolveTabVoltageTier(int index, boolean isTeam) {
@@ -714,7 +729,7 @@ public class PageTabBarWidget {
     }
 
     private void playClickSound() {
-        Minecraft.getInstance().getSoundManager().play(
+        ClientSafetyHelper.playSoundSafely(
             net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F)
         );
     }
@@ -763,10 +778,10 @@ public class PageTabBarWidget {
             return true;
         }
 
-        Font font = Minecraft.getInstance().font;
+        Font font = Minecraft.getInstance() != null ? Minecraft.getInstance().font : null;
         int curX = screen.getDynamicLeftMargin() + browserBtnW + 6;
         String backLabel = "⮌ " + Component.translatable("gui.gtcalcboard.subpage.back").getString();
-        int backW = font.width(backLabel) + 10;
+        int backW = ClientSafetyHelper.getStringWidth(font, backLabel) + 10;
 
         if (mouseX >= curX && mouseX <= curX + backW && button == 0) {
             screen.returnToParentPage();
@@ -780,7 +795,7 @@ public class PageTabBarWidget {
         }
         if (parentName.isEmpty()) parentName = "Main";
         String parentText = parentName + "  >  ";
-        int parentW = font.width(parentText);
+        int parentW = ClientSafetyHelper.getStringWidth(font, parentText);
 
         if (mouseX >= curX && mouseX <= curX + parentW && button == 0) {
             screen.returnToParentPage();
@@ -798,7 +813,7 @@ public class PageTabBarWidget {
         boolean isTeam = teamState.isTeamMode();
         if (isTeam) return -1;
 
-        Font font = Minecraft.getInstance().font;
+        Font font = Minecraft.getInstance() != null ? Minecraft.getInstance().font : null;
         List<String> pageTitles = getPageTitles(teamState, isTeam);
         int activeIdx = getActivePageIndex(teamState, isTeam);
         int browserBtnW = 22;

@@ -6,7 +6,9 @@ import com.gtceu.calcboard.api.solver.FlowGraphModuleHandler;
 import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.api.storage.BoardPage;
 import com.gtceu.calcboard.api.type.BoardGuiScale;
+import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
 import com.gtceu.calcboard.client.gui.util.BoardViewportTransform;
+import com.gtceu.calcboard.client.util.ClientSafetyHelper;
 import com.gtceu.calcboard.integration.spi.RecipeViewerRegistry;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.Minecraft;
@@ -48,7 +50,13 @@ public class BoardNavigationHandler {
             return;
         }
 
-        long window = Minecraft.getInstance().getWindow().getWindow();
+        long window = ClientSafetyHelper.getWindowHandleSafely();
+        if (window == 0L) {
+            wasdVelX = 0.0;
+            wasdVelY = 0.0;
+            return;
+        }
+
         boolean isW = InputConstants.isKeyDown(window, GLFW.GLFW_KEY_W) || InputConstants.isKeyDown(window, GLFW.GLFW_KEY_UP);
         boolean isS = InputConstants.isKeyDown(window, GLFW.GLFW_KEY_S) || InputConstants.isKeyDown(window, GLFW.GLFW_KEY_DOWN);
         boolean isA = InputConstants.isKeyDown(window, GLFW.GLFW_KEY_A) || InputConstants.isKeyDown(window, GLFW.GLFW_KEY_LEFT);
@@ -67,7 +75,7 @@ public class BoardNavigationHandler {
             dirY *= norm;
         }
 
-        double speed = (Screen.hasShiftDown() ? 850.0 : 420.0) / Math.max(0.2, screen.getZoom());
+        double speed = (ClientSafetyHelper.isShiftDown() ? 850.0 : 420.0) / Math.max(0.2, screen.getZoom());
         applyVelocityDamping(dirX, dirY, speed, dt);
     }
 
@@ -170,6 +178,11 @@ public class BoardNavigationHandler {
         String subPageId = moduleNode.getSubPageId();
         if (subPageId == null || subPageId.isEmpty()) return;
 
+        if (screen.getCanvasHandler() != null) {
+            screen.getCanvasHandler().getStateMachine().returnToIdle();
+            screen.getCanvasHandler().getWireHandler().cancelWireDrag();
+        }
+
         BoardPage current = BoardManager.getInstance().getActivePage();
         if (current != null) {
             current.setPanX(screen.getPanX());
@@ -186,7 +199,8 @@ public class BoardNavigationHandler {
             }
             screen.rebuildWidgets();
             screen.markSummaryDirty();
-            Minecraft.getInstance().getSoundManager().play(
+            TutorialManager.getInstance().onSubpageEntered();
+            ClientSafetyHelper.playSoundSafely(
                 SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.1F)
             );
         }
@@ -196,6 +210,11 @@ public class BoardNavigationHandler {
         BoardPage current = BoardManager.getInstance().getActivePage();
         if (current == null || !current.isModuleSubPage()) return;
 
+        if (screen.getCanvasHandler() != null) {
+            screen.getCanvasHandler().getStateMachine().returnToIdle();
+            screen.getCanvasHandler().getWireHandler().cancelWireDrag();
+        }
+
         current.setPanX(screen.getPanX());
         current.setPanY(screen.getPanY());
         current.setZoom(screen.getZoom());
@@ -203,8 +222,12 @@ public class BoardNavigationHandler {
         String parentPageId = current.getParentPageId();
         String parentModuleNodeId = current.getParentModuleNodeId();
 
-        if (parentPageId == null || parentPageId.isEmpty()) return;
-        if (!BoardManager.getInstance().openPage(parentPageId)) return;
+        if (parentPageId == null || parentPageId.isEmpty() || !BoardManager.getInstance().openPage(parentPageId)) {
+            BoardManager.getInstance().cleanupOrphanSubpages();
+            screen.rebuildWidgets();
+            screen.markSummaryDirty();
+            return;
+        }
 
         BoardPage parentPage = BoardManager.getInstance().getActivePage();
         if (parentPage != null) {
@@ -220,7 +243,8 @@ public class BoardNavigationHandler {
         }
         screen.rebuildWidgets();
         screen.markSummaryDirty();
-        Minecraft.getInstance().getSoundManager().play(
+        TutorialManager.getInstance().onSubpageExited();
+        ClientSafetyHelper.playSoundSafely(
             SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 0.9F)
         );
     }

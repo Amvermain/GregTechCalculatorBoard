@@ -120,6 +120,12 @@ public final class NodeWidgetInteractionHandler {
         var stats = widget.getParent().getGraph().getInputPortStats(widget.getNode(), inPort);
         if (stats != null && stats.isSteadyStateRecirculating()) {
             widget.getParent().scaleLoopToSteadyState(widget.getNode().getId());
+            return true;
+        }
+        var meta = com.gtceu.calcboard.api.solver.FlowBalanceMatrixSolver.findDampedLoopMetaForNode(widget.getParent().getGraph(), widget.getNode());
+        if (meta != null) {
+            widget.getParent().scaleLoopToSteadyState(widget.getNode().getId());
+            return true;
         }
         return true;
     }
@@ -185,6 +191,7 @@ public final class NodeWidgetInteractionHandler {
 
         Minecraft mc = Minecraft.getInstance();
         if (nowBase) {
+            TutorialManager.getInstance().onAnchorConfigured();
             BoardToast.show(Component.literal("§6⌖ ").append(Component.translatable("message.gtcalcboard.base_set", node.getName())));
             mc.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.2F));
         } else {
@@ -384,6 +391,7 @@ public final class NodeWidgetInteractionHandler {
             parent.getGraph().cleanupInvalidConnections();
             parent.markSummaryDirty();
         }
+        TutorialManager.getInstance().onPortTagCycled();
         playClickSound(1.4F);
         return true;
     }
