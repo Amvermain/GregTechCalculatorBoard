@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <a href="https://www.curseforge.com/minecraft/mc-mods/gregtech-calculator-board"><img src="https://img.shields.io/curseforge/dt/1183699?logo=curseforge&logoColor=white&color=f16436&label=CurseForge" alt="CurseForge"></a>
+  <a href="https://www.curseforge.com/minecraft/mc-mods/gregtech-calculator-board"><img src="https://img.shields.io/curseforge/dt/1656634?logo=curseforge&logoColor=white&color=f16436&label=CurseForge" alt="CurseForge"></a>
   <a href="https://modrinth.com/mod/gtcalcboard"><img src="https://img.shields.io/modrinth/dt/gtcalcboard?logo=modrinth&logoColor=white&color=00AF5C&label=Modrinth" alt="Modrinth"></a>
   <img src="https://img.shields.io/badge/Minecraft-1.20.1-brightgreen.svg" alt="Minecraft 1.20.1">
   <img src="https://img.shields.io/badge/Loader-Forge%2047.2.0+-orange.svg" alt="Forge">
