@@ -19,6 +19,7 @@ import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
 import com.gtceu.calcboard.client.gui.util.FormatUtil;
 import com.gtceu.calcboard.client.gui.widget.BoardToast;
 import com.gtceu.calcboard.client.gui.widget.NodeWidget;
+import com.gtceu.calcboard.client.web.IconPrewarmer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.Component;
@@ -44,6 +45,7 @@ public class BoardActionHandler {
         screen.getGraph().addNode(node);
         screen.rebuildWidgets();
         TutorialManager.getInstance().onNodeAdded(node);
+        IconPrewarmer.getInstance().enqueue(node);
     }
 
     public void batchApplyPageTargetVoltage() {

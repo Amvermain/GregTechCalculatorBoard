@@ -49,7 +49,7 @@ public final class GTCEuPortProjector implements IPortProjectionProvider {
         }
 
         List<ProjectedPort> ports = new ArrayList<>();
-        appendCoreInputs(baseSpec, ports);
+        appendCoreInputs(node, baseSpec, ports);
         appendSteamInput(node, ports);
         appendCombustionInputs(node, ports);
         return Collections.unmodifiableList(ports);
@@ -61,20 +61,30 @@ public final class GTCEuPortProjector implements IPortProjectionProvider {
         if (com.gtceu.calcboard.compat.tfg.TFGBoilerPhysics.isTFGLargeBoiler(node)) {
             return com.gtceu.calcboard.compat.tfg.TFGBoilerPortProjectionProvider.getInstance().projectOutputPorts(node, baseSpec);
         }
-        if (baseSpec == null || baseSpec.baseOutputs() == null) {
+        List<IngredientStack> baseOutputs = (baseSpec != null && baseSpec.baseOutputs() != null && !baseSpec.baseOutputs().isEmpty())
+                ? baseSpec.baseOutputs()
+                : (node != null ? node.getOutputs() : Collections.emptyList());
+        if (baseOutputs == null || baseOutputs.isEmpty()) {
             return Collections.emptyList();
         }
-        List<ProjectedPort> ports = new ArrayList<>(baseSpec.baseOutputs().size());
-        for (int i = 0; i < baseSpec.baseOutputs().size(); i++) {
-            ports.add(ProjectedPort.ofCore(baseSpec.baseOutputs().get(i), i));
+        List<ProjectedPort> ports = new ArrayList<>(baseOutputs.size());
+        for (int i = 0; i < baseOutputs.size(); i++) {
+            ports.add(ProjectedPort.ofCore(baseOutputs.get(i), i));
         }
         return Collections.unmodifiableList(ports);
     }
 
-    private static void appendCoreInputs(RecipeSpec baseSpec, List<ProjectedPort> ports) {
-        if (baseSpec == null || baseSpec.baseInputs() == null) return;
-        for (int i = 0; i < baseSpec.baseInputs().size(); i++) {
-            ports.add(ProjectedPort.ofCore(baseSpec.baseInputs().get(i), i));
+    private static void appendCoreInputs(RecipeNode node, RecipeSpec baseSpec, List<ProjectedPort> ports) {
+        List<IngredientStack> coreInputs;
+        if (baseSpec != null && baseSpec.baseInputs() != null && !baseSpec.baseInputs().isEmpty()) {
+            coreInputs = baseSpec.baseInputs();
+        } else if (node != null && node.getInputs() != null && !node.getInputs().isEmpty()) {
+            coreInputs = INSTANCE.sanitizeLegacyCoreInputs(node, node.getInputs());
+        } else {
+            return;
+        }
+        for (int i = 0; i < coreInputs.size(); i++) {
+            ports.add(ProjectedPort.ofCore(coreInputs.get(i), i));
         }
     }
 

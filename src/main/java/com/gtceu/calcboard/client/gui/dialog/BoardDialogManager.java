@@ -54,6 +54,7 @@ public class BoardDialogManager {
     private JunctionSupplyDialog junctionSupplyDialog;
     private TargetOutputRateDialog targetOutputRateDialog;
     private PageSettingsDialog pageSettingsDialog;
+    private BatchRunCalculatorDialog batchRunDialog;
 
     public BoardDialogManager(BoardScreen screen) {
         this.screen = screen;
@@ -85,6 +86,7 @@ public class BoardDialogManager {
         if (this.junctionSupplyDialog == null) this.junctionSupplyDialog = new JunctionSupplyDialog(screen);
         if (this.targetOutputRateDialog == null) this.targetOutputRateDialog = new TargetOutputRateDialog(screen);
         if (this.pageSettingsDialog == null) this.pageSettingsDialog = new PageSettingsDialog(screen);
+        if (this.batchRunDialog == null) this.batchRunDialog = new BatchRunCalculatorDialog(screen);
         this.welcomeDialog.setScreen(screen);
         this.tutorialLauncherDialog.setScreen(screen);
 
@@ -121,6 +123,7 @@ public class BoardDialogManager {
         trackModal(junctionSupplyDialog);
         trackModal(targetOutputRateDialog);
         trackModal(pageSettingsDialog);
+        trackModal(batchRunDialog);
     }
 
     private void trackModal(IBoardModal modal) {
@@ -222,8 +225,12 @@ public class BoardDialogManager {
     }
 
     public void openSettingsDialog() {
+        openSettingsDialog(null);
+    }
+
+    public void openSettingsDialog(BoardSettingsDialog.SettingsTab tab) {
         if (settingsDialog != null) {
-            settingsDialog.open();
+            settingsDialog.openTab(tab);
             modalStack.push(settingsDialog);
         }
     }
@@ -463,5 +470,18 @@ public class BoardDialogManager {
         }
         pageSettingsDialog.open(page);
         modalStack.push(pageSettingsDialog);
+    }
+
+    public BatchRunCalculatorDialog getBatchRunDialog() {
+        return batchRunDialog;
+    }
+
+    public void openBatchRunCalculator(com.gtceu.calcboard.api.model.IngredientStack preselected, boolean isInput) {
+        if (batchRunDialog == null) {
+            batchRunDialog = new BatchRunCalculatorDialog(screen);
+            trackModal(batchRunDialog);
+        }
+        batchRunDialog.open(preselected, isInput);
+        modalStack.push(batchRunDialog);
     }
 }

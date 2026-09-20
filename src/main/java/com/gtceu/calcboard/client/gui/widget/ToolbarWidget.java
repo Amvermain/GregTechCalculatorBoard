@@ -301,6 +301,7 @@ public class ToolbarWidget {
         currentDropdownItems.add(new DropdownItem("⚖ " + Component.translatable("gui.gtcalcboard.auto_ratio").getString(), "Alt+R", () -> performAutoRatio(false, false)));
         currentDropdownItems.add(new DropdownItem("⚡ " + Component.translatable("gui.gtcalcboard.auto_ratio_fractional").getString(), "Shift+Alt+R", () -> performAutoRatio(false, true)));
         currentDropdownItems.add(new DropdownItem("▲ " + Component.translatable("gui.gtcalcboard.max_flow").getString(), null, this::performMaxThroughputOptimization));
+        currentDropdownItems.add(new DropdownItem("⏱ " + Component.translatable("gui.gtcalcboard.dialog.batch_run.title").getString(), null, () -> screen.openBatchRunCalculator(null, true)));
     }
 
     private void populateViewDropdown() {
@@ -347,6 +348,7 @@ public class ToolbarWidget {
         currentDropdownItems.add(new DropdownItem(Component.translatable("gui.gtcalcboard.png.copy").getString(), null, screen::copyFlowAsPng));
         currentDropdownItems.add(new DropdownItem("» " + Component.translatable("gui.gtcalcboard.export").getString(), "Ctrl+C", this::copyBlueprintToClipboard));
         currentDropdownItems.add(new DropdownItem("« " + Component.translatable("gui.gtcalcboard.import").getString(), "Ctrl+V", this::importBlueprintFromClipboard));
+        currentDropdownItems.add(new DropdownItem("🌐 " + Component.translatable("gui.gtcalcboard.web.open").getString(), null, screen::openWebDashboard));
 
         if (ModCompatHelper.isAe2Loaded()) {
             BoardPage activePage = BoardManager.getInstance().getActivePage();

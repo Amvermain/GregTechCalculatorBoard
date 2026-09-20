@@ -34,15 +34,17 @@ An in-game node graph calculator and flowchart editor for GregTech CEu Modern, E
 - **Hardware Addons & Multiblocks**: Deductive calculation for heating coils (temperature & duration bonuses), parallel hatches, configurable maintenance hatches, and turbine rotors.
 - **Multi-Mod Energy Systems**: Kinetic calculations for **Create** & **Create: New Age** (SU, RPM, generator coils), RF/t dynamos & tier kits for **Thermal Series**, steam consumption modeling for **Systeams** / Boilers, and **TerraFirmaGreg (TFG)** Large Bronze and Steel Boilers with 9 booster fluids and dual-fuel Super Boiler mode.
 - **Master Anchor & Auto-Ratio Sizing**: Designate bottleneck machines as Base Anchors to automatically scale all upstream production chains backwards using integer ceiling, with full support for expanded group frames and steady-state recirculation balancing.
+- **Recipe Manual Override**: Manually customize base processing duration, power consumption/generation, and input/output ingredient quantities in the machine settings dialog for custom or mod-tweaked recipes with one-click restoration.
 
 ### 3. Factory Multiblock BOM & Shared Machine Pools
 - **Automated Multiblock Bill of Materials (BOM)**: Aggregates all multiblock and singleblock construction requirements (casings, coils, hatches, controllers) across pages, frames, and compound modules (`B` hotkey). Export shopping lists directly to EMI Recipe Tree, JEI++, or clipboard.
 - **Shared Machine Pools (Time-Sharing Frame)**: Group multiple recipes sharing physical machines into a pool frame (`Ctrl + Shift + S`). Automatically calculates cumulative duty cycles (`Total Duty %`), quantized machine counts (`Ceil`), and de-duplicated multiblock BOM.
 - **Hardware Config Synchronization**: Synchronize voltage tiers, overclock modes, parallel counts, and addons across all enclosed machines from the frame header.
 
-### 4. AE2 Integration & Target Batch Production ETA
+### 4. AE2 Integration & Batch Production Solvers
 - **AE2 Autocrafting Integration**: Bind board pages directly to AE2 Processing Patterns (`[💠 Bind AE2 Pattern]`). Displays calculated completion times (ETA) and bottleneck overlays directly on AE2's Crafting Confirmation screen (`CraftConfirmScreen`).
 - **DAG Pipeline & Critical Path ETA**: Evaluates multi-tier autocrafting jobs over a directed acyclic graph (DAG), accounting for machine parallelism, batch counts, and stage pipeline delays.
+- **Batch Run Calculator**: Calculate total processing duration, required raw materials, projected output yields, and energy consumption based on finite input batches or target production goals via the Optimize menu or Process Summary panel.
 - **Target Batch Quantity & Real-Time ETA**: Define batch goals (e.g. `100x`, `1,000x`, `10 B`) on goal and reroute nodes to compute remaining completion time, total energy (EU), and raw material requirements.
 
 ### 5. Real-Time Multiplayer Team Workspaces
@@ -51,6 +53,7 @@ An in-game node graph calculator and flowchart editor for GregTech CEu Modern, E
 - **Edit Concurrency Control**: Automatic per-page edit locks and live teammate presence indicators prevent concurrent overwrite collisions, backed by automated background saving and revision history forks.
 
 ### 6. Advanced Flow Analytics & Responsive UX
+- **Local Web Dashboard**: Real-time read-only board viewer and page browser for secondary monitors or web browsers (`/gtcalcboard web`), powered by an embedded local daemon with background prewarming and authentic Minecraft slot styling.
 - **Flow Saturation Wire Modulation**: Dynamically modulates wire pulse animation speeds, stalls (duty cycle stutter), and RGB colors (Cyan -> Amber -> Crimson) based on real-time supply saturation ratios ($R = \text{Supply} / \text{Demand}$), with pulsing glow outlines indicating starved bottleneck machines.
 - **Full-Flow PNG Clipboard Export**: One-click clipboard copy (`Share / I/O` menu) of the active canvas page as a clear, high-resolution image regardless of viewport position or zoom level.
 - **Interactive 3-Track Tutorial & Academy**: 45-second starter tutorial, 4 specialized academy chapters (ratio solving, wiring, module subpages, workspace management), and contextual in-game design tips.

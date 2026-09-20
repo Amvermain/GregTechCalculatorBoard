@@ -24,6 +24,7 @@ public final class AddonCategory {
     public static final AddonCategory MULTIBLOCK_TRAIT = register("multiblock_trait", "Multiblock Traits", "gui.gtcalcboard.addon_cat.trait", 65);
     public static final AddonCategory THERMAL_AUGMENT = register("thermal_augment", "Thermal Augments & Kits", "gui.gtcalcboard.addon_cat.thermal", 60);
     public static final AddonCategory MAGNET = register("magnet", "Magnets & Magnetic Cores", "gui.gtcalcboard.addon_cat.magnet", 50);
+    public static final AddonCategory MANUAL_OVERRIDE = register("manual_override", "Recipe Override", "gui.gtcalcboard.addon_cat.manual_override", 5);
     public static final AddonCategory CUSTOM = register("custom", "Custom Modifiers", "gui.gtcalcboard.addon_cat.custom", 0);
 
     private final String id;

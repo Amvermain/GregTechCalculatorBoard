@@ -10,6 +10,7 @@ import com.gregtechceu.gtceu.api.pattern.predicates.SimplePredicate;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
+import com.gtceu.calcboard.api.catalog.MultiblockDetector;
 import net.minecraftforge.registries.ForgeRegistries;
 
 import java.lang.reflect.Field;
@@ -386,6 +387,9 @@ public final class GTCEuPatternScanner {
             if ("BULK_PROCESSING".equals(modId)) abilities.add("BULK_PROCESSING");
             if ("THREADING".equals(modId) || "THREADING_MACHINE".equals(modId)) abilities.add("THREADING");
             if ("REFLECTOR_FUSION_REACTOR".equals(modId)) abilities.add("REFLECTOR");
+            if ("STEAM_PARALLEL_MULTIBLOCK".equals(modId) || "STEAM_PARALLEL".equals(modId) || modId.contains("STEAM")) {
+                abilities.add("STEAM");
+            }
         }
     }
 
@@ -396,12 +400,19 @@ public final class GTCEuPatternScanner {
         abilities.add("EXPORT_ITEMS");
         abilities.add("IMPORT_FLUIDS");
         abilities.add("EXPORT_FLUIDS");
-        abilities.add("MAINTENANCE");
 
-        if (multiDef.isGenerator()) {
-            abilities.add("OUTPUT_ENERGY");
-        } else {
-            abilities.add("INPUT_ENERGY");
+        ResourceLocation id = multiDef.getId();
+        boolean isSteam = abilities.contains("STEAM")
+                || abilities.contains("STEAM_IMPORT_ITEMS")
+                || MultiblockDetector.isSteamMultiblock(id);
+
+        if (!isSteam) {
+            abilities.add("MAINTENANCE");
+            if (multiDef.isGenerator()) {
+                abilities.add("OUTPUT_ENERGY");
+            } else {
+                abilities.add("INPUT_ENERGY");
+            }
         }
     }
 

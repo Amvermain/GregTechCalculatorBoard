@@ -4,7 +4,7 @@
 
 본 디렉터리는 **GregTech Calculator Board (GTCalcBoard)** 프로젝트의 핵심 기술적 의사결정 맥락(Context), 채택 이유(Why), 시스템 구조(Architecture), 그리고 결과 및 파급 효과(Consequences)를 영구히 기록하고 보존하는 **공식 아키텍처 결정 기록(ADR) 레지스트리**입니다.
 
-모든 핵심 아키텍처 결정은 구현 완료 후 공식 시스템 사양서([`docs/ko_kr/spec/`](../ko_kr/spec/))로 체계화되어 반영되며, 본 문서는 58개 ADR 전체의 생명주기 및 공식 사양서 연계 맵을 제공합니다.
+모든 핵심 아키텍처 결정은 구현 완료 후 공식 시스템 사양서([`docs/ko_kr/spec/`](../ko_kr/spec/))로 체계화되어 반영되며, 본 문서는 59개 ADR 전체의 생명주기 및 공식 사양서 연계 맵을 제공합니다.
 
 ---
 
@@ -22,11 +22,11 @@ stateDiagram-v2
 
 | 상태 (Status) | 건수 | 설명 |
 | :--- | :---: | :--- |
-| 🟢 **`Active`** | **21건** | 현재 시스템의 구조, 인터페이스 및 동작을 직접 규정하는 활성 아키텍처 결정 |
+| 🟢 **`Active`** | **22건** | 현재 시스템의 구조, 인터페이스 및 동작을 직접 규정하는 활성 아키텍처 결정 |
 | 🔄 **`Superseded`** | **5건** | 후속 ADR에 의해 설계, 모델 또는 알고리즘이 대체된 결정 |
 | 📦 **`Retired / Consolidated`** | **31건** | 구현 완료 후 공식 시스템 사양서([`docs/ko_kr/spec/`](../ko_kr/spec/))에 완전히 통합·체계화된 결정 |
 | ❌ **`Rejected`** | **1건** | 기술 검토 단계에서 기각되어 결번으로 영구 보존된 제안 (`RFC-046`) |
-| **합계** | **58건** | 전체 등록 아키텍처 결정 및 결번 레코드 총합 |
+| **합계** | **59건** | 전체 등록 아키텍처 결정 및 결번 레코드 총합 |
 
 ---
 
@@ -72,6 +72,7 @@ flowchart TD
     ADR025 --> ADR053["ADR-053<br/>NodeInspectorPanel SRP 4대 분해"]
     ADR005["ADR-005 (대체됨)<br/>11단계 단일 튜토리얼"] -.->|대체| ADR056["ADR-056<br/>3-트랙 모듈형 아카데미 & 맥락 넛지"]
     ADR027 --> ADR058["ADR-058<br/>children 방어 복사 & 모달 핫키 격리"]
+    ADR025 --> ADR059["ADR-059<br/>로컬 내장 웹 대시보드 & SSE 동기화"]
 ```
 
 ### 3. 도메인 모델, 확장성 & 네트워크 발전사 (Domain Models, SPI & Networking)
@@ -96,7 +97,7 @@ flowchart TD
 
 ---
 
-## 🟢 활성 아키텍처 결정 레지스트리 (Active ADRs - 21건)
+## 🟢 활성 아키텍처 결정 레지스트리 (Active ADRs - 22건)
 
 현재 시스템의 핵심 불변식, 데이터 구조, 연산 알고리즘 및 인터랙션을 직접 규정하는 활성 결정 목록입니다.
 
@@ -123,6 +124,7 @@ flowchart TD
 | **[ADR-056](ADR_056_MODULAR_ACADEMY_AND_CONTEXTUAL_TUTORIAL_ARCHITECTURE.md)** | 모듈형 아카데미 및 맥락형 튜토리얼 아키텍처 개편 명세 | `v2.3.0` | Client UI (`client.gui.tutorial`) | [03-04. 검색 & 도구](../ko_kr/spec/03_04_RECIPE_SEARCH_AND_TOOLS.md) | 3-트랙 온보딩(45초 스타터, 4대 아카데미 챕터, 맥락 넛지) 도입 및 누락 핵심 기능 통합 |
 | **[ADR-057](ADR_057_TFG_LARGE_BOILER_BOOSTER_MECHANISM.md)** | TFG 대형 보일러 부스터 메커니즘 및 비선형 물리 모델 명세 | `v2.3.0` | Compat Physics (`compat.tfg`) | [02. 수학 & 알고리즘](../ko_kr/spec/02_MATH_AND_ALGORITHMS.md) | TFG 대형 보일러(LBB 480PU, LSB 1280PU) 9종 부스터, 수질 계층(1.5x), 480PU 초과 비선형 물/연료 곡선, Super Boiler |
 | **[ADR-058](ADR_058_CANVAS_INTERACTION_AND_SOLVER_DEFENSIVE_STABILITY.md)** | 캔버스 인터랙션 생명주기 및 유량 솔버 방어적 안정성 명세 | `v2.3.0` | Client GUI & Solver (`client.gui`, `api.solver`) | [03. UI & 렌더링](../ko_kr/spec/03_UI_AND_RENDERING_PIPELINE.md) | `children()` 방어 복사본 반환, 유량 솔버 음수 인덱스 가드, 모달 활성 시 핫키 차단, `MachineNodeRole` NBT 정규화 |
+| **[ADR-059](ADR_059_LOCAL_WEB_BOARD_DASHBOARD.md)** | 로컬 내장 웹 대시보드 및 단방향 실시간 도면 뷰어 명세 | `v2.4.0-beta.1` | Client Web & GUI (`client.web`, `client.gui`) | [03. UI & 렌더링](../ko_kr/spec/03_UI_AND_RENDERING_PIPELINE.md) | 내장 HttpServer(127.0.0.1) 기반 듀얼 모니터용 실시간 도면 SPA, SSE 이벤트 스트림, 32×32 아이콘 FBO 캐시 파이프라인 |
 
 ---
 
@@ -194,4 +196,6 @@ flowchart TD
 
 구현 착수 전 기술 검토, 대안 비교 및 승인 대기 중인 RFC 제안 문서 목록입니다. 구현이 완료되면 공식 ADR로 승격되어 상단 레지스트리에 영구 보존됩니다.
 
-*현재 활성 상태의 미결정 RFC가 없습니다.*
+| 문서 번호 | 제안 제목 (Title) | 대상 버전 | 기안일 | 주관 계층 | 제안 요약 |
+| :---: | :--- | :---: | :---: | :--- | :--- |
+| - | *(현재 활성 RFC 제안 없음)* | - | - | - | 모든 제안이 구현 완료되어 공식 ADR로 승격되었습니다. |

@@ -530,4 +530,8 @@ public class ToolbarActionHandler {
             BoardToast.show(Component.literal("§c✖ ").append(Component.translatable("message.gtcalcboard.clipboard_empty")));
         }
     }
+
+    public void openWebDashboard() {
+        screen.openWebDashboard();
+    }
 }

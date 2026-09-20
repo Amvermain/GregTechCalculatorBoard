@@ -160,6 +160,18 @@ public final class NodePropertyKey<T> {
         );
     }
 
+    public static NodePropertyKey<CompoundTag> ofCompoundTag(String id) {
+        return new NodePropertyKey<>(
+                id,
+                CompoundTag.class,
+                new CompoundTag(),
+                (tag, val) -> {
+                    if (val != null && !val.isEmpty()) tag.put(id, val.copy());
+                },
+                tag -> tag.contains(id, Tag.TAG_COMPOUND) ? tag.getCompound(id).copy() : new CompoundTag()
+        );
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

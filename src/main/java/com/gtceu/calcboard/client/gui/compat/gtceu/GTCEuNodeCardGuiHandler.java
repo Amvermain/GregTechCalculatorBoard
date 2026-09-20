@@ -10,6 +10,7 @@ import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTBoilerTier;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.type.OverclockMode;
+import com.gtceu.calcboard.api.type.SteamMode;
 import com.gtceu.calcboard.client.gui.compat.GenericModGuiHandler;
 import com.gtceu.calcboard.client.gui.render.NodeCardRenderer;
 import com.gtceu.calcboard.client.gui.widget.NodeWidget;
@@ -123,11 +124,13 @@ public class GTCEuNodeCardGuiHandler {
                 buttons.add(new com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button(nextRelX, tierBtnW, boilerText, textW, boilerColor, !isOperational, false, com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button.ButtonRole.TIER, null));
                 nextRelX += tierBtnW + 4;
             }
-        } else if (!node.isMultiblock() && node.getSteamMode() != null && node.getSteamMode().isSteam()) {
-            String steamText = node.getSteamMode().getDisplayName();
+        } else if ((node.getSteamMode() != null && node.getSteamMode().isSteam()) || MultiblockDetector.isSteamMultiblock(node)) {
+            SteamMode mode = (node.getSteamMode() != null && node.getSteamMode().isSteam()) ? node.getSteamMode() : SteamMode.HIGH_PRESSURE;
+            String prefix = node.isMultiblock() ? "▦ " : "";
+            String steamText = prefix + mode.getDisplayName();
             int textW = font.width(steamText);
             int tierBtnW = Math.max(48, textW + 8);
-            int steamColor = !isOperational ? 0xFFFF8888 : node.getSteamMode().getColor();
+            int steamColor = !isOperational ? 0xFFFF8888 : mode.getColor();
             buttons.add(new com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button(nextRelX, tierBtnW, steamText, textW, steamColor, !isOperational, false, com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button.ButtonRole.TIER, null));
             nextRelX += tierBtnW + 4;
         } else {
@@ -221,7 +224,8 @@ public class GTCEuNodeCardGuiHandler {
     }
 
     private void populateConsumerButtons(RecipeNode node, int cardW, boolean isOperational, int nextRelX, Font font, List<com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button> buttons) {
-        if (!node.isFusion() && node.getEnergyType() != EnergyType.HEAT_OR_SELF && (node.isMultiblock() || node.getSteamMode() == null || !node.getSteamMode().isSteam())) {
+        boolean isSteam = (node.getSteamMode() != null && node.getSteamMode().isSteam()) || MultiblockDetector.isSteamMultiblock(node);
+        if (!node.isFusion() && node.getEnergyType() != EnergyType.HEAT_OR_SELF && !isSteam) {
             String ocKey = node.getOverclockMode() == OverclockMode.PERFECT ? "gui.gtcalcboard.oc_perf" : "gui.gtcalcboard.oc_std";
             String ocText = Component.translatable(ocKey).getString();
             int ocTextW = font.width(ocText);
@@ -352,8 +356,9 @@ public class GTCEuNodeCardGuiHandler {
             }
             int tierBtnW = Math.max(54, safeFontWidth(boilerText, 46) + 8);
             return x + 6 + tierBtnW + 4;
-        } else if (!node.isMultiblock() && node.getSteamMode() != null && node.getSteamMode().isSteam()) {
-            String steamText = node.getSteamMode().getDisplayName();
+        } else if (node.getSteamMode() != null && node.getSteamMode().isSteam()) {
+            String prefix = node.isMultiblock() ? "▦ " : "";
+            String steamText = prefix + node.getSteamMode().getDisplayName();
             int tierBtnW = Math.max(48, safeFontWidth(steamText, 40) + 8);
             return x + 6 + tierBtnW + 4;
         } else {
@@ -433,7 +438,7 @@ public class GTCEuNodeCardGuiHandler {
     }
 
     public boolean isSecondaryControlHovered(NodeWidget widget, RecipeNode node, double mouseX, double mouseY) {
-        if (node == null || node.isGenerator() || node.isFusion() || node.getEnergyType() == EnergyType.HEAT_OR_SELF || node.getEnergyType() == EnergyType.NONE || (!node.isMultiblock() && node.getSteamMode() != null && node.getSteamMode().isSteam())) return false;
+        if (node == null || node.isGenerator() || node.isFusion() || node.getEnergyType() == EnergyType.HEAT_OR_SELF || node.getEnergyType() == EnergyType.NONE || (node.getSteamMode() != null && node.getSteamMode().isSteam())) return false;
         if (hasCachedButtons(widget)) {
             return isCachedButtonHovered(widget, node, mouseX, mouseY,
                     btn -> btn.role() == com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button.ButtonRole.OC);

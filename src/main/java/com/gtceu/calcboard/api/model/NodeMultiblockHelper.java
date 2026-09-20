@@ -22,19 +22,29 @@ public final class NodeMultiblockHelper {
     public static void configureMultiblock(RecipeNode node, boolean multiblock) {
         if (multiblock) {
             node.setCustomParallel(0);
-            if (node.getSteamMode().isSteam()) {
-                node.setSteamMode(SteamMode.NONE);
-            }
-            if (node.getParallel() <= 1) {
-                int defPar = ModAdapterRegistry.getAdapterForNode(node).getDefaultParallel(node);
-                if (defPar > 1) {
-                    node.setParallel(defPar);
-                }
-            }
             if (node.getMachineIcon() == null || !MultiblockDetector.isMultiblock(node.getMachineIcon())) {
                 ResourceLocation mbWs = node.getMultiblockWorkstation();
                 if (mbWs != null && !Objects.equals(node.getMachineIcon(), mbWs)) {
                     node.setMachineIcon(mbWs);
+                }
+            }
+            if (MultiblockDetector.isSteamMultiblock(node)) {
+                if (node.getSteamMode() == null || !node.getSteamMode().isSteam()) {
+                    node.setSteamMode(SteamMode.HIGH_PRESSURE);
+                }
+                int defPar = MultiblockDetector.getDefaultParallel(node);
+                if (defPar > 1) {
+                    node.setParallel(defPar);
+                }
+            } else {
+                if (node.getSteamMode() != null && node.getSteamMode().isSteam()) {
+                    node.setSteamMode(SteamMode.NONE);
+                }
+                if (node.getParallel() <= 1) {
+                    int defPar = ModAdapterRegistry.getAdapterForNode(node).getDefaultParallel(node);
+                    if (defPar > 1) {
+                        node.setParallel(defPar);
+                    }
                 }
             }
         } else {

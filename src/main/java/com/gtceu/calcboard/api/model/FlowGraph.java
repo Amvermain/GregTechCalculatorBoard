@@ -827,7 +827,19 @@ public class FlowGraph {
         targetNode.setBaseEUt(newRecipeTemplate.getBaseEUt());
         targetNode.setRecipeTier(newRecipeTemplate.getRecipeTier());
         targetNode.setRecipeCategoryId(newRecipeTemplate.getRecipeCategoryId());
-        targetNode.setBaseSpec(newRecipeTemplate.getBaseSpec());
+
+        RecipeSpec incomingSpec = newRecipeTemplate.getBaseSpec();
+        if (incomingSpec == null || (incomingSpec.baseInputs().isEmpty() && incomingSpec.baseOutputs().isEmpty())) {
+            incomingSpec = RecipeSpec.of(
+                    targetNode.getId(),
+                    newRecipeTemplate.getRecipeCategoryId(),
+                    newRecipeTemplate.getBaseDurationTicks(),
+                    newRecipeTemplate.getBaseEUt(),
+                    newRecipeTemplate.getInputs(),
+                    newRecipeTemplate.getOutputs()
+            );
+        }
+        targetNode.setBaseSpec(incomingSpec);
 
         NodeHardwareReconciler.reconcileForRecipe(targetNode, newRecipeTemplate);
         targetNode.syncProjectedPorts();

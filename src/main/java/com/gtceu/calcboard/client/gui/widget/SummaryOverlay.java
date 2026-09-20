@@ -44,6 +44,8 @@ public class SummaryOverlay {
     private IngredientStack hoveredActionStack = null;
     private boolean hoveredActionIsRestore = false;
     private boolean hoveredVoidHeader = false;
+    private boolean hoveredStackIsInput = false;
+    private boolean hoveredStackIsVoid = false;
     private BalanceSummary lastSummary = null;
 
     private int rightOffset = 0;
@@ -136,6 +138,7 @@ public class SummaryOverlay {
         }
 
         hoveredStack = null;
+        hoveredStackIsVoid = false;
         hoveredRate = 0.0;
         hoveredActionStack = null;
         hoveredActionIsRestore = false;
@@ -247,7 +250,7 @@ public class SummaryOverlay {
         } else {
             for (Map.Entry<IngredientStack, Double> entry : summary.rawInputs().entrySet()) {
                 if (curY >= contentY - 16 && curY <= contentY + contentH) {
-                    renderSummaryRow(graphics, font, x, curY, entry.getKey(), -entry.getValue(), 0xFFFF5555, mouseX, mouseY, contentY, contentH, effectiveW, false, false);
+                    renderSummaryRow(graphics, font, x, curY, entry.getKey(), -entry.getValue(), 0xFFFF5555, mouseX, mouseY, contentY, contentH, effectiveW, false, false, true);
                 }
                 curY += 16;
             }
@@ -264,7 +267,7 @@ public class SummaryOverlay {
         } else {
             for (Map.Entry<IngredientStack, Double> entry : summary.netOutputs().entrySet()) {
                 if (curY >= contentY - 16 && curY <= contentY + contentH) {
-                    renderSummaryRow(graphics, font, x, curY, entry.getKey(), entry.getValue(), 0xFF55FF55, mouseX, mouseY, contentY, contentH, effectiveW, false, true);
+                    renderSummaryRow(graphics, font, x, curY, entry.getKey(), entry.getValue(), 0xFF55FF55, mouseX, mouseY, contentY, contentH, effectiveW, false, true, false);
                 }
                 curY += 16;
             }
@@ -284,7 +287,7 @@ public class SummaryOverlay {
             if (!voidedCollapsed) {
                 for (Map.Entry<IngredientStack, Double> entry : summary.voidedOutputs().entrySet()) {
                     if (curY >= contentY - 16 && curY <= contentY + contentH) {
-                        renderSummaryRow(graphics, font, x, curY, entry.getKey(), entry.getValue(), 0xFFC084FC, mouseX, mouseY, contentY, contentH, effectiveW, true, true);
+                        renderSummaryRow(graphics, font, x, curY, entry.getKey(), entry.getValue(), 0xFFC084FC, mouseX, mouseY, contentY, contentH, effectiveW, true, true, false);
                     }
                     curY += 16;
                 }
@@ -308,11 +311,7 @@ public class SummaryOverlay {
         graphics.pose().popPose();
     }
 
-    private void renderSummaryRow(GuiGraphics graphics, Font font, int x, int y, IngredientStack stack, double rate, int rateColor, int mouseX, int mouseY, int contentY, int contentH, int panelW) {
-        renderSummaryRow(graphics, font, x, y, stack, rate, rateColor, mouseX, mouseY, contentY, contentH, panelW, false, false);
-    }
-
-    private void renderSummaryRow(GuiGraphics graphics, Font font, int x, int y, IngredientStack stack, double rate, int rateColor, int mouseX, int mouseY, int contentY, int contentH, int panelW, boolean isVoidSection, boolean hasActionButton) {
+    private void renderSummaryRow(GuiGraphics graphics, Font font, int x, int y, IngredientStack stack, double rate, int rateColor, int mouseX, int mouseY, int contentY, int contentH, int panelW, boolean isVoidSection, boolean hasActionButton, boolean isInput) {
         IngredientRenderer.render(graphics, stack, x + 8, y - 2);
 
         String ratePrefix = rate > 0 ? "+" : "";
@@ -343,6 +342,8 @@ public class SummaryOverlay {
         if (mouseX >= x + 8 && mouseX <= x + panelW - 8 && mouseY >= y && mouseY <= y + 14 && mouseY >= contentY && mouseY <= contentY + contentH) {
             hoveredStack = stack;
             hoveredRate = rate;
+            hoveredStackIsInput = isInput;
+            hoveredStackIsVoid = isVoidSection;
         }
     }
 
@@ -417,6 +418,9 @@ public class SummaryOverlay {
             String exactRateStr = FormatUtil.formatExactRate(hoveredRate, hoveredStack);
             String ratePrefix = hoveredRate > 0 ? "+" : "";
             tooltip.add(Component.literal("§7").append(Component.translatable("gui.gtcalcboard.summary.rate", "§f" + ratePrefix + exactRateStr)));
+            if (!hoveredStackIsVoid) {
+                tooltip.add(Component.literal("§e").append(Component.translatable("gui.gtcalcboard.dialog.batch_run.summary_hint")));
+            }
             tooltip.add(Component.literal("§8").append(Component.translatable("gui.gtcalcboard.tooltip.recipes_uses")));
             BoardTooltipRenderer.renderComponentTooltip(graphics, font, tooltip, mouseX, mouseY);
         }
@@ -489,6 +493,21 @@ public class SummaryOverlay {
             mc.getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F));
             BoardToast.show(Component.literal("§e⚡ ").append(Component.translatable("message.gtcalcboard.power_mode_changed", newMode.getDisplayName())));
             return true;
+        }
+
+        // Ingredient Row Click -> open batch run calculator
+        if (hoveredStack != null && !hoveredStackIsVoid && button == 0) {
+            IBoardScreenContext ctx = this.screen;
+            if (ctx == null && Minecraft.getInstance().screen instanceof IBoardScreenContext bs) {
+                ctx = bs;
+            }
+            if (ctx != null) {
+                ctx.openBatchRunCalculator(hoveredStack, hoveredStackIsInput);
+                Minecraft.getInstance().getSoundManager().play(
+                        net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F)
+                );
+                return true;
+            }
         }
         return false;
     }

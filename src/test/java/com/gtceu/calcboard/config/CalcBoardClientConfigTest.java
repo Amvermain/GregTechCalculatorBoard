@@ -19,5 +19,11 @@ public class CalcBoardClientConfigTest {
 
         Assertions.assertNotNull(CalcBoardClientConfig.NOTIFY_UPDATE_IN_CHAT);
         Assertions.assertFalse(CalcBoardClientConfig.NOTIFY_UPDATE_IN_CHAT.getDefault());
+
+        Assertions.assertNotNull(CalcBoardClientConfig.ENABLE_LOCAL_WEB_SERVER);
+        Assertions.assertFalse(CalcBoardClientConfig.ENABLE_LOCAL_WEB_SERVER.getDefault());
+
+        Assertions.assertNotNull(CalcBoardClientConfig.LOCAL_WEB_SERVER_PORT);
+        Assertions.assertEquals(8080, CalcBoardClientConfig.LOCAL_WEB_SERVER_PORT.getDefault());
     }
 }

@@ -1,5 +1,6 @@
 package com.gtceu.calcboard.api.property;
 
+import net.minecraft.nbt.CompoundTag;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -68,6 +69,14 @@ public final class NodeProperties {
     );
     public static final NodePropertyKey<String> DIVERGENCE_DETAIL = register(
             NodePropertyKey.ofString("divergence_detail", "")
+    );
+
+    // Manual Recipe Override Properties
+    public static final NodePropertyKey<Boolean> IS_MANUAL_OVERRIDE = register(
+            NodePropertyKey.ofBoolean("is_manual_override", false)
+    );
+    public static final NodePropertyKey<CompoundTag> ORIGINAL_RECIPE_SPEC = register(
+            NodePropertyKey.ofCompoundTag("original_recipe_spec")
     );
 
     private NodeProperties() {}

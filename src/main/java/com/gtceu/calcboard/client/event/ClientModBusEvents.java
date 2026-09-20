@@ -27,6 +27,8 @@ public class ClientModBusEvents {
                 com.gtceu.calcboard.integration.ae2.registry.PatternGraphRegistry.getInstance();
                 MinecraftForge.EVENT_BUS.register(com.gtceu.calcboard.client.gui.compat.ae2.ClientAe2CraftConfirmHook.class);
             }
+            com.gtceu.calcboard.api.property.NodeBadgeRegistry.setLoopScaledListener(node -> com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().onLoopScaled());
+            com.gtceu.calcboard.client.web.LocalWebServerDaemon.getInstance().start();
         });
     }
 

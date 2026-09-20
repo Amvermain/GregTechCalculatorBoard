@@ -137,7 +137,7 @@ public final class IngredientRenderer {
         return false;
     }
 
-    private static boolean renderFluid(GuiGraphics graphics, ResourceLocation id, int x, int y) {
+    public static boolean renderFluid(GuiGraphics graphics, ResourceLocation id, int x, int y) {
         if (id == null) return false;
         CachedFluid cached = FLUID_RENDER_CACHE.computeIfAbsent(id, IngredientRenderer::computeFluid);
         if (cached != null && cached.sprite() != null) {

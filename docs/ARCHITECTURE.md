@@ -33,7 +33,8 @@ graph TD
         WSI["WireSpatialIndex (128x128 AABB Uniform Grid O(log E) Spatial Indexing)"]
         NCTC["NodeCardTextCache (Dirty-Flag Based Text Truncation & Formatting Cache)"]
         Widgets["widget.* (NodeWidget, ToolbarWidget, PageTabBarWidget, HotkeyHudWidget, SummaryOverlay, FavoritesDockWidget)"]
-        Dialogs["dialog.* (BoardSettingsDialog, MachineConfigDialog, BOMDialog, SearchDialog, GlobalBalanceDialog, JunctionSupplyDialog, FrameEditDialog)"]
+        Dialogs["dialog.* (BoardSettingsDialog, MachineConfigDialog & RecipeOverrideView, BatchRunCalculatorDialog, BOMDialog, SearchDialog, GlobalBalanceDialog, JunctionSupplyDialog, FrameEditDialog)"]
+        Web["web.* (LocalWebServerDaemon, WebSyncEventBus, MicroIconRenderer, IconDiskCache, BoardJsonSerializer)"]
         Search["search.* (RecipeSearchCacheManager, RecipeSearchQueryEngine & Composable Specification)"]
     end
 
@@ -42,6 +43,7 @@ graph TD
         Preset["preset.* (CategoryMachinePreset, CategoryMachinePresetManager)"]
         Model["model.* (RecipeNode, ConnectionEdge, IngredientStack, CanvasGroupFrame, NodeRateCalculator, NodeWorkstationResolver)"]
         Solver["solver.* (FlowGraph, FlowGraphSolver, MassBalanceSolver, FlowBalanceMatrixSolver, FlowEdgeAllocator, FlowGraphModuleHandler)"]
+        BatchSolver["solver.* (BatchRunSolver, BatchRunResult)"]
         Linear["solver.linear.* (TwoStageLinearFlowSolver, GaussJordanEliminator, LinearEquationSystem)"]
         Stability["solver.* (ProcessStabilityAnalyzer, HarmonizedRatioOptimizer, AutoRatioEngine)"]
         Catalog["catalog.* (CapabilityMatrix, MachineAddonCatalog, PartCategory, MultiblockDetector)"]

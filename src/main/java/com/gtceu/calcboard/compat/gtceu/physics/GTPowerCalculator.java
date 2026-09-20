@@ -16,6 +16,7 @@ import com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper;
 import com.gtceu.calcboard.compat.gtceu.addon.GTCoilAddon;
 import com.gtceu.calcboard.compat.gtceu.helper.CoilHelper;
 import com.gtceu.calcboard.compat.gtceu.handler.GTAddonCompatibilityHandler;
+import com.gtceu.calcboard.compat.gtceu.handler.GTEnergyHatchCalculator;
 import com.gtceu.calcboard.compat.start.helper.RecipeNodeThreadingHelper;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -348,6 +349,9 @@ public final class GTPowerCalculator {
             return defaultCap;
         }
         if (node.getSteamMode() != null && node.getSteamMode().isSteam()) {
+            return defaultCap;
+        }
+        if (node.isMultiblock() && GTEnergyHatchCalculator.requiresEnergyHatch(node) && !GTEnergyHatchCalculator.hasEnergyHatch(node)) {
             return defaultCap;
         }
         double singleRecipeEUt = node.getBaseEUt();

@@ -11,6 +11,7 @@ import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.util.ModCompatHelper;
 import com.gtceu.calcboard.api.catalog.MultiblockDetector;
 import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.model.RecipeSpec;
 import dev.emi.emi.api.recipe.EmiRecipe;
 import dev.emi.emi.api.stack.EmiIngredient;
 import dev.emi.emi.api.stack.EmiStack;
@@ -21,6 +22,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.Fluids;
 import net.minecraftforge.registries.ForgeRegistries;
+import com.gtceu.calcboard.api.util.RecipeConversionHelper;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -32,22 +34,6 @@ import java.util.Map;
 import java.util.Objects;
 
 public class EmiRecipeConverter {
-
-    private static final Class<?> CREATE_BASIN_BLOCK_CLASS;
-    private static final Class<?> CREATE_BLAZE_BURNER_BLOCK_CLASS;
-
-    static {
-        Class<?> basinCls = null;
-        Class<?> burnerCls = null;
-        try {
-            basinCls = Class.forName("com.simibubi.create.content.processing.basin.BasinBlock");
-        } catch (Throwable ignored) {}
-        try {
-            burnerCls = Class.forName("com.simibubi.create.content.processing.burner.BlazeBurnerBlock");
-        } catch (Throwable ignored) {}
-        CREATE_BASIN_BLOCK_CLASS = basinCls;
-        CREATE_BLAZE_BURNER_BLOCK_CLASS = burnerCls;
-    }
 
     public static RecipeNode convert(EmiRecipe recipe) {
         return convert(recipe, null);
@@ -203,8 +189,8 @@ public class EmiRecipeConverter {
                 if (stack == null || stack.isEmpty()) continue;
                 if (isIgnoredInput(stack.getId(), reqChance > 0 ? reqChance : stack.getChance())) continue;
 
-                long finalAmount = reqAmount > 0 ? reqAmount : stack.getAmount();
-                float finalChance = reqChance > 0 ? reqChance : stack.getChance();
+                long finalAmount = reqAmount > 0 ? reqAmount : Math.max(1, stack.getAmount());
+                float finalChance = reqChance > 0 ? reqChance : (stack.getChance() > 0 ? stack.getChance() : 1.0f);
                 IngredientStack is = convertEmiStack(stack, finalAmount, finalChance);
                 if (is != null && is.getId() != null) {
                     if (isIgnoredInput(is.getId(), is.getChance())) continue;
@@ -359,6 +345,14 @@ public class EmiRecipeConverter {
             effectiveTier = adapter.sanitizeTargetTier(node, effectiveTier);
         }
         node.setTargetTier(effectiveTier);
+        node.setBaseSpec(RecipeSpec.of(
+                node.getId(),
+                node.getRecipeCategoryId(),
+                node.getBaseDurationTicks(),
+                node.getBaseEUt(),
+                node.getInputs(),
+                node.getOutputs()
+        ));
         com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.ensureCombustionInputs(node);
         return node;
     }
@@ -419,52 +413,19 @@ public class EmiRecipeConverter {
     }
 
     public static boolean isIgnoredInput(ResourceLocation id, double chance) {
-        if (id == null) return true;
-        if (isDummyConditionMarker(id)) return true;
-        if (isProgrammedCircuit(id)) return true;
-        if (chance <= 0.0) return true;
-        return false;
+        return RecipeConversionHelper.isIgnoredInput(id, chance);
     }
 
     public static boolean isProgrammedCircuit(ResourceLocation id) {
-        if (id == null) return false;
-        String path = id.getPath().toLowerCase(Locale.ROOT);
-        String ns = id.getNamespace().toLowerCase(Locale.ROOT);
-        return ("gtceu".equals(ns) || "gtce".equals(ns) || "gregtech".equals(ns))
-                && (path.equals("programmed_circuit") || path.equals("integrated_circuit") || path.startsWith("circuit_config"));
+        return RecipeConversionHelper.isProgrammedCircuit(id);
     }
 
     public static boolean isDummyConditionMarker(ResourceLocation id) {
-        if (id == null) return false;
-        String path = id.getPath().toLowerCase();
-
-        // Any dummy condition/dimension/planet marker across all mods (gtceu, start_core, kubejs, etc.)
-        if (path.endsWith("_marker") || path.endsWith("_marker_item") || path.endsWith("_marker_block")
-                || path.startsWith("dimension_marker") || path.startsWith("biome_marker")
-                || path.startsWith("planet_marker") || path.startsWith("environmental_marker")
-                || path.startsWith("altitude_marker") || path.startsWith("temperature_marker")) {
-            return true;
-        }
-
-        return false;
+        return RecipeConversionHelper.isDummyConditionMarker(id);
     }
 
     public static boolean isIgnoredWorkstation(ResourceLocation id) {
-        if (id == null) return true;
-        if (isDummyConditionMarker(id)) return true;
-        try {
-            net.minecraft.world.item.Item item = ForgeRegistries.ITEMS.getValue(id);
-            if (item instanceof net.minecraft.world.item.BlockItem bi) {
-                net.minecraft.world.level.block.Block block = bi.getBlock();
-                if (CREATE_BASIN_BLOCK_CLASS != null && CREATE_BASIN_BLOCK_CLASS.isInstance(block)) {
-                    return true;
-                }
-                if (CREATE_BLAZE_BURNER_BLOCK_CLASS != null && CREATE_BLAZE_BURNER_BLOCK_CLASS.isInstance(block)) {
-                    return true;
-                }
-            }
-        } catch (Throwable ignored) {}
-        return false;
+        return RecipeConversionHelper.isIgnoredWorkstation(id);
     }
 
     public static ResourceLocation findMachineIcon(EmiRecipe recipe) {

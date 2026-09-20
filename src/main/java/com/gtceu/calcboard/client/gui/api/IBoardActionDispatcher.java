@@ -73,6 +73,8 @@ public interface IBoardActionDispatcher {
 
     void copyFlowAsPng();
 
+    default void openWebDashboard() {}
+
     boolean scaleLoopToSteadyState(String targetNodeId);
 
     void openModuleSubPage(RecipeNode moduleNode);

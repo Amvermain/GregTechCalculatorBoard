@@ -44,8 +44,7 @@ public final class RecipeConversionHelper {
     public static boolean isIgnoredInput(ResourceLocation id, double chance) {
         if (id == null) return true;
         if (isDummyConditionMarker(id)) return true;
-        if (isProgrammedCircuit(id)) return true;
-        return chance <= 0.0;
+        return isProgrammedCircuit(id);
     }
 
     public static boolean isProgrammedCircuit(ResourceLocation id) {

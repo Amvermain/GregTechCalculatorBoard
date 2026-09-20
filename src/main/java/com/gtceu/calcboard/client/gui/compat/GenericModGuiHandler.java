@@ -125,8 +125,9 @@ public class GenericModGuiHandler implements IModGuiHandler {
         if (node.isLiquidBoilerRecipe() || (adapter != null && adapter.isBoilerRecipe(node))) {
             GTBoilerTier bTier = GTBoilerTier.getBoilerTier(node);
             btnW = Math.max(54, safeFontWidth(bTier.getDisplayName(), 46) + 8);
-        } else if (!node.isMultiblock() && node.getSteamMode() != null && node.getSteamMode().isSteam()) {
-            String steamText = node.getSteamMode().getDisplayName();
+        } else if (node.getSteamMode() != null && node.getSteamMode().isSteam()) {
+            String prefix = node.isMultiblock() ? "▦ " : "";
+            String steamText = prefix + node.getSteamMode().getDisplayName();
             btnW = Math.max(48, safeFontWidth(steamText, 40) + 8);
         } else {
             GTVoltageTier tier = node.getTargetTier();
@@ -150,7 +151,7 @@ public class GenericModGuiHandler implements IModGuiHandler {
 
     @Override
     public boolean isSecondaryControlHovered(RecipeNode node, double mouseX, double mouseY) {
-        if (node == null || node.getEnergyType() == EnergyType.NONE || node.isGenerator() || node.isFusion() || node.getEnergyType() == EnergyType.HEAT_OR_SELF || (!node.isMultiblock() && node.getSteamMode() != null && node.getSteamMode().isSteam())) return false;
+        if (node == null || node.getEnergyType() == EnergyType.NONE || node.isGenerator() || node.isFusion() || node.getEnergyType() == EnergyType.HEAT_OR_SELF || (node.getSteamMode() != null && node.getSteamMode().isSteam())) return false;
         int x = (int) node.getPosX();
         int y = (int) node.getPosY();
         int ctrlY = y + 20 + 6;

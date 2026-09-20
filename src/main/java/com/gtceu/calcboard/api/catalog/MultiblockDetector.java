@@ -44,6 +44,7 @@ public class MultiblockDetector {
 
     static {
         registerBaselineTurbines();
+        registerBaselineSteamMultiblocks();
     }
 
     public static void registerMultiblock(ResourceLocation id) {
@@ -284,6 +285,20 @@ public class MultiblockDetector {
         }
     }
 
+    public static void registerBaselineSteamMultiblocks() {
+        registerSteamMultiblock(ResourceLocation.tryParse("gtceu:steam_grinder"), 8);
+        registerSteamMultiblock(ResourceLocation.tryParse("gtceu:steam_oven"), 8);
+        registerSteamMultiblock(ResourceLocation.tryParse("gtceu:steam_compressor"), 8);
+        registerSteamMultiblock(ResourceLocation.tryParse("gtceu:steam_ore_factory"), 6);
+        registerSteamMultiblock(ResourceLocation.tryParse("gtceu:bronze_steam_ore_factory"), 6);
+        registerSteamMultiblock(ResourceLocation.tryParse("gtceu:steel_steam_ore_factory"), 6);
+        registerSteamMultiblock(ResourceLocation.tryParse("gtceu:steam_hammer"), 8);
+        registerSteamMultiblock(ResourceLocation.tryParse("gtceu:steam_alloy_smelter"), 8);
+        registerSteamMultiblock(ResourceLocation.tryParse("gtceu:steam_purifier"), 8);
+        registerSteamMultiblock(ResourceLocation.tryParse("gtceu:steam_rock_breaker"), 8);
+        registerSteamMultiblock(ResourceLocation.tryParse("gtceu:steam_kiln"), 8);
+    }
+
     public static void registerDefaultParallel(ResourceLocation controllerId, int defaultParallel) {
         if (controllerId != null && defaultParallel > 1) {
             DEFAULT_MULTIBLOCK_PARALLELS.put(controllerId, defaultParallel);
@@ -293,6 +308,16 @@ public class MultiblockDetector {
     public static boolean isSteamMultiblock(ResourceLocation id) {
         if (id == null) return false;
         return STEAM_MULTIBLOCKS.contains(id);
+    }
+
+    public static boolean isSteamMultiblock(RecipeNode node) {
+        if (node == null) return false;
+        if (node.getMachineIcon() != null && isSteamMultiblock(node.getMachineIcon())) return true;
+        if (node.getMultiblockWorkstation() != null && isSteamMultiblock(node.getMultiblockWorkstation())) return true;
+        for (ResourceLocation ws : node.getAvailableWorkstations()) {
+            if (ws != null && isSteamMultiblock(ws)) return true;
+        }
+        return node.isMultiblock() && node.getSteamMode() != null && node.getSteamMode().isSteam();
     }
 
     public static double getSteamConsumption(ResourceLocation id, SteamMode mode) {
@@ -325,6 +350,7 @@ public class MultiblockDetector {
             try {
                 registerBaselineTurbines();
                 registerBaselinePerfectOverclockMachines();
+                registerBaselineSteamMultiblocks();
                 initializeStructureCatalog();
                 scanEmiMultiblockRecipes(rmObj);
                 scanAdapterMultiblocks(rmObj);

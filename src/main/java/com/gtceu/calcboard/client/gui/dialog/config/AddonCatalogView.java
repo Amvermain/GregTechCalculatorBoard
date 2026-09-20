@@ -329,6 +329,10 @@ public class AddonCatalogView {
     }
 
     public boolean mouseClicked(double mX, double mY, int button, RecipeNode node, int startX, int startY, int width, int height, BoardScreen parent) {
+        if (!node.hasMultiblockOption() && !ModAdapterRegistry.getAdapterForNode(node).supportsAddons(node) && !dialog.isCustomBuilderActive()) {
+            return false;
+        }
+
         List<MachineAddon> filtered = getFilteredCatalog(node);
         int totalCards = filtered.size();
 

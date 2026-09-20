@@ -1,5 +1,6 @@
 package com.gtceu.calcboard.client.gui.render;
 
+import com.gtceu.calcboard.api.catalog.MultiblockDetector;
 import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
@@ -227,7 +228,7 @@ public class NodeCardTextCache {
         if (energyType == EnergyType.ELECTRIC_FE) {
             return "§c0 FE/t";
         }
-        if (energyType == EnergyType.HEAT_OR_SELF) {
+        if (energyType == EnergyType.HEAT_OR_SELF || (node.getSteamMode() != null && node.getSteamMode().isSteam()) || MultiblockDetector.isSteamMultiblock(node)) {
             return "§c0 mB/t Steam";
         }
         GTVoltageTier tier = node.getTargetTier();

@@ -859,22 +859,20 @@ public class RecipeNode {
     }
 
     public void setBaseSpec(RecipeSpec baseSpec) {
-        setBaseSpecOnly(baseSpec);
-        if (baseSpec != null) {
-            this.inputs.clear();
-            for (IngredientStack in : baseSpec.baseInputs()) {
-                this.inputs.add(in.copy());
-            }
-            this.outputs.clear();
-            for (IngredientStack out : baseSpec.baseOutputs()) {
-                this.outputs.add(out.copy());
-            }
-            syncProjectedPorts();
-        } else {
-            this.inputs.clear();
-            this.outputs.clear();
-            markPortsDirty();
+        if (baseSpec == null) {
+            setBaseSpecOnly(null);
+            return;
         }
+        setBaseSpecOnly(baseSpec);
+        this.inputs.clear();
+        for (IngredientStack in : baseSpec.baseInputs()) {
+            this.inputs.add(in.copy());
+        }
+        this.outputs.clear();
+        for (IngredientStack out : baseSpec.baseOutputs()) {
+            this.outputs.add(out.copy());
+        }
+        syncProjectedPorts();
     }
 
     public void setBaseSpecOnly(RecipeSpec baseSpec) {
@@ -895,6 +893,181 @@ public class RecipeNode {
             }
             markPortsDirty();
         }
+    }
+
+    public boolean isManualOverride() {
+        return properties.get(NodeProperties.IS_MANUAL_OVERRIDE);
+    }
+
+    public void setManualOverride(boolean manual) {
+        properties.set(NodeProperties.IS_MANUAL_OVERRIDE, manual);
+    }
+
+    public boolean hasOriginalRecipeSpec() {
+        CompoundTag orig = properties.get(NodeProperties.ORIGINAL_RECIPE_SPEC);
+        return orig != null && !orig.isEmpty();
+    }
+
+    public void captureOriginalRecipeSpec() {
+        if (hasOriginalRecipeSpec()) return;
+        RecipeSpec spec = getBaseSpec();
+        if (spec != null) {
+            CompoundTag tag = spec.serializeNBT();
+            tag.putBoolean("isGenerator", isGenerator());
+            tag.putString("energyType", getEnergyType().name());
+            tag.putString("recipeTier", getRecipeTier().name());
+            properties.set(NodeProperties.ORIGINAL_RECIPE_SPEC, tag);
+        }
+    }
+
+    /**
+     * Overrides the base processing duration in ticks for this node.
+     *
+     * @param ticks the custom duration in ticks (must be >= 1.0)
+     */
+    public void overrideDurationTicks(double ticks) {
+        captureOriginalRecipeSpec();
+        setBaseDurationTicks(Math.max(1.0, ticks));
+        setManualOverride(true);
+        markOverclockDirty();
+    }
+
+    /**
+     * Overrides the base power consumption or generation in EU/t for this node.
+     *
+     * @param eut the base power in EU/t
+     * @param isGen true if the machine generates power, false if it consumes
+     */
+    public void overrideBaseEUt(double eut, boolean isGen) {
+        captureOriginalRecipeSpec();
+        double absEUt = Math.abs(eut);
+        setBaseEUt(absEUt);
+        setGenerator(isGen);
+        if (absEUt > 0.0) {
+            GTVoltageTier minTier = GTVoltageTier.getTierForVoltage((long) absEUt);
+            setRecipeTier(minTier);
+            if (getTargetTier() == null || getTargetTier().getVoltage() < minTier.getVoltage()) {
+                setTargetTier(minTier);
+            }
+            if (getEnergyType() == EnergyType.NONE) {
+                setEnergyType(EnergyType.ELECTRIC_EU);
+            }
+        } else {
+            setEnergyType(EnergyType.NONE);
+        }
+        setManualOverride(true);
+        markOverclockDirty();
+    }
+
+    /**
+     * Overrides the ingredient amount for a specific input port on this node.
+     *
+     * @param portIndex the input port index
+     * @param amount the custom ingredient amount (clamped to >= 0.0001)
+     */
+    public void overrideInputAmount(int portIndex, double amount) {
+        if (portIndex < 0) return;
+        ensurePortsProjected();
+        int targetIndex = portIndex;
+        if (projectedInputs != null && portIndex < projectedInputs.size()) {
+            ProjectedPort port = projectedInputs.get(portIndex);
+            if (port.isAuxiliary()) {
+                return;
+            }
+            if (port.coreIndex() >= 0) {
+                targetIndex = port.coreIndex();
+            }
+        }
+        captureOriginalRecipeSpec();
+        double validAmount = Math.max(0.0001, amount);
+        RecipeSpec spec = getBaseSpec();
+        List<IngredientStack> coreIns = new ArrayList<>(extractCoreInputs());
+        if (targetIndex >= coreIns.size()) return;
+        coreIns.set(targetIndex, coreIns.get(targetIndex).withAmount(validAmount));
+        List<IngredientStack> coreOuts = new ArrayList<>(extractCoreOutputs());
+        this.baseSpec = new RecipeSpec(
+                spec.recipeId(),
+                spec.categoryId(),
+                spec.baseDurationTicks(),
+                spec.baseEUt(),
+                coreIns,
+                coreOuts
+        );
+        setManualOverride(true);
+        syncProjectedPorts();
+    }
+
+    /**
+     * Overrides the ingredient amount for a specific output port on this node.
+     *
+     * @param portIndex the output port index
+     * @param amount the custom ingredient amount (clamped to >= 0.0001)
+     */
+    public void overrideOutputAmount(int portIndex, double amount) {
+        if (portIndex < 0) return;
+        ensurePortsProjected();
+        int targetIndex = portIndex;
+        if (projectedOutputs != null && portIndex < projectedOutputs.size()) {
+            ProjectedPort port = projectedOutputs.get(portIndex);
+            if (port.isAuxiliary()) {
+                return;
+            }
+            if (port.coreIndex() >= 0) {
+                targetIndex = port.coreIndex();
+            }
+        }
+        captureOriginalRecipeSpec();
+        double validAmount = Math.max(0.0001, amount);
+        RecipeSpec spec = getBaseSpec();
+        List<IngredientStack> coreOuts = new ArrayList<>(extractCoreOutputs());
+        if (targetIndex >= coreOuts.size()) return;
+        coreOuts.set(targetIndex, coreOuts.get(targetIndex).withAmount(validAmount));
+        List<IngredientStack> coreIns = new ArrayList<>(extractCoreInputs());
+        this.baseSpec = new RecipeSpec(
+                spec.recipeId(),
+                spec.categoryId(),
+                spec.baseDurationTicks(),
+                spec.baseEUt(),
+                coreIns,
+                coreOuts
+        );
+        setManualOverride(true);
+        syncProjectedPorts();
+    }
+
+    /**
+     * Restores this node's recipe specification to its original values before manual overrides.
+     *
+     * @return true if successfully restored, false otherwise
+     */
+    public boolean resetToOriginalRecipe() {
+        if (!hasOriginalRecipeSpec()) return false;
+        CompoundTag origTag = properties.get(NodeProperties.ORIGINAL_RECIPE_SPEC);
+        RecipeSpec originalSpec = RecipeSpec.deserializeNBT(origTag);
+        if (originalSpec == null) return false;
+        setBaseDurationTicks(originalSpec.baseDurationTicks());
+        setBaseEUt(originalSpec.baseEUt());
+        if (origTag.contains("isGenerator")) {
+            setGenerator(origTag.getBoolean("isGenerator"));
+        }
+        if (origTag.contains("energyType")) {
+            try {
+                setEnergyType(EnergyType.valueOf(origTag.getString("energyType")));
+            } catch (Throwable ignored) {}
+        }
+        if (origTag.contains("recipeTier")) {
+            try {
+                setRecipeTier(GTVoltageTier.valueOf(origTag.getString("recipeTier")));
+            } catch (Throwable ignored) {}
+        } else if (originalSpec.baseEUt() > 0.0) {
+            setRecipeTier(GTVoltageTier.getTierForVoltage((long) originalSpec.baseEUt()));
+        }
+        setBaseSpec(originalSpec);
+        properties.set(NodeProperties.IS_MANUAL_OVERRIDE, false);
+        properties.set(NodeProperties.ORIGINAL_RECIPE_SPEC, new CompoundTag());
+        markPortsDirty();
+        markOverclockDirty();
+        return true;
     }
 
     public void markPortsDirty() {
@@ -923,19 +1096,25 @@ public class RecipeNode {
     }
 
     private List<ProjectedPort> defaultProjectInputPorts(RecipeSpec spec) {
-        if (spec == null || spec.baseInputs() == null) return Collections.emptyList();
-        List<ProjectedPort> list = new ArrayList<>(spec.baseInputs().size());
-        for (int i = 0; i < spec.baseInputs().size(); i++) {
-            list.add(ProjectedPort.ofCore(spec.baseInputs().get(i), i));
+        List<IngredientStack> source = (spec != null && spec.baseInputs() != null && !spec.baseInputs().isEmpty())
+                ? spec.baseInputs()
+                : this.inputs;
+        if (source == null || source.isEmpty()) return Collections.emptyList();
+        List<ProjectedPort> list = new ArrayList<>(source.size());
+        for (int i = 0; i < source.size(); i++) {
+            list.add(ProjectedPort.ofCore(source.get(i), i));
         }
         return Collections.unmodifiableList(list);
     }
 
     private List<ProjectedPort> defaultProjectOutputPorts(RecipeSpec spec) {
-        if (spec == null || spec.baseOutputs() == null) return Collections.emptyList();
-        List<ProjectedPort> list = new ArrayList<>(spec.baseOutputs().size());
-        for (int i = 0; i < spec.baseOutputs().size(); i++) {
-            list.add(ProjectedPort.ofCore(spec.baseOutputs().get(i), i));
+        List<IngredientStack> source = (spec != null && spec.baseOutputs() != null && !spec.baseOutputs().isEmpty())
+                ? spec.baseOutputs()
+                : this.outputs;
+        if (source == null || source.isEmpty()) return Collections.emptyList();
+        List<ProjectedPort> list = new ArrayList<>(source.size());
+        for (int i = 0; i < source.size(); i++) {
+            list.add(ProjectedPort.ofCore(source.get(i), i));
         }
         return Collections.unmodifiableList(list);
     }

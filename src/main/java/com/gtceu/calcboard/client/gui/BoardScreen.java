@@ -6,6 +6,7 @@ import com.gtceu.calcboard.api.history.BoardCommand;
 import com.gtceu.calcboard.api.model.CanvasGroupFrame;
 import com.gtceu.calcboard.api.model.CanvasStickyNote;
 import com.gtceu.calcboard.api.model.FlowGraph;
+import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.solver.BalanceSummary;
 import com.gtceu.calcboard.api.solver.FlowGraphSolver;
@@ -28,6 +29,7 @@ import com.gtceu.calcboard.client.gui.tutorial.WelcomeTutorialDialog;
 import com.gtceu.calcboard.client.gui.util.BoardViewportTransform;
 import com.gtceu.calcboard.client.gui.widget.*;
 import com.gtceu.calcboard.client.team.ClientWorkspaceState;
+import com.gtceu.calcboard.client.web.IconPrewarmer;
 import com.gtceu.calcboard.integration.emi.BoardMenu;
 import com.gtceu.calcboard.integration.spi.RecipeViewerRegistry;
 import net.minecraft.client.Minecraft;
@@ -152,6 +154,7 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> implements I
             }
         });
         rebuildWidgets();
+        IconPrewarmer.getInstance().enqueue(getGraph());
 
         teamSyncCoordinator.initNetworkPresence();
         RecipeSearchDialog.ensureGlobalRecipesCachedAsync(null);
@@ -585,6 +588,42 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> implements I
         com.gtceu.calcboard.client.gui.export.FlowPngExporter.request(this);
     }
 
+    @Override
+    public void openWebDashboard() {
+        if (com.gtceu.calcboard.config.CalcBoardClientConfig.ENABLE_LOCAL_WEB_SERVER != null
+                && !com.gtceu.calcboard.config.CalcBoardClientConfig.ENABLE_LOCAL_WEB_SERVER.get()) {
+            com.gtceu.calcboard.client.gui.widget.BoardToast.show(
+                    Component.literal("⚠ ").append(Component.translatable("gui.gtcalcboard.web.disabled_hint"))
+            );
+            openSettingsDialog(com.gtceu.calcboard.client.gui.dialog.BoardSettingsDialog.SettingsTab.UPDATES);
+            return;
+        }
+
+        var daemon = com.gtceu.calcboard.client.web.LocalWebServerDaemon.getInstance();
+        if (!daemon.isRunning()) {
+            daemon.start();
+        }
+        if (!daemon.isRunning()) {
+            com.gtceu.calcboard.client.gui.widget.BoardToast.show(
+                    Component.literal("⚠ ").append(Component.translatable("gui.gtcalcboard.web.bind_failed"))
+            );
+            return;
+        }
+        com.gtceu.calcboard.client.web.WebSyncEventBus.publishCurrentBoard();
+        String url = daemon.getUrl();
+        try {
+            net.minecraft.Util.getPlatform().openUri(java.net.URI.create(url));
+        } catch (Throwable t) {
+            GregTechCalcBoard.LOGGER.warn("[GTCalcBoard] Failed to open system browser for web dashboard: {}", t.getMessage());
+        }
+        try {
+            Minecraft.getInstance().keyboardHandler.setClipboard(url);
+        } catch (Throwable ignored) {}
+        com.gtceu.calcboard.client.gui.widget.BoardToast.show(
+                Component.literal("🌐 ").append(Component.translatable("gui.gtcalcboard.web.opened", url))
+        );
+    }
+
     public void requestPngCapture() { pngCaptureRequested = true; }
 
     public BoardDialogManager getDialogManager() { return dialogManager; }
@@ -634,8 +673,11 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> implements I
     public AutoConnectFilterDialog getAutoConnectDialog() { return dialogManager.getAutoConnectDialog(); }
     public PatternBindingDialog getPatternBindingDialog() { return dialogManager.getPatternBindingDialog(); }
     public JunctionSupplyDialog getJunctionSupplyDialog() { return dialogManager.getJunctionSupplyDialog(); }
+    public BatchRunCalculatorDialog getBatchRunDialog() { return dialogManager.getBatchRunDialog(); }
 
+    public void openBatchRunCalculator(IngredientStack preselected, boolean isInput) { dialogManager.openBatchRunCalculator(preselected, isInput); }
     public void openSettingsDialog() { dialogManager.openSettingsDialog(); }
+    public void openSettingsDialog(com.gtceu.calcboard.client.gui.dialog.BoardSettingsDialog.SettingsTab tab) { dialogManager.openSettingsDialog(tab); }
     public void openExportFolderDialog(String folderPath) { dialogManager.openExportFolderDialog(folderPath); }
     public void openImportFolderDialog() { dialogManager.openImportFolderDialog(); }
     public void openImportFolderDialog(FolderBlueprintPackage pkg) { dialogManager.openImportFolderDialog(pkg); }
@@ -738,6 +780,7 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> implements I
         BoardManager.getInstance().saveToFile(BoardManager.getInstance().getDefaultSaveFile(), this.panX, this.panY, this.zoom);
         lastBoardScreenActiveTime = 0;
         GregTechCalcBoard.LOGGER.info("[GTCalcBoard] [UI] BoardScreen closed. State saved.");
+        com.gtceu.calcboard.client.web.WebSyncEventBus.publishCurrentBoard();
         super.onClose();
     }
 

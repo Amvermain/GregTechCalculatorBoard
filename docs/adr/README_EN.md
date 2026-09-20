@@ -4,7 +4,7 @@
 
 This directory serves as the official **Architecture Decision Records (ADR) Registry** for the **GregTech Calculator Board (GTCalcBoard)** project, permanently preserving technical context, decision rationale, system architecture, and architectural consequences.
 
-All core architectural decisions, once implemented, are consolidated and structured into the official system specifications ([`docs/en_us/spec/`](../en_us/spec/)). This document provides a complete lifecycle map of all 58 ADRs and their integration with the specifications.
+All core architectural decisions, once implemented, are consolidated and structured into the official system specifications ([`docs/en_us/spec/`](../en_us/spec/)). This document provides a complete lifecycle map of all 59 ADRs and their integration with the specifications.
 
 ---
 
@@ -22,11 +22,11 @@ stateDiagram-v2
 
 | Status | Count | Description |
 | :--- | :---: | :--- |
-| 🟢 **`Active`** | **21** | Active decisions directly governing current system architecture, interfaces, and invariants |
+| 🟢 **`Active`** | **22** | Active decisions directly governing current system architecture, interfaces, and invariants |
 | 🔄 **`Superseded`** | **5** | Decisions replaced by subsequent ADRs due to architectural evolution or model upgrades |
 | 📦 **`Retired / Consolidated`** | **31** | Decisions fully integrated and codified into the official specifications ([`docs/en_us/spec/`](../en_us/spec/)) |
 | ❌ **`Rejected`** | **1** | Proposals permanently rejected during technical review and preserved as gaps (`RFC-046`) |
-| **Total** | **58** | Total registered architecture decision and gap records |
+| **Total** | **59** | Total registered architecture decision and gap records |
 
 ---
 
@@ -72,6 +72,7 @@ flowchart TD
     ADR025 --> ADR053["ADR-053<br/>NodeInspectorPanel SRP Decomposition"]
     ADR005["ADR-005 (Superseded)<br/>11-Step Linear Tutorial"] -.->|Replaced by| ADR056["ADR-056<br/>3-Track Modular Academy & Nudges"]
     ADR027 --> ADR058["ADR-058<br/>Defensive Copy of children & Modal Hotkey Guard"]
+    ADR025 --> ADR059["ADR-059<br/>Local Web Dashboard & SSE Live Sync"]
 ```
 
 ### 3. Domain Models, SPI & Networking Evolution
@@ -96,7 +97,7 @@ flowchart TD
 
 ---
 
-## 🟢 Active ADR Registry (21 Active Decisions)
+## 🟢 Active ADR Registry (22 Active Decisions)
 
 These active decisions directly govern the core invariants, data structures, computation algorithms, and interactions of the current codebase.
 
@@ -123,6 +124,7 @@ These active decisions directly govern the core invariants, data structures, com
 | **[ADR-056](ADR_056_MODULAR_ACADEMY_AND_CONTEXTUAL_TUTORIAL_ARCHITECTURE.md)** | Modular Academy and Contextual Tutorial Architecture Overhaul Specification | `v2.3.0` | Client UI (`client.gui.tutorial`) | [03-04. Search & Tools](../en_us/spec/03_04_RECIPE_SEARCH_AND_TOOLS.md) | Introduced 3-track onboarding (45-second starter, 4 academy chapters, contextual nudges) and integrated tutorial registry. |
 | **[ADR-057](ADR_057_TFG_LARGE_BOILER_BOOSTER_MECHANISM.md)** | TFG Large Boiler Booster Mechanism and Non-Linear Physics Model Specification | `v2.3.0` | Compat Physics (`compat.tfg`) | [02. Math & Algorithms](../en_us/spec/02_MATH_AND_ALGORITHMS.md) | TFG Large Boiler (LBB 480PU, LSB 1280PU) 9 booster fluids, water quality tiers (1.5x), $1.5$-power non-linear water consumption curve beyond 480PU, Super Boiler mode. |
 | **[ADR-058](ADR_058_CANVAS_INTERACTION_AND_SOLVER_DEFENSIVE_STABILITY.md)** | Canvas Interaction Lifecycle and Flow Solver Defensive Stability Specification | `v2.3.0` | Client GUI & Solver (`client.gui`, `api.solver`) | [03. UI & Rendering](../en_us/spec/03_UI_AND_RENDERING_PIPELINE.md) | Defensive copy of `children()`, flow solver negative index guards, hotkey interception during active modals, `MachineNodeRole` NBT normalization. |
+| **[ADR-059](ADR_059_LOCAL_WEB_BOARD_DASHBOARD.md)** | Local Embedded Web Dashboard and Read-Only Live Board Viewer Specification | `v2.4.0-beta.1` | Client Web & GUI (`client.web`, `client.gui`) | [03. UI & Rendering](../en_us/spec/03_UI_AND_RENDERING_PIPELINE.md) | Embedded HttpServer (127.0.0.1) live board SPA for second monitors, SSE event streaming, 32×32 icon FBO caching pipeline |
 
 ---
 
@@ -194,4 +196,6 @@ Proposals permanently rejected during review due to architectural violations, st
 
 RFC proposals currently undergoing technical review and awaiting approval prior to implementation. Once approved and implemented, they are promoted to permanent ADRs.
 
-*There are currently no active, undecided RFC proposals.*
+| ID | Title | Target Ver. | Date | Responsible Layers | Summary |
+| :---: | :--- | :---: | :---: | :--- | :--- |
+| - | *(No active RFC proposals)* | - | - | - | All proposals implemented and promoted to official ADRs. |

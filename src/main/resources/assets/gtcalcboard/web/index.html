@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GTCalcBoard Live Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header class="app-header">
+        <div class="header-left">
+            <div class="logo">
+                <span class="logo-icon">🌐</span>
+                <span class="logo-text">GTCalcBoard Live</span>
+            </div>
+            <div id="connectionBadge" class="badge badge-connecting">
+                <span class="status-dot"></span>
+                <span id="connectionText">Connecting...</span>
+            </div>
+            <div class="page-selector-wrapper">
+                <button id="pageTitleBadge" class="page-title-badge" title="Browse Pages">
+                    <span id="pageTitleText">Untitled Page</span>
+                    <span class="dropdown-arrow">▾</span>
+                </button>
+                <div id="pageBrowserMenu" class="page-browser-dropdown hidden">
+                    <div class="page-browser-header">
+                        <input type="text" id="pageSearchInput" placeholder="Search pages..." autocomplete="off">
+                        <label class="live-follow-toggle" title="Auto-switch when active page changes in Minecraft">
+                            <input type="checkbox" id="chkLiveFollow" checked>
+                            <span>Live Follow</span>
+                        </label>
+                    </div>
+                    <div id="pageListContainer" class="page-list-container"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="header-center">
+            <div id="statsBar" class="stats-bar">
+                <span id="nodeCount">0 Nodes</span>
+                <span class="separator">•</span>
+                <span id="wireCount">0 Wires</span>
+                <span class="separator">•</span>
+                <span id="powerBalance">0 EU/t</span>
+            </div>
+        </div>
+
+        <div class="header-right">
+            <button id="btnUnitMode" class="btn" title="Toggle Fluid Unit (Auto / Always B / Always mB)">Unit: Auto</button>
+            <button id="btnFit" class="btn" title="Fit View (F)">⌖ Fit View</button>
+            <button id="btnReset" class="btn" title="Reset View (Home)">↺ Reset</button>
+            <div class="zoom-controls">
+                <button id="btnZoomOut" class="btn btn-icon" title="Zoom Out (-)">−</button>
+                <span id="zoomLevel" class="zoom-text">100%</span>
+                <button id="btnZoomIn" class="btn btn-icon" title="Zoom In (+)">+</button>
+            </div>
+            <button id="btnRefresh" class="btn btn-icon" title="Refresh (R)">↻</button>
+        </div>
+    </header>
+
+    <main class="canvas-container">
+        <canvas id="boardCanvas"></canvas>
+        <div id="tooltip" class="tooltip hidden"></div>
+    </main>
+
+    <footer class="app-footer">
+        <div class="footer-left">
+            <span class="hint"><kbd>Left Click + Drag</kbd> Pan</span>
+            <span class="hint"><kbd>Wheel</kbd> Zoom</span>
+            <span class="hint"><kbd>F</kbd> Fit All</span>
+            <span class="hint"><kbd>Home</kbd> Reset</span>
+            <span class="hint"><kbd>R</kbd> Refresh</span>
+        </div>
+        <div class="footer-right">
+            <span id="lastUpdated" class="last-updated">Waiting for board data...</span>
+        </div>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>

@@ -88,8 +88,7 @@ public final class GTEnergyHatchCalculator {
         if (node.getSteamMode() != null && node.getSteamMode().isSteam()) {
             return false;
         }
-        ResourceLocation mbId = node.getMachineIcon() != null ? node.getMachineIcon() : node.getMultiblockWorkstation();
-        if (mbId != null && MultiblockDetector.isSteamMultiblock(mbId)) {
+        if (MultiblockDetector.isSteamMultiblock(node)) {
             return false;
         }
         return true;
@@ -167,6 +166,9 @@ public final class GTEnergyHatchCalculator {
                 return totalInputVoltage;
             }
             return calculateEffectiveOverclockVoltage(totalInputVoltage, inputAmperage);
+        }
+        if (node.isMultiblock() && requiresEnergyHatch(node)) {
+            return Long.MAX_VALUE;
         }
         if (node.isMultiblock() && node.getTargetTier() != null) {
             boolean hasParallelHatch = node.getAddons().stream().anyMatch(a ->

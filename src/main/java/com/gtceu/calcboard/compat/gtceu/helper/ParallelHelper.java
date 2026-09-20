@@ -371,9 +371,10 @@ public class ParallelHelper {
     }
 
     public static void registerDefaultParallelHatches(List<MachineAddon> collector) {
+        boolean isStarT = com.gtceu.calcboard.api.util.ModCompatHelper.isStarTLoaded();
         Object[][] tiers = new Object[][]{
                 {"ev", "EV", 4},
-                {"iv", "IV", 16},
+                {"iv", "IV", isStarT ? 8 : 16},
                 {"luv", "LuV", 64},
                 {"zpm", "ZPM", 256},
                 {"uv", "UV", 1024},

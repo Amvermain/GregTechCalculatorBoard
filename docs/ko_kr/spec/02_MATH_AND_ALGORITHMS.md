@@ -472,6 +472,26 @@ $$S = \frac{M_{\text{target}}}{D_{\text{current}}}$$
    - 정수 기계 대수 연산 요구 시, 각 미지수 해에 천장 함수를 적용($\lceil x_i^* \rceil$)하고 공정 병목 비율을 보존하는 스케일링을 거쳐 정수 대수 벡터를 확정합니다.
    - 이를 통해 긴 순환 루프에서도 여러 번 클릭할 필요 없이 1클릭만으로 루프 내부 및 외부 공급선이 정확히 균형을 이루도록 보장합니다.
 
+### [알고리즘 14] 유한 배치 및 목표 생산량 기준 공정 소요 시간/자원 산출 솔버 (`BatchRunSolver`)
+
+특정 원자재의 유한한 투입량 또는 목표 완제품 생산량을 기준으로 전체 공정 그래프의 총 소요 시간, 원자재 요구량, 생산 수율 및 총 에너지 소비량을 일괄 연산합니다:
+
+##### 1. 총 공정 소요 시간 ($T_{\text{sec}}$) 산출
+- **유한 원자재 투입 모드 (`BatchMode.FINITE_INPUT`)**:
+  지정된 기준 원료의 투입량 $A_{\text{input}}$과 공정 그래프의 초당 순 소모 속도 $R_{\text{consume}}$ 기준:
+  $$T_{\text{sec}} = \frac{A_{\text{input}}}{R_{\text{consume}}}$$
+- **목표 완제품 생산 모드 (`BatchMode.TARGET_OUTPUT`)**:
+  지정된 목표 제품의 요구량 $A_{\text{target}}$과 공정 그래프의 초당 순 생산 속도 $R_{\text{produce}}$ 기준:
+  $$T_{\text{sec}} = \frac{A_{\text{target}}}{R_{\text{produce}}}$$
+
+##### 2. 총 원자재 요구량 및 제품 수율 적분
+시간 $T_{\text{sec}}$ 동안 전체 공정에서 소모 및 생산되는 각 자원 $k$의 누적 수량:
+$$I_k = T_{\text{sec}} \times \text{RawDeficitRate}(k) \quad [\text{Items / mB}]$$
+$$O_k = T_{\text{sec}} \times \text{NetSurplusRate}(k) \quad [\text{Items / mB}]$$
+
+##### 3. 총 전력 및 에너지 적분
+$$E_{\text{total}} = T_{\text{sec}} \times 20 \times \sum_{m \in \text{Machines}} \Big( m.\text{getEffectiveEUt}() \times m.\text{getMachineCount}() \times m.\text{getEfficiency}() \Big) \quad [\text{EU}]$$
+
 ---
 
 > ➡ **다음 장으로 이동**: [[03] UI 및 캔버스 렌더링 파이프라인](03_UI_AND_RENDERING_PIPELINE.md)

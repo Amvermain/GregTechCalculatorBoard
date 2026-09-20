@@ -33,7 +33,8 @@ graph TD
         WSI["WireSpatialIndex (128x128 AABB 균일 그리드 O(log E) 공간 분할)"]
         NCTC["NodeCardTextCache (dirty 기반 텍스트 절삭 및 단위 포맷팅 캐시)"]
         Widgets["widget.* (NodeWidget, ToolbarWidget, PageTabBarWidget, HotkeyHudWidget, SummaryOverlay, FavoritesDockWidget)"]
-        Dialogs["dialog.* (BoardSettingsDialog, MachineConfigDialog, BOMDialog, SearchDialog, GlobalBalanceDialog, JunctionSupplyDialog, FrameEditDialog)"]
+        Dialogs["dialog.* (BoardSettingsDialog, MachineConfigDialog & RecipeOverrideView, BatchRunCalculatorDialog, BOMDialog, SearchDialog, GlobalBalanceDialog, JunctionSupplyDialog, FrameEditDialog)"]
+        Web["web.* (LocalWebServerDaemon, WebSyncEventBus, MicroIconRenderer, IconDiskCache, BoardJsonSerializer)"]
         Search["search.* (RecipeSearchCacheManager, RecipeSearchQueryEngine & 합성 가능 명세 패턴)"]
     end
 
@@ -42,6 +43,7 @@ graph TD
         Preset["preset.* (CategoryMachinePreset, CategoryMachinePresetManager)"]
         Model["model.* (RecipeNode, ConnectionEdge, IngredientStack, CanvasGroupFrame, NodeRateCalculator, NodeWorkstationResolver)"]
         Solver["solver.* (FlowGraph, FlowGraphSolver, MassBalanceSolver, FlowBalanceMatrixSolver, FlowEdgeAllocator, FlowGraphModuleHandler)"]
+        BatchSolver["solver.* (BatchRunSolver, BatchRunResult)"]
         Linear["solver.linear.* (TwoStageLinearFlowSolver, GaussJordanEliminator, LinearEquationSystem)"]
         Stability["solver.* (ProcessStabilityAnalyzer, HarmonizedRatioOptimizer, AutoRatioEngine)"]
         Catalog["catalog.* (CapabilityMatrix, MachineAddonCatalog, PartCategory, MultiblockDetector)"]

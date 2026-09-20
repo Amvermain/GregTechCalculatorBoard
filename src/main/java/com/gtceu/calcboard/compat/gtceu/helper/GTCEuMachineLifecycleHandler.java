@@ -84,6 +84,10 @@ public final class GTCEuMachineLifecycleHandler {
     }
 
     public static void purgeIncompatibleAddons(RecipeNode node, ResourceLocation oldIcon, ResourceLocation newIcon) {
+        if (MultiblockDetector.isSteamMultiblock(newIcon)) {
+            node.getAddons().removeIf(a -> a.getCategory() != MachineAddon.Category.CUSTOM);
+        }
+
         if (!MultiblockDetector.isCoilMultiblock(newIcon) && !node.canUseCoils()) {
             node.getAddons().removeIf(a -> a.getCategory() == MachineAddon.Category.COIL);
         }

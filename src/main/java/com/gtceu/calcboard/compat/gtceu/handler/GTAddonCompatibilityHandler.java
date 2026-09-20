@@ -61,6 +61,10 @@ public final class GTAddonCompatibilityHandler {
         return false;
     }
 
+    public static boolean isSteamMultiblock(RecipeNode node) {
+        return MultiblockDetector.isSteamMultiblock(node);
+    }
+
     public static boolean supportsAddons(RecipeNode node) {
         if (node == null || node.getEnergyType() == EnergyType.NONE) return false;
         if (GTCombustionHelper.isCombustionFamily(node)) {
@@ -153,9 +157,12 @@ public final class GTAddonCompatibilityHandler {
     }
 
     private static List<AddonCategory> resolveMultiblockApplicableCategories(RecipeNode node) {
+        if (isSteamMultiblock(node)) {
+            return List.of(AddonCategory.HATCH_BUS, AddonCategory.CUSTOM);
+        }
         ResourceLocation mbId = node.getMachineIcon() != null ? node.getMachineIcon() : node.getMultiblockWorkstation();
         var def = mbId != null ? MultiblockStructureCatalog.getStructure(mbId) : null;
-        boolean isSteamMb = (node.getSteamMode() != null && node.getSteamMode().isSteam()) || (mbId != null && MultiblockDetector.isSteamMultiblock(mbId));
+        boolean isSteamMb = false;
 
         List<AddonCategory> cats = new ArrayList<>();
         if (!isSteamMb && !node.isGenerator() && node.getEnergyType() != EnergyType.NONE && node.getEnergyType() != EnergyType.KINETIC_SU
@@ -198,6 +205,12 @@ public final class GTAddonCompatibilityHandler {
     public static boolean isAddonCompatible(RecipeNode node, MachineAddon addon) {
         if (node == null || addon == null) return false;
         if (addon.getCategory().equals(AddonCategory.CUSTOM)) return true;
+        if (isSteamMultiblock(node)) {
+            if (addon.getCategory() == AddonCategory.HATCH_BUS) {
+                return isHatchBusCompatible(node, addon);
+            }
+            return false;
+        }
 
         if (GTPowerCalculator.isBoilerRecipe(node)) {
             if (!node.isMultiblock()) return false;
@@ -302,6 +315,14 @@ public final class GTAddonCompatibilityHandler {
 
     private static boolean isHatchBusCompatible(RecipeNode node, MachineAddon addon) {
         if (!node.isMultiblock()) return false;
+        boolean isSteamMb = isSteamMultiblock(node);
+        if (addon instanceof GTHatchAddon gh) {
+            boolean isSteamHatch = gh.getAbilities().stream().anyMatch(a -> a.startsWith("STEAM"));
+            if (isSteamMb && !isSteamHatch) return false;
+            if (!isSteamMb && isSteamHatch) return false;
+        } else if (isSteamMb) {
+            return false;
+        }
         ResourceLocation mbId = node.getMachineIcon() != null ? node.getMachineIcon() : node.getMultiblockWorkstation();
         if (mbId != null && !matchesHatchStructure(mbId, addon)) {
             return false;

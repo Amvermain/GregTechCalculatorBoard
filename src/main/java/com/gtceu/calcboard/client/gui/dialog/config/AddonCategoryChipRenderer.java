@@ -51,7 +51,7 @@ public final class AddonCategoryChipRenderer {
         }
 
         for (AddonCategory cat : relCats) {
-            if (cat != null && !cat.equals(AddonCategory.CUSTOM) && !list.contains(cat)) {
+            if (cat != null && !cat.equals(AddonCategory.CUSTOM) && !cat.equals(AddonCategory.MANUAL_OVERRIDE) && !list.contains(cat)) {
                 if (cat.equals(AddonCategory.THREADING)
                         || cat.equals(AddonCategory.MCF_MODULE)
                         || (cat.equals(AddonCategory.HEATER) && com.gtceu.calcboard.compat.create.CreateProperties.isCreateBoiler(node))
@@ -60,13 +60,14 @@ public final class AddonCategoryChipRenderer {
                 }
             }
         }
+        list.add(AddonCategory.MANUAL_OVERRIDE);
         list.add(AddonCategory.CUSTOM);
         return list;
     }
 
     public static double ensureCategoryVisible(RecipeNode node, AddonCategory targetCat, int dialogWidth, double currentScrollX, List<AddonCategory> allCats) {
         if (node == null) return currentScrollX;
-        int targetIdx = (targetCat != null && targetCat.equals(AddonCategory.CUSTOM)) ? (allCats.size() - 1) : allCats.indexOf(targetCat);
+        int targetIdx = allCats.indexOf(targetCat);
         if (targetIdx < 0) return currentScrollX;
         Minecraft mc = Minecraft.getInstance();
         if (mc == null || mc.font == null) return currentScrollX;

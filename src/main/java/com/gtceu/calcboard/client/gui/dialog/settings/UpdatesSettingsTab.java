@@ -51,6 +51,14 @@ public class UpdatesSettingsTab extends AbstractSettingsTab {
 
         drawButton(graphics, font, Component.translatable("gui.gtcalcboard.settings.check_updates_now").getString(),
                 x + 4, rowY, 130, 20, mouseX, mouseY, 0xFF58D3FF, 0xFF222834, 0xFF35445E);
+
+        rowY += 28;
+        graphics.drawString(font, "§b" + Component.translatable("gui.gtcalcboard.settings.web_server_section").getString(), x, rowY, 0xFFFFFFFF, false);
+        rowY += 12;
+
+        drawCheckbox(graphics, font, x, rowY, w, rowH, mouseX, mouseY,
+                Component.translatable("gui.gtcalcboard.settings.enable_web_server").getString(),
+                CalcBoardClientConfig.ENABLE_LOCAL_WEB_SERVER.get());
     }
 
     private void renderUpdateStatusCard(GuiGraphics graphics, Font font, int cx, int cy, int cw, int mouseX, int mouseY, ClientUpdateNotifier notifier) {
@@ -138,7 +146,31 @@ public class UpdatesSettingsTab extends AbstractSettingsTab {
             playClickSound();
             return true;
         }
+
+        rowY += 28;
+        rowY += 12;
+
+        if (isInsideRow(mouseX, mouseY, x, rowY, w, rowH)) {
+            toggleWebServerConfig();
+            return true;
+        }
+
         return false;
+    }
+
+    private void toggleWebServerConfig() {
+        boolean current = CalcBoardClientConfig.ENABLE_LOCAL_WEB_SERVER.get();
+        CalcBoardClientConfig.ENABLE_LOCAL_WEB_SERVER.set(!current);
+        CalcBoardClientConfig.SPEC.save();
+        playClickSound();
+
+        var daemon = com.gtceu.calcboard.client.web.LocalWebServerDaemon.getInstance();
+        if (current) {
+            daemon.stop();
+        } else {
+            daemon.start();
+            com.gtceu.calcboard.client.web.WebSyncEventBus.publishCurrentBoard();
+        }
     }
 
     private void toggleConfigBoolean(ForgeConfigSpec.BooleanValue configValue) {

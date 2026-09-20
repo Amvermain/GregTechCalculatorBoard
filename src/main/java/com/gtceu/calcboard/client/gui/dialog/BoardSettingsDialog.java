@@ -75,6 +75,13 @@ public class BoardSettingsDialog implements IBoardModal {
         this.visible = visible;
     }
 
+    public void openTab(SettingsTab tab) {
+        if (tab != null) {
+            this.activeTab = tab.ordinal();
+        }
+        open();
+    }
+
     public void open() {
         this.visible = true;
         for (ISettingsTab tab : tabHandlers) {

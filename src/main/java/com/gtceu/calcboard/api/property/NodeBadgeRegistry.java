@@ -29,6 +29,20 @@ public final class NodeBadgeRegistry {
             return List.of();
         });
 
+        register((node, store) -> {
+            if (node == null || store == null) return List.of();
+            if (Boolean.TRUE.equals(store.get(NodeProperties.IS_MANUAL_OVERRIDE))) {
+                String badgeText = net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.node_badge.manual_override").getString();
+                List<net.minecraft.network.chat.Component> tooltip = List.of(
+                        net.minecraft.network.chat.Component.literal("§b✎ " + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.node_badge.manual_override_title").getString()),
+                        net.minecraft.network.chat.Component.literal("§7" + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.node_badge.manual_override_desc").getString()),
+                        net.minecraft.network.chat.Component.literal("§e💡 " + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.node_badge.manual_override_hint").getString())
+                );
+                return List.of(new NodeBadge(badgeText, 0xFF38BDF8, 0xEE082F49, 0xFF38BDF8, tooltip));
+            }
+            return List.of();
+        });
+
         // Compound / Layered Recipe Badge Provider
         register((node, store) -> {
             if (node == null || store == null) return List.of();
@@ -192,14 +206,18 @@ public final class NodeBadgeRegistry {
         return new NodeBadge(badgeText, 0xFF38BDF8, 0xEE082F49, 0xFF0284C7, tooltip, false, () -> executeSteadyStateScale(node, graph));
     }
 
+    private static java.util.function.Consumer<RecipeNode> loopScaledListener = null;
+
+    public static void setLoopScaledListener(java.util.function.Consumer<RecipeNode> listener) {
+        loopScaledListener = listener;
+    }
+
     private static void executeSteadyStateScale(RecipeNode node, FlowGraph graph) {
         if (node == null || graph == null) return;
         com.gtceu.calcboard.api.solver.FlowBalanceMatrixSolver.scaleLoopToSteadyState(graph, node.getId());
-        try {
-            Class<?> clazz = Class.forName("com.gtceu.calcboard.client.gui.tutorial.TutorialManager");
-            Object instance = clazz.getMethod("getInstance").invoke(null);
-            clazz.getMethod("onLoopScaled").invoke(instance);
-        } catch (Throwable ignored) {}
+        if (loopScaledListener != null) {
+            loopScaledListener.accept(node);
+        }
     }
 
     private static net.minecraft.network.chat.Component resolveHint2(RecipeNode node, String defaultKey) {

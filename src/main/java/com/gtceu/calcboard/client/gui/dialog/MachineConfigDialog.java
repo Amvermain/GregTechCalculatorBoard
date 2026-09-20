@@ -11,6 +11,7 @@ import com.gtceu.calcboard.client.gui.dialog.config.ActiveAddonsView;
 import com.gtceu.calcboard.client.gui.dialog.config.AddonCatalogView;
 import com.gtceu.calcboard.client.gui.dialog.config.CustomAddonBuilderView;
 import com.gtceu.calcboard.client.gui.dialog.config.MCFConfigView;
+import com.gtceu.calcboard.client.gui.dialog.config.RecipeOverrideView;
 import com.gtceu.calcboard.client.gui.dialog.config.ThreadingHelixView;
 import com.gtceu.calcboard.api.preset.CategoryMachinePreset;
 import com.gtceu.calcboard.api.preset.CategoryMachinePresetManager;
@@ -63,6 +64,7 @@ public class MachineConfigDialog implements IBoardModal {
     private final ThreadingHelixView threadingHelixView;
     private final com.gtceu.calcboard.client.gui.compat.create.CreateBoilerConfigView createBoilerConfigView;
     private final MCFConfigView mcfConfigView;
+    private final RecipeOverrideView recipeOverrideView;
 
     // Top Base Parallel EditBox
     private EditBox parallelBox;
@@ -92,6 +94,7 @@ public class MachineConfigDialog implements IBoardModal {
         this.threadingHelixView = new ThreadingHelixView(this);
         this.createBoilerConfigView = new com.gtceu.calcboard.client.gui.compat.create.CreateBoilerConfigView(this);
         this.mcfConfigView = new MCFConfigView(this);
+        this.recipeOverrideView = new RecipeOverrideView(this);
     }
 
     public BoardScreen getParent() {
@@ -112,6 +115,10 @@ public class MachineConfigDialog implements IBoardModal {
 
     public CustomAddonBuilderView getCustomAddonBuilderView() {
         return customAddonBuilderView;
+    }
+
+    public RecipeOverrideView getRecipeOverrideView() {
+        return recipeOverrideView;
     }
 
     public ThreadingHelixView getThreadingHelixView() {
@@ -191,6 +198,7 @@ public class MachineConfigDialog implements IBoardModal {
         this.addonCatalogView.init();
         this.addonCatalogView.ensureCategoryVisible(node, this.selectedCategory, DIALOG_WIDTH);
         this.customAddonBuilderView.init();
+        this.recipeOverrideView.init(node);
         invalidateFilteredCatalog();
 
         syncThreadingAddons(node);
@@ -198,6 +206,9 @@ public class MachineConfigDialog implements IBoardModal {
 
     public static AddonCategory getDefaultCategoryForNode(RecipeNode node) {
         if (node == null) return null;
+        if (Boolean.TRUE.equals(node.getProperties().get(com.gtceu.calcboard.api.property.NodeProperties.IS_GENERIC_UNSUPPORTED))) {
+            return AddonCategory.MANUAL_OVERRIDE;
+        }
         if (com.gtceu.calcboard.compat.create.CreateProperties.isCreateBoiler(node)) {
             return AddonCategory.HEATER;
         }
@@ -549,6 +560,8 @@ public class MachineConfigDialog implements IBoardModal {
 
         if (isCustomBuilderActive) {
             customAddonBuilderView.render(graphics, font, catalogStartX + 4, catalogStartY + 4, catalogW - 8, catalogH - 8, virtualMouseX, virtualMouseY);
+        } else if (selectedCategory == AddonCategory.MANUAL_OVERRIDE) {
+            recipeOverrideView.render(graphics, font, catalogStartX + 4, catalogStartY + 4, catalogW - 8, catalogH - 8, virtualMouseX, virtualMouseY);
         } else if (selectedCategory == AddonCategory.THREADING) {
             threadingHelixView.render(graphics, font, node, catalogStartX + 4, catalogStartY + 4, catalogW - 8, catalogH - 8, virtualMouseX, virtualMouseY);
         } else if (selectedCategory == AddonCategory.HEATER && com.gtceu.calcboard.compat.create.CreateProperties.isCreateBoiler(node)) {
@@ -825,6 +838,8 @@ public class MachineConfigDialog implements IBoardModal {
 
         if (isCustomBuilderActive) {
             return customAddonBuilderView.mouseClicked(mX, mY, button, catalogStartX + 4, catalogStartY + 4, catalogW - 8, catalogH - 8, node, parent);
+        } else if (selectedCategory == AddonCategory.MANUAL_OVERRIDE) {
+            return recipeOverrideView.mouseClicked(mX, mY, button, catalogStartX + 4, catalogStartY + 4, catalogW - 8, catalogH - 8, node, parent);
         } else if (selectedCategory == AddonCategory.THREADING) {
             if (threadingHelixView.mouseClicked(catalogStartX + 4, catalogStartY + 4, catalogW - 8, catalogH - 8, mX, mY, node)) {
                 syncThreadingAddons(node);
@@ -898,6 +913,10 @@ public class MachineConfigDialog implements IBoardModal {
         int catalogW = dialogW - 12;
         int catalogH = dialogH - 158;
 
+        if (selectedCategory == AddonCategory.MANUAL_OVERRIDE) {
+            return recipeOverrideView.mouseScrolled(mX, mY, delta, catalogStartX + 4, catalogStartY + 4, catalogW - 8, catalogH - 8);
+        }
+
         if (!isCustomBuilderActive && selectedCategory != AddonCategory.THREADING) {
             if (selectedCategory == AddonCategory.MCF_MODULE && com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isModularCombustionFrame(node)) {
                 return mcfConfigView.mouseScrolled(mX, mY, delta, catalogStartX + 4, catalogStartY + 4, catalogW - 8, catalogH - 8);
@@ -923,6 +942,8 @@ public class MachineConfigDialog implements IBoardModal {
 
         if (isCustomBuilderActive) {
             if (customAddonBuilderView.keyPressed(keyCode, scanCode, modifiers)) return true;
+        } else if (selectedCategory == AddonCategory.MANUAL_OVERRIDE) {
+            if (recipeOverrideView.keyPressed(keyCode, scanCode, modifiers)) return true;
         } else if (selectedCategory != AddonCategory.THREADING) {
             if (addonCatalogView.keyPressed(keyCode, scanCode, modifiers)) return true;
         }
@@ -939,6 +960,8 @@ public class MachineConfigDialog implements IBoardModal {
 
         if (isCustomBuilderActive) {
             if (customAddonBuilderView.charTyped(codePoint, modifiers)) return true;
+        } else if (selectedCategory == AddonCategory.MANUAL_OVERRIDE) {
+            if (recipeOverrideView.charTyped(codePoint, modifiers)) return true;
         } else if (selectedCategory != AddonCategory.THREADING) {
             if (addonCatalogView.charTyped(codePoint, modifiers)) return true;
         }

@@ -83,6 +83,14 @@ public interface IBoardScreenContext extends IBoardViewportAccessor, IBoardSelec
 
     void openPageSettingsDialog();
 
+    default BatchRunCalculatorDialog getBatchRunDialog() { return null; }
+
+    default void openBatchRunCalculator(com.gtceu.calcboard.api.model.IngredientStack preselected, boolean isInput) {}
+
+    default void openBatchRunCalculator() {
+        openBatchRunCalculator(null, true);
+    }
+
     default void openPage(String pageId) {}
 
     default void openPage(java.util.UUID pageId) {}

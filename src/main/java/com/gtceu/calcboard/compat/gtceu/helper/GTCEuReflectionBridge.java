@@ -424,6 +424,15 @@ public final class GTCEuReflectionBridge {
                 return true;
             }
         }
+        List<Object> modifiers = getRecipeModifiers(def);
+        if (modifiers != null) {
+            for (Object mod : modifiers) {
+                String name = getRecipeModifierName(mod);
+                if (name != null && (name.contains("STEAM") || name.equals("STEAM_PARALLEL_MULTIBLOCK"))) {
+                    return true;
+                }
+            }
+        }
         return false;
     }
 

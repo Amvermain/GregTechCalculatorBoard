@@ -207,6 +207,8 @@ public class BoardScreenContextDecouplingTest {
         @Override public void openPageSettingsDialog() {}
         @Override public PageSettingsDialog getPageSettingsDialog() { return null; }
         @Override public void batchApplyPageTargetVoltage() {}
+        @Override public void openBatchRunCalculator(com.gtceu.calcboard.api.model.IngredientStack preselected, boolean isInput) {}
+        @Override public BatchRunCalculatorDialog getBatchRunDialog() { return null; }
 
         @Override public FlowGraph getGraph() { return graph; }
         @Override public BalanceSummary getCachedSummary() { return null; }

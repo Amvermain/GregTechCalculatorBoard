@@ -3,6 +3,7 @@ package com.gtceu.calcboard.integration.jei;
 import com.gtceu.calcboard.api.catalog.CategoryCapabilityMatrix;
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.model.RecipeSpec;
 import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.util.ModCompatHelper;
@@ -330,6 +331,14 @@ public class JeiRecipeConverter {
             effectiveTier = adapter.sanitizeTargetTier(node, effectiveTier);
         }
         node.setTargetTier(effectiveTier);
+        node.setBaseSpec(RecipeSpec.of(
+                node.getId(),
+                node.getRecipeCategoryId(),
+                node.getBaseDurationTicks(),
+                node.getBaseEUt(),
+                node.getInputs(),
+                node.getOutputs()
+        ));
         com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.ensureCombustionInputs(node);
 
         return node;

@@ -205,6 +205,9 @@ public final class GTCEuMachineAnalyzer {
         }
 
         if (isMb) {
+            if (isSteamContract(def, id, abilities)) {
+                return GTMachineArchetype.STEAM_MACHINE;
+            }
             if (isCoilContract(mCls, abilities, id)) {
                 return GTMachineArchetype.COIL_HEATED;
             }
@@ -216,7 +219,7 @@ public final class GTCEuMachineAnalyzer {
             }
         }
 
-        if (isSteamContract(def, id)) {
+        if (isSteamContract(def, id, abilities)) {
             return GTMachineArchetype.STEAM_MACHINE;
         }
 
@@ -261,8 +264,10 @@ public final class GTCEuMachineAnalyzer {
         return MultiblockDetector.isThreadingMultiblock(id);
     }
 
-    private static boolean isSteamContract(Object def, ResourceLocation id) {
-        return MultiblockDetector.isSteamMultiblock(id) || GTCEuReflectionBridge.isSteamMachine(def);
+    private static boolean isSteamContract(Object def, ResourceLocation id, Set<String> abilities) {
+        if (MultiblockDetector.isSteamMultiblock(id)) return true;
+        if (abilities != null && (abilities.contains("STEAM") || abilities.contains("STEAM_IMPORT_ITEMS"))) return true;
+        return GTCEuReflectionBridge.isSteamMachine(def);
     }
 
     private static MachineCapabilities emptyCapabilities(ResourceLocation id) {

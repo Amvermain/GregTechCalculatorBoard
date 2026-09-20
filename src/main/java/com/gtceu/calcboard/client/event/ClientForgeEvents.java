@@ -14,6 +14,7 @@ import com.gtceu.calcboard.client.gui.BoardScreen;
 import com.gtceu.calcboard.client.gui.dialog.RecipeSearchDialog;
 import com.gtceu.calcboard.client.key.KeyBindings;
 import com.gtceu.calcboard.client.team.ClientWorkspaceState;
+import com.gtceu.calcboard.client.web.IconPrewarmer;
 import com.gtceu.calcboard.network.NetworkHandler;
 import com.gtceu.calcboard.network.packet.c2s.C2SRequestWorkspacePacket;
 import net.minecraft.client.Minecraft;
@@ -81,6 +82,7 @@ public class ClientForgeEvents {
         GregTechCalcBoard.LOGGER.info("[GTCalcBoard] [Lifecycle] Client logged in to world/server. Reloading board data and preloading catalogs...");
         // Load personal boards scoped to this world / server
         BoardManager.getInstance().reloadForCurrentContext();
+        try { com.gtceu.calcboard.client.web.WebSyncEventBus.publishCurrentBoard(); } catch (Throwable ignored) {}
 
         // Load client-wide preferences & determine welcome chat delay
         ClientPreferenceManager.getInstance().ensureLoaded();
@@ -134,6 +136,7 @@ public class ClientForgeEvents {
         if (com.gtceu.calcboard.api.util.ModCompatHelper.isEmiLoaded()) {
             try { com.gtceu.calcboard.integration.emi.EmiLifecycleHook.reset(); } catch (Throwable ignored) {}
         }
+        try { com.gtceu.calcboard.client.web.WebSyncEventBus.reset(); } catch (Throwable ignored) {}
     }
 
     @SubscribeEvent
@@ -269,6 +272,7 @@ public class ClientForgeEvents {
     @SubscribeEvent
     public static void onClientTick(TickEvent.ClientTickEvent event) {
         if (event.phase == TickEvent.Phase.END) {
+            IconPrewarmer.getInstance().tick();
             Minecraft mc = Minecraft.getInstance();
             if (mc == null || mc.player == null || mc.level == null) {
                 while (KeyBindings.OPEN_BOARD.consumeClick()) {
