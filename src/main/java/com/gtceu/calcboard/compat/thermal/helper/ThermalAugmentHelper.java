@@ -84,39 +84,58 @@ public class ThermalAugmentHelper {
     private static CompoundTag inspectAugmentMethods(ItemStack stack) {
         Item item = stack.getItem();
         for (Method m : item.getClass().getMethods()) {
-            String mn = m.getName().toLowerCase(Locale.ROOT);
-            if (mn.contains("augmentdata") || mn.contains("augmenttag") || mn.contains("augment") || mn.contains("data")) {
-                if (m.getParameterCount() == 1 && m.getParameterTypes()[0].isAssignableFrom(ItemStack.class)) {
-                    try {
-                        Object res = m.invoke(item, stack);
-                        if (res instanceof CompoundTag ct && hasAnyAugmentKey(ct)) return ct;
-                    } catch (ReflectiveOperationException ignored) {}
-                } else if (m.getParameterCount() == 0) {
-                    try {
-                        Object res = m.invoke(item);
-                        if (res instanceof CompoundTag ct && hasAnyAugmentKey(ct)) return ct;
-                    } catch (ReflectiveOperationException ignored) {}
-                }
-            }
+            CompoundTag tag = tryInvokeAugmentMethod(m, item, stack);
+            if (tag != null) return tag;
         }
+        return null;
+    }
+
+    private static CompoundTag tryInvokeAugmentMethod(Method m, Item item, ItemStack stack) {
+        String mn = m.getName().toLowerCase(Locale.ROOT);
+        if (!mn.contains("augmentdata") && !mn.contains("augmenttag") && !mn.contains("augment") && !mn.contains("data")) {
+            return null;
+        }
+        try {
+            Object res = null;
+            if (m.getParameterCount() == 1 && m.getParameterTypes()[0].isAssignableFrom(ItemStack.class)) {
+                res = m.invoke(item, stack);
+            } else if (m.getParameterCount() == 0) {
+                res = m.invoke(item);
+            }
+            if (res instanceof CompoundTag ct && hasAnyAugmentKey(ct)) {
+                return ct;
+            }
+        } catch (ReflectiveOperationException ignored) {}
         return null;
     }
 
     private static CompoundTag inspectAugmentFields(ItemStack stack) {
         Class<?> cl = stack.getItem().getClass();
         while (cl != null && cl != Object.class) {
-            for (Field f : cl.getDeclaredFields()) {
-                try {
-                    f.setAccessible(true);
-                    Object fVal = f.get(stack.getItem());
-                    if (fVal instanceof CompoundTag ct) {
-                        if (ct.contains("AugmentData")) return ct.getCompound("AugmentData");
-                        if (hasAnyAugmentKey(ct)) return ct;
-                    }
-                } catch (ReflectiveOperationException ignored) {}
-            }
+            CompoundTag tag = inspectClassAugmentFields(cl, stack.getItem());
+            if (tag != null) return tag;
             cl = cl.getSuperclass();
         }
+        return null;
+    }
+
+    private static CompoundTag inspectClassAugmentFields(Class<?> cl, Item item) {
+        for (Field f : cl.getDeclaredFields()) {
+            CompoundTag tag = tryExtractAugmentField(f, item);
+            if (tag != null) return tag;
+        }
+        return null;
+    }
+
+    private static CompoundTag tryExtractAugmentField(Field f, Item item) {
+        try {
+            f.setAccessible(true);
+            Object fVal = f.get(item);
+            if (fVal instanceof CompoundTag ct) {
+                if (ct.contains("AugmentData")) return ct.getCompound("AugmentData");
+                if (hasAnyAugmentKey(ct)) return ct;
+            }
+        } catch (ReflectiveOperationException ignored) {}
         return null;
     }
 
@@ -440,52 +459,38 @@ public class ThermalAugmentHelper {
     }
 
     public static double getThermalDynamoBasePowerRF(ResourceLocation dynamoId) {
-        if (DYNAMO_BLOCK_ENTITY_CLS != null) {
-            for (Field f : DYNAMO_BLOCK_ENTITY_CLS.getDeclaredFields()) {
-                if (f.getName().equalsIgnoreCase("BASE_POWER") || f.getName().equalsIgnoreCase("DEFAULT_POWER")) {
-                    try {
-                        f.setAccessible(true);
-                        Object val = f.get(null);
-                        if (val instanceof Number num && num.doubleValue() > 0) {
-                            return num.doubleValue();
-                        }
-                    } catch (ReflectiveOperationException ignored) {}
-                }
-            }
-        }
+        double power = readStaticDoubleField(DYNAMO_BLOCK_ENTITY_CLS, name ->
+                name.equalsIgnoreCase("BASE_POWER") || name.equalsIgnoreCase("DEFAULT_POWER"));
+        if (power > 0) return power;
 
-        if (THERMAL_CORE_CONFIG_CLS != null) {
-            for (Field f : THERMAL_CORE_CONFIG_CLS.getDeclaredFields()) {
-                if (f.getName().toLowerCase(Locale.ROOT).contains("dynamopower") || f.getName().toLowerCase(Locale.ROOT).contains("defaultpower")) {
-                    try {
-                        f.setAccessible(true);
-                        Object val = f.get(null);
-                        if (val instanceof Number num && num.doubleValue() > 0) {
-                            return num.doubleValue();
-                        }
-                    } catch (ReflectiveOperationException ignored) {}
-                }
-            }
-        }
+        power = readStaticDoubleField(THERMAL_CORE_CONFIG_CLS, name -> {
+            String lower = name.toLowerCase(Locale.ROOT);
+            return lower.contains("dynamopower") || lower.contains("defaultpower");
+        });
+        if (power > 0) return power;
 
         return 200.0;
     }
 
     public static double getThermalMachineBasePowerRF(ResourceLocation machineId) {
-        if (MACHINE_BLOCK_ENTITY_CLS != null) {
-            for (Field f : MACHINE_BLOCK_ENTITY_CLS.getDeclaredFields()) {
-                if (f.getName().equalsIgnoreCase("BASE_POWER") || f.getName().equalsIgnoreCase("DEFAULT_POWER")) {
-                    try {
-                        f.setAccessible(true);
-                        Object val = f.get(null);
-                        if (val instanceof Number num && num.doubleValue() > 0) {
-                            return num.doubleValue();
-                        }
-                    } catch (ReflectiveOperationException ignored) {}
+        double power = readStaticDoubleField(MACHINE_BLOCK_ENTITY_CLS, name ->
+                name.equalsIgnoreCase("BASE_POWER") || name.equalsIgnoreCase("DEFAULT_POWER"));
+        return power > 0 ? power : 20.0;
+    }
+
+    private static double readStaticDoubleField(Class<?> cls, java.util.function.Predicate<String> nameFilter) {
+        if (cls == null) return 0.0;
+        for (Field f : cls.getDeclaredFields()) {
+            if (!nameFilter.test(f.getName())) continue;
+            try {
+                f.setAccessible(true);
+                Object val = f.get(null);
+                if (val instanceof Number num && num.doubleValue() > 0) {
+                    return num.doubleValue();
                 }
-            }
+            } catch (ReflectiveOperationException ignored) {}
         }
-        return 20.0;
+        return 0.0;
     }
 
     public static boolean isThermalUpgradeKit(MachineAddon addon) {

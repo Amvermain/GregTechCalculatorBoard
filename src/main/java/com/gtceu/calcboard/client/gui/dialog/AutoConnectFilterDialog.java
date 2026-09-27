@@ -185,34 +185,35 @@ public class AutoConnectFilterDialog implements IBoardModal {
         Queue<String> queue = new ArrayDeque<>();
 
         for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
-            if (edge.fromNodeId().equals(fromNodeId) && edge.outputIndex() == outIdx) {
-                if (edge.toNodeId().equals(toNodeId) && edge.inputIndex() == inIdx) {
-                    return true;
-                }
-                RecipeNode target = graph.getNode(edge.toNodeId());
-                if (target != null && target.isReroute()) {
-                    if (visited.add(target.getId())) {
-                        queue.add(target.getId());
-                    }
-                }
+            if (!edge.fromNodeId().equals(fromNodeId) || edge.outputIndex() != outIdx) {
+                continue;
+            }
+            if (processOutgoingConnection(edge, toNodeId, inIdx, graph, visited, queue)) {
+                return true;
             }
         }
 
         while (!queue.isEmpty()) {
             String currRerouteId = queue.poll();
             for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
-                if (edge.fromNodeId().equals(currRerouteId)) {
-                    if (edge.toNodeId().equals(toNodeId) && edge.inputIndex() == inIdx) {
-                        return true;
-                    }
-                    RecipeNode target = graph.getNode(edge.toNodeId());
-                    if (target != null && target.isReroute()) {
-                        if (visited.add(target.getId())) {
-                            queue.add(target.getId());
-                        }
-                    }
+                if (!edge.fromNodeId().equals(currRerouteId)) {
+                    continue;
+                }
+                if (processOutgoingConnection(edge, toNodeId, inIdx, graph, visited, queue)) {
+                    return true;
                 }
             }
+        }
+        return false;
+    }
+
+    private static boolean processOutgoingConnection(FlowGraph.ConnectionEdge edge, String toNodeId, int inIdx, FlowGraph graph, Set<String> visited, Queue<String> queue) {
+        if (edge.toNodeId().equals(toNodeId) && edge.inputIndex() == inIdx) {
+            return true;
+        }
+        RecipeNode target = graph.getNode(edge.toNodeId());
+        if (target != null && target.isReroute() && visited.add(target.getId())) {
+            queue.add(target.getId());
         }
         return false;
     }
@@ -260,13 +261,14 @@ public class AutoConnectFilterDialog implements IBoardModal {
         while (!queue.isEmpty()) {
             String curr = queue.poll();
             for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
-                if (edge.fromNodeId().equals(curr)) {
-                    if (edge.toNodeId().equals(targetNodeId)) {
-                        return true;
-                    }
-                    if (visited.add(edge.toNodeId())) {
-                        queue.add(edge.toNodeId());
-                    }
+                if (!edge.fromNodeId().equals(curr)) {
+                    continue;
+                }
+                if (edge.toNodeId().equals(targetNodeId)) {
+                    return true;
+                }
+                if (visited.add(edge.toNodeId())) {
+                    queue.add(edge.toNodeId());
                 }
             }
         }

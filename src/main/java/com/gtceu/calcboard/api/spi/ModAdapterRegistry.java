@@ -143,6 +143,18 @@ public class ModAdapterRegistry {
         return fallbackAdapter;
     }
 
+    public static ResourceLocation getRecipeCategoryIdForMachine(ResourceLocation machineId) {
+        if (machineId == null) return null;
+        init();
+        for (IModAdapter a : ADAPTERS) {
+            if (a.isLoaded()) {
+                ResourceLocation catId = a.getRecipeCategoryIdForMachine(machineId);
+                if (catId != null) return catId;
+            }
+        }
+        return null;
+    }
+
     public static IModAdapter getAdapterForNode(RecipeNode node) {
         if (node == null) return fallbackAdapter;
         IModAdapter cached = node.getCachedModAdapter();

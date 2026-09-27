@@ -1,6 +1,7 @@
 package com.gtceu.calcboard.client.gui.render;
 
 import com.gtceu.calcboard.api.catalog.MachineAddon;
+import com.gtceu.calcboard.api.catalog.MultiblockDetector;
 import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.property.NodeBadge;
@@ -46,7 +47,11 @@ public final class NodeControlsTooltipRenderer {
         } else if (SysteamsRecipeHandler.isDynamoToBoilerConvertible(n)) {
             tooltipLines = buildSysteamsTierTooltipLines(n);
         } else if (n.isMultiblock()) {
-            tooltipLines = buildMultiblockTierTooltipLines(n);
+            if (MultiblockDetector.isSteamMultiblock(n)) {
+                tooltipLines = buildSteamTierTooltipLines(n);
+            } else {
+                tooltipLines = buildMultiblockTierTooltipLines(n);
+            }
         } else if (n.supportsSteamMode() && n.getSteamMode() != SteamMode.NONE) {
             tooltipLines = buildSteamTierTooltipLines(n);
         } else {
@@ -86,6 +91,23 @@ public final class NodeControlsTooltipRenderer {
             nextCtrlX += badgeW + 3;
         }
         return false;
+    }
+
+    public static boolean renderCircuitBadgeTooltip(GuiGraphics graphics, Font font, BoardScreen screen, NodeWidget widget, double canvasMouseX, double canvasMouseY, int mouseX, int mouseY) {
+        if (widget == null || widget.getNode() == null) return false;
+        var bounds = widget.getLayoutBounds();
+        if (bounds == null || bounds.getCircuitIconBounds().isEmpty()) return false;
+        if (!bounds.getCircuitIconBounds().contains(canvasMouseX, canvasMouseY)) return false;
+
+        int circuit = widget.getNode().getCircuitNumber();
+        if (circuit < 0) return false;
+
+        List<Component> lines = List.of(
+                Component.translatable("gui.gtcalcboard.circuit_required", circuit),
+                Component.translatable("gui.gtcalcboard.circuit_required_desc", circuit)
+        );
+        BoardTooltipRenderer.renderComponentTooltip(graphics, font, lines, mouseX, mouseY, screen.width, screen.height);
+        return true;
     }
 
     public static boolean renderNodeInfoTooltip(GuiGraphics graphics, Font font, BoardScreen screen, NodeWidget widget, double canvasMouseX, double canvasMouseY, int mouseX, int mouseY) {
@@ -254,7 +276,8 @@ public final class NodeControlsTooltipRenderer {
 
     private static List<Component> buildSteamTierTooltipLines(RecipeNode n) {
         List<Component> list = new ArrayList<>();
-        list.add(Component.literal("§6♨ " + Component.translatable("gui.gtcalcboard.config.steam_tier").getString() + " §7(" + n.getSteamMode().name() + ")"));
+        SteamMode mode = (n != null && n.getSteamMode() != null && n.getSteamMode().isSteam()) ? n.getSteamMode() : SteamMode.HIGH_PRESSURE;
+        list.add(Component.literal("§6♨ " + Component.translatable("gui.gtcalcboard.config.steam_tier").getString() + " §7(" + mode.name() + ")"));
         list.add(Component.literal("§7[Click / Scroll]: §f" + Component.translatable("gui.gtcalcboard.tooltip.cycle_steam_tier").getString()));
         return list;
     }

@@ -181,8 +181,11 @@ public final class TestMultiblockFixtures {
         MultiblockDetector.registerThroughputBoostingMultiblock(ultimateAbs);
         MultiblockDetector.registerThroughputBoostingMultiblock(superCracker);
         MultiblockDetector.registerThroughputBoostingMultiblock(superCrackerStart);
+        MultiblockDetector.registerThroughputBoostingMultiblock(ResourceLocation.tryParse("gtceu:mega_electric_blast_furnace"));
         MultiblockDetector.registerBulkProcessingMultiblock(ultimateAbs);
-        MultiblockDetector.registerOverpressureMultiblock(ResourceLocation.tryParse("gtceu:autoclave"));
+        ResourceLocation largeAutoclave = ResourceLocation.tryParse("gtceu:large_autoclave");
+        MultiblockDetector.registerMultiblock(largeAutoclave);
+        MultiblockDetector.registerOverpressureMultiblock(largeAutoclave);
     }
 
     private static void initSteamMultiblockDefaults() {

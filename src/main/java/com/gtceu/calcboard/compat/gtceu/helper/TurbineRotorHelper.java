@@ -222,22 +222,36 @@ public class TurbineRotorHelper {
             if (materialsRegistry == null) return null;
 
             for (Method m : materialsRegistry.getClass().getMethods()) {
-                if (m.getParameterCount() != 1) continue;
-                Class<?> pType = m.getParameterTypes()[0];
-                if (pType != ResourceLocation.class && pType != String.class) continue;
+                RotorStats stats = tryQueryRotorFromRegistryMethod(m, materialsRegistry, matName, rotorKey);
+                if (stats != null) return stats;
+            }
+        } catch (ReflectiveOperationException | LinkageError ignored) {}
+        return null;
+    }
 
-                Object param = pType == String.class ? matName : ResourceLocation.tryParse(matName.contains(":") ? matName : "gtceu:" + matName);
-                m.setAccessible(true);
-                Object mat = m.invoke(materialsRegistry, param);
-                if (mat != null) {
-                    Method getPropM = GET_PROPERTY_METHOD != null ? GET_PROPERTY_METHOD : mat.getClass().getMethod("getProperty", PROPERTY_KEY_CLS);
-                    getPropM.setAccessible(true);
-                    Object prop = getPropM.invoke(mat, rotorKey);
-                    if (prop != null) {
-                        RotorStats st = extractStatsFromRotorProperty(prop);
-                        if (st != null) return st;
-                    }
-                }
+    private static RotorStats tryQueryRotorFromRegistryMethod(Method m, Object materialsRegistry, String matName, Object rotorKey) {
+        if (m.getParameterCount() != 1) return null;
+        Class<?> pType = m.getParameterTypes()[0];
+        if (pType != ResourceLocation.class && pType != String.class) return null;
+
+        try {
+            Object param = pType == String.class ? matName : ResourceLocation.tryParse(matName.contains(":") ? matName : "gtceu:" + matName);
+            m.setAccessible(true);
+            Object mat = m.invoke(materialsRegistry, param);
+            if (mat == null) return null;
+
+            return extractRotorStatsFromMaterial(mat, rotorKey);
+        } catch (ReflectiveOperationException | LinkageError ignored) {}
+        return null;
+    }
+
+    private static RotorStats extractRotorStatsFromMaterial(Object mat, Object rotorKey) {
+        try {
+            Method getPropM = GET_PROPERTY_METHOD != null ? GET_PROPERTY_METHOD : mat.getClass().getMethod("getProperty", PROPERTY_KEY_CLS);
+            getPropM.setAccessible(true);
+            Object prop = getPropM.invoke(mat, rotorKey);
+            if (prop != null) {
+                return extractStatsFromRotorProperty(prop);
             }
         } catch (ReflectiveOperationException | LinkageError ignored) {}
         return null;
@@ -418,15 +432,19 @@ public class TurbineRotorHelper {
             Collection<ItemStack> items = tab.getDisplayItems();
             if (items == null) continue;
             for (ItemStack s : items) {
-                if (s == null || s.isEmpty()) continue;
-                ResourceLocation id = ForgeRegistries.ITEMS.getKey(s.getItem());
-                if (id != null && id.getPath().equals("turbine_rotor")) {
-                    GTRotorAddon rotor = parseTurbineRotor(s, id);
-                    if (rotor != null && list.stream().noneMatch(a -> a.getId().equals(rotor.getId()))) {
-                        list.add(rotor);
-                    }
-                }
+                tryRegisterCreativeTabRotor(s, list);
             }
+        }
+    }
+
+    private static void tryRegisterCreativeTabRotor(ItemStack stack, List<MachineAddon> list) {
+        if (stack == null || stack.isEmpty()) return;
+        ResourceLocation id = ForgeRegistries.ITEMS.getKey(stack.getItem());
+        if (id == null || !id.getPath().equals("turbine_rotor")) return;
+
+        GTRotorAddon rotor = parseTurbineRotor(stack, id);
+        if (rotor != null && list.stream().noneMatch(a -> a.getId().equals(rotor.getId()))) {
+            list.add(rotor);
         }
     }
 
@@ -434,14 +452,14 @@ public class TurbineRotorHelper {
         if (MATERIALS_REGISTRY_FIELD == null || MATERIAL_CLS == null) return;
         try {
             Object materialsRegistry = MATERIALS_REGISTRY_FIELD.get(null);
-            if (materialsRegistry != null) {
-                Iterable<?> iterable = MultiblockDetector.getRegistryIterable(materialsRegistry);
-                if (iterable != null) {
-                    for (Object mat : iterable) {
-                        if (mat != null && MATERIAL_CLS.isInstance(mat) && !allMaterials.contains(mat)) {
-                            allMaterials.add(mat);
-                        }
-                    }
+            if (materialsRegistry == null) return;
+
+            Iterable<?> iterable = MultiblockDetector.getRegistryIterable(materialsRegistry);
+            if (iterable == null) return;
+
+            for (Object mat : iterable) {
+                if (mat != null && MATERIAL_CLS.isInstance(mat) && !allMaterials.contains(mat)) {
+                    allMaterials.add(mat);
                 }
             }
         } catch (ReflectiveOperationException ignored) {}

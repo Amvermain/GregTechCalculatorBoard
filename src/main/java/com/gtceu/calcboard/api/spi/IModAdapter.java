@@ -140,6 +140,10 @@ public interface IModAdapter extends
         return null;
     }
 
+    default ResourceLocation getRecipeCategoryIdForMachine(ResourceLocation machineId) {
+        return null;
+    }
+
     default void onAttach(RecipeNode node) {
     }
 

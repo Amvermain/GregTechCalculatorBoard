@@ -20,8 +20,29 @@ public record BalanceSummary(
     Map<IngredientStack, Double> voidedOutputs,
     long totalFusionStartupEU,
     Map<Integer, Integer> fusionTierCounts,
-    Map<Integer, Long> fusionTierStartupEU
+    Map<Integer, Long> fusionTierStartupEU,
+    double peakEUt
 ) {
+    public BalanceSummary(
+            double totalEUt,
+            double totalSU,
+            double totalFE,
+            GTVoltageTier highestVoltageTier,
+            int totalMachineCount,
+            Map<String, Integer> machineBreakdown,
+            Map<IngredientStack, Double> rawInputs,
+            Map<IngredientStack, Double> netOutputs,
+            Map<IngredientStack, Double> fullyBalanced,
+            Map<IngredientStack, Double> totalProduction,
+            Map<IngredientStack, Double> totalConsumption,
+            Map<IngredientStack, Double> voidedOutputs,
+            long totalFusionStartupEU,
+            Map<Integer, Integer> fusionTierCounts,
+            Map<Integer, Long> fusionTierStartupEU
+    ) {
+        this(totalEUt, totalSU, totalFE, highestVoltageTier, totalMachineCount, machineBreakdown, rawInputs, netOutputs, fullyBalanced, totalProduction, totalConsumption, voidedOutputs, totalFusionStartupEU, fusionTierCounts, fusionTierStartupEU, totalEUt);
+    }
+
     public BalanceSummary(
             double totalEUt,
             double totalSU,
@@ -38,7 +59,7 @@ public record BalanceSummary(
             Map<Integer, Integer> fusionTierCounts,
             Map<Integer, Long> fusionTierStartupEU
     ) {
-        this(totalEUt, totalSU, totalFE, highestVoltageTier, totalMachineCount, machineBreakdown, rawInputs, netOutputs, fullyBalanced, totalProduction, totalConsumption, Map.of(), totalFusionStartupEU, fusionTierCounts, fusionTierStartupEU);
+        this(totalEUt, totalSU, totalFE, highestVoltageTier, totalMachineCount, machineBreakdown, rawInputs, netOutputs, fullyBalanced, totalProduction, totalConsumption, Map.of(), totalFusionStartupEU, fusionTierCounts, fusionTierStartupEU, totalEUt);
     }
 
     public BalanceSummary(

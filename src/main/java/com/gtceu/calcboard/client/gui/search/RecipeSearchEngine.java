@@ -694,40 +694,59 @@ public class RecipeSearchEngine {
 
         int score = 0;
         for (AndGroup group : query.orGroups()) {
-            StringBuilder groupTextSb = new StringBuilder();
-            for (QueryTerm term : group.terms()) {
-                if (!term.negated()) {
-                    if (groupTextSb.length() > 0) groupTextSb.append(" ");
-                    groupTextSb.append(term.text());
-                }
+            score += calculateGroupScore(recipe, group);
+        }
+        return score;
+    }
+
+    private static int calculateGroupScore(SearchableRecipe recipe, AndGroup group) {
+        String fullGroupText = buildGroupSearchText(group);
+        String fullGroupUnder = fullGroupText.replace(' ', '_');
+
+        String dn = recipe.displayName().toLowerCase(Locale.ROOT);
+        String cat = recipe.categoryName().toLowerCase(Locale.ROOT);
+        String catId = recipe.categoryId().toLowerCase(Locale.ROOT);
+
+        int score = 0;
+        if (!fullGroupText.isEmpty()) {
+            score += scoreFullGroupText(fullGroupText, fullGroupUnder, dn, cat, catId);
+        }
+
+        for (QueryTerm term : group.terms()) {
+            if (term.negated()) continue;
+            score += calculateTermScore(term, recipe, cat, catId, dn);
+        }
+        return score;
+    }
+
+    private static String buildGroupSearchText(AndGroup group) {
+        StringBuilder groupTextSb = new StringBuilder();
+        for (QueryTerm term : group.terms()) {
+            if (term.negated()) {
+                continue;
             }
-            String fullGroupText = groupTextSb.toString().toLowerCase(Locale.ROOT);
-            String fullGroupUnder = fullGroupText.replace(' ', '_');
-
-            String dn = recipe.displayName().toLowerCase(Locale.ROOT);
-            String cat = recipe.categoryName().toLowerCase(Locale.ROOT);
-            String catId = recipe.categoryId().toLowerCase(Locale.ROOT);
-
-            if (!fullGroupText.isEmpty()) {
-                if (dn.equals(fullGroupText)) {
-                    score += 20000;
-                } else if (dn.startsWith(fullGroupText)) {
-                    score += 10000;
-                } else if (dn.contains(fullGroupText)) {
-                    score += 6000;
-                }
-
-                if (cat.equals(fullGroupText) || catId.equals(fullGroupText) || catId.equals(fullGroupUnder)) {
-                    score += 18000;
-                } else if (cat.contains(fullGroupText) || catId.contains(fullGroupText) || catId.contains(fullGroupUnder)) {
-                    score += 9000;
-                }
+            if (groupTextSb.length() > 0) {
+                groupTextSb.append(" ");
             }
+            groupTextSb.append(term.text());
+        }
+        return groupTextSb.toString().toLowerCase(Locale.ROOT);
+    }
 
-            for (QueryTerm term : group.terms()) {
-                if (term.negated()) continue;
-                score += calculateTermScore(term, recipe, cat, catId, dn);
-            }
+    private static int scoreFullGroupText(String fullGroupText, String fullGroupUnder, String dn, String cat, String catId) {
+        int score = 0;
+        if (dn.equals(fullGroupText)) {
+            score += 20000;
+        } else if (dn.startsWith(fullGroupText)) {
+            score += 10000;
+        } else if (dn.contains(fullGroupText)) {
+            score += 6000;
+        }
+
+        if (cat.equals(fullGroupText) || catId.equals(fullGroupText) || catId.equals(fullGroupUnder)) {
+            score += 18000;
+        } else if (cat.contains(fullGroupText) || catId.contains(fullGroupText) || catId.contains(fullGroupUnder)) {
+            score += 9000;
         }
         return score;
     }

@@ -311,13 +311,26 @@ public class MultiblockDetector {
     }
 
     public static boolean isSteamMultiblock(RecipeNode node) {
-        if (node == null) return false;
-        if (node.getMachineIcon() != null && isSteamMultiblock(node.getMachineIcon())) return true;
-        if (node.getMultiblockWorkstation() != null && isSteamMultiblock(node.getMultiblockWorkstation())) return true;
-        for (ResourceLocation ws : node.getAvailableWorkstations()) {
-            if (ws != null && isSteamMultiblock(ws)) return true;
+        if (node == null || !node.isMultiblock()) return false;
+        if (hasEnergyHatchAddon(node)) return false;
+        if (node.getMachineIcon() != null) {
+            return isSteamMultiblock(node.getMachineIcon());
         }
-        return node.isMultiblock() && node.getSteamMode() != null && node.getSteamMode().isSteam();
+        if (node.getSteamMode() != null && node.getSteamMode().isSteam()) return true;
+        if (node.getMultiblockWorkstation() != null && isSteamMultiblock(node.getMultiblockWorkstation())) {
+            return true;
+        }
+        return false;
+    }
+
+    private static boolean hasEnergyHatchAddon(RecipeNode node) {
+        if (node.getAddons() == null) return false;
+        for (MachineAddon addon : node.getAddons()) {
+            if (addon != null && addon.getCategory() == MachineAddon.Category.ENERGY_HATCH) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static double getSteamConsumption(ResourceLocation id, SteamMode mode) {

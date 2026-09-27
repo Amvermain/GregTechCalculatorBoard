@@ -203,50 +203,62 @@ public class MachineAddon {
 
     private String resolveDescription() {
         if (description != null && !description.trim().isEmpty()) {
-            if (description.startsWith("gui.gtcalcboard.") || description.startsWith("item.") || description.startsWith("block.")) {
-                try {
-                    return Component.translatable(description).getString();
-                } catch (Throwable ignored) {}
-            }
-            return description;
+            return resolveExplicitDescription();
         }
-        if (itemStackSample != null && !itemStackSample.isEmpty()) {
-            try {
-                var lines = itemStackSample.getTooltipLines(null, TooltipFlag.Default.NORMAL);
-                if (lines != null && lines.size() > 1) {
-                    StringBuilder sb = new StringBuilder();
-                    for (int i = 1; i < lines.size(); i++) {
-                        String t = lines.get(i).getString().trim();
-                        if (!t.isEmpty()) {
-                            if (sb.length() > 0) sb.append(" | ");
-                            sb.append(t);
-                        }
-                    }
-                    if (sb.length() > 0) return sb.toString();
-                }
-            } catch (Throwable ignored) {}
-        }
+        String fromStack = extractTooltipDescription(itemStackSample);
+        if (fromStack != null) return fromStack;
+
         if (itemIcon != null && category != Category.ROTOR) {
-            try {
-                var item = ForgeRegistries.ITEMS.getValue(itemIcon);
-                if (item != null && item != Items.AIR) {
-                    ItemStack stack = new ItemStack(item);
-                    var lines = stack.getTooltipLines(null, TooltipFlag.Default.NORMAL);
-                    if (lines != null && lines.size() > 1) {
-                        StringBuilder sb = new StringBuilder();
-                        for (int i = 1; i < lines.size(); i++) {
-                            String t = lines.get(i).getString().trim();
-                            if (!t.isEmpty()) {
-                                if (sb.length() > 0) sb.append(" | ");
-                                sb.append(t);
-                            }
-                        }
-                        if (sb.length() > 0) return sb.toString();
-                    }
-                }
-            } catch (Throwable ignored) {}
+            return extractItemIconDescription();
         }
         return "";
+    }
+
+    private String resolveExplicitDescription() {
+        if (description.startsWith("gui.gtcalcboard.") || description.startsWith("item.") || description.startsWith("block.")) {
+            try {
+                return Component.translatable(description).getString();
+            } catch (Throwable ignored) {}
+        }
+        return description;
+    }
+
+    private String extractItemIconDescription() {
+        try {
+            var item = ForgeRegistries.ITEMS.getValue(itemIcon);
+            if (item != null && item != Items.AIR) {
+                String desc = extractTooltipDescription(new ItemStack(item));
+                return desc != null ? desc : "";
+            }
+        } catch (Throwable ignored) {}
+        return "";
+    }
+
+    private String extractTooltipDescription(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) return null;
+        try {
+            var lines = stack.getTooltipLines(null, TooltipFlag.Default.NORMAL);
+            if (lines == null || lines.size() <= 1) return null;
+            return formatTooltipLines(lines);
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private String formatTooltipLines(List<Component> lines) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 1; i < lines.size(); i++) {
+            appendTooltipLine(sb, lines.get(i).getString().trim());
+        }
+        return sb.length() > 0 ? sb.toString() : null;
+    }
+
+    private void appendTooltipLine(StringBuilder sb, String line) {
+        if (line.isEmpty()) return;
+        if (sb.length() > 0) {
+            sb.append(" | ");
+        }
+        sb.append(line);
     }
 
     public String getRawDescription() {

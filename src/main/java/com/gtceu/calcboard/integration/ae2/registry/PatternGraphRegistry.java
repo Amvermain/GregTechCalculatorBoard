@@ -130,6 +130,12 @@ public final class PatternGraphRegistry {
                     return pageOpt;
                 }
             }
+
+            for (BoardPage page : BoardManager.getInstance().getPages()) {
+                if (page != null && !page.isModuleSubPage() && pageProducesOutput(page, patternId.getPrimaryOutputId())) {
+                    return Optional.of(page);
+                }
+            }
         }
         return Optional.empty();
     }
@@ -148,20 +154,9 @@ public final class PatternGraphRegistry {
     public static boolean pageProducesOutput(BoardPage page, ResourceLocation outputId) {
         if (page == null || page.getGraph() == null || outputId == null) return false;
         FlowGraph graph = page.getGraph();
-
         for (RecipeNode node : graph.getNodes()) {
-            if (node == null) continue;
-            if (node.isReroute() && node.getRerouteIngredient() != null && outputId.equals(node.getRerouteIngredient().getId())) {
-                if (isOutputJunction(graph, node)) {
-                    return true;
-                }
-            }
-            if (!node.isReroute()) {
-                for (IngredientStack out : node.getOutputs()) {
-                    if (out != null && outputId.equals(out.getId())) {
-                        return true;
-                    }
-                }
+            if (nodeProducesOutput(graph, node, outputId)) {
+                return true;
             }
         }
         return false;
@@ -172,25 +167,12 @@ public final class PatternGraphRegistry {
         FlowGraph graph = page.getGraph();
 
         for (RecipeNode node : graph.getNodes()) {
-            if (node == null) continue;
-            if (node.isReroute() && node.getRerouteIngredient() != null && outputId.equals(node.getRerouteIngredient().getId())) {
-                if (isOutputJunction(graph, node)) {
-                    if (node.getTargetBatchAmount() > 0) {
-                        return node.getTargetBatchAmount();
-                    }
-                    if (node.getRerouteIngredient().getAmount() > 0) {
-                        return node.getRerouteIngredient().getAmount();
-                    }
-                }
-            }
+            double junctionBatch = findJunctionBatchAmount(graph, node, outputId);
+            if (junctionBatch > 0.0) return junctionBatch;
         }
         for (RecipeNode node : graph.getNodes()) {
-            if (node == null || node.isReroute()) continue;
-            for (IngredientStack out : node.getOutputs()) {
-                if (out != null && outputId.equals(out.getId()) && out.getAmount() > 0) {
-                    return out.getAmount();
-                }
-            }
+            double machineBatch = findMachineBatchAmount(node, outputId);
+            if (machineBatch > 0.0) return machineBatch;
         }
         return 1.0;
     }
@@ -201,24 +183,8 @@ public final class PatternGraphRegistry {
         if (page == null || page.getGraph() == null) return outputJunctionOutputs;
 
         FlowGraph graph = page.getGraph();
-
         for (RecipeNode node : graph.getNodes()) {
-            if (node == null) continue;
-            if (node.isReroute() && node.getRerouteIngredient() != null) {
-                if (isOutputJunction(graph, node)) {
-                    ResourceLocation id = node.getRerouteIngredient().getId();
-                    if (id != null) {
-                        double amount = node.getTargetBatchAmount() > 0 ? node.getTargetBatchAmount() : Math.max(1.0, node.getRerouteIngredient().getAmount());
-                        outputJunctionOutputs.put(id, outputJunctionOutputs.getOrDefault(id, 0.0) + amount);
-                    }
-                }
-            } else if (!node.isReroute()) {
-                for (IngredientStack out : node.getOutputs()) {
-                    if (out != null && out.getId() != null) {
-                        machineOutputs.put(out.getId(), machineOutputs.getOrDefault(out.getId(), 0.0) + Math.max(1.0, out.getAmount()));
-                    }
-                }
-            }
+            collectNodeOutputs(graph, node, outputJunctionOutputs, machineOutputs);
         }
 
         return !outputJunctionOutputs.isEmpty() ? outputJunctionOutputs : machineOutputs;
@@ -259,23 +225,99 @@ public final class PatternGraphRegistry {
 
         FlowGraph graph = page.getGraph();
         for (RecipeNode node : graph.getNodes()) {
-            if (node == null) continue;
-            if (node.isReroute() && node.getRerouteIngredient() != null) {
-                if (!isOutputJunction(graph, node)) {
-                    ResourceLocation id = node.getRerouteIngredient().getId();
-                    if (id != null) {
-                        inputs.add(id);
-                    }
-                }
-            } else if (!node.isReroute()) {
-                for (IngredientStack in : node.getInputs()) {
-                    if (in != null && in.getId() != null) {
-                        inputs.add(in.getId());
-                    }
-                }
-            }
+            collectNodeInputs(graph, node, inputs);
         }
         return inputs;
+    }
+
+    private static boolean nodeProducesOutput(FlowGraph graph, RecipeNode node, ResourceLocation outputId) {
+        if (node == null) return false;
+        if (node.isReroute()) {
+            return isRerouteOutputMatch(graph, node, outputId);
+        }
+        for (IngredientStack out : node.getOutputs()) {
+            if (out != null && outputId.equals(out.getId())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isRerouteOutputMatch(FlowGraph graph, RecipeNode node, ResourceLocation outputId) {
+        return node.getRerouteIngredient() != null
+                && outputId.equals(node.getRerouteIngredient().getId())
+                && isOutputJunction(graph, node);
+    }
+
+    private static double findJunctionBatchAmount(FlowGraph graph, RecipeNode node, ResourceLocation outputId) {
+        if (node == null || !node.isReroute() || !isRerouteOutputMatch(graph, node, outputId)) return 0.0;
+        if (node.getTargetBatchAmount() > 0) return node.getTargetBatchAmount();
+        return Math.max(0.0, node.getRerouteIngredient().getAmount());
+    }
+
+    private static double findMachineBatchAmount(RecipeNode node, ResourceLocation outputId) {
+        if (node == null || node.isReroute()) return 0.0;
+        for (IngredientStack out : node.getOutputs()) {
+            if (out != null && outputId.equals(out.getId()) && out.getAmount() > 0) {
+                return out.getAmount();
+            }
+        }
+        return 0.0;
+    }
+
+    private static void collectNodeOutputs(
+            FlowGraph graph,
+            RecipeNode node,
+            Map<ResourceLocation, Double> junctionOutputs,
+            Map<ResourceLocation, Double> machineOutputs
+    ) {
+        if (node == null) return;
+        if (node.isReroute()) {
+            collectRerouteOutput(graph, node, junctionOutputs);
+        } else {
+            collectMachineOutputs(node, machineOutputs);
+        }
+    }
+
+    private static void collectRerouteOutput(FlowGraph graph, RecipeNode node, Map<ResourceLocation, Double> outputs) {
+        if (node.getRerouteIngredient() == null || !isOutputJunction(graph, node)) return;
+        ResourceLocation id = node.getRerouteIngredient().getId();
+        if (id == null) return;
+        double amount = node.getTargetBatchAmount() > 0 ? node.getTargetBatchAmount() : Math.max(1.0, node.getRerouteIngredient().getAmount());
+        outputs.put(id, outputs.getOrDefault(id, 0.0) + amount);
+    }
+
+    private static void collectMachineOutputs(RecipeNode node, Map<ResourceLocation, Double> outputs) {
+        for (IngredientStack out : node.getOutputs()) {
+            if (out != null && out.getId() != null) {
+                outputs.put(out.getId(), outputs.getOrDefault(out.getId(), 0.0) + Math.max(1.0, out.getAmount()));
+            }
+        }
+    }
+
+    private static void collectNodeInputs(FlowGraph graph, RecipeNode node, Set<ResourceLocation> inputs) {
+        if (node == null) return;
+        if (node.isReroute()) {
+            collectRerouteInput(graph, node, inputs);
+        } else {
+            collectMachineInputs(node, inputs);
+        }
+    }
+
+    private static void collectRerouteInput(FlowGraph graph, RecipeNode node, Set<ResourceLocation> inputs) {
+        if (node.getRerouteIngredient() == null || isOutputJunction(graph, node)) return;
+        ResourceLocation id = node.getRerouteIngredient().getId();
+        if (id != null) {
+            inputs.add(id);
+        }
+    }
+
+    private static void collectMachineInputs(RecipeNode node, Set<ResourceLocation> inputs) {
+        for (IngredientStack in : node.getInputs()) {
+            if (in != null && in.getId() != null) {
+                inputs.add(in.getId());
+            }
+        }
     }
 
     public Optional<BoardPage> getBoundPage(IPatternDetails pattern) {

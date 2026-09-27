@@ -47,7 +47,7 @@ public final class FlowPngExporter {
             RenderSystem.assertOnRenderThread();
             var graph = screen.getGraph();
             List<NodeWidget> nodes = graph.getNodes().stream()
-                    .filter(n -> !graph.isNodeInFoldedFrame(n.getId()))
+                    .filter(n -> !graph.isNodeInFoldedOrEmbeddedFrame(n.getId()))
                     .map(n -> new NodeWidget(n, screen)).toList();
             var widgets = nodes.stream().collect(java.util.stream.Collectors.toMap(n -> n.getNode().getId(), n -> n));
             FlowImageBounds bounds = new FlowImageBounds();

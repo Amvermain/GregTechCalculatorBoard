@@ -104,28 +104,28 @@ public class PhoenixGuildsProvider implements ITeamProvider {
 
     @Override
     public Set<UUID> getTeamMembers(UUID teamId) {
-        if (!isAvailable() || teamId == null) {
+        if (!isAvailable() || teamId == null || getGuildMembersByIdMethod == null) {
             return Collections.emptySet();
         }
 
         try {
-            if (getGuildMembersByIdMethod != null) {
-                Object res = getGuildMembersByIdMethod.invoke(null, teamId);
-                if (res instanceof Set<?> set) {
-                    Set<UUID> memberUuids = new HashSet<>();
-                    for (Object item : set) {
-                        if (item instanceof UUID u) {
-                            memberUuids.add(u);
-                        }
-                    }
-                    if (!memberUuids.isEmpty()) {
-                        return memberUuids;
-                    }
-                }
+            Object res = getGuildMembersByIdMethod.invoke(null, teamId);
+            if (res instanceof Set<?> set) {
+                return parseMemberUuids(set);
             }
         } catch (Throwable ignored) {}
 
         return Collections.emptySet();
+    }
+
+    private Set<UUID> parseMemberUuids(Set<?> set) {
+        Set<UUID> memberUuids = new HashSet<>();
+        for (Object item : set) {
+            if (item instanceof UUID u) {
+                memberUuids.add(u);
+            }
+        }
+        return memberUuids.isEmpty() ? Collections.emptySet() : memberUuids;
     }
 
     @Override

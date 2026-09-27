@@ -236,4 +236,27 @@ public class NodeLayoutBoundsTest {
         double producerMatch = HarmonizedRatioOptimizer.calculateProducerMatchCount(graph, inPin, 0, machine, 0);
         Assertions.assertEquals(1.0, producerMatch, 0.0001);
     }
+
+    @Test
+    public void testCircuitIconBoundsCalculationAndHover() {
+        RecipeNode node = createSampleMachineNode(100, 100);
+        NodeLayoutBounds noCircuitBounds = NodeLayoutCalculator.compute(node, false, 20, false);
+        Assertions.assertTrue(noCircuitBounds.getCircuitIconBounds().isEmpty());
+        Assertions.assertFalse(noCircuitBounds.isCircuitIconHovered(150, 125));
+
+        node.setCircuitNumber(24);
+        NodeLayoutBounds circuitBounds = NodeLayoutCalculator.compute(node, false, 20, false);
+        Assertions.assertFalse(circuitBounds.getCircuitIconBounds().isEmpty());
+        Assertions.assertEquals(16, circuitBounds.getCircuitIconBounds().width());
+        Assertions.assertEquals(16, circuitBounds.getCircuitIconBounds().height());
+
+        int cx = circuitBounds.getCircuitIconBounds().x();
+        int cy = circuitBounds.getCircuitIconBounds().y();
+        Assertions.assertTrue(circuitBounds.isCircuitIconHovered(cx + 4, cy + 4));
+        Assertions.assertFalse(circuitBounds.isCircuitIconHovered(cx - 10, cy));
+
+        NodeLayoutBounds slimBounds = NodeLayoutCalculator.compute(node, true, 20, false);
+        Assertions.assertFalse(slimBounds.getCircuitIconBounds().isEmpty());
+        Assertions.assertEquals(16, slimBounds.getCircuitIconBounds().width());
+    }
 }

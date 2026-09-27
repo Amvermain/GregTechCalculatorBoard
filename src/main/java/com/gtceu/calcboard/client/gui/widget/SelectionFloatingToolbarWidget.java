@@ -10,11 +10,13 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.Component;
+import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.function.BooleanSupplier;
 
 /**
  * Floating contextual action toolbar that appears above multi-selected nodes on the canvas.
@@ -36,7 +38,11 @@ public class SelectionFloatingToolbarWidget {
     private int badgeWidth = 0;
     private boolean visible = false;
 
-    public record ToolbarAction(String icon, Component label, Component tooltip, Runnable action, boolean isDanger) {}
+    public record ToolbarAction(String icon, Component label, Component tooltip, Runnable action, boolean isDanger, BooleanSupplier available) {
+        public ToolbarAction(String icon, Component label, Component tooltip, Runnable action, boolean isDanger) {
+            this(icon, label, tooltip, action, isDanger, () -> true);
+        }
+    }
 
     private static class ButtonSlot {
         final ToolbarAction action;
@@ -60,6 +66,7 @@ public class SelectionFloatingToolbarWidget {
     }
 
     private void initActions() {
+        Runnable onConnect = screen != null ? screen::performAutoConnectForSelection : () -> {};
         Runnable onFrame = screen != null ? screen::createFrameFromSelection : () -> {};
         Runnable onModule = screen != null ? screen::performGroupIntoModule : () -> {};
         Runnable onShared = screen != null ? screen::createSharedMachineFrameFromSelection : () -> {};
@@ -67,6 +74,9 @@ public class SelectionFloatingToolbarWidget {
         Runnable onCopy = screen != null ? screen::copySelection : () -> {};
         Runnable onDelete = screen != null ? screen::deleteSelection : () -> {};
 
+        actions.add(new ToolbarAction("↔", Component.translatable("gui.gtcalcboard.floating_bar.auto_connect"),
+                Component.translatable("gui.gtcalcboard.floating_bar.tooltip.auto_connect"), onConnect, false,
+                () -> screen != null && screen.getSelectedNodeIds().size() >= 2));
         actions.add(new ToolbarAction("▤", Component.translatable("gui.gtcalcboard.floating_bar.frame"),
                 Component.translatable("gui.gtcalcboard.floating_bar.tooltip.frame"), onFrame, false));
         actions.add(new ToolbarAction("📦", Component.translatable("gui.gtcalcboard.floating_bar.module"),
@@ -187,6 +197,7 @@ public class SelectionFloatingToolbarWidget {
 
         int curRelX = badgeWidth + 7;
         for (ToolbarAction action : actions) {
+            if (!action.available().getAsBoolean()) continue;
             ButtonSlot slot = new ButtonSlot(action);
             String btnText = compact ? action.icon() : action.icon() + " " + action.label().getString();
             slot.width = font.width(btnText) + 10;
@@ -304,6 +315,12 @@ public class SelectionFloatingToolbarWidget {
     }
 
     private void playClickSound() {
-        Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F));
+        Minecraft mc = Minecraft.getInstance();
+        if (mc != null && mc.getSoundManager() != null) {
+            SoundEvent sound = SoundEvents.UI_BUTTON_CLICK.get();
+            if (sound != null) {
+                mc.getSoundManager().play(SimpleSoundInstance.forUI(sound, 1.0F));
+            }
+        }
     }
 }

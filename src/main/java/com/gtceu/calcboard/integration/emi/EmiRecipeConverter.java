@@ -153,7 +153,6 @@ public class EmiRecipeConverter {
 
         boolean isGreate = (catId != null && catId.getNamespace().equals("greate"))
                 || (recipe.getId() != null && recipe.getId().getNamespace().equals("greate"))
-                || details.circuitNumber >= 0
                 || !"NONE".equalsIgnoreCase(details.heatCondition);
 
         if (isGreate) {
@@ -168,6 +167,10 @@ public class EmiRecipeConverter {
             com.gtceu.calcboard.compat.greate.GreateMachineHelper.syncMachineIconToTier(node, initTier);
         }
 
+        if (details.circuitNumber >= 0) {
+            node.setCircuitNumber(details.circuitNumber);
+        }
+
         List<IngredientStack> gtTickInputs = null;
         List<IngredientStack> gtTickOutputs = null;
         if (backing != null && com.gtceu.calcboard.compat.gtceu.GTCEuRecipeHandler.isGTRecipe(backing)) {
@@ -179,50 +182,7 @@ public class EmiRecipeConverter {
         boolean[] usedInputChances = new boolean[extractedInputChances.size()];
 
         for (int inIdx = 0; inIdx < recipe.getInputs().size(); inIdx++) {
-            EmiIngredient input = recipe.getInputs().get(inIdx);
-            long reqAmount = input.getAmount();
-            float reqChance = input.getChance();
-            IngredientStack primaryStack = null;
-            List<ResourceLocation> altIds = new ArrayList<>();
-
-            for (EmiStack stack : input.getEmiStacks()) {
-                if (stack == null || stack.isEmpty()) continue;
-                if (isIgnoredInput(stack.getId(), reqChance > 0 ? reqChance : stack.getChance())) continue;
-
-                long finalAmount = reqAmount > 0 ? reqAmount : Math.max(1, stack.getAmount());
-                float finalChance = reqChance > 0 ? reqChance : (stack.getChance() > 0 ? stack.getChance() : 1.0f);
-                IngredientStack is = convertEmiStack(stack, finalAmount, finalChance);
-                if (is != null && is.getId() != null) {
-                    if (isIgnoredInput(is.getId(), is.getChance())) continue;
-                    if (primaryStack == null) {
-                        primaryStack = is;
-                    }
-                    if (!altIds.contains(is.getId())) {
-                        altIds.add(is.getId());
-                    }
-                }
-            }
-
-            if (primaryStack != null) {
-                try {
-                    if (primaryStack.isFluid() && primaryStack.getId() != null) {
-                        var tagKey = net.minecraft.tags.TagKey.create(net.minecraft.core.registries.Registries.FLUID, primaryStack.getId());
-                        if (ForgeRegistries.FLUIDS.tags().isKnownTagName(tagKey)) {
-                            for (Fluid fluid : ForgeRegistries.FLUIDS.tags().getTag(tagKey)) {
-                                ResourceLocation fId = ForgeRegistries.FLUIDS.getKey(fluid);
-                                if (fId != null && !altIds.contains(fId)) {
-                                    altIds.add(fId);
-                                }
-                            }
-                        }
-                    }
-                } catch (Throwable ignored) {}
-
-                primaryStack = applyTickIngredientScaling(primaryStack, gtTickInputs);
-                applySlotChance(primaryStack, inIdx, extractedInputChances, usedInputChances);
-                primaryStack.setAlternatives(altIds);
-                node.addInput(primaryStack);
-            }
+            processRecipeInput(node, recipe.getInputs().get(inIdx), inIdx, gtTickInputs, extractedInputChances, usedInputChances);
         }
 
         if (gtTickInputs != null) {
@@ -373,42 +333,49 @@ public class EmiRecipeConverter {
 
         try {
             if (recipe.getCategory() != null) {
-                try {
-                    Method mCat = recipe.getCategory().getClass().getMethod("getWorkstations");
-                    Object catRes = mCat.invoke(recipe.getCategory());
-                    if (catRes instanceof List<?> catWorkstations && !catWorkstations.isEmpty()) {
-                        for (Object ws : catWorkstations) {
-                            addEmiIngredientToWorkstations(ws, list);
-                        }
-                    }
-                } catch (Throwable ignored) {}
-
-                try {
-                    var rm = dev.emi.emi.api.EmiApi.getRecipeManager();
-                    if (rm != null) {
-                        var catWs = rm.getWorkstations(recipe.getCategory());
-                        if (catWs != null && !catWs.isEmpty()) {
-                            for (Object ws : catWs) {
-                                addEmiIngredientToWorkstations(ws, list);
-                            }
-                        }
-                    }
-                } catch (Throwable ignored) {}
+                addCategoryDeclaredWorkstations(recipe, list);
+                addCategoryManagerWorkstations(recipe, list);
             }
         } catch (Throwable ignored) {}
 
         return list;
     }
 
-    private static void addEmiIngredientToWorkstations(Object ws, List<ResourceLocation> list) {
-        if (ws instanceof EmiIngredient ei) {
-            for (EmiStack es : ei.getEmiStacks()) {
-                if (es != null && !es.isEmpty() && es.getId() != null) {
-                    if (!list.contains(es.getId())) {
-                        list.add(es.getId());
-                    }
+    private static void addCategoryDeclaredWorkstations(EmiRecipe recipe, List<ResourceLocation> list) {
+        try {
+            Method mCat = recipe.getCategory().getClass().getMethod("getWorkstations");
+            Object catRes = mCat.invoke(recipe.getCategory());
+            if (catRes instanceof List<?> catWorkstations) {
+                for (Object ws : catWorkstations) {
+                    addEmiIngredientToWorkstations(ws, list);
                 }
             }
+        } catch (Throwable ignored) {}
+    }
+
+    private static void addCategoryManagerWorkstations(EmiRecipe recipe, List<ResourceLocation> list) {
+        try {
+            var rm = dev.emi.emi.api.EmiApi.getRecipeManager();
+            if (rm == null) return;
+            var catWs = rm.getWorkstations(recipe.getCategory());
+            if (catWs == null) return;
+            for (Object ws : catWs) {
+                addEmiIngredientToWorkstations(ws, list);
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    private static void addEmiIngredientToWorkstations(Object ws, List<ResourceLocation> list) {
+        if (!(ws instanceof EmiIngredient ei)) return;
+        for (EmiStack es : ei.getEmiStacks()) {
+            addSingleEmiStackToWorkstations(es, list);
+        }
+    }
+
+    private static void addSingleEmiStackToWorkstations(EmiStack es, List<ResourceLocation> list) {
+        if (es == null || es.isEmpty() || es.getId() == null) return;
+        if (!list.contains(es.getId())) {
+            list.add(es.getId());
         }
     }
 
@@ -418,6 +385,29 @@ public class EmiRecipeConverter {
 
     public static boolean isProgrammedCircuit(ResourceLocation id) {
         return RecipeConversionHelper.isProgrammedCircuit(id);
+    }
+
+    public static int extractCircuitFromEmiStack(EmiStack stack) {
+        if (stack == null) return -1;
+        CompoundTag nbt = stack.getNbt();
+        if (nbt != null && nbt.contains("Configuration")) {
+            return nbt.getInt("Configuration");
+        }
+        ItemStack is = stack.getItemStack();
+        if (is != null && is.hasTag() && is.getTag().contains("Configuration")) {
+            return is.getTag().getInt("Configuration");
+        }
+        return -1;
+    }
+
+    private static void checkAndApplyCircuitInput(RecipeNode node, EmiStack stack) {
+        if (node == null || stack == null) return;
+        if (!isProgrammedCircuit(stack.getId())) return;
+        if (node.getCircuitNumber() >= 0) return;
+        int circuit = extractCircuitFromEmiStack(stack);
+        if (circuit >= 0) {
+            node.setCircuitNumber(circuit);
+        }
     }
 
     public static boolean isDummyConditionMarker(ResourceLocation id) {
@@ -432,6 +422,11 @@ public class EmiRecipeConverter {
         if (recipe == null) return null;
 
         List<ResourceLocation> allWs = findAllWorkstations(recipe);
+        for (ResourceLocation ws : allWs) {
+            if (ws != null && !isDummyConditionMarker(ws) && !isIgnoredWorkstation(ws) && !MultiblockDetector.isMultiblock(ws)) {
+                return ws;
+            }
+        }
         for (ResourceLocation ws : allWs) {
             if (ws != null && !isDummyConditionMarker(ws) && !isIgnoredWorkstation(ws)) {
                 return ws;
@@ -496,23 +491,99 @@ public class EmiRecipeConverter {
             if (ForgeRegistries.FLUIDS.containsKey(id)) {
                 return IngredientStack.fluid(id, displayName, amount, chance);
             }
-            try {
-                var tagKey = net.minecraft.tags.TagKey.create(net.minecraft.core.registries.Registries.FLUID, id);
-                if (ForgeRegistries.FLUIDS.tags().isKnownTagName(tagKey)) {
-                    var it = ForgeRegistries.FLUIDS.tags().getTag(tagKey).iterator();
-                    if (it.hasNext()) {
-                        Fluid firstFluid = it.next();
-                        if (firstFluid != null && firstFluid != Fluids.EMPTY) {
-                            ResourceLocation fluidId = ForgeRegistries.FLUIDS.getKey(firstFluid);
-                            return IngredientStack.fluid(fluidId != null ? fluidId : id, displayName, amount, chance);
-                        }
-                    }
-                    return IngredientStack.fluid(id, displayName, amount, chance);
-                }
-            } catch (Throwable ignored) {}
+            ResourceLocation tagFluid = findFirstFluidInTag(id);
+            if (tagFluid != null) {
+                return IngredientStack.fluid(tagFluid, displayName, amount, chance);
+            }
             return IngredientStack.item(id, displayName, amount, chance);
         } else {
             return IngredientStack.item(id, displayName, amount, chance);
+        }
+    }
+
+    private static ResourceLocation findFirstFluidInTag(ResourceLocation tagId) {
+        try {
+            var tagKey = net.minecraft.tags.TagKey.create(net.minecraft.core.registries.Registries.FLUID, tagId);
+            if (!ForgeRegistries.FLUIDS.tags().isKnownTagName(tagKey)) return null;
+            var it = ForgeRegistries.FLUIDS.tags().getTag(tagKey).iterator();
+            if (!it.hasNext()) return null;
+            Fluid firstFluid = it.next();
+            if (firstFluid != null && firstFluid != Fluids.EMPTY) {
+                return ForgeRegistries.FLUIDS.getKey(firstFluid);
+            }
+            return tagId;
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static void processRecipeInput(
+            RecipeNode node,
+            EmiIngredient input,
+            int inIdx,
+            List<IngredientStack> gtTickInputs,
+            List<SlotChance> extractedInputChances,
+            boolean[] usedInputChances
+    ) {
+        long reqAmount = input.getAmount();
+        float reqChance = input.getChance();
+        IngredientStack primaryStack = null;
+        List<ResourceLocation> altIds = new ArrayList<>();
+
+        for (EmiStack stack : input.getEmiStacks()) {
+            primaryStack = collectEmiInputStack(node, stack, reqAmount, reqChance, primaryStack, altIds);
+        }
+
+        if (primaryStack == null) return;
+
+        collectFluidTagAlternatives(primaryStack, altIds);
+        primaryStack = applyTickIngredientScaling(primaryStack, gtTickInputs);
+        applySlotChance(primaryStack, inIdx, extractedInputChances, usedInputChances);
+        primaryStack.setAlternatives(altIds);
+        node.addInput(primaryStack);
+    }
+
+    private static IngredientStack collectEmiInputStack(
+            RecipeNode node,
+            EmiStack stack,
+            long reqAmount,
+            float reqChance,
+            IngredientStack currentPrimary,
+            List<ResourceLocation> altIds
+    ) {
+        if (stack == null || stack.isEmpty()) return currentPrimary;
+        checkAndApplyCircuitInput(node, stack);
+        float effectiveChance = reqChance > 0 ? reqChance : stack.getChance();
+        if (isIgnoredInput(stack.getId(), effectiveChance)) return currentPrimary;
+
+        long finalAmount = reqAmount > 0 ? reqAmount : Math.max(1, stack.getAmount());
+        float finalChance = reqChance > 0 ? reqChance : (stack.getChance() > 0 ? stack.getChance() : 1.0f);
+        IngredientStack is = convertEmiStack(stack, finalAmount, finalChance);
+        if (is == null || is.getId() == null || isIgnoredInput(is.getId(), is.getChance())) {
+            return currentPrimary;
+        }
+
+        if (!altIds.contains(is.getId())) {
+            altIds.add(is.getId());
+        }
+        return currentPrimary != null ? currentPrimary : is;
+    }
+
+    private static void collectFluidTagAlternatives(IngredientStack primaryStack, List<ResourceLocation> altIds) {
+        if (!primaryStack.isFluid() || primaryStack.getId() == null) return;
+        try {
+            var tagKey = net.minecraft.tags.TagKey.create(net.minecraft.core.registries.Registries.FLUID, primaryStack.getId());
+            if (!ForgeRegistries.FLUIDS.tags().isKnownTagName(tagKey)) return;
+            for (Fluid fluid : ForgeRegistries.FLUIDS.tags().getTag(tagKey)) {
+                addFluidAlternative(altIds, fluid);
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    private static void addFluidAlternative(List<ResourceLocation> altIds, Fluid fluid) {
+        ResourceLocation fId = ForgeRegistries.FLUIDS.getKey(fluid);
+        if (fId != null && !altIds.contains(fId)) {
+            altIds.add(fId);
         }
     }
 

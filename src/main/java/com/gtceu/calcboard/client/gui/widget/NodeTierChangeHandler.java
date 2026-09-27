@@ -136,6 +136,8 @@ public final class NodeTierChangeHandler {
     private static boolean handleLowPressureSteam(NodeWidget widget, RecipeNode node, IBoardScreenContext parent, int direction, boolean isVanillaCooking) {
         if (direction > 0) {
             node.setSteamMode(SteamMode.HIGH_PRESSURE);
+            syncSteamWorkstation(node, SteamMode.HIGH_PRESSURE);
+            syncSharedFrameHardware(parent, node);
             if (parent != null) parent.markSummaryDirty();
             widget.invalidateCache();
             return true;
@@ -169,6 +171,7 @@ public final class NodeTierChangeHandler {
         }
         if (direction < 0) {
             node.setSteamMode(SteamMode.LOW_PRESSURE);
+            syncSteamWorkstation(node, SteamMode.LOW_PRESSURE);
             syncSharedFrameHardware(parent, node);
             if (parent != null) parent.markSummaryDirty();
             widget.invalidateCache();
@@ -181,6 +184,7 @@ public final class NodeTierChangeHandler {
         if (direction > 0) {
             if (node.supportsSteamMode()) {
                 node.setSteamMode(SteamMode.LOW_PRESSURE);
+                syncSteamWorkstation(node, SteamMode.LOW_PRESSURE);
             } else {
                 GTVoltageTier lowestElectric = isVanillaCooking ? GTVoltageTier.LV : GTVoltageTier.getByIndex(minIdx);
                 node.setTargetTier(lowestElectric);
@@ -205,6 +209,7 @@ public final class NodeTierChangeHandler {
         if (direction < 0 && curIdx <= lowestAllowedElectric) {
             if (node.supportsSteamMode()) {
                 node.setSteamMode(SteamMode.HIGH_PRESSURE);
+                syncSteamWorkstation(node, SteamMode.HIGH_PRESSURE);
                 syncSharedFrameHardware(parent, node);
                 if (parent != null) parent.markSummaryDirty();
                 widget.invalidateCache();
@@ -299,6 +304,16 @@ public final class NodeTierChangeHandler {
                 frame.syncHardwareConfig(node, parent.getGraph());
                 parent.rebuildBoardWidgets();
             }
+        }
+    }
+
+    private static void syncSteamWorkstation(RecipeNode node, SteamMode mode) {
+        if (node == null || node.getRecipeCategoryId() == null) return;
+        var cap = com.gtceu.calcboard.api.catalog.CategoryCapabilityMatrix.getInstance().getCapability(node.getRecipeCategoryId());
+        if (cap == null) return;
+        ResourceLocation ws = (mode == SteamMode.LOW_PRESSURE) ? cap.lowPressureWorkstation() : cap.highPressureWorkstation();
+        if (ws != null) {
+            node.setMachineIcon(ws);
         }
     }
 }

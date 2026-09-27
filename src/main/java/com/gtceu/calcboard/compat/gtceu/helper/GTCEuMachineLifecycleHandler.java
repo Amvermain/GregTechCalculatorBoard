@@ -62,6 +62,7 @@ public final class GTCEuMachineLifecycleHandler {
             if (node.getParallel() > 1 && oldIcon != null && MultiblockDetector.isMultiblock(oldIcon)) {
                 node.setParallel(1);
             }
+            syncSingleblockSteamState(node, newIcon);
         }
 
         if (oldIcon != null && !oldIcon.equals(newIcon)) {
@@ -84,6 +85,13 @@ public final class GTCEuMachineLifecycleHandler {
     }
 
     public static void purgeIncompatibleAddons(RecipeNode node, ResourceLocation oldIcon, ResourceLocation newIcon) {
+        if (oldIcon != null && MultiblockDetector.isMultiblock(oldIcon) && !MultiblockDetector.isMultiblock(newIcon)) {
+            node.getAddons().removeIf(a -> a.getCategory() == MachineAddon.Category.MAINTENANCE
+                    || a.getCategory() == MachineAddon.Category.ENERGY_HATCH
+                    || a.getCategory() == MachineAddon.Category.HATCH_BUS
+                    || a.getCategory() == MachineAddon.Category.MULTIBLOCK_TRAIT);
+        }
+
         if (MultiblockDetector.isSteamMultiblock(newIcon)) {
             node.getAddons().removeIf(a -> a.getCategory() != MachineAddon.Category.CUSTOM);
         }
@@ -182,7 +190,7 @@ public final class GTCEuMachineLifecycleHandler {
             configureTurbineParallel(node, oldIcon, defPar);
         }
 
-        if (oldIcon != null && !oldIcon.equals(newIcon)) {
+        if (oldIcon != null && !oldIcon.equals(newIcon) && node.isMultiblock()) {
             ensureAddonIfSupported(node, "gtceu:throughput_boosting", MultiblockDetector.supportsThroughputBoosting(newIcon));
             ensureAddonIfSupported(node, "gtceu:overpressure_autoclave", MultiblockDetector.supportsOverpressure(newIcon));
         }
@@ -375,5 +383,13 @@ public final class GTCEuMachineLifecycleHandler {
             return boostRate;
         }
         return defaultRate;
+    }
+
+    private static void syncSingleblockSteamState(RecipeNode node, ResourceLocation icon) {
+        if (node == null || icon == null) return;
+        Object def = GTCEuReflectionBridge.getMachineDefinition(icon);
+        if (!GTCEuCapabilityScanner.isSteamDefinition(def, icon) && node.getSteamMode().isSteam()) {
+            node.setSteamMode(SteamMode.NONE);
+        }
     }
 }

@@ -105,21 +105,28 @@ public final class GTCEuReflectionBridge {
         IS_GENERATOR_METHOD = findMethod(mbDefCls, "isGenerator");
         GENERATOR_FIELD = findField(mbDefCls, "generator");
 
+        RECIPE_MODIFIER_NAMES = Collections.unmodifiableMap(collectRecipeModifierNames());
+    }
+
+    private static Map<Object, String> collectRecipeModifierNames() {
         Map<Object, String> modNames = new IdentityHashMap<>();
         Class<?> gtRecipeModifiersCls = loadClassQuietly("com.gregtechceu.gtceu.common.data.GTRecipeModifiers");
-        if (gtRecipeModifiersCls != null) {
-            for (Field f : gtRecipeModifiersCls.getFields()) {
-                if (Modifier.isStatic(f.getModifiers())) {
-                    try {
-                        Object mod = f.get(null);
-                        if (mod != null) {
-                            modNames.put(mod, f.getName().toUpperCase(Locale.ROOT));
-                        }
-                    } catch (Throwable ignored) {}
-                }
-            }
+        if (gtRecipeModifiersCls == null) return modNames;
+
+        for (Field f : gtRecipeModifiersCls.getFields()) {
+            registerModifierField(f, modNames);
         }
-        RECIPE_MODIFIER_NAMES = Collections.unmodifiableMap(modNames);
+        return modNames;
+    }
+
+    private static void registerModifierField(Field f, Map<Object, String> modNames) {
+        if (!Modifier.isStatic(f.getModifiers())) return;
+        try {
+            Object mod = f.get(null);
+            if (mod != null) {
+                modNames.put(mod, f.getName().toUpperCase(Locale.ROOT));
+            }
+        } catch (Throwable ignored) {}
     }
 
     private GTCEuReflectionBridge() {}

@@ -16,6 +16,7 @@ import mezz.jei.api.recipe.IFocusGroup;
 import mezz.jei.api.recipe.RecipeIngredientRole;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.level.material.Fluid;
@@ -135,17 +136,19 @@ public class JeiRecipeLayoutCollector implements IRecipeLayoutBuilder {
 
         @Override
         public IRecipeSlotBuilder addIngredients(Ingredient ingredient) {
-            if (ingredient != null && !ingredient.isEmpty()) {
-                ItemStack[] items = ingredient.getItems();
-                if (items != null) {
-                    for (ItemStack is : items) {
-                        if (is != null && !is.isEmpty()) {
-                            this.itemStacks.add(is);
-                        }
-                    }
-                }
+            if (ingredient == null || ingredient.isEmpty()) return this;
+            ItemStack[] items = ingredient.getItems();
+            if (items == null) return this;
+            for (ItemStack is : items) {
+                addItemStackIfValid(is);
             }
             return this;
+        }
+
+        private void addItemStackIfValid(ItemStack is) {
+            if (is != null && !is.isEmpty()) {
+                this.itemStacks.add(is);
+            }
         }
 
         @Override
@@ -194,25 +197,38 @@ public class JeiRecipeLayoutCollector implements IRecipeLayoutBuilder {
 
         @Override
         public IRecipeSlotBuilder addIngredientsUnsafe(List<?> ingredients) {
-            if (ingredients != null) {
-                for (Object ing : ingredients) {
-                    if (ing instanceof ItemStack is) {
-                        addItemStack(is);
-                    } else if (ing instanceof FluidStack fs) {
-                        if (!fs.isEmpty()) this.fluidStacks.add(fs);
-                    } else if (ing instanceof Ingredient in) {
-                        addIngredients(in);
-                    } else if (ing instanceof ITypedIngredient<?> ti) {
-                        Object obj = ti.getIngredient();
-                        if (obj instanceof ItemStack is && !is.isEmpty()) {
-                            this.itemStacks.add(is);
-                        } else if (obj instanceof FluidStack fs && !fs.isEmpty()) {
-                            this.fluidStacks.add(fs);
-                        }
-                    }
-                }
+            if (ingredients == null) return this;
+            for (Object ing : ingredients) {
+                addSingleIngredientUnsafe(ing);
             }
             return this;
+        }
+
+        private void addSingleIngredientUnsafe(Object ing) {
+            if (ing instanceof ItemStack is) {
+                addItemStack(is);
+            } else if (ing instanceof FluidStack fs) {
+                addFluidStackUnsafe(fs);
+            } else if (ing instanceof Ingredient in) {
+                addIngredients(in);
+            } else if (ing instanceof ITypedIngredient<?> ti) {
+                addTypedIngredient(ti);
+            }
+        }
+
+        private void addFluidStackUnsafe(FluidStack fs) {
+            if (!fs.isEmpty()) {
+                this.fluidStacks.add(fs);
+            }
+        }
+
+        private void addTypedIngredient(ITypedIngredient<?> ti) {
+            Object obj = ti.getIngredient();
+            if (obj instanceof ItemStack is && !is.isEmpty()) {
+                this.itemStacks.add(is);
+            } else if (obj instanceof FluidStack fs && !fs.isEmpty()) {
+                this.fluidStacks.add(fs);
+            }
         }
 
         @Override
@@ -321,21 +337,8 @@ public class JeiRecipeLayoutCollector implements IRecipeLayoutBuilder {
                     (proxy, method, args) -> {
                         String name = method.getName();
                         if ("addSlot".equals(name) || "addInputSlot".equals(name) || "addOutputSlot".equals(name) || "addSlotToWidget".equals(name)) {
-                            RecipeIngredientRole role = RecipeIngredientRole.INPUT;
-                            int x = 0, y = 0;
-                            if ("addOutputSlot".equals(name)) {
-                                role = RecipeIngredientRole.OUTPUT;
-                            }
-                            if (args != null) {
-                                for (Object arg : args) {
-                                    if (arg instanceof RecipeIngredientRole r) role = r;
-                                    else if (arg instanceof Integer i) {
-                                        if (x == 0) x = i;
-                                        else y = i;
-                                    }
-                                }
-                            }
-                            CollectedSlot slot = new CollectedSlot(role, x, y);
+                            SlotRoleAndCoordinates coords = parseSlotArgs(name, args);
+                            CollectedSlot slot = new CollectedSlot(coords.role, coords.x, coords.y);
                             collector.slots.add(slot);
                             return createProxySlot(slot);
                         }
@@ -400,67 +403,102 @@ public class JeiRecipeLayoutCollector implements IRecipeLayoutBuilder {
 
     private void appendSlotIngredients(CollectedSlot slot, List<IngredientStack> target) {
         if (!slot.getFluidStacks().isEmpty()) {
-            FluidStack fs = slot.getFluidStacks().get(0);
-            if (fs != null && !fs.isEmpty()) {
-                ResourceLocation fId = null;
-                try {
-                    fId = ForgeRegistries.FLUIDS.getKey(fs.getFluid());
-                } catch (Throwable ignored) {}
-                if (fId != null) {
-                    String name = "";
-                    try {
-                        name = fs.getDisplayName().getString();
-                    } catch (Throwable ignored) {}
-                    if (name.isEmpty()) {
-                        name = JeiRecipeConverter.formatName(fId.getPath());
-                    }
-                    IngredientStack is = IngredientStack.fluid(fId, name, fs.getAmount());
-                    for (int i = 1; i < slot.getFluidStacks().size(); i++) {
-                        FluidStack altFs = slot.getFluidStacks().get(i);
-                        if (altFs != null && !altFs.isEmpty()) {
-                            ResourceLocation altId = null;
-                            try {
-                                altId = ForgeRegistries.FLUIDS.getKey(altFs.getFluid());
-                            } catch (Throwable ignored) {}
-                            if (altId != null && !is.getAlternatives().contains(altId)) {
-                                is.getAlternatives().add(altId);
-                            }
-                        }
-                    }
-                    target.add(is);
-                }
-            }
+            addSlotFluidIngredient(slot, target);
         } else if (!slot.getItemStacks().isEmpty()) {
-            ItemStack primary = slot.getItemStacks().get(0);
-            if (primary != null && !primary.isEmpty()) {
-                ResourceLocation iId = null;
-                try {
-                    iId = ForgeRegistries.ITEMS.getKey(primary.getItem());
-                } catch (Throwable ignored) {}
-                if (iId != null) {
-                    String name = "";
-                    try {
-                        name = primary.getHoverName().getString();
-                    } catch (Throwable ignored) {}
-                    if (name.isEmpty()) {
-                        name = JeiRecipeConverter.formatName(iId.getPath());
-                    }
-                    IngredientStack is = IngredientStack.item(iId, name, primary.getCount());
-                    for (int i = 1; i < slot.getItemStacks().size(); i++) {
-                        ItemStack altIs = slot.getItemStacks().get(i);
-                        if (altIs != null && !altIs.isEmpty()) {
-                            ResourceLocation altId = null;
-                            try {
-                                altId = ForgeRegistries.ITEMS.getKey(altIs.getItem());
-                            } catch (Throwable ignored) {}
-                            if (altId != null && !is.getAlternatives().contains(altId)) {
-                                is.getAlternatives().add(altId);
-                            }
-                        }
-                    }
-                    target.add(is);
-                }
+            addSlotItemIngredient(slot, target);
+        }
+    }
+
+    private static void addSlotFluidIngredient(CollectedSlot slot, List<IngredientStack> target) {
+        FluidStack fs = slot.getFluidStacks().get(0);
+        if (fs == null || fs.isEmpty()) return;
+        ResourceLocation fId = getFluidIdQuietly(fs.getFluid());
+        if (fId == null) return;
+
+        String name = resolveFluidDisplayName(fs, fId);
+        IngredientStack is = IngredientStack.fluid(fId, name, fs.getAmount());
+        for (int i = 1; i < slot.getFluidStacks().size(); i++) {
+            addAlternativeFluid(is, slot.getFluidStacks().get(i));
+        }
+        target.add(is);
+    }
+
+    private static void addAlternativeFluid(IngredientStack is, FluidStack altFs) {
+        if (altFs == null || altFs.isEmpty()) return;
+        ResourceLocation altId = getFluidIdQuietly(altFs.getFluid());
+        if (altId != null && !is.getAlternatives().contains(altId)) {
+            is.getAlternatives().add(altId);
+        }
+    }
+
+    private static ResourceLocation getFluidIdQuietly(Fluid fluid) {
+        try {
+            return ForgeRegistries.FLUIDS.getKey(fluid);
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static String resolveFluidDisplayName(FluidStack fs, ResourceLocation id) {
+        try {
+            String name = fs.getDisplayName().getString();
+            if (!name.isEmpty()) return name;
+        } catch (Throwable ignored) {}
+        return JeiRecipeConverter.formatName(id.getPath());
+    }
+
+    private static void addSlotItemIngredient(CollectedSlot slot, List<IngredientStack> target) {
+        ItemStack primary = slot.getItemStacks().get(0);
+        if (primary == null || primary.isEmpty()) return;
+        ResourceLocation iId = getItemIdQuietly(primary.getItem());
+        if (iId == null) return;
+
+        String name = resolveItemDisplayName(primary, iId);
+        IngredientStack is = IngredientStack.item(iId, name, primary.getCount());
+        for (int i = 1; i < slot.getItemStacks().size(); i++) {
+            addAlternativeItem(is, slot.getItemStacks().get(i));
+        }
+        target.add(is);
+    }
+
+    private static void addAlternativeItem(IngredientStack is, ItemStack altIs) {
+        if (altIs == null || altIs.isEmpty()) return;
+        ResourceLocation altId = getItemIdQuietly(altIs.getItem());
+        if (altId != null && !is.getAlternatives().contains(altId)) {
+            is.getAlternatives().add(altId);
+        }
+    }
+
+    private static ResourceLocation getItemIdQuietly(Item item) {
+        try {
+            return ForgeRegistries.ITEMS.getKey(item);
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static String resolveItemDisplayName(ItemStack stack, ResourceLocation id) {
+        try {
+            String name = stack.getHoverName().getString();
+            if (!name.isEmpty()) return name;
+        } catch (Throwable ignored) {}
+        return JeiRecipeConverter.formatName(id.getPath());
+    }
+
+    private record SlotRoleAndCoordinates(RecipeIngredientRole role, int x, int y) {}
+
+    private static SlotRoleAndCoordinates parseSlotArgs(String methodName, Object[] args) {
+        RecipeIngredientRole role = "addOutputSlot".equals(methodName) ? RecipeIngredientRole.OUTPUT : RecipeIngredientRole.INPUT;
+        int x = 0, y = 0;
+        if (args == null) return new SlotRoleAndCoordinates(role, x, y);
+        for (Object arg : args) {
+            if (arg instanceof RecipeIngredientRole r) {
+                role = r;
+            } else if (arg instanceof Integer i) {
+                if (x == 0) x = i;
+                else y = i;
             }
         }
+        return new SlotRoleAndCoordinates(role, x, y);
     }
 }

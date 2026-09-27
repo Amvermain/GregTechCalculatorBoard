@@ -83,6 +83,8 @@ public interface IBoardActionDispatcher {
 
     void performAutoRatio();
 
+    default void performAutoConnectForSelection() {}
+
     void performGroupIntoModule();
 
     void openSettingsDialog();
@@ -132,4 +134,6 @@ public interface IBoardActionDispatcher {
     void openTargetOutputRateDialog(RecipeNode node, int outputIndex);
  
     void batchApplyPageTargetVoltage();
+
+    default void openRecipeSearchForSharedFrame(CanvasGroupFrame frame) {}
 }

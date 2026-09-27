@@ -129,6 +129,11 @@ public class IngredientStack {
         this.id = alternatives.get(selectedAltIndex);
     }
 
+    public boolean matches(IngredientStack other) {
+        if (other == null) return false;
+        return this.type == other.type && Objects.equals(this.id, other.id);
+    }
+
     public boolean matchesOrAlternative(IngredientStack other) {
         if (other == null || other.type != this.type) return false;
         if (Objects.equals(this.id, other.id)) return true;
@@ -136,31 +141,50 @@ public class IngredientStack {
     }
 
     public String getDisplayName() {
-        if (id != null) {
-            try {
-                if (type == Type.FLUID) {
-                    var fluid = ForgeRegistries.FLUIDS.getValue(id);
-                    if (fluid != null && fluid != net.minecraft.world.level.material.Fluids.EMPTY) {
-                        String name = fluid.getFluidType().getDescription().getString();
-                        if (name != null && !name.isEmpty() && !name.equalsIgnoreCase("air") && !name.equalsIgnoreCase("empty")) {
-                            return name;
-                        }
-                    }
-                } else {
-                    var item = ForgeRegistries.ITEMS.getValue(id);
-                    if (item != null && item != Items.AIR) {
-                        String name = item.getDescription().getString();
-                        if (name != null && !name.isEmpty() && !name.equalsIgnoreCase("air")) {
-                            return name;
-                        }
-                    }
-                }
-            } catch (Throwable ignored) {}
+        if (id == null) {
+            return displayName != null ? displayName : "";
+        }
+        String resolvedName = resolveRegistryDisplayName();
+        if (resolvedName != null && !resolvedName.isEmpty()) {
+            return resolvedName;
         }
         return displayName != null ? displayName : "";
     }
 
-    private double tierChanceBoost = 0.0; // Additional chance per voltage tier above base recipe tier (e.g. 0.05 = +5% per tier)
+    private String resolveRegistryDisplayName() {
+        try {
+            return type == Type.FLUID ? resolveFluidDisplayName() : resolveItemDisplayName();
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private String resolveFluidDisplayName() {
+        var fluid = ForgeRegistries.FLUIDS.getValue(id);
+        if (fluid == null || fluid == net.minecraft.world.level.material.Fluids.EMPTY) {
+            return null;
+        }
+        String name = fluid.getFluidType().getDescription().getString();
+        if (isValidDisplayName(name) && !name.equalsIgnoreCase("empty")) {
+            return name;
+        }
+        return null;
+    }
+
+    private String resolveItemDisplayName() {
+        var item = ForgeRegistries.ITEMS.getValue(id);
+        if (item == null || item == Items.AIR) {
+            return null;
+        }
+        String name = item.getDescription().getString();
+        return isValidDisplayName(name) ? name : null;
+    }
+
+    private static boolean isValidDisplayName(String name) {
+        return name != null && !name.isEmpty() && !name.equalsIgnoreCase("air");
+    }
+
+    private double tierChanceBoost = 0.0;
 
     public double getAmount() {
         return amount;

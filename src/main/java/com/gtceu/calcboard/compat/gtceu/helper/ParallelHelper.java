@@ -107,17 +107,26 @@ public class ParallelHelper {
 
     private static ParallelStats extractStatsFromBlockClass(Block block) {
         for (Method m : block.getClass().getMethods()) {
-            if ((m.getName().equalsIgnoreCase("getMachineDefinition") || m.getName().equalsIgnoreCase("getDefinition")) && m.getParameterCount() == 0) {
-                try {
-                    Object def = m.invoke(block);
-                    if (def != null) {
-                        ParallelStats s = extractStatsFromMachineDef(def);
-                        if (s != null) return s;
-                    }
-                } catch (ReflectiveOperationException ignored) {}
+            if (isMachineDefinitionGetter(m)) {
+                ParallelStats s = tryExtractStatsFromMethod(block, m);
+                if (s != null) return s;
             }
         }
         return null;
+    }
+
+    private static boolean isMachineDefinitionGetter(Method m) {
+        return (m.getName().equalsIgnoreCase("getMachineDefinition") || m.getName().equalsIgnoreCase("getDefinition"))
+                && m.getParameterCount() == 0;
+    }
+
+    private static ParallelStats tryExtractStatsFromMethod(Block block, Method m) {
+        try {
+            Object def = m.invoke(block);
+            return def != null ? extractStatsFromMachineDef(def) : null;
+        } catch (ReflectiveOperationException ignored) {
+            return null;
+        }
     }
 
     public static ParallelStats getParallelStats(String identifier) {
@@ -162,23 +171,39 @@ public class ParallelHelper {
         if (machineDef == null) return null;
 
         Object dummyHolder = getOrCreateDummyHolderProxy();
-        if (dummyHolder != null) {
-            for (Method m : machineDef.getClass().getMethods()) {
-                if (m.getParameterCount() == 1 && (m.getName().equals("createMetaMachine") || m.getName().equals("createMachine"))) {
-                    try {
-                        Object machine = m.invoke(machineDef, dummyHolder);
-                        if (machine != null) {
-                            ParallelStats stats = extractStatsFromMachineInstance(machine);
-                            if (stats != null) return stats;
-                        }
-                    } catch (ReflectiveOperationException ignored) {}
-                }
-            }
+        ParallelStats dummyStats = tryExtractStatsViaDummyHolder(machineDef, dummyHolder);
+        if (dummyStats != null) {
+            return dummyStats;
         }
 
         int maxPar = extractInt(machineDef, "getCurrentParallel", "getMaxParallel", "getParallel", "getMaxParallelAmount");
         boolean isAbsolute = extractBoolean(machineDef, "isAbsolute", "isExact", "isFixedEnergy", "isPowerConstant");
         return maxPar > 0 ? new ParallelStats(maxPar, isAbsolute) : null;
+    }
+
+    private static ParallelStats tryExtractStatsViaDummyHolder(Object machineDef, Object dummyHolder) {
+        if (dummyHolder == null) return null;
+        for (Method m : machineDef.getClass().getMethods()) {
+            if (isCreateMachineMethod(m)) {
+                ParallelStats stats = tryCreateAndExtractStats(machineDef, dummyHolder, m);
+                if (stats != null) return stats;
+            }
+        }
+        return null;
+    }
+
+    private static boolean isCreateMachineMethod(Method m) {
+        return m.getParameterCount() == 1
+                && (m.getName().equals("createMetaMachine") || m.getName().equals("createMachine"));
+    }
+
+    private static ParallelStats tryCreateAndExtractStats(Object machineDef, Object dummyHolder, Method m) {
+        try {
+            Object machine = m.invoke(machineDef, dummyHolder);
+            return machine != null ? extractStatsFromMachineInstance(machine) : null;
+        } catch (ReflectiveOperationException ignored) {
+            return null;
+        }
     }
 
     public static ParallelStats extractStatsFromMachineInstance(Object machine) {
@@ -201,42 +226,66 @@ public class ParallelHelper {
         if (currentMaxPar > 0) return currentMaxPar;
         Class<?> curr = machine.getClass();
         while (curr != null && curr != Object.class) {
-            for (Field f : curr.getDeclaredFields()) {
-                String fName = f.getName().toLowerCase(Locale.ROOT);
-                if (fName.equals("maxparallel") || fName.equals("currentparallel") || fName.equals("parallel")) {
-                    try {
-                        f.setAccessible(true);
-                        Object v = f.get(machine);
-                        if (v instanceof Number n && n.intValue() > 0) {
-                            return n.intValue();
-                        }
-                    } catch (ReflectiveOperationException ignored) {}
-                }
-            }
+            int found = scanClassFieldsForParallel(machine, curr);
+            if (found > 0) return found;
             curr = curr.getSuperclass();
         }
         return currentMaxPar;
+    }
+
+    private static int scanClassFieldsForParallel(Object machine, Class<?> clazz) {
+        for (Field f : clazz.getDeclaredFields()) {
+            int parallel = tryReadParallelField(machine, f);
+            if (parallel > 0) return parallel;
+        }
+        return 0;
+    }
+
+    private static int tryReadParallelField(Object machine, Field f) {
+        String fName = f.getName().toLowerCase(Locale.ROOT);
+        if (!fName.equals("maxparallel") && !fName.equals("currentparallel") && !fName.equals("parallel")) {
+            return 0;
+        }
+        try {
+            f.setAccessible(true);
+            Object v = f.get(machine);
+            if (v instanceof Number n && n.intValue() > 0) {
+                return n.intValue();
+            }
+        } catch (ReflectiveOperationException ignored) {}
+        return 0;
     }
 
     private static boolean inspectInstanceFieldsForAbsolute(Object machine, boolean currentAbsolute) {
         if (currentAbsolute) return true;
         Class<?> curr = machine.getClass();
         while (curr != null && curr != Object.class) {
-            for (Field f : curr.getDeclaredFields()) {
-                String fName = f.getName().toLowerCase(Locale.ROOT);
-                if (fName.equals("isabsolute") || fName.equals("isfixedenergy") || fName.equals("powerconstant") || fName.equals("energyfree")) {
-                    try {
-                        f.setAccessible(true);
-                        Object v = f.get(machine);
-                        if (v instanceof Boolean b && b) {
-                            return true;
-                        }
-                    } catch (ReflectiveOperationException ignored) {}
-                }
-            }
+            if (scanClassFieldsForAbsolute(machine, curr)) return true;
             curr = curr.getSuperclass();
         }
         return currentAbsolute;
+    }
+
+    private static boolean scanClassFieldsForAbsolute(Object machine, Class<?> clazz) {
+        for (Field f : clazz.getDeclaredFields()) {
+            if (tryReadAbsoluteField(machine, f)) return true;
+        }
+        return false;
+    }
+
+    private static boolean tryReadAbsoluteField(Object machine, Field f) {
+        String fName = f.getName().toLowerCase(Locale.ROOT);
+        if (!fName.equals("isabsolute") && !fName.equals("isfixedenergy") && !fName.equals("powerconstant") && !fName.equals("energyfree")) {
+            return false;
+        }
+        try {
+            f.setAccessible(true);
+            Object v = f.get(machine);
+            if (v instanceof Boolean b && b) {
+                return true;
+            }
+        } catch (ReflectiveOperationException ignored) {}
+        return false;
     }
 
     private static boolean checkRecipeModifierOverride(Object machine) {

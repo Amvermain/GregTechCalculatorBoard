@@ -252,4 +252,22 @@ public interface BoardCommand {
             super(frameId, previousFolded, newFolded);
         }
     }
+
+    class SetFrameViewModeCommand extends com.gtceu.calcboard.api.history.command.SetFrameViewModeCommand {
+        public SetFrameViewModeCommand(String frameId, com.gtceu.calcboard.api.model.PoolViewMode previousMode, com.gtceu.calcboard.api.model.PoolViewMode newMode) {
+            super(frameId, previousMode, newMode);
+        }
+    }
+
+    class AddRecipeToSharedFrameCommand extends com.gtceu.calcboard.api.history.command.AddRecipeToSharedFrameCommand {
+        public AddRecipeToSharedFrameCommand(String frameId, RecipeNode node, double assignedMachineCount, String description) {
+            super(frameId, node, assignedMachineCount, description);
+        }
+    }
+
+    class RemoveRecipeFromSharedFrameCommand extends com.gtceu.calcboard.api.history.command.RemoveRecipeFromSharedFrameCommand {
+        public RemoveRecipeFromSharedFrameCommand(String frameId, RecipeNode node, List<FlowGraph.ConnectionEdge> edges, String description) {
+            super(frameId, node, edges, description);
+        }
+    }
 }

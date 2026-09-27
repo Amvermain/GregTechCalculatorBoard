@@ -12,11 +12,38 @@
 
 ## [Unreleased]
 
+## [2.4.0-beta.2] - 2026-09-27
+
 ### Added
+- Multi-selected machines now dynamically scope the Process Summary panel: selecting a group of machines dynamically filters the summary to show Average and Peak consumption, machine counts, and net raw materials specifically for the selection (and seamlessly returns to the full board summary when cleared), making branch cable sizing and sub-group power planning effortless.
+- Added cross-page junction flow allocation: players can now link a junction on one page directly to an upstream junction on another page or export flows to remote pages with priority rules and flow caps. The Calculator Board automatically synchronizes inter-page resource supplies in real-time, displays link status and starvation indicators on junction cards, and allows 1-click jumping to the source page by clicking the linked badge.
+- Added Peak Power readout in the Process Summary panel alongside Average Power: players can now clearly see both average throughput consumption (for fuel balance) and peak electrical load (for cable thickness and transformer sizing) simultaneously, preventing in-game wire burnouts caused by recipe bursts.
+- Added contextual auto-connect for selected nodes: when multiple machines are selected, clicking the new '↔ Connect' button on the floating toolbar or pressing Shift+C automatically connects matching input/output ports only between the selected machines, preventing unwanted wiring to unrelated parts of large setups.
+- Added a machine-centric embedded recipe panel for shared machine pools, allowing players to manage multiple time-shared recipes cleanly inside a single panel as vertical sub-cards and add recipes inline via an [+ Add Recipe] button. Supports seamless 3-tier view transitions between folded cards, embedded panels, and expanded frames, with direct wire routing to individual recipe pins.
+- For recipes requiring a Programmed Circuit (such as GregTech chemical reactors), the configured circuit number is now clearly displayed as an icon next to the machine count buttons, with a tooltip indicating the required circuit configuration for in-game machine setup.
 
 ### Improved
+- Cross-page sync junctions now automatically deduce and propagate their inter-page supply priority from outgoing wire priorities, ensuring high-priority downstream machines receive their required resource allocation first from upstream producer junctions.
+- Linked consumer junctions now visualize the upstream source junction's total production, current usage, and available surplus in tooltips and supply dialogs, and starvation badges now display exact decimal flow rates.
+- The Local Web Dashboard now visualizes cross-page linked junctions with color-coded status badges, upstream source metrics (production, usage, available surplus) in tooltips, and 1-click jumping to the source page upon clicking the badge.
+- Eliminated redundant recipe re-indexing and catalog clearing when switching between singleplayer worlds and multiplayer servers, reducing memory allocation spikes (GC pressure) during world transitions while keeping the Calculator Board instantly responsive.
+- Overhauled the side Inspector Panel to adapt to each node type: selecting a multiblock electric machine now provides a dedicated 'Energy Hatch' section displaying current hatch status and allowing 1-click installation or hot-swapping of default energy hatches directly from the voltage tier grid. This immediately resolves missing energy hatch warnings and updates overclocking and power consumption without opening the hardware dialog, while steam machines, boilers, and subpage modules now display streamlined controls tailored to their specific type.
+- When opening the Calculator Board from an inventory, AE2 terminal, or other container screens, closing the board or pressing the open board hotkey again now returns directly to the previous screen.
 
 ### Fixed
+- Fixed an issue in the AE2 Crafting Confirm screen where clicking the bottleneck button for an item not linked to the Calculator Board reopened an unrelated previously viewed page, and disabled the link arrow and click interaction when no linked page exists. Also improved auto-detection to link existing board pages that produce the requested item.
+- Fixed an issue where reopening the Calculator Board or reconnecting to a world caused cross-page sync junctions to lose their linked resource item/fluid and reset to an empty arrow icon.
+- Fixed an issue where adding recipes from the shared machine pool embedded panel used the machine ID instead of the recipe category for search prefill, causing no recipes to be displayed.
+- Fixed an issue where remote consumer junctions did not register as downstream demand or consumption on the upstream producer page, causing the producer page summary and upstream ports to show no resource consumption.
+- Fixed an issue in the Junction Supply Dialog where the source page and source junction selection labels overlapped with the arrow buttons, and the selected source junction's real-time flow status was not properly displayed.
+- Fixed a major frame drop (render lag) caused by redundant port calculations when viewing shared machine pools in folded card mode with many connecting wires.
+- Fixed an issue where switching between multiblock machines supporting different traits (such as Electric Ore Factory and Super Electric Ore Factory) or removing trait addons caused the machine's base parallel capacity to become corrupted and double-multiplied, resulting in abnormally inflated production rates.
+- Fixed an issue where typing inside EMI or external recipe viewer search bars could accidentally trigger the Calculator Board hotkey.
+- Fixed an issue where switching a Dynamo to Boiler mode and cycling through alternative fluids caused duplicate output ports to accumulate when reopening the board.
+- Fixed an issue where singleblock electric machines with a steam multiblock equivalent (such as Forge Hammer) incorrectly displayed an "HP Steam" tier badge.
+- Fixed an issue where Steam multiblock machines incorrectly requested an LV Energy Hatch instead of a Steam Input Hatch in the Multiblock BOM (Bill of Materials) list.
+- Fixed an issue where switching a multiblock machine with specialized traits (such as combustion engines or throughput boosting machines) to a singleblock machine could leave traits unpurged or result in incorrect power calculations.
+- Fixed an issue where clicking the machine count adjustment buttons ([+], [/2], [x2]) in the side Inspector Panel triggered the wrong count changes.
 
 ## [2.4.0-beta.1] - 2026-09-20
 

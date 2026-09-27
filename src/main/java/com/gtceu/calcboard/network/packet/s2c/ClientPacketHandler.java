@@ -134,7 +134,7 @@ public class ClientPacketHandler {
     public static void handleOpenBoard(S2COpenBoardPacket packet) {
         com.gtceu.calcboard.client.storage.ClientPreferenceManager.getInstance().markWelcomeMessageSeen();
         Minecraft mc = Minecraft.getInstance();
-        mc.tell(() -> mc.setScreen(new BoardScreen()));
+        mc.tell(() -> BoardScreen.openScreen(mc.screen));
     }
 
     public static void handleAe2CraftingEta(S2CAe2CraftingEtaPacket packet) {

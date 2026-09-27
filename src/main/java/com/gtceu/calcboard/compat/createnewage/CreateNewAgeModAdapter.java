@@ -160,42 +160,72 @@ public class CreateNewAgeModAdapter implements IModAdapter {
     public void handleInstallAddon(RecipeNode node, MachineAddon addon, boolean shiftClick) {
         if (node == null || addon == null) return;
         if (addon.getCategory().equals(AddonCategory.MAGNET)) {
-            int targetCount = (int) node.getAddons().stream().filter(a -> a.getId().equals(addon.getId())).count();
-            long totalMagnets = node.getAddons().stream().filter(a -> a.getCategory().equals(AddonCategory.MAGNET)).count();
-
-            if (shiftClick) {
-                int toAdd = (int) (12 - totalMagnets);
-                if (toAdd > 0) {
-                    for (int k = 0; k < toAdd; k++) {
-                        node.addAddon(addon.copy());
-                    }
-                } else if (targetCount < 12) {
-                    node.getAddons().removeIf(a -> a.getCategory().equals(AddonCategory.MAGNET) || a.getMagneticForce() > 0);
-                    for (int k = 0; k < 12; k++) {
-                        node.addAddon(addon.copy());
-                    }
-                } else {
-                    node.getAddons().removeIf(a -> a.getId().equals(addon.getId()));
-                }
-            } else {
-                if (totalMagnets < 12) {
-                    node.addAddon(addon.copy());
-                } else if (targetCount < 12) {
-                    for (MachineAddon existing : new java.util.ArrayList<>(node.getAddons())) {
-                        if ((existing.getCategory().equals(AddonCategory.MAGNET) || existing.getMagneticForce() > 0) && !existing.getId().equals(addon.getId())) {
-                            node.removeSingleAddon(existing.getId());
-                            node.addAddon(addon.copy());
-                            break;
-                        }
-                    }
-                } else {
-                    node.removeSingleAddon(addon.getId());
-                }
-            }
+            handleInstallMagnetAddon(node, addon, shiftClick);
         } else {
             node.addAddon(addon.copy());
         }
         syncGeneratorCoilInput(node);
+    }
+
+    private void handleInstallMagnetAddon(RecipeNode node, MachineAddon addon, boolean shiftClick) {
+        if (shiftClick) {
+            handleShiftClickMagnet(node, addon);
+        } else {
+            handleRegularClickMagnet(node, addon);
+        }
+    }
+
+    private void handleShiftClickMagnet(RecipeNode node, MachineAddon addon) {
+        int targetCount = (int) node.getAddons().stream().filter(a -> a.getId().equals(addon.getId())).count();
+        long totalMagnets = node.getAddons().stream().filter(a -> a.getCategory().equals(AddonCategory.MAGNET)).count();
+        int toAdd = (int) (12 - totalMagnets);
+
+        if (toAdd > 0) {
+            addMultipleAddons(node, addon, toAdd);
+            return;
+        }
+        if (targetCount < 12) {
+            node.getAddons().removeIf(a -> a.getCategory().equals(AddonCategory.MAGNET) || a.getMagneticForce() > 0);
+            addMultipleAddons(node, addon, 12);
+            return;
+        }
+        node.getAddons().removeIf(a -> a.getId().equals(addon.getId()));
+    }
+
+    private void handleRegularClickMagnet(RecipeNode node, MachineAddon addon) {
+        int targetCount = (int) node.getAddons().stream().filter(a -> a.getId().equals(addon.getId())).count();
+        long totalMagnets = node.getAddons().stream().filter(a -> a.getCategory().equals(AddonCategory.MAGNET)).count();
+
+        if (totalMagnets < 12) {
+            node.addAddon(addon.copy());
+            return;
+        }
+        if (targetCount < 12) {
+            replaceFirstDifferentMagnet(node, addon);
+            return;
+        }
+        node.removeSingleAddon(addon.getId());
+    }
+
+    private void addMultipleAddons(RecipeNode node, MachineAddon addon, int count) {
+        for (int k = 0; k < count; k++) {
+            node.addAddon(addon.copy());
+        }
+    }
+
+    private void replaceFirstDifferentMagnet(RecipeNode node, MachineAddon addon) {
+        for (MachineAddon existing : new java.util.ArrayList<>(node.getAddons())) {
+            if (isDifferentMagnet(existing, addon)) {
+                node.removeSingleAddon(existing.getId());
+                node.addAddon(addon.copy());
+                break;
+            }
+        }
+    }
+
+    private boolean isDifferentMagnet(MachineAddon existing, MachineAddon addon) {
+        boolean isMagnet = existing.getCategory().equals(AddonCategory.MAGNET) || existing.getMagneticForce() > 0;
+        return isMagnet && !existing.getId().equals(addon.getId());
     }
 
     @Override

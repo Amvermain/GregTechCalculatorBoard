@@ -30,6 +30,11 @@ public final class NodeProperties {
             NodePropertyKey.ofBoolean("is_generic_unsupported", false)
     );
 
+    // Programmed Circuit Configuration
+    public static final NodePropertyKey<Integer> CIRCUIT_NUMBER = register(
+            NodePropertyKey.ofInt("circuit_number", -1)
+    );
+
     // Steam Mode Property (RFC-037)
     public static final NodePropertyKey<com.gtceu.calcboard.api.type.SteamMode> STEAM_MODE = register(
             NodePropertyKey.ofEnum("steam_mode", com.gtceu.calcboard.api.type.SteamMode.class, com.gtceu.calcboard.api.type.SteamMode.NONE)

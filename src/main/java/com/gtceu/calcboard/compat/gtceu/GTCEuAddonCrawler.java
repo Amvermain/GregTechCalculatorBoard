@@ -18,10 +18,12 @@ import net.minecraftforge.registries.ForgeRegistries;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Handles dynamic discovery of GregTech CEu Modern coils, turbine rotors,
@@ -78,20 +80,10 @@ public class GTCEuAddonCrawler {
             }
         }
 
-        // 4. Registry crawl for GT & Addon hatches, coils, reflectors, rotors
         if (ForgeRegistries.ITEMS != null) {
             Map<Item, ItemStack> nbtItemSamples = new HashMap<>();
             java.util.Set<Item> activeRecipeItems = new java.util.HashSet<>();
-            if (recipeOutputStacks != null) {
-                for (ItemStack s : recipeOutputStacks) {
-                    if (s != null && !s.isEmpty()) {
-                        activeRecipeItems.add(s.getItem());
-                        if (s.hasTag()) {
-                            nbtItemSamples.put(s.getItem(), s);
-                        }
-                    }
-                }
-            }
+            collectRecipeOutputSamples(recipeOutputStacks, activeRecipeItems, nbtItemSamples);
 
             for (Item item : ForgeRegistries.ITEMS) {
                 ResourceLocation id = ForgeRegistries.ITEMS.getKey(item);
@@ -143,13 +135,28 @@ public class GTCEuAddonCrawler {
                 }
 
                 if (isMaintenanceHatchItem(item, id)) {
-                    List<MachineAddon> mAddons = parseMaintenanceHatches(stack, id);
-                    for (MachineAddon addon : mAddons) {
-                        if (addon != null && seenIds.add(addon.getId())) {
-                            collector.add(addon);
-                        }
-                    }
+                    collectMaintenanceHatches(stack, id, seenIds, collector);
                 }
+            }
+        }
+    }
+
+    private static void collectRecipeOutputSamples(Collection<ItemStack> recipeOutputStacks, Set<Item> activeRecipeItems, Map<Item, ItemStack> nbtItemSamples) {
+        if (recipeOutputStacks == null) return;
+        for (ItemStack s : recipeOutputStacks) {
+            if (s == null || s.isEmpty()) continue;
+            activeRecipeItems.add(s.getItem());
+            if (s.hasTag()) {
+                nbtItemSamples.put(s.getItem(), s);
+            }
+        }
+    }
+
+    private static void collectMaintenanceHatches(ItemStack stack, ResourceLocation id, Set<String> seenIds, List<MachineAddon> collector) {
+        List<MachineAddon> mAddons = parseMaintenanceHatches(stack, id);
+        for (MachineAddon addon : mAddons) {
+            if (addon != null && seenIds.add(addon.getId())) {
+                collector.add(addon);
             }
         }
     }

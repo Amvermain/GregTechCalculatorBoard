@@ -47,6 +47,8 @@ public class NodeLayoutBounds {
     private final RectBounds configBtnBounds;
     private final RectBounds addonTrayBounds;
     private final RectBounds moduleBadgeBounds;
+    private final RectBounds circuitIconBounds;
+    private final RectBounds linkedBadgeBounds;
     private final int separatorY;
     private final int contentStartY;
     private final int autoHeight;
@@ -87,6 +89,140 @@ public class NodeLayoutBounds {
             RectBounds hiddenPortsBadgeBounds,
             RectBounds targetBatchBadgeBounds
     ) {
+        this(
+                cardBounds,
+                headerBounds,
+                machineIconBounds,
+                nameBounds,
+                countMinusBtnBounds,
+                countBoxBounds,
+                countPlusBtnBounds,
+                countHalfBtnBounds,
+                countDoubleBtnBounds,
+                switchBtnBounds,
+                expandBtnBounds,
+                flipBtnBounds,
+                targetBtnBounds,
+                closeBtnBounds,
+                resizeHandleBounds,
+                hasRow2Controls,
+                tierBtnBounds,
+                secondaryBtnBounds,
+                configBtnBounds,
+                addonTrayBounds,
+                moduleBadgeBounds,
+                RectBounds.EMPTY,
+                separatorY,
+                contentStartY,
+                autoHeight,
+                cardHeight,
+                inputPorts,
+                outputPorts,
+                hiddenPortsBadgeBounds,
+                targetBatchBadgeBounds
+        );
+    }
+
+    public NodeLayoutBounds(
+            RectBounds cardBounds,
+            RectBounds headerBounds,
+            RectBounds machineIconBounds,
+            RectBounds nameBounds,
+            RectBounds countMinusBtnBounds,
+            RectBounds countBoxBounds,
+            RectBounds countPlusBtnBounds,
+            RectBounds countHalfBtnBounds,
+            RectBounds countDoubleBtnBounds,
+            RectBounds switchBtnBounds,
+            RectBounds expandBtnBounds,
+            RectBounds flipBtnBounds,
+            RectBounds targetBtnBounds,
+            RectBounds closeBtnBounds,
+            RectBounds resizeHandleBounds,
+            boolean hasRow2Controls,
+            RectBounds tierBtnBounds,
+            RectBounds secondaryBtnBounds,
+            RectBounds configBtnBounds,
+            RectBounds addonTrayBounds,
+            RectBounds moduleBadgeBounds,
+            RectBounds circuitIconBounds,
+            int separatorY,
+            int contentStartY,
+            int autoHeight,
+            int cardHeight,
+            List<PortBounds> inputPorts,
+            List<PortBounds> outputPorts,
+            RectBounds hiddenPortsBadgeBounds,
+            RectBounds targetBatchBadgeBounds
+    ) {
+        this(
+                cardBounds,
+                headerBounds,
+                machineIconBounds,
+                nameBounds,
+                countMinusBtnBounds,
+                countBoxBounds,
+                countPlusBtnBounds,
+                countHalfBtnBounds,
+                countDoubleBtnBounds,
+                switchBtnBounds,
+                expandBtnBounds,
+                flipBtnBounds,
+                targetBtnBounds,
+                closeBtnBounds,
+                resizeHandleBounds,
+                hasRow2Controls,
+                tierBtnBounds,
+                secondaryBtnBounds,
+                configBtnBounds,
+                addonTrayBounds,
+                moduleBadgeBounds,
+                circuitIconBounds,
+                RectBounds.EMPTY,
+                separatorY,
+                contentStartY,
+                autoHeight,
+                cardHeight,
+                inputPorts,
+                outputPorts,
+                hiddenPortsBadgeBounds,
+                targetBatchBadgeBounds
+        );
+    }
+
+    public NodeLayoutBounds(
+            RectBounds cardBounds,
+            RectBounds headerBounds,
+            RectBounds machineIconBounds,
+            RectBounds nameBounds,
+            RectBounds countMinusBtnBounds,
+            RectBounds countBoxBounds,
+            RectBounds countPlusBtnBounds,
+            RectBounds countHalfBtnBounds,
+            RectBounds countDoubleBtnBounds,
+            RectBounds switchBtnBounds,
+            RectBounds expandBtnBounds,
+            RectBounds flipBtnBounds,
+            RectBounds targetBtnBounds,
+            RectBounds closeBtnBounds,
+            RectBounds resizeHandleBounds,
+            boolean hasRow2Controls,
+            RectBounds tierBtnBounds,
+            RectBounds secondaryBtnBounds,
+            RectBounds configBtnBounds,
+            RectBounds addonTrayBounds,
+            RectBounds moduleBadgeBounds,
+            RectBounds circuitIconBounds,
+            RectBounds linkedBadgeBounds,
+            int separatorY,
+            int contentStartY,
+            int autoHeight,
+            int cardHeight,
+            List<PortBounds> inputPorts,
+            List<PortBounds> outputPorts,
+            RectBounds hiddenPortsBadgeBounds,
+            RectBounds targetBatchBadgeBounds
+    ) {
         this.cardBounds = cardBounds;
         this.headerBounds = headerBounds;
         this.machineIconBounds = machineIconBounds;
@@ -108,6 +244,8 @@ public class NodeLayoutBounds {
         this.configBtnBounds = configBtnBounds;
         this.addonTrayBounds = addonTrayBounds;
         this.moduleBadgeBounds = moduleBadgeBounds;
+        this.circuitIconBounds = circuitIconBounds != null ? circuitIconBounds : RectBounds.EMPTY;
+        this.linkedBadgeBounds = linkedBadgeBounds != null ? linkedBadgeBounds : RectBounds.EMPTY;
         this.separatorY = separatorY;
         this.contentStartY = contentStartY;
         this.autoHeight = autoHeight;
@@ -127,6 +265,8 @@ public class NodeLayoutBounds {
     public RectBounds getCountPlusBtnBounds() { return countPlusBtnBounds; }
     public RectBounds getCountHalfBtnBounds() { return countHalfBtnBounds; }
     public RectBounds getCountDoubleBtnBounds() { return countDoubleBtnBounds; }
+    public RectBounds getCircuitIconBounds() { return circuitIconBounds; }
+    public RectBounds getLinkedBadgeBounds() { return linkedBadgeBounds; }
     public RectBounds getSwitchBtnBounds() { return switchBtnBounds; }
     public RectBounds getExpandBtnBounds() { return expandBtnBounds; }
     public RectBounds getFlipBtnBounds() { return flipBtnBounds; }
@@ -153,6 +293,9 @@ public class NodeLayoutBounds {
             return true;
         }
         if (findHoveredInputPort(mouseX, mouseY) != null || findHoveredOutputPort(mouseX, mouseY) != null) {
+            return true;
+        }
+        if (linkedBadgeBounds.contains(mouseX, mouseY)) {
             return true;
         }
         return targetBatchBadgeBounds.contains(mouseX, mouseY);
@@ -275,5 +418,13 @@ public class NodeLayoutBounds {
 
     public boolean isModuleBadgeHovered(double mouseX, double mouseY) {
         return moduleBadgeBounds.contains(mouseX, mouseY);
+    }
+
+    public boolean isCircuitIconHovered(double mouseX, double mouseY) {
+        return circuitIconBounds.contains(mouseX, mouseY);
+    }
+
+    public boolean isLinkedBadgeHovered(double mouseX, double mouseY) {
+        return linkedBadgeBounds.contains(mouseX, mouseY);
     }
 }

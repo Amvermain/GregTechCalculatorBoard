@@ -86,21 +86,26 @@ public class MachineSelectorDialog implements IBoardModal {
         int x = (parent.width - DIALOG_WIDTH) / 2;
         int y = (parent.height - DIALOG_HEIGHT) / 2;
 
-        this.searchBox = new EditBox(
-                Minecraft.getInstance().font,
-                x + DIALOG_WIDTH - 170,
-                y + 8,
-                140,
-                14,
-                Component.literal("Search...")
-        );
-        this.searchBox.setMaxLength(30);
-        this.searchBox.setValue("");
-        this.searchBox.setResponder(text -> {
-            this.searchQuery = text.trim().toLowerCase(Locale.ROOT);
-            this.scrollY = 0.0;
-            updateFilteredList();
-        });
+        Minecraft mc = Minecraft.getInstance();
+        if (mc != null && mc.font != null) {
+            this.searchBox = new EditBox(
+                    mc.font,
+                    x + DIALOG_WIDTH - 170,
+                    y + 8,
+                    140,
+                    14,
+                    Component.literal("Search...")
+            );
+            this.searchBox.setMaxLength(30);
+            this.searchBox.setValue("");
+            this.searchBox.setResponder(text -> {
+                this.searchQuery = text.trim().toLowerCase(Locale.ROOT);
+                this.scrollY = 0.0;
+                updateFilteredList();
+            });
+        } else {
+            this.searchBox = null;
+        }
 
         populateEntries();
         updateFilteredList();
@@ -263,7 +268,9 @@ public class MachineSelectorDialog implements IBoardModal {
     public void render(GuiGraphics graphics, int screenWidth, int screenHeight, int mouseX, int mouseY) {
         if (!visible || node == null) return;
 
-        Font font = Minecraft.getInstance().font;
+        Minecraft mc = Minecraft.getInstance();
+        if (mc == null || mc.font == null) return;
+        Font font = mc.font;
         int x = (screenWidth - DIALOG_WIDTH) / 2;
         int y = (screenHeight - DIALOG_HEIGHT) / 2;
 
@@ -500,9 +507,12 @@ public class MachineSelectorDialog implements IBoardModal {
         int closeBtnY = y + 8;
         if (mouseX >= closeBtnX && mouseX <= closeBtnX + 12 && mouseY >= closeBtnY && mouseY <= closeBtnY + 12) {
             close();
-            Minecraft.getInstance().getSoundManager().play(
-                    net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 0.9F)
-            );
+            Minecraft mc = Minecraft.getInstance();
+            if (mc != null && mc.getSoundManager() != null) {
+                mc.getSoundManager().play(
+                        net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 0.9F)
+                );
+            }
             return true;
         }
 

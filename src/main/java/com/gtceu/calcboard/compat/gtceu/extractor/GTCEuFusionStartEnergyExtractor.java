@@ -96,40 +96,57 @@ public class GTCEuFusionStartEnergyExtractor implements IRecipePropertyExtractor
     }
 
     private long extractEuFromReflection(Object backingRecipe) {
-        try {
-            Method mConds = backingRecipe.getClass().getMethod("conditions");
-            Object conds = mConds.invoke(backingRecipe);
-            if (conds instanceof List<?> condList) {
-                for (Object c : condList) {
-                    if (c == null) continue;
-                    String cName = c.getClass().getName();
-                    if (cName.contains("Fusion") || cName.contains("Reflector")) {
-                        long val = readNumericMember(c, "getEuToStart", "euToStart");
-                        if (val > 0) return val;
-                    }
-                }
-            }
-        } catch (Throwable ignored) {}
+        List<?> condList = getRecipeConditions(backingRecipe);
+        if (condList == null) return 0L;
+
+        for (Object c : condList) {
+            long val = tryExtractEuFromCondition(c);
+            if (val > 0) return val;
+        }
         return 0L;
     }
 
     private int extractReflectorFromReflection(Object backingRecipe) {
+        List<?> condList = getRecipeConditions(backingRecipe);
+        if (condList == null) return 0;
+
+        for (Object c : condList) {
+            int val = tryExtractReflectorFromCondition(c);
+            if (val > 0) return val;
+        }
+        return 0;
+    }
+
+    private List<?> getRecipeConditions(Object backingRecipe) {
+        if (backingRecipe == null) return null;
         try {
             Method mConds = backingRecipe.getClass().getMethod("conditions");
             Object conds = mConds.invoke(backingRecipe);
             if (conds instanceof List<?> condList) {
-                for (Object c : condList) {
-                    if (c == null) continue;
-                    String cName = c.getClass().getName();
-                    if (cName.contains("Reflector") || cName.contains("Fusion")) {
-                        long val = readNumericMember(c, "getReflectorTier", "reflectorTier");
-                        if (val <= 0) val = readNumericMember(c, "getMinReflectorTier", "minReflectorTier");
-                        if (val > 0) return (int) val;
-                    }
-                }
+                return condList;
             }
         } catch (Throwable ignored) {}
-        return 0;
+        return null;
+    }
+
+    private long tryExtractEuFromCondition(Object c) {
+        if (c == null) return 0L;
+        String cName = c.getClass().getName();
+        if (!cName.contains("Fusion") && !cName.contains("Reflector")) return 0L;
+
+        return readNumericMember(c, "getEuToStart", "euToStart");
+    }
+
+    private int tryExtractReflectorFromCondition(Object c) {
+        if (c == null) return 0;
+        String cName = c.getClass().getName();
+        if (!cName.contains("Reflector") && !cName.contains("Fusion")) return 0;
+
+        long val = readNumericMember(c, "getReflectorTier", "reflectorTier");
+        if (val <= 0) {
+            val = readNumericMember(c, "getMinReflectorTier", "minReflectorTier");
+        }
+        return val > 0 ? (int) val : 0;
     }
 
     private long readNumericMember(Object target, String methodName, String fieldName) {

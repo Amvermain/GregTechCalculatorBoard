@@ -61,7 +61,6 @@ public final class CreateSequencedRecipeExtractor {
                 return null;
             }
 
-            // Extract initial ingredient (base item for sequence)
             Ingredient baseIngredient = null;
             try {
                 Method getIngredientMethod = seqClass.getMethod("getIngredient");
@@ -71,7 +70,6 @@ public final class CreateSequencedRecipeExtractor {
                 }
             } catch (Throwable ignored) {}
 
-            // Extract final result
             List<IngredientStack> finalOutputs = new ArrayList<>();
             try {
                 Method getResultMethod = seqClass.getMethod("getResultItem");
@@ -84,7 +82,6 @@ public final class CreateSequencedRecipeExtractor {
             } catch (Throwable ignored) {
                 try {
                     Method getResultMethod = seqClass.getMethod("getResultItem", net.minecraft.core.RegistryAccess.class);
-                    // Fallback reflection if registry access parameter required
                 } catch (Throwable ignored2) {}
             }
 
@@ -110,7 +107,6 @@ public final class CreateSequencedRecipeExtractor {
                     List<IngredientStack> stepInputs = new ArrayList<>();
                     List<IngredientStack> stepOutputs = new ArrayList<>();
 
-                    // For the very first step of loop 0, include the base ingredient
                     if (globalStepNumber == 1 && baseIngredient != null && baseIngredient.getItems().length > 0) {
                         ItemStack firstStack = baseIngredient.getItems()[0];
                         ResourceLocation itemId = ForgeRegistries.ITEMS.getKey(firstStack.getItem());
@@ -118,10 +114,9 @@ public final class CreateSequencedRecipeExtractor {
                         stepInputs.add(IngredientStack.item(itemId, name, firstStack.getCount() > 0 ? firstStack.getCount() : 1));
                     }
 
-                    // Extract additional step inputs (e.g. secondary item from deployer, fluid from spout)
                     extractSubRecipeInputs(subRecipe, stepInputs);
 
-                    int stepDuration = 20; // Default 1 second
+                    int stepDuration = 20;
                     try {
                         Method durMethod = subRecipe.getClass().getMethod("getProcessingDuration");
                         Object durObj = durMethod.invoke(subRecipe);
@@ -137,7 +132,6 @@ public final class CreateSequencedRecipeExtractor {
                         stepTitle += " (Loop " + (loop + 1) + "/" + loops + ")";
                     }
 
-                    // If this is the absolute last step, attach final outputs
                     boolean isLastStep = (loop == loops - 1) && (stepObj == rawSteps.get(rawSteps.size() - 1));
                     if (isLastStep) {
                         stepOutputs.addAll(finalOutputs);
@@ -178,53 +172,76 @@ public final class CreateSequencedRecipeExtractor {
 
     private static void extractSubRecipeInputs(Object subRecipe, List<IngredientStack> collector) {
         if (subRecipe == null || collector == null) return;
+        extractItemIngredients(subRecipe, collector);
+        extractFluidIngredients(subRecipe, collector);
+    }
+
+    private static void extractItemIngredients(Object subRecipe, List<IngredientStack> collector) {
         try {
-            // Check Ingredients
             Method getIngredientsMethod = subRecipe.getClass().getMethod("getIngredients");
             Object ingListObj = getIngredientsMethod.invoke(subRecipe);
             if (ingListObj instanceof List<?> ingList) {
-                // In Sequenced Recipes, the first ingredient is usually the transition item placeholder,
-                // so secondary ingredients start from index 1.
                 for (int i = 1; i < ingList.size(); i++) {
-                    Object itemIng = ingList.get(i);
-                    if (itemIng instanceof Ingredient ing && ing.getItems().length > 0) {
-                        ItemStack st = ing.getItems()[0];
-                        if (!st.isEmpty()) {
-                            ResourceLocation id = ForgeRegistries.ITEMS.getKey(st.getItem());
-                            collector.add(IngredientStack.item(id, st.getHoverName().getString(), st.getCount() > 0 ? st.getCount() : 1));
-                        }
-                    }
+                    collectItemIngredient(ingList.get(i), collector);
                 }
             }
         } catch (Throwable ignored) {}
+    }
 
+    private static void collectItemIngredient(Object itemIng, List<IngredientStack> collector) {
+        if (!(itemIng instanceof Ingredient ing) || ing.getItems().length == 0) return;
+        ItemStack st = ing.getItems()[0];
+        if (st.isEmpty()) return;
+        ResourceLocation id = ForgeRegistries.ITEMS.getKey(st.getItem());
+        collector.add(IngredientStack.item(id, st.getHoverName().getString(), st.getCount() > 0 ? st.getCount() : 1));
+    }
+
+    private static void extractFluidIngredients(Object subRecipe, List<IngredientStack> collector) {
         try {
-            // Check FluidIngredients
             Method getFluidIngredientsMethod = subRecipe.getClass().getMethod("getFluidIngredients");
             Object fluidListObj = getFluidIngredientsMethod.invoke(subRecipe);
             if (fluidListObj instanceof List<?> fluidList) {
                 for (Object fIng : fluidList) {
-                    if (fIng == null) continue;
-                    try {
-                        Method getRequiredAmount = fIng.getClass().getMethod("getRequiredAmount");
-                        Object amtObj = getRequiredAmount.invoke(fIng);
-                        long amount = (amtObj instanceof Number n) ? n.longValue() : 1000L;
-
-                        Method getMatchingFluids = fIng.getClass().getMethod("getMatchingFluidStacks");
-                        Object mFluids = getMatchingFluids.invoke(fIng);
-                        if (mFluids instanceof List<?> fStacks && !fStacks.isEmpty()) {
-                            Object fStack = fStacks.get(0);
-                            Method getFluidMethod = fStack.getClass().getMethod("getFluid");
-                            Object fluidObj = getFluidMethod.invoke(fStack);
-                            if (fluidObj instanceof net.minecraft.world.level.material.Fluid fluid) {
-                                ResourceLocation fluidId = ForgeRegistries.FLUIDS.getKey(fluid);
-                                collector.add(IngredientStack.fluid(fluidId, fluidId != null ? fluidId.getPath() : "Fluid", amount));
-                            }
-                        }
-                    } catch (Throwable ignored) {}
+                    collectFluidIngredient(fIng, collector);
                 }
             }
         } catch (Throwable ignored) {}
+    }
+
+    private static void collectFluidIngredient(Object fIng, List<IngredientStack> collector) {
+        if (fIng == null) return;
+        try {
+            long amount = readFluidAmount(fIng);
+            ResourceLocation fluidId = extractFluidId(fIng);
+            if (fluidId != null) {
+                collector.add(IngredientStack.fluid(fluidId, fluidId.getPath(), amount));
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    private static long readFluidAmount(Object fIng) {
+        try {
+            Method getRequiredAmount = fIng.getClass().getMethod("getRequiredAmount");
+            Object amtObj = getRequiredAmount.invoke(fIng);
+            return (amtObj instanceof Number n) ? n.longValue() : 1000L;
+        } catch (Throwable ignored) {
+            return 1000L;
+        }
+    }
+
+    private static ResourceLocation extractFluidId(Object fIng) {
+        try {
+            Method getMatchingFluids = fIng.getClass().getMethod("getMatchingFluidStacks");
+            Object mFluids = getMatchingFluids.invoke(fIng);
+            if (!(mFluids instanceof List<?> fStacks) || fStacks.isEmpty()) return null;
+            Object fStack = fStacks.get(0);
+            Method getFluidMethod = fStack.getClass().getMethod("getFluid");
+            Object fluidObj = getFluidMethod.invoke(fStack);
+            if (fluidObj instanceof net.minecraft.world.level.material.Fluid fluid) {
+                return ForgeRegistries.FLUIDS.getKey(fluid);
+            }
+        } catch (Throwable ignored) {}
+        return null;
     }
 
     private static final Map<ResourceLocation, ResourceLocation> SEQUENCED_STEP_MACHINES = Map.of(

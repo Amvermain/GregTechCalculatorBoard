@@ -55,18 +55,7 @@ public class NodeClipboard {
         }
 
         List<RecipeNode> selectedNodes = new ArrayList<>();
-        Set<String> effectiveNodeIds = new HashSet<>();
-        if (selectedNodeIds != null) {
-            effectiveNodeIds.addAll(selectedNodeIds);
-            for (RecipeNode n : graph.getNodes()) {
-                if (selectedNodeIds.contains(n.getId()) && n.isCompoundNode()) {
-                    List<RecipeNode> siblings = graph.findCompoundSiblingNodes(n.getCompoundGroupId());
-                    for (RecipeNode sib : siblings) {
-                        effectiveNodeIds.add(sib.getId());
-                    }
-                }
-            }
-        }
+        Set<String> effectiveNodeIds = collectEffectiveNodeIds(graph, selectedNodeIds);
 
         for (RecipeNode n : graph.getNodes()) {
             if (effectiveNodeIds.contains(n.getId())) {
@@ -107,7 +96,6 @@ public class NodeClipboard {
             return;
         }
 
-        // Calculate bounding box centroid across all selected elements
         double sumX = 0, sumY = 0;
         int count = 0;
         for (RecipeNode n : selectedNodes) {
@@ -162,6 +150,26 @@ public class NodeClipboard {
         tag.put("connections", edgeList);
 
         this.clipboardData = tag;
+    }
+
+    private Set<String> collectEffectiveNodeIds(FlowGraph graph, Set<String> selectedNodeIds) {
+        if (selectedNodeIds == null || selectedNodeIds.isEmpty()) {
+            return Collections.emptySet();
+        }
+        Set<String> effective = new HashSet<>(selectedNodeIds);
+        for (RecipeNode n : graph.getNodes()) {
+            if (selectedNodeIds.contains(n.getId()) && n.isCompoundNode()) {
+                addCompoundSiblings(graph, n.getCompoundGroupId(), effective);
+            }
+        }
+        return effective;
+    }
+
+    private void addCompoundSiblings(FlowGraph graph, String groupId, Set<String> target) {
+        List<RecipeNode> siblings = graph.findCompoundSiblingNodes(groupId);
+        for (RecipeNode sib : siblings) {
+            target.add(sib.getId());
+        }
     }
 
     public PasteResult paste(FlowGraph graph, double targetCanvasX, double targetCanvasY) {

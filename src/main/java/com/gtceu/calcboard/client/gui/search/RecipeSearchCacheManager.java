@@ -1,5 +1,6 @@
 package com.gtceu.calcboard.client.gui.search;
 
+import com.gtceu.calcboard.api.model.RecipeFingerprint;
 import com.gtceu.calcboard.api.model.SearchableRecipe;
 import com.gtceu.calcboard.api.util.ModCompatHelper;
 import com.gtceu.calcboard.client.gui.widget.FavoritesDockWidget;
@@ -31,6 +32,7 @@ public final class RecipeSearchCacheManager {
     private static volatile boolean GLOBAL_CACHED = false;
     private static volatile boolean IS_CACHING = false;
     private static volatile long GLOBAL_VERSION = 0;
+    private static volatile RecipeFingerprint CACHED_FINGERPRINT = RecipeFingerprint.EMPTY;
     private static volatile RecipeLoadingProgress CACHING_PROGRESS = new RecipeLoadingProgress(1, 4, "gui.gtcalcboard.loading_recipe_phase.1", "");
 
     private RecipeSearchCacheManager() {}
@@ -83,6 +85,7 @@ public final class RecipeSearchCacheManager {
         ON_COMPLETE_CALLBACKS.clear();
         GLOBAL_CACHED = false;
         IS_CACHING = false;
+        CACHED_FINGERPRINT = RecipeFingerprint.EMPTY;
         GLOBAL_VERSION++;
     }
 
@@ -100,6 +103,14 @@ public final class RecipeSearchCacheManager {
 
     public static int getCachedRecipeCount() {
         return GLOBAL_RECIPES.size();
+    }
+
+    public static RecipeFingerprint getCachedFingerprint() {
+        return CACHED_FINGERPRINT;
+    }
+
+    public static void setCachedFingerprintForTesting(RecipeFingerprint fingerprint) {
+        CACHED_FINGERPRINT = fingerprint != null ? fingerprint : RecipeFingerprint.EMPTY;
     }
 
     public static List<SearchableRecipe> getGlobalRecipes() {
@@ -128,13 +139,32 @@ public final class RecipeSearchCacheManager {
     }
 
     public static void ensureGlobalRecipesCachedAsync(Runnable onComplete) {
-        if (GLOBAL_CACHED) {
-            if (onComplete != null) onComplete.run();
-            return;
-        }
         if (onComplete != null && !ON_COMPLETE_CALLBACKS.contains(onComplete)) {
             ON_COMPLETE_CALLBACKS.add(onComplete);
         }
+
+        var adapter = com.gtceu.calcboard.integration.spi.RecipeViewerRegistry.getActiveAdapter();
+        if (!adapter.isRecipeBakingComplete()) {
+            if (IS_CACHING) return;
+            IS_CACHING = true;
+            CACHING_PROGRESS = new RecipeLoadingProgress(1, 4, "gui.gtcalcboard.loading_recipe_phase.1", "Waiting for " + adapter.getViewerId().toUpperCase(Locale.ROOT) + " recipes to bake...");
+            adapter.runWhenReady(() -> {
+                IS_CACHING = false;
+                ensureGlobalRecipesCachedAsync(null);
+            });
+            return;
+        }
+
+        RecipeFingerprint currentFingerprint = adapter.computeFingerprint();
+        if (GLOBAL_CACHED && CACHED_FINGERPRINT.matches(currentFingerprint)) {
+            com.gtceu.calcboard.GregTechCalcBoard.LOGGER.info(
+                    "[GTCalcBoard] [RecipeSearch] Recipe fingerprint matched ({} {} recipes). Reusing existing cache without re-indexing.",
+                    currentFingerprint.recipeCount(), adapter.getViewerId().toUpperCase(Locale.ROOT)
+            );
+            dispatchCompletedCallbacks();
+            return;
+        }
+
         if (IS_CACHING) return;
 
         Minecraft mc = Minecraft.getInstance();
@@ -142,19 +172,21 @@ public final class RecipeSearchCacheManager {
             return;
         }
 
-        IS_CACHING = true;
-
-        var adapter = com.gtceu.calcboard.integration.spi.RecipeViewerRegistry.getActiveAdapter();
-        if (!adapter.isRecipeBakingComplete()) {
-            CACHING_PROGRESS = new RecipeLoadingProgress(1, 4, "gui.gtcalcboard.loading_recipe_phase.1", "Waiting for " + adapter.getViewerId().toUpperCase(Locale.ROOT) + " recipes to bake...");
-            adapter.runWhenReady(() -> startIndexingAsync(adapter));
-            return;
-        }
-
-        startIndexingAsync(adapter);
+        startIndexingAsync(adapter, currentFingerprint);
     }
 
-    private static void startIndexingAsync(com.gtceu.calcboard.integration.spi.IRecipeViewerAdapter adapter) {
+    private static void dispatchCompletedCallbacks() {
+        List<Runnable> callbacks;
+        synchronized (ON_COMPLETE_CALLBACKS) {
+            callbacks = new ArrayList<>(ON_COMPLETE_CALLBACKS);
+            ON_COMPLETE_CALLBACKS.clear();
+        }
+        for (Runnable cb : callbacks) {
+            Minecraft.getInstance().execute(cb);
+        }
+    }
+
+    private static void startIndexingAsync(com.gtceu.calcboard.integration.spi.IRecipeViewerAdapter adapter, RecipeFingerprint fingerprint) {
         IS_CACHING = true;
         CACHING_PROGRESS = new RecipeLoadingProgress(1, 4, "gui.gtcalcboard.loading_recipe_phase.1", "Connecting to " + adapter.getViewerId().toUpperCase(Locale.ROOT) + " Recipe Manager");
 
@@ -175,6 +207,7 @@ public final class RecipeSearchCacheManager {
                     GLOBAL_RECIPES.clear();
                     GLOBAL_RECIPES.addAll(tempList);
                     GLOBAL_CACHED = true;
+                    CACHED_FINGERPRINT = fingerprint.isEmpty() ? adapter.computeFingerprint() : fingerprint;
                     GLOBAL_VERSION++;
                 }
 
@@ -197,14 +230,7 @@ public final class RecipeSearchCacheManager {
                     );
                 } catch (Throwable ignored) {}
 
-                List<Runnable> callbacks;
-                synchronized (ON_COMPLETE_CALLBACKS) {
-                    callbacks = new ArrayList<>(ON_COMPLETE_CALLBACKS);
-                    ON_COMPLETE_CALLBACKS.clear();
-                }
-                for (Runnable cb : callbacks) {
-                    Minecraft.getInstance().execute(cb);
-                }
+                dispatchCompletedCallbacks();
             } catch (Throwable t) {
                 com.gtceu.calcboard.GregTechCalcBoard.LOGGER.error("[GTCalcBoard] [RecipeSearch] Error during recipe indexing", t);
             } finally {

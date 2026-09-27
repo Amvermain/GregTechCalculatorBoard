@@ -220,29 +220,40 @@ public class GTCEuMultiblockScanner {
 
             if (controllerId == null) return;
 
-            int helixCount = 0;
-            if (recipe.getInputs() != null) {
-                for (var ei : recipe.getInputs()) {
-                    if (ei == null || ei.getEmiStacks() == null) continue;
-                    for (var es : ei.getEmiStacks()) {
-                        if (es != null) {
-                            ItemStack stack = es.getItemStack();
-                            if (stack != null && !stack.isEmpty()) {
-                                ResourceLocation itemId = ForgeRegistries.ITEMS.getKey(stack.getItem());
-                                if (itemId != null) {
-                                    if (GTThreadingHelix.fromId(itemId) != null || GTThreadingHelix.fromId(itemId.toString()) != null) {
-                                        helixCount = Math.max(helixCount, (int) es.getAmount());
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
+            int helixCount = calculateThreadingHelixCount(recipe.getInputs());
             if (helixCount > 0) {
                 MultiblockDetector.registerThreadingMultiblock(controllerId, helixCount);
             }
+        }
+
+        private static int calculateThreadingHelixCount(java.util.List<dev.emi.emi.api.stack.EmiIngredient> inputs) {
+            if (inputs == null) return 0;
+            int helixCount = 0;
+            for (var ei : inputs) {
+                helixCount = Math.max(helixCount, extractHelixCountFromInput(ei));
+            }
+            return helixCount;
+        }
+
+        private static int extractHelixCountFromInput(dev.emi.emi.api.stack.EmiIngredient ei) {
+            if (ei == null || ei.getEmiStacks() == null) return 0;
+            int max = 0;
+            for (var es : ei.getEmiStacks()) {
+                max = Math.max(max, extractHelixAmountFromStack(es));
+            }
+            return max;
+        }
+
+        private static int extractHelixAmountFromStack(dev.emi.emi.api.stack.EmiStack es) {
+            if (es == null) return 0;
+            ItemStack stack = es.getItemStack();
+            if (stack == null || stack.isEmpty()) return 0;
+
+            ResourceLocation itemId = ForgeRegistries.ITEMS.getKey(stack.getItem());
+            if (itemId == null) return 0;
+
+            boolean isHelix = GTThreadingHelix.fromId(itemId) != null || GTThreadingHelix.fromId(itemId.toString()) != null;
+            return isHelix ? (int) es.getAmount() : 0;
         }
     }
 

@@ -395,6 +395,14 @@ public class RecipeNode {
 
     public NodePropertyStore getProperties() { return properties; }
 
+    public int getCircuitNumber() {
+        return properties.get(com.gtceu.calcboard.api.property.NodeProperties.CIRCUIT_NUMBER);
+    }
+
+    public void setCircuitNumber(int circuitNumber) {
+        properties.set(com.gtceu.calcboard.api.property.NodeProperties.CIRCUIT_NUMBER, circuitNumber);
+    }
+
     public EnergyType getEnergyType() {
         if (isMachine()) return asMachine().getEnergyType();
         if (isModule()) return asModule().getEnergyType();
@@ -528,6 +536,72 @@ public class RecipeNode {
     public void setExternalDrainRate(double rate) {
         if (isJunction()) {
             asJunction().setExternalDrainRate(rate);
+        }
+    }
+
+    public boolean isLinkedJunction() {
+        return isJunction() && asJunction().isLinkedJunction();
+    }
+
+    public double getAllocatedInputRate() {
+        return isJunction() ? asJunction().getAllocatedInputRate() : 0.0;
+    }
+
+    public void setAllocatedInputRate(double rate) {
+        if (isJunction()) {
+            asJunction().setAllocatedInputRate(rate);
+        }
+    }
+
+    public double getAllocatedExportRate() {
+        return isJunction() ? asJunction().getAllocatedExportRate() : 0.0;
+    }
+
+    public void setAllocatedExportRate(double rate) {
+        if (isJunction()) {
+            asJunction().setAllocatedExportRate(rate);
+        }
+    }
+
+    public String getLinkedSourcePageId() {
+        return isJunction() ? asJunction().getLinkedSourcePageId() : "";
+    }
+
+    public void setLinkedSourcePageId(String pageId) {
+        if (isJunction()) {
+            asJunction().setLinkedSourcePageId(pageId);
+        }
+    }
+
+    public String getLinkedSourceNodeId() {
+        return isJunction() ? asJunction().getLinkedSourceNodeId() : "";
+    }
+
+    public void setLinkedSourceNodeId(String nodeId) {
+        if (isJunction()) {
+            asJunction().setLinkedSourceNodeId(nodeId);
+        }
+    }
+
+    public void setLinkedSource(String pageId, String nodeId) {
+        if (isJunction()) {
+            asJunction().setLinkedSource(pageId, nodeId);
+        }
+    }
+
+    public List<CrossPageExportTarget> getExportTargets() {
+        return isJunction() ? asJunction().getExportTargets() : Collections.emptyList();
+    }
+
+    public void addExportTarget(CrossPageExportTarget target) {
+        if (isJunction()) {
+            asJunction().addExportTarget(target);
+        }
+    }
+
+    public void removeExportTarget(String targetPageId) {
+        if (isJunction()) {
+            asJunction().removeExportTarget(targetPageId);
         }
     }
 
@@ -778,6 +852,36 @@ public class RecipeNode {
             }
             markPortsDirty();
         }
+    }
+
+    public void clearInputs() {
+        inputs.clear();
+        if (baseSpec != null) {
+            this.baseSpec = new RecipeSpec(
+                    baseSpec.recipeId(),
+                    baseSpec.categoryId(),
+                    baseSpec.baseDurationTicks(),
+                    baseSpec.baseEUt(),
+                    Collections.emptyList(),
+                    baseSpec.baseOutputs()
+            );
+        }
+        markPortsDirty();
+    }
+
+    public void clearOutputs() {
+        outputs.clear();
+        if (baseSpec != null) {
+            this.baseSpec = new RecipeSpec(
+                    baseSpec.recipeId(),
+                    baseSpec.categoryId(),
+                    baseSpec.baseDurationTicks(),
+                    baseSpec.baseEUt(),
+                    baseSpec.baseInputs(),
+                    Collections.emptyList()
+            );
+        }
+        markPortsDirty();
     }
 
     public boolean hasAuxiliaryInputPorts() {

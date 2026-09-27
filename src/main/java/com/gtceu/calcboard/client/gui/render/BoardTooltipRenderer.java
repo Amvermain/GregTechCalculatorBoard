@@ -122,7 +122,7 @@ public final class BoardTooltipRenderer {
     private static boolean renderNodeWidgetsTooltips(BoardScreen screen, GuiGraphics graphics, Font font, List<NodeWidget> nodeWidgets, FlowGraph graph, double canvasMouseX, double canvasMouseY, int mouseX, int mouseY) {
         for (int i = nodeWidgets.size() - 1; i >= 0; i--) {
             NodeWidget widget = nodeWidgets.get(i);
-            if (graph != null && graph.isNodeInFoldedFrame(widget.getNode().getId())) {
+            if (graph != null && graph.isNodeInFoldedOrEmbeddedFrame(widget.getNode().getId())) {
                 continue;
             }
             if (widget.isPointInside(canvasMouseX, canvasMouseY)) {
@@ -165,6 +165,9 @@ public final class BoardTooltipRenderer {
             return true;
         }
         if (NodeControlsTooltipRenderer.renderCountBoxTooltip(graphics, font, screen, widget, canvasMouseX, canvasMouseY, mouseX, mouseY)) {
+            return true;
+        }
+        if (NodeControlsTooltipRenderer.renderCircuitBadgeTooltip(graphics, font, screen, widget, canvasMouseX, canvasMouseY, mouseX, mouseY)) {
             return true;
         }
         if (NodeControlsTooltipRenderer.renderMachineConfigTooltip(graphics, font, screen, widget, canvasMouseX, canvasMouseY, mouseX, mouseY)) {

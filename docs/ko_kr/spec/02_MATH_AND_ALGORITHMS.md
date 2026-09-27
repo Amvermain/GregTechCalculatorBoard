@@ -494,4 +494,24 @@ $$E_{\text{total}} = T_{\text{sec}} \times 20 \times \sum_{m \in \text{Machines}
 
 ---
 
+### [알고리즘 15] 페이지 간 정션 유량 분배 및 가상 연동 솔버 (`WorkspaceFlowCoordinator`, `FlowEdgeAllocator`) (ADR-064)
+
+정션 노드의 계층적 우선순위(`priority`) 및 분기 분할 엔진을 페이지 경계로 확장하여, 단일 캔버스 과밀 없이 대규모 복합 공정 간 자원 수급을 결정론적으로 조율합니다:
+
+##### 1. 가상 간선 통합 및 계층적 우선순위 분배
+공급자 정션 노드의 유효 출력 유량 $Q_{\text{out}}$을 분배할 때, 로컬 연결 간선(`ConnectionEdge`)과 원격 타겟(`CrossPageExportTarget`)을 하나의 공통 할당 풀로 추상화합니다:
+- 각 `CrossPageExportTarget`을 가상의 선로(요구량 $D_k = \text{원격 정션의 총 수요량}$, 우선순위 $P_k$, 한도 $L_k$)로 변환.
+- `FlowEdgeAllocator.allocateHierarchicalPriorityEdges`를 통해 최상위 우선순위 티어부터 순차적으로 채우고, 동일 티어 내에서는 노드의 `FlowSplitMode`(`PROPORTIONAL` / `EQUAL`)를 적용.
+- 산출된 유량 $q_k$는 대상 소비자 정션의 `JunctionNodeRole.allocatedInputRate`로 실시간 주입되어 다운스트림 기계 계산에 즉각 반영됩니다.
+
+##### 2. 워크스페이스 의존성 DAG 및 위상 정렬 (Topological Sorting)
+- `WorkspaceFlowCoordinator`가 워크스페이스 내 모든 활성 페이지 간의 정션 연동 관계를 수집하여 유향 그래프 $G = (V, E)$를 구성합니다.
+- Kahn 알고리즘 또는 DFS 진입 차수 기반 위상 정렬을 수행하여 선행 공급자 페이지부터 하류 소비자 페이지 순으로 각 페이지의 `FlowGraphSolver`를 순차 실행합니다.
+
+##### 3. Tarjan 순환 참조 감지 및 클램핑 방어
+- 페이지 간 의존 그래프에서 Tarjan 강결합 컴포넌트(SCC)를 탐색하여 크기 2 이상의 순환 루프(Page A ➔ Page B ➔ Page A)를 검출합니다.
+- 순환이 감지된 선로의 전달 유량을 즉시 $0.0$으로 클램핑하여 솔버의 무한 루프 계산 동결을 차단하고, 관련 정션 카드에 `[⚠ Circular Loop]` 경고 뱃지를 표시합니다.
+
+---
+
 > ➡ **다음 장으로 이동**: [[03] UI 및 캔버스 렌더링 파이프라인](03_UI_AND_RENDERING_PIPELINE.md)

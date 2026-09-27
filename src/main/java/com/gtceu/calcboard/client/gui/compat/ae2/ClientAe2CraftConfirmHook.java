@@ -118,7 +118,10 @@ public class ClientAe2CraftConfirmHook {
 
         AbstractContainerScreen<?> containerScreen = (AbstractContainerScreen<?>) screen;
         Ae2PlanEvaluationResult etaResult = resolveEtaResult(containerScreen);
-        if (etaResult == null || etaResult.totalDurationTicks() <= 0) return;
+        if (etaResult == null || etaResult.totalDurationTicks() <= 0) {
+            resetBottleneckBounds();
+            return;
+        }
 
         renderEtaPanel(event.getGuiGraphics(), Minecraft.getInstance().font, containerScreen, event.getMouseX(), event.getMouseY(), etaResult);
     }
@@ -324,24 +327,41 @@ public class ClientAe2CraftConfirmHook {
             displayBName = displayBName.substring(0, displayBName.length() - 3) + "...";
         }
 
-        String fullStr = "§e↔ " + displayBName + " §a↗";
-        int btnW = font.width(fullStr) + 6;
-        int btnH = 10;
-        int btnX = panelX + 4;
+        boolean hasBoundPage = eta.hasBottleneckPage() && BoardManager.getInstance().getPage(eta.bottleneckPageId()).isPresent();
+        if (hasBoundPage) {
+            String fullStr = "§e↔ " + displayBName + " §a↗";
+            int btnW = font.width(fullStr) + 6;
+            int btnH = 10;
+            int btnX = panelX + 4;
 
-        boolean hover = mouseX >= btnX && mouseX <= btnX + btnW && mouseY >= btnY && mouseY <= btnY + btnH;
-        if (hover) {
-            graphics.fill(btnX, btnY - 1, btnX + btnW, btnY + btnH, 0x4438BDF8);
-            graphics.renderOutline(btnX, btnY - 1, btnW, btnH + 1, 0xFF38BDF8);
+            boolean hover = mouseX >= btnX && mouseX <= btnX + btnW && mouseY >= btnY && mouseY <= btnY + btnH;
+            if (hover) {
+                graphics.fill(btnX, btnY - 1, btnX + btnW, btnY + btnH, 0x4438BDF8);
+                graphics.renderOutline(btnX, btnY - 1, btnW, btnH + 1, 0xFF38BDF8);
+
+                Optional<BoardPage> pageOpt = BoardManager.getInstance().getPage(eta.bottleneckPageId());
+                String pageName = pageOpt.map(BoardPage::getName).orElse(displayBName);
+                List<Component> tip = List.of(
+                        Component.literal("§b⚡ " + pageName),
+                        Component.literal("§7" + Component.translatable("gui.gtcalcboard.ae2.eta.bottleneck.click").getString())
+                );
+                graphics.renderComponentTooltip(font, tip, mouseX, mouseY);
+            }
+
+            graphics.drawString(font, fullStr, btnX + 3, btnY, 0xFFFFFFFF, false);
+
+            lastBottleneckX = btnX;
+            lastBottleneckY = btnY;
+            lastBottleneckW = btnW;
+            lastBottleneckH = btnH;
+            lastBottleneckPageId = eta.bottleneckPageId();
+        } else {
+            String fullStr = "§7↔ " + displayBName;
+            int btnX = panelX + 4;
+            graphics.drawString(font, fullStr, btnX + 3, btnY, 0xFFAAAAAA, false);
+
+            resetBottleneckBounds();
         }
-
-        graphics.drawString(font, fullStr, btnX + 3, btnY, 0xFFFFFFFF, false);
-
-        lastBottleneckX = btnX;
-        lastBottleneckY = btnY;
-        lastBottleneckW = btnW;
-        lastBottleneckH = btnH;
-        lastBottleneckPageId = eta.bottleneckPageId();
     }
 
     private static boolean isInsideBottleneckBadge(double mx, double my) {
@@ -350,11 +370,24 @@ public class ClientAe2CraftConfirmHook {
     }
 
     private static void openBottleneckPage(String pageId) {
+        if (pageId == null || pageId.isEmpty()) return;
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return;
 
-        mc.player.playSound(SoundEvents.UI_BUTTON_CLICK.get(), 0.6f, 1.0f);
-        BoardManager.getInstance().openPage(pageId);
-        mc.setScreen(new BoardScreen());
+        Optional<BoardPage> pageOpt = BoardManager.getInstance().getPage(pageId);
+        if (pageOpt.isEmpty()) return;
+
+        if (BoardManager.getInstance().openPage(pageId)) {
+            mc.player.playSound(SoundEvents.UI_BUTTON_CLICK.get(), 0.6f, 1.0f);
+            BoardScreen.openScreen(mc.screen);
+        }
+    }
+
+    private static void resetBottleneckBounds() {
+        lastBottleneckX = 0;
+        lastBottleneckY = 0;
+        lastBottleneckW = 0;
+        lastBottleneckH = 0;
+        lastBottleneckPageId = "";
     }
 }

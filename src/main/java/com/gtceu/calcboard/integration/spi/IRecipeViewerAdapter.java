@@ -3,6 +3,7 @@ package com.gtceu.calcboard.integration.spi;
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.bom.MultiblockBOMSummary;
+import com.gtceu.calcboard.api.model.RecipeFingerprint;
 import com.gtceu.calcboard.api.model.SearchableRecipe;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -26,6 +27,10 @@ public interface IRecipeViewerAdapter {
     boolean isRecipeBakingComplete();
 
     void runWhenReady(Runnable callback);
+
+    default RecipeFingerprint computeFingerprint() {
+        return RecipeFingerprint.EMPTY;
+    }
 
     // 1. Recipe Discovery & Indexing
     List<SearchableRecipe> collectSearchableRecipes();

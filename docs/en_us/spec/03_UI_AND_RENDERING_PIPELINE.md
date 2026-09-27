@@ -32,6 +32,25 @@ flowchart TB
 
 ---
 
+## 2. Dynamic Hardware Reconciliation & Declarative Inspector Architecture (ADR-049, ADR-061, ADR-062, ADR-063)
+
+### 2.1 Hardware Reconciler & Atomic Undo (`NodeHardwareReconciler`, ADR-049)
+- Normalizes machine switches, purging incompatible addons and clamping voltage tiers while preserving complete hardware snapshots in `SwitchRecipeCommand` for 100% lossless `Ctrl+Z` undo.
+
+### 2.2 Declarative Composite Node Inspector (`CompositeNodeInspector`, ADR-061)
+- Decomposes the monolithic node inspector into `CompositeNodeInspector` and 10 single-responsibility sections (`MultiblockEnergyHatchSection`, `SingleblockTierSection`, `BoilerThrottleSection`, etc.).
+- Direct 1-click multiblock energy hatch installation and hot-swapping from the tier grid, updating overclocking and power readouts immediately.
+
+### 2.3 Headless Canvas Interaction Test Harness & Fuzzing (`CanvasTestHarness`, ADR-062)
+- Evaluates complex dragging, selection, and wiring workflows in pure JVM environments without GLFW or OpenGL graphics contexts.
+- Pseudorandom state fuzzing guarantees 100% reversible state machine transitions and hardware integrity.
+
+### 2.4 Selection-Scoped Contextual Auto-Connect (`SelectionFloatingToolbarWidget`, ADR-063)
+- Multi-selecting nodes and pressing `Shift+C` or clicking `[↔ Connect]` on the floating toolbar auto-wires matching ports strictly within the selection.
+- All connections are batched into a single command for single-step `Ctrl+Z` reversal.
+
+---
+
 ## 📑 UI Detailed Specification Series
 
 Detailed component behavior, interaction flows, and high-fidelity wireframes are cataloged in the following sub-specifications:

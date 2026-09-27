@@ -3,6 +3,7 @@ package com.gtceu.calcboard.integration.vanilla;
 import com.gtceu.calcboard.client.gui.render.IngredientRenderer;
 
 import com.gtceu.calcboard.api.model.IngredientStack;
+import com.gtceu.calcboard.api.model.RecipeFingerprint;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.bom.MultiblockBOMSummary;
 import com.gtceu.calcboard.api.model.SearchableRecipe;
@@ -45,6 +46,25 @@ public class VanillaRecipeViewerAdapter implements IRecipeViewerAdapter {
     public void runWhenReady(Runnable callback) {
         if (callback != null) {
             callback.run();
+        }
+    }
+
+    @Override
+    public RecipeFingerprint computeFingerprint() {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc == null || mc.level == null) return RecipeFingerprint.EMPTY;
+        try {
+            var recipes = mc.level.getRecipeManager().getRecipes();
+            int size = recipes.size();
+            long hash = 1125899906842597L;
+            for (var r : recipes) {
+                if (r != null && r.getId() != null) {
+                    hash = hash * 31L + r.getId().hashCode();
+                }
+            }
+            return new RecipeFingerprint(getViewerId(), size, hash);
+        } catch (Throwable t) {
+            return RecipeFingerprint.EMPTY;
         }
     }
 
@@ -138,43 +158,7 @@ public class VanillaRecipeViewerAdapter implements IRecipeViewerAdapter {
 
             var outputs = rn.getOutputs();
             if (outputs != null && !outputs.isEmpty()) {
-                var sortedOutputs = new java.util.ArrayList<>(outputs);
-                if (matchedOutputId != null || matchedOutputName != null) {
-                    int matchIdx = -1;
-                    for (int i = 0; i < sortedOutputs.size(); i++) {
-                        var stack = sortedOutputs.get(i);
-                        if (stack == null) continue;
-                        if (matchedOutputId != null && matchedOutputId.equals(stack.getId())) {
-                            matchIdx = i;
-                            break;
-                        }
-                        if (matchedOutputName != null && matchedOutputName.equalsIgnoreCase(stack.getDisplayName())) {
-                            matchIdx = i;
-                            break;
-                        }
-                    }
-                    if (matchIdx > 0) {
-                        var matched = sortedOutputs.remove(matchIdx);
-                        sortedOutputs.add(0, matched);
-                    }
-                }
-
-                int maxDisplay = rn.isGenerator() ? 2 : 3;
-                int count = Math.min(sortedOutputs.size(), maxDisplay);
-                for (int i = 0; i < count; i++) {
-                    var out = sortedOutputs.get(i);
-                    if (out != null) {
-                        com.gtceu.calcboard.client.gui.render.IngredientRenderer.render(graphics, out, currentX, rowY + 8);
-                    }
-                    currentX += 18;
-                }
-
-                if (sortedOutputs.size() > maxDisplay) {
-                    int remaining = sortedOutputs.size() - maxDisplay;
-                    String badge = "+" + remaining;
-                    graphics.drawString(font, badge, currentX, rowY + 12, 0xFF94A3B8, false);
-                    currentX += font.width(badge) + 2;
-                }
+                currentX = renderOutputIngredients(graphics, font, rn, outputs, matchedOutputId, matchedOutputName, currentX, rowY);
             }
             return currentX - listX;
         }
@@ -188,6 +172,70 @@ public class VanillaRecipeViewerAdapter implements IRecipeViewerAdapter {
 
     @Override
     public void registerBoMGoal(MultiblockBOMSummary summary) {}
+
+    private int renderOutputIngredients(
+            GuiGraphics graphics,
+            Font font,
+            RecipeNode rn,
+            List<IngredientStack> outputs,
+            ResourceLocation matchedOutputId,
+            String matchedOutputName,
+            int currentX,
+            int rowY
+    ) {
+        List<IngredientStack> sortedOutputs = prioritizeMatchedOutput(outputs, matchedOutputId, matchedOutputName);
+        int maxDisplay = rn.isGenerator() ? 2 : 3;
+        int count = Math.min(sortedOutputs.size(), maxDisplay);
+
+        for (int i = 0; i < count; i++) {
+            IngredientStack out = sortedOutputs.get(i);
+            if (out != null) {
+                com.gtceu.calcboard.client.gui.render.IngredientRenderer.render(graphics, out, currentX, rowY + 8);
+            }
+            currentX += 18;
+        }
+
+        if (sortedOutputs.size() > maxDisplay) {
+            int remaining = sortedOutputs.size() - maxDisplay;
+            String badge = "+" + remaining;
+            graphics.drawString(font, badge, currentX, rowY + 12, 0xFF94A3B8, false);
+            currentX += font.width(badge) + 2;
+        }
+        return currentX;
+    }
+
+    private List<IngredientStack> prioritizeMatchedOutput(
+            List<IngredientStack> outputs,
+            ResourceLocation matchedOutputId,
+            String matchedOutputName
+    ) {
+        var sorted = new java.util.ArrayList<>(outputs);
+        if (matchedOutputId == null && matchedOutputName == null) return sorted;
+        int matchIdx = findMatchedOutputIndex(sorted, matchedOutputId, matchedOutputName);
+        if (matchIdx > 0) {
+            var matched = sorted.remove(matchIdx);
+            sorted.add(0, matched);
+        }
+        return sorted;
+    }
+
+    private int findMatchedOutputIndex(
+            List<IngredientStack> outputs,
+            ResourceLocation matchedOutputId,
+            String matchedOutputName
+    ) {
+        for (int i = 0; i < outputs.size(); i++) {
+            var stack = outputs.get(i);
+            if (stack == null) continue;
+            if (matchedOutputId != null && matchedOutputId.equals(stack.getId())) {
+                return i;
+            }
+            if (matchedOutputName != null && matchedOutputName.equalsIgnoreCase(stack.getDisplayName())) {
+                return i;
+            }
+        }
+        return -1;
+    }
 }
 
 

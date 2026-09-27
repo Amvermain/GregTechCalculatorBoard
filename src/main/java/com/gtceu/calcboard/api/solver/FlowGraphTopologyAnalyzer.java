@@ -24,20 +24,29 @@ public final class FlowGraphTopologyAnalyzer {
 
         while (!queue.isEmpty()) {
             String currId = queue.poll();
-            for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
-                if (edge.toNodeId().equals(currId)) {
-                    RecipeNode src = graph.findNodeById(edge.fromNodeId());
-                    if (src != null && visited.add(src.getId())) {
-                        if (src.isReroute()) {
-                            queue.add(src.getId());
-                        } else {
-                            directSuppliers.add(src.getId());
-                        }
-                    }
-                }
-            }
+            collectDirectSuppliersForNode(graph, currId, visited, queue, directSuppliers);
         }
         return directSuppliers;
+    }
+
+    private static void collectDirectSuppliersForNode(
+            FlowGraph graph,
+            String currId,
+            Set<String> visited,
+            Queue<String> queue,
+            Set<String> directSuppliers
+    ) {
+        for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+            if (!edge.toNodeId().equals(currId)) continue;
+            RecipeNode src = graph.findNodeById(edge.fromNodeId());
+            if (src == null || !visited.add(src.getId())) continue;
+
+            if (src.isReroute()) {
+                queue.add(src.getId());
+            } else {
+                directSuppliers.add(src.getId());
+            }
+        }
     }
 
     public static Set<String> findDownstreamNodes(FlowGraph graph, String anchorId, Set<String> directAnchorSuppliers) {
@@ -47,18 +56,27 @@ public final class FlowGraphTopologyAnalyzer {
 
         while (!queue.isEmpty()) {
             String currId = queue.poll();
-            for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
-                if (edge.fromNodeId().equals(currId)) {
-                    String nextId = edge.toNodeId();
-                    if (!nextId.equals(anchorId) && !directAnchorSuppliers.contains(nextId)) {
-                        if (downstream.add(nextId)) {
-                            queue.add(nextId);
-                        }
-                    }
-                }
-            }
+            collectDownstreamForNode(graph, currId, anchorId, directAnchorSuppliers, downstream, queue);
         }
         return downstream;
+    }
+
+    private static void collectDownstreamForNode(
+            FlowGraph graph,
+            String currId,
+            String anchorId,
+            Set<String> directAnchorSuppliers,
+            Set<String> downstream,
+            Queue<String> queue
+    ) {
+        for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+            if (!edge.fromNodeId().equals(currId)) continue;
+            String nextId = edge.toNodeId();
+            if (nextId.equals(anchorId) || directAnchorSuppliers.contains(nextId)) continue;
+            if (downstream.add(nextId)) {
+                queue.add(nextId);
+            }
+        }
     }
 
     public static Set<String> findUpstreamNodes(FlowGraph graph, String anchorId, Set<String> downstreamNodes) {
@@ -71,18 +89,27 @@ public final class FlowGraphTopologyAnalyzer {
 
         while (!queue.isEmpty()) {
             String currId = queue.poll();
-            for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
-                if (edge.toNodeId().equals(currId)) {
-                    String prevId = edge.fromNodeId();
-                    if (!prevId.equals(anchorId) && (downstreamNodes == null || !downstreamNodes.contains(prevId))) {
-                        if (upstream.add(prevId)) {
-                            queue.add(prevId);
-                        }
-                    }
-                }
-            }
+            collectUpstreamForNode(graph, currId, anchorId, downstreamNodes, upstream, queue);
         }
         return upstream;
+    }
+
+    private static void collectUpstreamForNode(
+            FlowGraph graph,
+            String currId,
+            String anchorId,
+            Set<String> downstreamNodes,
+            Set<String> upstream,
+            Queue<String> queue
+    ) {
+        for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+            if (!edge.toNodeId().equals(currId)) continue;
+            String prevId = edge.fromNodeId();
+            if (prevId.equals(anchorId) || (downstreamNodes != null && downstreamNodes.contains(prevId))) continue;
+            if (upstream.add(prevId)) {
+                queue.add(prevId);
+            }
+        }
     }
 
     public static void collectFeedingProducers(FlowGraph graph, String targetNodeId, int inIdx, Set<RecipeNode> result) {
@@ -218,6 +245,11 @@ public final class FlowGraphTopologyAnalyzer {
         if (graph == null || frame == null) {
             return new FoldedPortSummary(Collections.emptyList(), Collections.emptyList());
         }
+        FoldedPortSummary cached = frame.getCachedFoldedPortSummary();
+        if (cached != null) {
+            return cached;
+        }
+
         Map<String, AggregatedFoldedPortBuilder> inputBuilders = new LinkedHashMap<>();
         Map<String, AggregatedFoldedPortBuilder> outputBuilders = new LinkedHashMap<>();
 
@@ -255,7 +287,9 @@ public final class FlowGraphTopologyAnalyzer {
             outputs.add(b.build());
         }
 
-        return new FoldedPortSummary(inputs, outputs);
+        FoldedPortSummary summary = new FoldedPortSummary(inputs, outputs);
+        frame.setCachedFoldedPortSummary(summary);
+        return summary;
     }
 
     /**
@@ -275,30 +309,41 @@ public final class FlowGraphTopologyAnalyzer {
      */
     public record FoldedPortSummary(
             List<AggregatedFoldedPort> inputs,
-            List<AggregatedFoldedPort> outputs
+            List<AggregatedFoldedPort> outputs,
+            Map<RecipeNode.PortOrigin, Integer> inputOriginMap,
+            Map<RecipeNode.PortOrigin, Integer> outputOriginMap
     ) {
+        public FoldedPortSummary(List<AggregatedFoldedPort> inputs, List<AggregatedFoldedPort> outputs) {
+            this(inputs, outputs, buildOriginMap(inputs), buildOriginMap(outputs));
+        }
+
+        private static Map<RecipeNode.PortOrigin, Integer> buildOriginMap(List<AggregatedFoldedPort> ports) {
+            if (ports == null || ports.isEmpty()) return Collections.emptyMap();
+            Map<RecipeNode.PortOrigin, Integer> map = new HashMap<>();
+            for (int i = 0; i < ports.size(); i++) {
+                for (RecipeNode.PortOrigin origin : ports.get(i).internalOrigins()) {
+                    map.putIfAbsent(origin, i);
+                }
+            }
+            return map;
+        }
+
         public int maxPortCount() {
             return Math.max(inputs.size(), outputs.size());
         }
 
         public int findInputIndexForOrigin(String nodeId, int portIndex) {
-            for (int i = 0; i < inputs.size(); i++) {
-                for (RecipeNode.PortOrigin origin : inputs.get(i).internalOrigins()) {
-                    if (origin.internalNodeId().equals(nodeId) && origin.internalPortIndex() == portIndex) {
-                        return i;
-                    }
-                }
+            if (inputOriginMap != null && nodeId != null) {
+                Integer idx = inputOriginMap.get(new RecipeNode.PortOrigin(nodeId, portIndex));
+                if (idx != null) return idx;
             }
             return -1;
         }
 
         public int findOutputIndexForOrigin(String nodeId, int portIndex) {
-            for (int i = 0; i < outputs.size(); i++) {
-                for (RecipeNode.PortOrigin origin : outputs.get(i).internalOrigins()) {
-                    if (origin.internalNodeId().equals(nodeId) && origin.internalPortIndex() == portIndex) {
-                        return i;
-                    }
-                }
+            if (outputOriginMap != null && nodeId != null) {
+                Integer idx = outputOriginMap.get(new RecipeNode.PortOrigin(nodeId, portIndex));
+                if (idx != null) return idx;
             }
             return -1;
         }

@@ -30,31 +30,39 @@ public final class ClientLevelHelper implements com.gtceu.calcboard.api.catalog.
     @Override
     public void collectClientRecipes(Consumer<ItemStack> collector) {
         Minecraft mc = Minecraft.getInstance();
-        if (mc != null && mc.level != null) {
-            try {
-                RecipeManager recipeManager = mc.level.getRecipeManager();
-                if (recipeManager != null) {
-                    RegistryAccess access = mc.level.registryAccess();
-                    List<ItemStack> temp = new java.util.ArrayList<>();
-                    for (Recipe<?> r : recipeManager.getRecipes()) {
-                        try {
-                            temp.clear();
-                            com.gtceu.calcboard.api.catalog.DynamicAddonCrawler.extractRecipeOutputs(r, temp);
-                            if (temp.isEmpty()) {
-                                ItemStack res = r.getResultItem(access);
-                                if (res != null && !res.isEmpty()) {
-                                    temp.add(res);
-                                }
-                            }
-                            for (ItemStack is : temp) {
-                                if (is != null && !is.isEmpty()) {
-                                    collector.accept(is);
-                                }
-                            }
-                        } catch (Throwable ignored) {}
-                    }
-                }
-            } catch (Throwable ignored) {}
+        if (mc == null || mc.level == null) return;
+        RecipeManager recipeManager = mc.level.getRecipeManager();
+        if (recipeManager == null) return;
+
+        RegistryAccess access = mc.level.registryAccess();
+        for (Recipe<?> r : recipeManager.getRecipes()) {
+            collectRecipeOutputs(r, access, collector);
+        }
+    }
+
+    private void collectRecipeOutputs(Recipe<?> r, RegistryAccess access, Consumer<ItemStack> collector) {
+        try {
+            List<ItemStack> temp = new java.util.ArrayList<>();
+            com.gtceu.calcboard.api.catalog.DynamicAddonCrawler.extractRecipeOutputs(r, temp);
+            if (temp.isEmpty()) {
+                addFallbackRecipeResult(r, access, temp);
+            }
+            for (ItemStack is : temp) {
+                acceptIfValid(is, collector);
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    private void addFallbackRecipeResult(Recipe<?> r, RegistryAccess access, List<ItemStack> temp) {
+        ItemStack res = r.getResultItem(access);
+        if (res != null && !res.isEmpty()) {
+            temp.add(res);
+        }
+    }
+
+    private void acceptIfValid(ItemStack is, Consumer<ItemStack> collector) {
+        if (is != null && !is.isEmpty()) {
+            collector.accept(is);
         }
     }
 

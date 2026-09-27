@@ -4,7 +4,7 @@
 
 본 디렉터리는 **GregTech Calculator Board (GTCalcBoard)** 프로젝트의 핵심 기술적 의사결정 맥락(Context), 채택 이유(Why), 시스템 구조(Architecture), 그리고 결과 및 파급 효과(Consequences)를 영구히 기록하고 보존하는 **공식 아키텍처 결정 기록(ADR) 레지스트리**입니다.
 
-모든 핵심 아키텍처 결정은 구현 완료 후 공식 시스템 사양서([`docs/ko_kr/spec/`](../ko_kr/spec/))로 체계화되어 반영되며, 본 문서는 59개 ADR 전체의 생명주기 및 공식 사양서 연계 맵을 제공합니다.
+모든 핵심 아키텍처 결정은 구현 완료 후 공식 시스템 사양서([`docs/ko_kr/spec/`](../ko_kr/spec/))로 체계화되어 반영되며, 본 문서는 64개 ADR 전체의 생명주기 및 공식 사양서 연계 맵을 제공합니다.
 
 ---
 
@@ -22,11 +22,11 @@ stateDiagram-v2
 
 | 상태 (Status) | 건수 | 설명 |
 | :--- | :---: | :--- |
-| 🟢 **`Active`** | **22건** | 현재 시스템의 구조, 인터페이스 및 동작을 직접 규정하는 활성 아키텍처 결정 |
+| 🟢 **`Active`** | **27건** | 현재 시스템의 구조, 인터페이스 및 동작을 직접 규정하는 활성 아키텍처 결정 |
 | 🔄 **`Superseded`** | **5건** | 후속 ADR에 의해 설계, 모델 또는 알고리즘이 대체된 결정 |
 | 📦 **`Retired / Consolidated`** | **31건** | 구현 완료 후 공식 시스템 사양서([`docs/ko_kr/spec/`](../ko_kr/spec/))에 완전히 통합·체계화된 결정 |
 | ❌ **`Rejected`** | **1건** | 기술 검토 단계에서 기각되어 결번으로 영구 보존된 제안 (`RFC-046`) |
-| **합계** | **59건** | 전체 등록 아키텍처 결정 및 결번 레코드 총합 |
+| **합계** | **64건** | 전체 등록 아키텍처 결정 및 결번 레코드 총합 |
 
 ---
 
@@ -50,6 +50,7 @@ flowchart TD
     ADR035 --> ADR041["ADR-041<br/>정션 균등/우선순위 계층 분배"]
     ADR034 --> ADR041
     ADR041 --> ADR044["ADR-044<br/>감쇠 순환 등비급수 해석적 수렴"]
+    ADR041 --> ADR064["ADR-064<br/>페이지 간 정션 유량 분배 & 가상 연동"]
     ADR035 --> ADR054["ADR-054<br/>솔버 제어 흐름 평탄화"]
     ADR044 --> ADR057["ADR-057<br/>TFG 대형 보일러 비선형 물리"]
     ADR035 --> ADR058["ADR-058<br/>솔버 음수 인덱스 방어"]
@@ -70,9 +71,13 @@ flowchart TD
     ADR025 --> ADR048["ADR-048<br/>페이지 목표 전압 자동 프로비저닝"]
     ADR048 --> ADR049["ADR-049<br/>하드웨어 정합성 조정자 & UI 동기화"]
     ADR025 --> ADR053["ADR-053<br/>NodeInspectorPanel SRP 4대 분해"]
+    ADR053 --> ADR061["ADR-061<br/>선언적 인스펙터 컴포지션 & 멀티블록 전력 해치"]
     ADR005["ADR-005 (대체됨)<br/>11단계 단일 튜토리얼"] -.->|대체| ADR056["ADR-056<br/>3-트랙 모듈형 아카데미 & 맥락 넛지"]
     ADR027 --> ADR058["ADR-058<br/>children 방어 복사 & 모달 핫키 격리"]
     ADR025 --> ADR059["ADR-059<br/>로컬 내장 웹 대시보드 & SSE 동기화"]
+    ADR027 --> ADR062["ADR-062<br/>헤드리스 인터랙션 하네스 & 퍼저"]
+    ADR049 --> ADR062
+    ADR027 --> ADR063["ADR-063<br/>선택 노드 컨텍스트 자동 연결"]
 ```
 
 ### 3. 도메인 모델, 확장성 & 네트워크 발전사 (Domain Models, SPI & Networking)
@@ -91,13 +96,14 @@ flowchart TD
     ADR045 --> ADR050["ADR-050<br/>불변 RecipeSpec & 지연 포트 투영"]
     ADR045 --> ADR055["ADR-055<br/>RecipeNode 직접 복제 생성자 최적화"]
     ADR031["ADR-031 (대체됨)<br/>공유 기계 풀 단순 스케일링"] -.->|대체| ADR042["ADR-042<br/>공유 풀 인플레이스 접기 & 비율 보존"]
+    ADR042 --> ADR060["ADR-060<br/>공유 기계 풀 임베디드 레시피 패널 리워크"]
     ADR003["ADR-003<br/>512KB C2S/S2C 분할 스트리밍"] --> ADR051["ADR-051<br/>api.team 모델 분리 & 계층 역전 해소"]
     ADR003 --> ADR052["ADR-052<br/>128청크/64MB DoS 방어 가드"]
 ```
 
 ---
 
-## 🟢 활성 아키텍처 결정 레지스트리 (Active ADRs - 22건)
+## 🟢 활성 아키텍처 결정 레지스트리 (Active ADRs - 27건)
 
 현재 시스템의 핵심 불변식, 데이터 구조, 연산 알고리즘 및 인터랙션을 직접 규정하는 활성 결정 목록입니다.
 
@@ -125,6 +131,11 @@ flowchart TD
 | **[ADR-057](ADR_057_TFG_LARGE_BOILER_BOOSTER_MECHANISM.md)** | TFG 대형 보일러 부스터 메커니즘 및 비선형 물리 모델 명세 | `v2.3.0` | Compat Physics (`compat.tfg`) | [02. 수학 & 알고리즘](../ko_kr/spec/02_MATH_AND_ALGORITHMS.md) | TFG 대형 보일러(LBB 480PU, LSB 1280PU) 9종 부스터, 수질 계층(1.5x), 480PU 초과 비선형 물/연료 곡선, Super Boiler |
 | **[ADR-058](ADR_058_CANVAS_INTERACTION_AND_SOLVER_DEFENSIVE_STABILITY.md)** | 캔버스 인터랙션 생명주기 및 유량 솔버 방어적 안정성 명세 | `v2.3.0` | Client GUI & Solver (`client.gui`, `api.solver`) | [03. UI & 렌더링](../ko_kr/spec/03_UI_AND_RENDERING_PIPELINE.md) | `children()` 방어 복사본 반환, 유량 솔버 음수 인덱스 가드, 모달 활성 시 핫키 차단, `MachineNodeRole` NBT 정규화 |
 | **[ADR-059](ADR_059_LOCAL_WEB_BOARD_DASHBOARD.md)** | 로컬 내장 웹 대시보드 및 단방향 실시간 도면 뷰어 명세 | `v2.4.0-beta.1` | Client Web & GUI (`client.web`, `client.gui`) | [03. UI & 렌더링](../ko_kr/spec/03_UI_AND_RENDERING_PIPELINE.md) | 내장 HttpServer(127.0.0.1) 기반 듀얼 모니터용 실시간 도면 SPA, SSE 이벤트 스트림, 32×32 아이콘 FBO 캐시 파이프라인 |
+| **[ADR-060](ADR_060_SHARED_MACHINE_POOL_RECIPE_PANEL_REWORK.md)** | 공유 기계 풀 머신 중심 워크플로우 및 임베디드 레시피 패널 리워크 명세 | `v2.4.0` | Client GUI & Domain (`client.gui`, `api.model`) | [01. 코어 도메인](../ko_kr/spec/01_CORE_DOMAIN_AND_MODELS.md) | 머신 중심 1클릭 풀 생성, 패널 내 레시피 서브 카드 세로 스택(`EMBEDDED_PANEL`), 인라인 레시피 추가 및 3-Tier 뷰 상태 머신 |
+| **[ADR-061](ADR_061_DECLARATIVE_NODE_INSPECTOR_AND_MULTIBLOCK_ENERGY_HATCH.md)** | 노드 유형별 선언적 인스펙터 패널 및 멀티블록 전력 해치 직접 연동 명세 | `v2.4.0` | Client GUI & Domain (`client.gui.inspector`, `api.model`) | [03. UI & 렌더링](../ko_kr/spec/03_UI_AND_RENDERING_PIPELINE.md) | 노드 유형별 독립 섹션 모듈 분리, 선언적 인스펙터 레지스트리 조립 및 멀티블록 전력 해치 1클릭 즉시 자동 장착·교체 연동 |
+| **[ADR-062](ADR_062_HEADLESS_CANVAS_INTERACTION_TEST_HARNESS_AND_FUZZER.md)** | 헤드리스 캔버스 인터랙션 및 노드 하드웨어 전이 가역성 테스트 하네스·퍼징 시스템 명세 | `v2.4.1` | Client GUI & Core Domain (`client.gui.interaction`, `api.model`) | [03. UI & 렌더링](../ko_kr/spec/03_UI_AND_RENDERING_PIPELINE.md) | 헤드리스 이벤트 시뮬레이션 하네스(`CanvasTestHarness`), 하드웨어 전이 가역성 검증기(`NodeHardwareSnapshot`), UI 및 하드웨어 2대 퍼징 엔진 |
+| **[ADR-063](ADR_063_SELECTION_CONTEXTUAL_AUTO_CONNECT.md)** | 선택 노드 한정 컨텍스트 자동 연결 명세 | `v2.4.0` | Client GUI & Action (`client.gui`, `client.gui.action`) | [03. UI & 렌더링](../ko_kr/spec/03_UI_AND_RENDERING_PIPELINE.md) | 다중 선택 노드 간 국소 자동 배선, 플로팅 바 Connect 버튼, Shift+C 스마트 분기 및 단일 복합 명령 Undo 롤백 |
+| **[ADR-064](ADR_064_CROSS_PAGE_JUNCTION_FLOW_ALLOCATION.md)** | 페이지 간 정션 유량 분배 및 가상 연동 시스템 명세 | `v2.4.1` | Domain, Solver & GUI (`api.model`, `api.solver`, `client.gui`) | [02. 수학 & 알고리즘](../ko_kr/spec/02_MATH_AND_ALGORITHMS.md) | 정션 1:N 유량 분할 엔진(`FlowEdgeAllocator`) 기반 페이지 간 자원 연동, 우선순위 티어링, 의존성 DAG 위상 정렬 및 순환 참조 방어 |
 
 ---
 
@@ -194,8 +205,8 @@ flowchart TD
 
 ## 💡 활성 RFC 제안 목록 (Active RFC Proposals in `docs/rfc/`)
 
-구현 착수 전 기술 검토, 대안 비교 및 승인 대기 중인 RFC 제안 문서 목록입니다. 구현이 완료되면 공식 ADR로 승격되어 상단 레지스트리에 영구 보존됩니다.
+*현재 검토 대기 중인 활성 RFC 제안이 없습니다. (모든 제안이 ADR로 승격 또는 채택 완료됨)*
 
-| 문서 번호 | 제안 제목 (Title) | 대상 버전 | 기안일 | 주관 계층 | 제안 요약 |
-| :---: | :--- | :---: | :---: | :--- | :--- |
-| - | *(현재 활성 RFC 제안 없음)* | - | - | - | 모든 제안이 구현 완료되어 공식 ADR로 승격되었습니다. |
+
+
+

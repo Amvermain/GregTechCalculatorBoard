@@ -2,6 +2,8 @@ package com.gtceu.calcboard.client.gui.render;
 
 import com.gtceu.calcboard.api.model.CanvasGroupFrame;
 import com.gtceu.calcboard.api.model.FlowGraph;
+import com.gtceu.calcboard.api.model.IngredientStack;
+import com.gtceu.calcboard.api.model.PoolViewMode;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.solver.FlowGraphTopologyAnalyzer;
 import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
@@ -23,7 +25,7 @@ import java.util.Locale;
 public class CanvasGroupFrameRenderer {
 
     public enum FrameAction {
-        NONE, COLOR, COLLAPSE, DELETE, RESIZE, CONFIG, AUTOFIT, AUTO_RATIO
+        NONE, COLOR, COLLAPSE, DELETE, RESIZE, CONFIG, AUTOFIT, AUTO_RATIO, EXPAND, ADD_RECIPE
     }
 
     public enum ResizeDirection {
@@ -72,9 +74,14 @@ public class CanvasGroupFrameRenderer {
 
     public static void renderSingleFrame(GuiGraphics graphics, Font font, FlowGraph graph, CanvasGroupFrame frame, double mouseX, double mouseY, boolean isEditing, boolean isSelected) {
         if (frame == null) return;
-        if (frame.isSharedMachineFrame() && frame.isFolded()) {
-            renderFoldedMachineCard(graphics, font, graph, frame, mouseX, mouseY, isEditing, isSelected);
-            return;
+        if (frame.isSharedMachineFrame()) {
+            if (frame.getViewMode() == com.gtceu.calcboard.api.model.PoolViewMode.FOLDED_CARD) {
+                renderFoldedMachineCard(graphics, font, graph, frame, mouseX, mouseY, isEditing, isSelected);
+                return;
+            } else if (frame.getViewMode() == com.gtceu.calcboard.api.model.PoolViewMode.EMBEDDED_PANEL) {
+                EmbeddedPanelRenderer.renderPanel(graphics, font, graph, frame, mouseX, mouseY, isEditing, isSelected);
+                return;
+            }
         }
 
         int x = (int) frame.getPosX();
@@ -155,18 +162,8 @@ public class CanvasGroupFrameRenderer {
                 graphics.drawString(font, clippedTitle, x + 6, y + 5, titleCol, true);
             }
 
-            // Render Duty Badge (guaranteed visibility)
             if (badgeStartX + badgeW <= x + w - 4) {
-                graphics.fill(badgeStartX, badgeY, badgeStartX + badgeW, badgeY + badgeH, badgeBg);
-                graphics.renderOutline(badgeStartX, badgeY, badgeW, badgeH, badgeBorder);
-                graphics.drawString(font, dutyText, badgeStartX + 4, badgeY + 2, badgeTextCol, false);
-
-                if (!isCompatible) {
-                    int warnX = badgeStartX + badgeW + 4;
-                    if (warnX + 12 <= rightButtonsBoundary + 4) {
-                        graphics.drawString(font, "\u26A0", warnX, badgeY + 1, 0xFFEF4444, false);
-                    }
-                }
+                renderDutyBadgeWithWarning(graphics, font, badgeStartX, badgeY, badgeW, badgeH, badgeBg, badgeBorder, dutyText, badgeTextCol, isCompatible, rightButtonsBoundary);
             }
         } else {
             int maxTitleW = rightButtonsBoundary - (x + 6) - 4;
@@ -262,8 +259,12 @@ public class CanvasGroupFrameRenderer {
     }
 
     private static boolean renderSingleFrameTooltip(GuiGraphics graphics, Font font, FlowGraph graph, CanvasGroupFrame frame, double canvasMouseX, double canvasMouseY, int mouseX, int mouseY) {
-        if (frame.isSharedMachineFrame() && frame.isFolded()) {
-            return renderFoldedFrameTooltip(graphics, font, graph, frame, canvasMouseX, canvasMouseY, mouseX, mouseY);
+        if (frame.isSharedMachineFrame()) {
+            if (frame.getViewMode() == com.gtceu.calcboard.api.model.PoolViewMode.FOLDED_CARD) {
+                return renderFoldedFrameTooltip(graphics, font, graph, frame, canvasMouseX, canvasMouseY, mouseX, mouseY);
+            } else if (frame.getViewMode() == com.gtceu.calcboard.api.model.PoolViewMode.EMBEDDED_PANEL) {
+                return renderEmbeddedFrameTooltip(graphics, font, graph, frame, canvasMouseX, canvasMouseY, mouseX, mouseY);
+            }
         }
 
         int x = (int) frame.getPosX();
@@ -287,6 +288,79 @@ public class CanvasGroupFrameRenderer {
         return false;
     }
 
+    private static boolean renderEmbeddedFrameTooltip(GuiGraphics graphics, Font font, FlowGraph graph, CanvasGroupFrame frame, double canvasMouseX, double canvasMouseY, int mouseX, int mouseY) {
+        int x = (int) frame.getPosX();
+        int y = (int) frame.getPosY();
+        int w = (int) frame.getWidth();
+        int h = (int) frame.getHeight();
+
+        if (canvasMouseX < x || canvasMouseX > x + w || canvasMouseY < y || canvasMouseY > y + h) {
+            return false;
+        }
+
+        int headerH = (int) CanvasGroupFrame.HEADER_HEIGHT;
+        if (canvasMouseY >= y && canvasMouseY <= y + headerH) {
+            int btnY = y + 4;
+            int curBtnX = x + w - BTN_SIZE - 5;
+
+            if (isMouseOver(canvasMouseX, canvasMouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
+                BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal("§c✕ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_delete")), mouseX, mouseY);
+                return true;
+            }
+            curBtnX -= (BTN_SIZE + BTN_SPACING);
+
+            if (isMouseOver(canvasMouseX, canvasMouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
+                BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal("§b⤡ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_fold")), mouseX, mouseY);
+                return true;
+            }
+            curBtnX -= (BTN_SIZE + BTN_SPACING);
+
+            if (isMouseOver(canvasMouseX, canvasMouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
+                BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal("§a⛶ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_expand_panel")), mouseX, mouseY);
+                return true;
+            }
+            curBtnX -= (BTN_SIZE + BTN_SPACING);
+
+            if (isMouseOver(canvasMouseX, canvasMouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
+                BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal("§e✦ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_color")), mouseX, mouseY);
+                return true;
+            }
+            curBtnX -= (BTN_SIZE + BTN_SPACING);
+
+            if (isMouseOver(canvasMouseX, canvasMouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
+                BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal("§e⚙ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_config")), mouseX, mouseY);
+                return true;
+            }
+            curBtnX -= (BTN_SIZE + BTN_SPACING);
+
+            if (isMouseOver(canvasMouseX, canvasMouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
+                String capacityStr = String.format(Locale.ROOT, "%.1f", frame.getTargetPoolCapacity());
+                BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal("§b⚖ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_auto_ratio", capacityStr)), mouseX, mouseY);
+                return true;
+            }
+
+            renderSharedMachineBreakdownTooltip(graphics, font, graph, frame, mouseX, mouseY);
+            return true;
+        }
+
+        var portHit = EmbeddedPanelRenderer.findHoveredEmbeddedPort(graph, canvasMouseX, canvasMouseY);
+        if (portHit != null && portHit.stack() != null) {
+            IngredientStack is = portHit.stack();
+            String prefix = portHit.isInput() ? "§7[In] " : "§a[Out] ";
+            String rateStr = String.format(Locale.ROOT, " (%.2f/s)", portHit.isInput() ? portHit.subNode().getInputSlotRate(portHit.portIndex(), true) : portHit.subNode().getOutputSlotRate(portHit.portIndex(), true));
+            BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal(prefix + is.getDisplayName() + rateStr), mouseX, mouseY);
+            return true;
+        }
+
+        int addBtnY = y + h - 28;
+        if (canvasMouseY >= addBtnY && canvasMouseY <= addBtnY + 22 && canvasMouseX >= x + 6 && canvasMouseX <= x + w - 6) {
+            BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal("§a+ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_add_recipe")), mouseX, mouseY);
+            return true;
+        }
+
+        return false;
+    }
+
     private static boolean renderHeaderButtonsTooltip(GuiGraphics graphics, Font font, CanvasGroupFrame frame, double canvasMouseX, double canvasMouseY, int x, int y, int w, int mouseX, int mouseY) {
         int btnY = y + 4;
         int curBtnX = x + w - BTN_SIZE - 5;
@@ -298,9 +372,14 @@ public class CanvasGroupFrameRenderer {
         curBtnX -= (BTN_SIZE + BTN_SPACING);
 
         if (isMouseOver(canvasMouseX, canvasMouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
-            Component tooltip = frame.isSharedMachineFrame()
-                    ? Component.literal("§b⤡ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_fold"))
-                    : Component.literal("§b▦ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_collapse"));
+            Component tooltip;
+            if (frame.isSharedMachineFrame()) {
+                tooltip = frame.getViewMode() == PoolViewMode.EXPANDED_FRAME
+                        ? Component.literal("§b▦ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_panelize"))
+                        : Component.literal("§b⤡ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_fold"));
+            } else {
+                tooltip = Component.literal("§b▦ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_collapse"));
+            }
             BoardTooltipRenderer.renderTooltip(graphics, font, tooltip, mouseX, mouseY);
             return true;
         }
@@ -416,6 +495,7 @@ public class CanvasGroupFrameRenderer {
 
     public static ResizeDirection getResizeDirection(CanvasGroupFrame frame, double mouseX, double mouseY) {
         if (frame == null) return ResizeDirection.NONE;
+        if (frame.getViewMode() == PoolViewMode.EMBEDDED_PANEL) return ResizeDirection.NONE;
 
         double x = frame.getPosX();
         double y = frame.getPosY();
@@ -484,7 +564,7 @@ public class CanvasGroupFrameRenderer {
             }
             curBtnX -= (BTN_SIZE + BTN_SPACING);
 
-            // [⤢ Unfold] or [▦ Collapse]
+            // [⤢ Unfold] or [▦ Collapse] or [⤡ Fold]
             if (isMouseOver(mouseX, mouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
                 return FrameAction.COLLAPSE;
             }
@@ -497,6 +577,25 @@ public class CanvasGroupFrameRenderer {
                 curBtnX -= (BTN_SIZE + BTN_SPACING);
                 if (isMouseOver(mouseX, mouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
                     return FrameAction.CONFIG;
+                }
+                return FrameAction.NONE;
+            }
+
+            if (frame.isSharedMachineFrame() && frame.getViewMode() == PoolViewMode.EMBEDDED_PANEL) {
+                if (isMouseOver(mouseX, mouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
+                    return FrameAction.EXPAND;
+                }
+                curBtnX -= (BTN_SIZE + BTN_SPACING);
+                if (isMouseOver(mouseX, mouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
+                    return FrameAction.COLOR;
+                }
+                curBtnX -= (BTN_SIZE + BTN_SPACING);
+                if (isMouseOver(mouseX, mouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
+                    return FrameAction.CONFIG;
+                }
+                curBtnX -= (BTN_SIZE + BTN_SPACING);
+                if (isMouseOver(mouseX, mouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
+                    return FrameAction.AUTO_RATIO;
                 }
                 return FrameAction.NONE;
             }
@@ -531,7 +630,7 @@ public class CanvasGroupFrameRenderer {
         }
 
         // 2. Multi-direction Resizing Grip & Edge Hit Test
-        if (!frame.isFolded()) {
+        if (!frame.isFolded() && frame.getViewMode() != PoolViewMode.EMBEDDED_PANEL) {
             ResizeDirection dir = getResizeDirection(frame, mouseX, mouseY);
             if (dir != ResizeDirection.NONE) {
                 return FrameAction.RESIZE;
@@ -575,18 +674,19 @@ public class CanvasGroupFrameRenderer {
             graphics.renderOutline(x - 1, y - 1, w + 2, h + 2, 0xFF00FFFF);
         }
 
-        renderFoldedHeader(graphics, font, graph, frame, x, y, w, color, isSelected, mouseX, mouseY);
-        renderFoldedCountRow(graphics, font, graph, frame, x, y, w, mouseX, mouseY);
-        renderFoldedHardwareRow(graphics, font, graph, frame, x, y, w);
+        List<RecipeNode> enclosedNodes = frame.getEnclosedNodes(graph);
+        renderFoldedHeader(graphics, font, enclosedNodes, frame, x, y, w, color, isSelected, mouseX, mouseY);
+        renderFoldedCountRow(graphics, font, graph, enclosedNodes, frame, x, y, w, mouseX, mouseY);
+        renderFoldedHardwareRow(graphics, font, graph, enclosedNodes, frame, x, y, w);
         renderFoldedPortRows(graphics, font, summary, x, y, w, portRows, mouseX, mouseY);
     }
 
-    private static void renderFoldedHeader(GuiGraphics graphics, Font font, FlowGraph graph, CanvasGroupFrame frame, int x, int y, int w, int color, boolean isSelected, double mouseX, double mouseY) {
+    private static void renderFoldedHeader(GuiGraphics graphics, Font font, List<RecipeNode> enclosedNodes, CanvasGroupFrame frame, int x, int y, int w, int color, boolean isSelected, double mouseX, double mouseY) {
         int headerH = (int) CanvasGroupFrame.HEADER_HEIGHT;
         int headerCol = (color & 0x00FFFFFF) | (isSelected ? 0xDD000000 : 0x99000000);
         graphics.fill(x, y, x + w, y + headerH, headerCol);
 
-        ResourceLocation icon = frame.getSharedMachineIcon(graph);
+        ResourceLocation icon = frame.getSharedMachineIcon(enclosedNodes);
         int iconX = x + 4;
         int iconY = y + 4;
         boolean rendered = false;
@@ -600,7 +700,7 @@ public class CanvasGroupFrameRenderer {
             graphics.drawString(font, "↔", iconX + 4, iconY + 4, 0xFFFFFFFF, false);
         }
 
-        String machineName = frame.getSharedMachineName(graph);
+        String machineName = frame.getSharedMachineName(enclosedNodes);
         if (machineName == null || machineName.isEmpty()) machineName = frame.getTitle();
         String suffix = " " + Component.translatable("gui.gtcalcboard.frame.shared_pool_suffix").getString();
         String displayTitle = machineName + suffix;
@@ -633,11 +733,11 @@ public class CanvasGroupFrameRenderer {
         drawIconButton(graphics, font, "⚙", curBtnX, btnY, BTN_SIZE, BTN_SIZE, cfgHover, 0xFFFCD34D, 0x55F59E0B);
     }
 
-    private static void renderFoldedCountRow(GuiGraphics graphics, Font font, FlowGraph graph, CanvasGroupFrame frame, int x, int y, int w, double mouseX, double mouseY) {
+    private static void renderFoldedCountRow(GuiGraphics graphics, Font font, FlowGraph graph, List<RecipeNode> enclosedNodes, CanvasGroupFrame frame, int x, int y, int w, double mouseX, double mouseY) {
         int ctrlY = y + 26;
         graphics.drawString(font, "Count:", x + 6, ctrlY + 3, 0xFFAAAAAA, false);
 
-        double totalDuty = frame.computeTotalMachineDuty(graph);
+        double totalDuty = frame.computeTotalMachineDuty(enclosedNodes, graph);
         String countText = String.format(Locale.ROOT, "%.2f", totalDuty);
         int countMinusX = x + 38;
         drawBtn(graphics, font, "-", countMinusX, ctrlY, 14, 14, mouseX, mouseY, 0xFFFFFFFF);
@@ -653,17 +753,17 @@ public class CanvasGroupFrameRenderer {
         drawBtn(graphics, font, "/2", countPlusX + 16, ctrlY, 16, 14, mouseX, mouseY, 0xFFFFFFFF);
         drawBtn(graphics, font, "x2", countPlusX + 34, ctrlY, 16, 14, mouseX, mouseY, 0xFFFFFFFF);
 
-        int recipeCount = frame.getEnclosedNodes(graph).size();
+        int recipeCount = enclosedNodes.size();
         String rBadge = "■ " + Component.translatable("gui.gtcalcboard.frame.recipes_count", recipeCount).getString();
         int rBadgeW = font.width(rBadge);
         graphics.drawString(font, rBadge, x + w - rBadgeW - 6, ctrlY + 3, 0xFF34D399, false);
     }
 
-    private static void renderFoldedHardwareRow(GuiGraphics graphics, Font font, FlowGraph graph, CanvasGroupFrame frame, int x, int y, int w) {
+    private static void renderFoldedHardwareRow(GuiGraphics graphics, Font font, FlowGraph graph, List<RecipeNode> enclosedNodes, CanvasGroupFrame frame, int x, int y, int w) {
         int hwY = y + 44;
-        com.gtceu.calcboard.api.type.GTVoltageTier tier = frame.getSharedVoltageTier(graph);
-        com.gtceu.calcboard.api.type.OverclockMode ocMode = frame.getSharedOverclockMode(graph);
-        double totalEUt = frame.computeSharedTotalEUt(graph);
+        com.gtceu.calcboard.api.type.GTVoltageTier tier = frame.getSharedVoltageTier(enclosedNodes);
+        com.gtceu.calcboard.api.type.OverclockMode ocMode = frame.getSharedOverclockMode(enclosedNodes);
+        double totalEUt = frame.computeSharedTotalEUt(enclosedNodes, graph);
 
         String tierStr = "[" + tier.name() + "]";
         graphics.drawString(font, tierStr, x + 6, hwY + 3, tier.getColor(), false);
@@ -821,10 +921,10 @@ public class CanvasGroupFrameRenderer {
             var in = summary.inputs().get(r);
             List<Component> lines = new ArrayList<>();
             lines.add(Component.literal(in.ingredient().getDisplayName()));
-            lines.add(Component.literal("§7Nominal Demand: §e" + FormatUtil.formatRate(in.nominalRate(), in.ingredient().isFluid())));
-            lines.add(Component.literal("§7Actual Rate: §f" + FormatUtil.formatRate(in.actualRate(), in.ingredient().isFluid())));
+            lines.add(Component.translatable("gui.gtcalcboard.frame.nominal_demand", "§e" + FormatUtil.formatRate(in.nominalRate(), in.ingredient().isFluid())).withStyle(net.minecraft.ChatFormatting.GRAY));
+            lines.add(Component.translatable("gui.gtcalcboard.frame.actual_rate", "§f" + FormatUtil.formatRate(in.actualRate(), in.ingredient().isFluid())).withStyle(net.minecraft.ChatFormatting.GRAY));
             if (in.hasDeficit()) {
-                lines.add(Component.literal("§c⚠ Upstream supply deficit!"));
+                lines.add(Component.translatable("gui.gtcalcboard.frame.upstream_deficit").withStyle(net.minecraft.ChatFormatting.RED));
             }
             BoardTooltipRenderer.renderComponentTooltip(graphics, font, lines, mouseX, mouseY);
             return true;
@@ -833,11 +933,24 @@ public class CanvasGroupFrameRenderer {
             var out = summary.outputs().get(r);
             List<Component> lines = new ArrayList<>();
             lines.add(Component.literal(out.ingredient().getDisplayName()));
-            lines.add(Component.literal("§7Production Rate: §a+" + FormatUtil.formatRate(out.nominalRate(), out.ingredient().isFluid())));
+            lines.add(Component.translatable("gui.gtcalcboard.frame.production_rate", "§a" + FormatUtil.formatRate(out.nominalRate(), out.ingredient().isFluid())).withStyle(net.minecraft.ChatFormatting.GRAY));
             BoardTooltipRenderer.renderComponentTooltip(graphics, font, lines, mouseX, mouseY);
             return true;
         }
         return false;
+    }
+
+    private static void renderDutyBadgeWithWarning(GuiGraphics graphics, Font font, int badgeStartX, int badgeY, int badgeW, int badgeH, int badgeBg, int badgeBorder, String dutyText, int badgeTextCol, boolean isCompatible, int rightButtonsBoundary) {
+        graphics.fill(badgeStartX, badgeY, badgeStartX + badgeW, badgeY + badgeH, badgeBg);
+        graphics.renderOutline(badgeStartX, badgeY, badgeW, badgeH, badgeBorder);
+        graphics.drawString(font, dutyText, badgeStartX + 4, badgeY + 2, badgeTextCol, false);
+
+        if (!isCompatible) {
+            int warnX = badgeStartX + badgeW + 4;
+            if (warnX + 12 <= rightButtonsBoundary + 4) {
+                graphics.drawString(font, "\u26A0", warnX, badgeY + 1, 0xFFEF4444, false);
+            }
+        }
     }
 }
 

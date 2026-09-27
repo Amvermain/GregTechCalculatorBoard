@@ -213,6 +213,46 @@ public final class FlowSummaryAggregator {
         return computeSummary(graph, false);
     }
 
+    public static BalanceSummary computeSubsetSummary(FlowGraph graph, Set<String> nodeIds) {
+        if (graph == null || nodeIds == null || nodeIds.isEmpty()) {
+            return graph != null ? computeSummaryPreservingEfficiencies(graph) : emptySummary();
+        }
+        if (nodeIds.size() == graph.getNodes().size()) {
+            return computeSummaryPreservingEfficiencies(graph);
+        }
+
+        List<RecipeNode> selectedNodes = new ArrayList<>();
+        for (RecipeNode n : graph.getNodes()) {
+            if (nodeIds.contains(n.getId())) {
+                selectedNodes.add(n);
+            }
+        }
+        if (selectedNodes.isEmpty()) {
+            return computeSummaryPreservingEfficiencies(graph);
+        }
+
+        FlowGraph subGraph = new FlowGraph();
+        for (RecipeNode n : selectedNodes) {
+            subGraph.addNode(n);
+        }
+        for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+            if (nodeIds.contains(edge.fromNodeId()) && nodeIds.contains(edge.toNodeId())) {
+                subGraph.addConnection(edge);
+            }
+        }
+        for (CanvasGroupFrame frame : graph.getFrames()) {
+            if (frame != null && frame.isSharedMachineFrame()) {
+                subGraph.addFrame(frame);
+            }
+        }
+
+        return computeSummaryPreservingEfficiencies(subGraph);
+    }
+
+    private static BalanceSummary emptySummary() {
+        return new BalanceSummary(0, GTVoltageTier.ULV, 0, Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap());
+    }
+
     public static BalanceSummary computeSummary(FlowGraph graph, boolean recomputeEfficiencies) {
         BalanceSummary summary = computeSummaryInternal(graph, recomputeEfficiencies, 0, Collections.newSetFromMap(new IdentityHashMap<>()));
         if (graph != null) {
@@ -326,11 +366,12 @@ public final class FlowSummaryAggregator {
         }
 
         double netEUt = totalConsumedEUt - totalGeneratedEUt;
+        double netPeakEUt = power.peakConsumedEUt - power.peakGeneratedEUt;
         double netSU = totalGeneratedSU - totalConsumedSU;
         double netFE = totalGeneratedFE - totalConsumedFE;
 
         graph.captureSnapshot();
-        return new BalanceSummary(netEUt, netSU, netFE, highestTier, totalMachineCount, machineBreakdown, rawInputs, netOutputs, balanced, totalProduction, totalConsumption, voidedOutputs, totalFusionStartupEU, fusionTierCounts, fusionTierStartupEU);
+        return new BalanceSummary(netEUt, netSU, netFE, highestTier, totalMachineCount, machineBreakdown, rawInputs, netOutputs, balanced, totalProduction, totalConsumption, voidedOutputs, totalFusionStartupEU, fusionTierCounts, fusionTierStartupEU, netPeakEUt);
     }
 
     private static void mergeRate(Map<IngredientStack, Double> map, IngredientStack stack, double rate) {
@@ -458,6 +499,8 @@ public final class FlowSummaryAggregator {
     private static final class PowerAccumulator {
         double consumedEUt;
         double generatedEUt;
+        double peakConsumedEUt;
+        double peakGeneratedEUt;
         double consumedSU;
         double generatedSU;
         double consumedFE;
@@ -469,17 +512,21 @@ public final class FlowSummaryAggregator {
             generatedSU += subSummary.totalSU() > 0 ? subSummary.totalSU() * moduleCount : 0;
             consumedFE += subSummary.totalFE() < 0 ? -subSummary.totalFE() * moduleCount : 0;
             generatedFE += subSummary.totalFE() > 0 ? subSummary.totalFE() * moduleCount : 0;
+            if (subSummary.highestVoltageTier() != null && subSummary.highestVoltageTier().ordinal() > highestTier.ordinal()) {
+                highestTier = subSummary.highestVoltageTier();
+            }
         }
 
         void addNodePower(RecipeNode node) {
-            double rawPower = node.getEffectiveTotalEUt();
+            double effectivePower = node.getEffectiveTotalEUt();
+            double nominalPower = node.getTotalEUt();
             EnergyType eType = node.getEnergyType();
             if (eType == EnergyType.KINETIC_SU) {
-                accumulateKineticPower(node, rawPower);
+                accumulateKineticPower(node, effectivePower);
             } else if (eType == EnergyType.ELECTRIC_FE) {
-                accumulateFePower(node, rawPower);
+                accumulateFePower(node, effectivePower, nominalPower);
             } else if (eType == EnergyType.ELECTRIC_EU) {
-                accumulateEuPower(node, rawPower);
+                accumulateEuPower(node, effectivePower, nominalPower);
             }
         }
 
@@ -491,21 +538,25 @@ public final class FlowSummaryAggregator {
             }
         }
 
-        private void accumulateFePower(RecipeNode node, double rawPower) {
+        private void accumulateFePower(RecipeNode node, double effectivePower, double nominalPower) {
             if (node.isGenerator()) {
-                generatedFE += rawPower;
-                generatedEUt += rawPower / 4.0;
+                generatedFE += effectivePower;
+                generatedEUt += effectivePower / 4.0;
+                peakGeneratedEUt += nominalPower / 4.0;
             } else {
-                consumedFE += rawPower;
-                consumedEUt += rawPower / 4.0;
+                consumedFE += effectivePower;
+                consumedEUt += effectivePower / 4.0;
+                peakConsumedEUt += nominalPower / 4.0;
             }
         }
 
-        private void accumulateEuPower(RecipeNode node, double rawPower) {
+        private void accumulateEuPower(RecipeNode node, double effectivePower, double nominalPower) {
             if (node.isGenerator()) {
-                generatedEUt += rawPower;
+                generatedEUt += effectivePower;
+                peakGeneratedEUt += nominalPower;
             } else {
-                consumedEUt += rawPower;
+                consumedEUt += effectivePower;
+                peakConsumedEUt += nominalPower;
             }
             if (node.getTargetTier().ordinal() > highestTier.ordinal()) {
                 highestTier = node.getTargetTier();
@@ -744,11 +795,19 @@ public final class FlowSummaryAggregator {
         }
         if (node.isExternalSupply()) {
             aggregateExternalSupplyReroute(graph, node, totalProduction);
-            return;
         }
         if (node.isFixedDrain()) {
             aggregateFixedDrainReroute(node, totalConsumption);
         }
+        if (node.getAllocatedExportRate() > 0.0) {
+            aggregateExportFlowReroute(node, totalConsumption);
+        }
+    }
+
+    private static void aggregateExportFlowReroute(RecipeNode node, Map<IngredientStack, Double> totalConsumption) {
+        IngredientStack rStack = node.getRerouteIngredient();
+        if (rStack == null || node.getAllocatedExportRate() <= 0.0) return;
+        mergeRate(totalConsumption, rStack, node.getAllocatedExportRate());
     }
 
     private static void aggregateFixedDrainReroute(RecipeNode node, Map<IngredientStack, Double> totalConsumption) {

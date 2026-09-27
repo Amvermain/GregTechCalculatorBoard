@@ -40,7 +40,11 @@ public record MultiblockStructureDef(
 
     public boolean supportsAbility(String abilityName) {
         if (abilityName == null || allowedAbilities == null) return false;
-        return allowedAbilities.contains(abilityName.toUpperCase(java.util.Locale.ROOT));
+        String upper = abilityName.toUpperCase(java.util.Locale.ROOT);
+        if (allowedAbilities.contains(upper)) return true;
+        if ("STEAM_IMPORT_FLUIDS".equals(upper) && allowedAbilities.contains("STEAM")) return true;
+        if ("STEAM".equals(upper) && allowedAbilities.contains("STEAM_IMPORT_FLUIDS")) return true;
+        return false;
     }
 
     public boolean isCandidateBlock(ResourceLocation blockId) {

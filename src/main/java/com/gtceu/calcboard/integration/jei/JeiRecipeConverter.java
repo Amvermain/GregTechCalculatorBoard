@@ -1,6 +1,7 @@
 package com.gtceu.calcboard.integration.jei;
 
 import com.gtceu.calcboard.api.catalog.CategoryCapabilityMatrix;
+import com.gtceu.calcboard.api.catalog.MultiblockDetector;
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.model.RecipeSpec;
@@ -198,29 +199,9 @@ public class JeiRecipeConverter {
             }
         }
 
-        // Workstations from JEI catalysts
         IJeiRuntime runtime = JeiRecipeViewerAdapter.getJeiRuntime();
         if (runtime != null && category != null && category.getRecipeType() != null) {
-            try {
-                var catalystLookup = runtime.getRecipeManager().createRecipeCatalystLookup(category.getRecipeType());
-                if (catalystLookup != null) {
-                    var catalysts = catalystLookup.get().toList();
-                    for (var cat : catalysts) {
-                        if (cat != null) {
-                            ItemStack is = cat.getItemStack().orElse(ItemStack.EMPTY);
-                            if (is.isEmpty() && cat.getIngredient() instanceof ItemStack s) {
-                                is = s;
-                            }
-                            if (!is.isEmpty()) {
-                                ResourceLocation itemId = ForgeRegistries.ITEMS.getKey(is.getItem());
-                                if (itemId != null && !node.getAvailableWorkstations().contains(itemId)) {
-                                    node.getAvailableWorkstations().add(itemId);
-                                }
-                            }
-                        }
-                    }
-                }
-            } catch (Throwable ignored) {}
+            populateCatalystWorkstations(runtime, category, node);
         }
 
         // Fallback workstation from vanilla Recipe.getToastSymbol()
@@ -247,7 +228,7 @@ public class JeiRecipeConverter {
             if (tieredWs != null && (node.getAvailableWorkstations().contains(tieredWs) || ForgeRegistries.ITEMS.containsKey(tieredWs))) {
                 icon = tieredWs;
             } else {
-                icon = node.getAvailableWorkstations().get(0);
+                icon = findPreferredWorkstation(node.getAvailableWorkstations());
             }
         }
         if (icon == null && catId != null) {
@@ -279,6 +260,10 @@ public class JeiRecipeConverter {
 
         if (details.backingRecipeTemp > 0) {
             node.setRecipeTemperature(details.backingRecipeTemp);
+        }
+
+        if (details.circuitNumber >= 0) {
+            node.setCircuitNumber(details.circuitNumber);
         }
 
         if (node.isFusion()) {
@@ -348,57 +333,105 @@ public class JeiRecipeConverter {
         if (!(recipe instanceof Recipe<?> vanillaRecipe)) return;
         try {
             if (inputs != null && inputs.isEmpty()) {
-                for (net.minecraft.world.item.crafting.Ingredient ing : vanillaRecipe.getIngredients()) {
-                    if (ing != null && !ing.isEmpty()) {
-                        ItemStack[] items = ing.getItems();
-                        if (items != null && items.length > 0) {
-                            ItemStack primary = items[0];
-                            ResourceLocation iId = ForgeRegistries.ITEMS.getKey(primary.getItem());
-                            if (iId != null) {
-                                String name = primary.getHoverName().getString();
-                                if (name.isEmpty()) name = formatName(iId.getPath());
-                                IngredientStack stack = IngredientStack.item(iId, name, Math.max(1, primary.getCount()));
-                                for (int i = 1; i < items.length; i++) {
-                                    ResourceLocation altId = ForgeRegistries.ITEMS.getKey(items[i].getItem());
-                                    if (altId != null && !stack.getAlternatives().contains(altId)) {
-                                        stack.getAlternatives().add(altId);
-                                    }
-                                }
-                                inputs.add(stack);
-                            }
-                        }
-                    }
+                for (var ing : vanillaRecipe.getIngredients()) {
+                    addVanillaIngredient(ing, inputs);
                 }
             }
             if (outputs != null && outputs.isEmpty()) {
-                ItemStack result = ItemStack.EMPTY;
-                try {
-                    var mc = net.minecraft.client.Minecraft.getInstance();
-                    if (mc != null && mc.level != null) {
-                        result = vanillaRecipe.getResultItem(mc.level.registryAccess());
-                    }
-                } catch (Throwable ignored) {}
-                if (result.isEmpty()) {
-                    try {
-                        result = vanillaRecipe.getResultItem(net.minecraft.core.RegistryAccess.EMPTY);
-                    } catch (Throwable ignored) {}
-                }
-                if (result.isEmpty()) {
-                    try {
-                        var m = vanillaRecipe.getClass().getMethod("getResultItem");
-                        result = (ItemStack) m.invoke(vanillaRecipe);
-                    } catch (Throwable ignored) {}
-                }
-                if (!result.isEmpty()) {
-                    ResourceLocation oId = ForgeRegistries.ITEMS.getKey(result.getItem());
-                    if (oId != null) {
-                        String name = result.getHoverName().getString();
-                        if (name.isEmpty()) name = formatName(oId.getPath());
-                        outputs.add(IngredientStack.item(oId, name, Math.max(1, result.getCount())));
-                    }
-                }
+                ItemStack result = resolveVanillaResultItem(vanillaRecipe);
+                addVanillaResultOutput(result, outputs);
             }
         } catch (Throwable ignored) {}
+    }
+
+    private static void addVanillaIngredient(net.minecraft.world.item.crafting.Ingredient ing, List<IngredientStack> inputs) {
+        if (ing == null || ing.isEmpty()) return;
+        ItemStack[] items = ing.getItems();
+        if (items == null || items.length == 0) return;
+        IngredientStack stack = createIngredientStackFromItems(items);
+        if (stack != null) {
+            inputs.add(stack);
+        }
+    }
+
+    private static IngredientStack createIngredientStackFromItems(ItemStack[] items) {
+        ItemStack primary = items[0];
+        ResourceLocation iId = ForgeRegistries.ITEMS.getKey(primary.getItem());
+        if (iId == null) return null;
+        String name = primary.getHoverName().getString();
+        if (name.isEmpty()) name = formatName(iId.getPath());
+        IngredientStack stack = IngredientStack.item(iId, name, Math.max(1, primary.getCount()));
+        for (int i = 1; i < items.length; i++) {
+            addAlternativeItem(stack, items[i]);
+        }
+        return stack;
+    }
+
+    private static void addAlternativeItem(IngredientStack stack, ItemStack item) {
+        ResourceLocation altId = ForgeRegistries.ITEMS.getKey(item.getItem());
+        if (altId != null && !stack.getAlternatives().contains(altId)) {
+            stack.getAlternatives().add(altId);
+        }
+    }
+
+    private static void addVanillaResultOutput(ItemStack result, List<IngredientStack> outputs) {
+        if (result.isEmpty()) return;
+        ResourceLocation oId = ForgeRegistries.ITEMS.getKey(result.getItem());
+        if (oId == null) return;
+        String name = result.getHoverName().getString();
+        if (name.isEmpty()) name = formatName(oId.getPath());
+        outputs.add(IngredientStack.item(oId, name, Math.max(1, result.getCount())));
+    }
+
+    private static ItemStack resolveVanillaResultItem(Recipe<?> vanillaRecipe) {
+        ItemStack result = ItemStack.EMPTY;
+        try {
+            var mc = net.minecraft.client.Minecraft.getInstance();
+            if (mc != null && mc.level != null) {
+                result = vanillaRecipe.getResultItem(mc.level.registryAccess());
+            }
+        } catch (Throwable ignored) {}
+        if (!result.isEmpty()) return result;
+
+        try {
+            result = vanillaRecipe.getResultItem(net.minecraft.core.RegistryAccess.EMPTY);
+        } catch (Throwable ignored) {}
+        if (!result.isEmpty()) return result;
+
+        try {
+            var m = vanillaRecipe.getClass().getMethod("getResultItem");
+            return (ItemStack) m.invoke(vanillaRecipe);
+        } catch (Throwable ignored) {}
+        return ItemStack.EMPTY;
+    }
+
+    private static void populateCatalystWorkstations(IJeiRuntime runtime, IRecipeCategory<?> category, RecipeNode node) {
+        try {
+            var catalystLookup = runtime.getRecipeManager().createRecipeCatalystLookup(category.getRecipeType());
+            if (catalystLookup == null) return;
+            for (var cat : catalystLookup.get().toList()) {
+                addCatalystWorkstation(node, cat);
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    private static void addCatalystWorkstation(RecipeNode node, Object cat) {
+        if (cat == null) return;
+        ItemStack is = extractCatalystItemStack(cat);
+        if (is.isEmpty()) return;
+        ResourceLocation itemId = ForgeRegistries.ITEMS.getKey(is.getItem());
+        if (itemId != null && !node.getAvailableWorkstations().contains(itemId)) {
+            node.getAvailableWorkstations().add(itemId);
+        }
+    }
+
+    private static ItemStack extractCatalystItemStack(Object cat) {
+        if (cat instanceof mezz.jei.api.ingredients.ITypedIngredient<?> typed) {
+            ItemStack is = typed.getItemStack().orElse(ItemStack.EMPTY);
+            if (!is.isEmpty()) return is;
+            if (typed.getIngredient() instanceof ItemStack s) return s;
+        }
+        return ItemStack.EMPTY;
     }
 
     public static String formatName(String path) {
@@ -440,5 +473,15 @@ public class JeiRecipeConverter {
             used[j] = true;
             return;
         }
+    }
+
+    private static ResourceLocation findPreferredWorkstation(List<ResourceLocation> workstations) {
+        if (workstations == null || workstations.isEmpty()) return null;
+        for (ResourceLocation ws : workstations) {
+            if (ws != null && !MultiblockDetector.isMultiblock(ws)) {
+                return ws;
+            }
+        }
+        return workstations.get(0);
     }
 }

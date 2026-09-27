@@ -164,13 +164,13 @@ public final class GTCombustionHelper {
         if (LARGE_COMBUSTION_ENGINE.equals(node.getMachineIcon())) {
             return true;
         }
-        if (isStarTModule(node) || isModularCombustionFrame(node)) {
+        if (!node.isMultiblock() || isStarTModule(node) || isModularCombustionFrame(node)) {
             return false;
         }
         if (LARGE_COMBUSTION_ENGINE.equals(node.getMultiblockWorkstation())) {
             return true;
         }
-        return COMBUSTION_CATEGORY_ID.equals(node.getRecipeCategoryId()) && node.isMultiblock() && node.getTargetTier() == com.gtceu.calcboard.api.type.GTVoltageTier.EV;
+        return COMBUSTION_CATEGORY_ID.equals(node.getRecipeCategoryId()) && node.getTargetTier() == com.gtceu.calcboard.api.type.GTVoltageTier.EV;
     }
 
     public static boolean isExtremeCombustionEngine(RecipeNode node) {
@@ -181,13 +181,13 @@ public final class GTCombustionHelper {
         if (EXTREME_COMBUSTION_ENGINE.equals(node.getMachineIcon())) {
             return true;
         }
-        if (isStarTModule(node) || isModularCombustionFrame(node)) {
+        if (!node.isMultiblock() || isStarTModule(node) || isModularCombustionFrame(node)) {
             return false;
         }
         if (EXTREME_COMBUSTION_ENGINE.equals(node.getMultiblockWorkstation())) {
             return true;
         }
-        return COMBUSTION_CATEGORY_ID.equals(node.getRecipeCategoryId()) && node.isMultiblock() && node.getTargetTier() == com.gtceu.calcboard.api.type.GTVoltageTier.IV;
+        return COMBUSTION_CATEGORY_ID.equals(node.getRecipeCategoryId()) && node.getTargetTier() == com.gtceu.calcboard.api.type.GTVoltageTier.IV;
     }
 
     public static boolean isStarTCombustionModule(RecipeNode node) {
@@ -195,8 +195,10 @@ public final class GTCombustionHelper {
         if (node.getMachineIcon() != null && isSingleblockCombustionGenerator(node.getMachineIcon())) {
             return false;
         }
-        return (node.getMachineIcon() != null && START_COMBUSTION_MODULES.contains(node.getMachineIcon()))
-                || (node.getMultiblockWorkstation() != null && START_COMBUSTION_MODULES.contains(node.getMultiblockWorkstation()));
+        if (node.getMachineIcon() != null && START_COMBUSTION_MODULES.contains(node.getMachineIcon())) {
+            return true;
+        }
+        return node.isMultiblock() && node.getMultiblockWorkstation() != null && START_COMBUSTION_MODULES.contains(node.getMultiblockWorkstation());
     }
 
     public static boolean isStarTRocketModule(RecipeNode node) {
@@ -204,8 +206,10 @@ public final class GTCombustionHelper {
         if (node.getMachineIcon() != null && isSingleblockCombustionGenerator(node.getMachineIcon())) {
             return false;
         }
-        return (node.getMachineIcon() != null && START_ROCKET_MODULES.contains(node.getMachineIcon()))
-                || (node.getMultiblockWorkstation() != null && START_ROCKET_MODULES.contains(node.getMultiblockWorkstation()));
+        if (node.getMachineIcon() != null && START_ROCKET_MODULES.contains(node.getMachineIcon())) {
+            return true;
+        }
+        return node.isMultiblock() && node.getMultiblockWorkstation() != null && START_ROCKET_MODULES.contains(node.getMultiblockWorkstation());
     }
 
     public static boolean isStarTModule(RecipeNode node) {
@@ -213,8 +217,10 @@ public final class GTCombustionHelper {
         if (node.getMachineIcon() != null && isSingleblockCombustionGenerator(node.getMachineIcon())) {
             return false;
         }
-        return (node.getMachineIcon() != null && START_MODULES.contains(node.getMachineIcon()))
-                || (node.getMultiblockWorkstation() != null && START_MODULES.contains(node.getMultiblockWorkstation()));
+        if (node.getMachineIcon() != null && START_MODULES.contains(node.getMachineIcon())) {
+            return true;
+        }
+        return node.isMultiblock() && node.getMultiblockWorkstation() != null && START_MODULES.contains(node.getMultiblockWorkstation());
     }
 
     public static boolean isModularCombustionFrame(RecipeNode node) {
@@ -225,7 +231,7 @@ public final class GTCombustionHelper {
         if (node.getMachineIcon() != null) {
             return isModularCombustionFrame(node.getMachineIcon());
         }
-        return isModularCombustionFrame(node.getMultiblockWorkstation());
+        return node.isMultiblock() && isModularCombustionFrame(node.getMultiblockWorkstation());
     }
 
     public static boolean isModularCombustionFrame(ResourceLocation icon) {

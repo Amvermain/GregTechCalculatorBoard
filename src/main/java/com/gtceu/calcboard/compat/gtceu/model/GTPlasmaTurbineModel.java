@@ -125,17 +125,20 @@ public enum GTPlasmaTurbineModel {
             return true;
         }
         ResourceLocation icon = node.getMachineIcon();
-        if (icon != null) {
-            for (GTPlasmaTurbineModel m : values()) {
-                if (m.matchingIcons.contains(icon)) return true;
-            }
+        if (icon != null && matchesAnyTurbineIcon(icon)) {
+            return true;
         }
         for (ResourceLocation ws : node.getAvailableWorkstations()) {
-            if (ws != null) {
-                for (GTPlasmaTurbineModel m : values()) {
-                    if (m.matchingIcons.contains(ws)) return true;
-                }
+            if (ws != null && matchesAnyTurbineIcon(ws)) {
+                return true;
             }
+        }
+        return false;
+    }
+
+    private static boolean matchesAnyTurbineIcon(ResourceLocation icon) {
+        for (GTPlasmaTurbineModel m : values()) {
+            if (m.matchingIcons.contains(icon)) return true;
         }
         return false;
     }

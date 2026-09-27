@@ -79,64 +79,94 @@ public class ReflectorHelper {
 
     private static ReflectorStats inspectMethodsForTier(Class<?> clazz, Object obj) {
         for (Method m : clazz.getMethods()) {
-            if (m.getParameterCount() == 0) {
-                String name = m.getName().toLowerCase(Locale.ROOT);
-                if (name.equals("getreflectortier") || name.equals("gettier") || name.equals("getfusionreflectortier") || name.equals("reflectortier")) {
-                    try {
-                        m.setAccessible(true);
-                        Object res = m.invoke(obj);
-                        if (res instanceof Number num && num.intValue() > 0) {
-                            return new ReflectorStats(num.intValue());
-                        }
-                    } catch (ReflectiveOperationException | LinkageError ignored) {}
-                }
+            ReflectorStats stats = tryInvokeTierMethod(m, obj);
+            if (stats != null) return stats;
+        }
+        return null;
+    }
+
+    private static ReflectorStats tryInvokeTierMethod(Method m, Object obj) {
+        if (m.getParameterCount() != 0) return null;
+        String name = m.getName().toLowerCase(Locale.ROOT);
+        if (!isTierMethodName(name)) return null;
+
+        try {
+            m.setAccessible(true);
+            Object res = m.invoke(obj);
+            if (res instanceof Number num && num.intValue() > 0) {
+                return new ReflectorStats(num.intValue());
+            }
+        } catch (ReflectiveOperationException | LinkageError ignored) {}
+        return null;
+    }
+
+    private static boolean isTierMethodName(String name) {
+        return name.equals("getreflectortier") || name.equals("gettier")
+                || name.equals("getfusionreflectortier") || name.equals("reflectortier");
+    }
+
+    private static ReflectorStats inspectFieldsForTier(Class<?> clazz, Object obj, int depth) {
+        for (Field f : clazz.getFields()) {
+            ReflectorStats directStats = tryInspectDirectField(f, obj);
+            if (directStats != null) return directStats;
+
+            if (depth < 2) {
+                ReflectorStats nestedStats = tryInspectNestedField(f, obj, depth);
+                if (nestedStats != null) return nestedStats;
             }
         }
         return null;
     }
 
-    private static ReflectorStats inspectFieldsForTier(Class<?> clazz, Object obj, int depth) {
-        for (Field f : clazz.getFields()) {
-            String name = f.getName().toLowerCase(Locale.ROOT);
-            if (name.equals("reflectortier") || name.equals("tier") || name.equals("fusionreflectortier")) {
-                try {
-                    f.setAccessible(true);
-                    Object res = f.get(obj);
-                    if (res instanceof Number num && num.intValue() > 0) {
-                        return new ReflectorStats(num.intValue());
-                    }
-                } catch (ReflectiveOperationException | LinkageError ignored) {}
-            }
-            if (depth < 2 && (name.contains("reflector") || name.contains("type"))) {
-                try {
-                    f.setAccessible(true);
-                    Object fieldObj = f.get(obj);
-                    if (fieldObj != null && fieldObj != obj) {
-                        ReflectorStats nested = inspectReflectorObject(fieldObj, depth + 1);
-                        if (nested != null) return nested;
-                    }
-                } catch (ReflectiveOperationException | LinkageError ignored) {}
-            }
+    private static ReflectorStats tryInspectDirectField(Field f, Object obj) {
+        String name = f.getName().toLowerCase(Locale.ROOT);
+        if (!name.equals("reflectortier") && !name.equals("tier") && !name.equals("fusionreflectortier")) {
+            return null;
         }
+        try {
+            f.setAccessible(true);
+            Object res = f.get(obj);
+            if (res instanceof Number num && num.intValue() > 0) {
+                return new ReflectorStats(num.intValue());
+            }
+        } catch (ReflectiveOperationException | LinkageError ignored) {}
+        return null;
+    }
+
+    private static ReflectorStats tryInspectNestedField(Field f, Object obj, int depth) {
+        String name = f.getName().toLowerCase(Locale.ROOT);
+        if (!name.contains("reflector") && !name.contains("type")) return null;
+
+        try {
+            f.setAccessible(true);
+            Object fieldObj = f.get(obj);
+            if (fieldObj != null && fieldObj != obj) {
+                return inspectReflectorObject(fieldObj, depth + 1);
+            }
+        } catch (ReflectiveOperationException | LinkageError ignored) {}
         return null;
     }
 
     private static ReflectorStats inspectNestedReflectorMethods(Class<?> clazz, Object obj, int depth) {
         for (Method m : clazz.getMethods()) {
-            if (m.getParameterCount() == 0) {
-                String name = m.getName().toLowerCase(Locale.ROOT);
-                if (name.equals("getreflectortype") || name.equals("getreflector")) {
-                    try {
-                        m.setAccessible(true);
-                        Object res = m.invoke(obj);
-                        if (res != null && res != obj) {
-                            ReflectorStats nested = inspectReflectorObject(res, depth + 1);
-                            if (nested != null) return nested;
-                        }
-                    } catch (ReflectiveOperationException | LinkageError ignored) {}
-                }
-            }
+            ReflectorStats stats = tryInspectNestedMethod(m, obj, depth);
+            if (stats != null) return stats;
         }
+        return null;
+    }
+
+    private static ReflectorStats tryInspectNestedMethod(Method m, Object obj, int depth) {
+        if (m.getParameterCount() != 0) return null;
+        String name = m.getName().toLowerCase(Locale.ROOT);
+        if (!name.equals("getreflectortype") && !name.equals("getreflector")) return null;
+
+        try {
+            m.setAccessible(true);
+            Object res = m.invoke(obj);
+            if (res != null && res != obj) {
+                return inspectReflectorObject(res, depth + 1);
+            }
+        } catch (ReflectiveOperationException | LinkageError ignored) {}
         return null;
     }
 
@@ -161,32 +191,40 @@ public class ReflectorHelper {
 
         if (ForgeRegistries.ITEMS != null) {
             for (Item item : ForgeRegistries.ITEMS) {
-                ResourceLocation id = ForgeRegistries.ITEMS.getKey(item);
-                if (id == null) continue;
-
-                ItemStack stack = new ItemStack(item);
-                ReflectorStats stats = getReflectorStats(stack);
-                if (stats != null && stats.tier() > 0) {
-                    GTReflectorAddon addon = parseReflectorItem(stack, id);
-                    if (addon != null && collector.stream().noneMatch(a -> a.getId().equals(addon.getId()))) {
-                        collector.add(addon);
-                        discoveredTiers.add(stats.tier());
-                    }
-                }
+                tryRegisterDiscoveredReflector(item, collector, discoveredTiers);
             }
         }
 
         for (int t = 1; t <= 5; t++) {
             if (!discoveredTiers.contains(t)) {
-                ResourceLocation id = ResourceLocation.tryParse("gtceu:fusion_reflector_t" + t);
-                String name = Component.translatable("gui.gtcalcboard.addon.reflector_tier_name", t).getString();
-                String desc = Component.translatable("gui.gtcalcboard.addon.reflector_desc", t).getString();
-                GTReflectorAddon addon = new GTReflectorAddon("gtceu:reflector_tier_" + t, name, desc, id, t);
-                addon.setDiscoverySource("GTCEu Built-in Reflector Specification");
-                if (collector.stream().noneMatch(a -> a.getId().equals(addon.getId()))) {
-                    collector.add(addon);
-                }
+                registerSyntheticReflector(t, collector);
             }
+        }
+    }
+
+    private static void tryRegisterDiscoveredReflector(Item item, List<MachineAddon> collector, Set<Integer> discoveredTiers) {
+        ResourceLocation id = ForgeRegistries.ITEMS.getKey(item);
+        if (id == null) return;
+
+        ItemStack stack = new ItemStack(item);
+        ReflectorStats stats = getReflectorStats(stack);
+        if (stats == null || stats.tier() <= 0) return;
+
+        GTReflectorAddon addon = parseReflectorItem(stack, id);
+        if (addon != null && collector.stream().noneMatch(a -> a.getId().equals(addon.getId()))) {
+            collector.add(addon);
+            discoveredTiers.add(stats.tier());
+        }
+    }
+
+    private static void registerSyntheticReflector(int tier, List<MachineAddon> collector) {
+        ResourceLocation id = ResourceLocation.tryParse("gtceu:fusion_reflector_t" + tier);
+        String name = Component.translatable("gui.gtcalcboard.addon.reflector_tier_name", tier).getString();
+        String desc = Component.translatable("gui.gtcalcboard.addon.reflector_desc", tier).getString();
+        GTReflectorAddon addon = new GTReflectorAddon("gtceu:reflector_tier_" + tier, name, desc, id, tier);
+        addon.setDiscoverySource("GTCEu Built-in Reflector Specification");
+        if (collector.stream().noneMatch(a -> a.getId().equals(addon.getId()))) {
+            collector.add(addon);
         }
     }
 

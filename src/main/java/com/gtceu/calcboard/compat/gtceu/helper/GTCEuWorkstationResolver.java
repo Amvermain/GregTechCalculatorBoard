@@ -308,6 +308,15 @@ public final class GTCEuWorkstationResolver {
         return false;
     }
 
+    public static ResourceLocation getRecipeCategoryIdForMachine(ResourceLocation machineId) {
+        if (machineId == null) return null;
+        Object def = GTCEuReflectionBridge.getMachineDefinition(machineId);
+        if (def == null) return null;
+        List<Object> recipeTypes = GTCEuReflectionBridge.getRecipeTypes(def);
+        if (recipeTypes == null || recipeTypes.isEmpty()) return null;
+        return MultiblockDetector.extractRecipeTypeId(recipeTypes.get(0));
+    }
+
     public static GTVoltageTier getMinimumWorkstationTier(RecipeNode node) {
         if (node == null) return null;
         List<ResourceLocation> workstations = node.getAvailableWorkstations();

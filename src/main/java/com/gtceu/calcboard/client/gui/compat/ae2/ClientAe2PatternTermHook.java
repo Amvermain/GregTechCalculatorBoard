@@ -71,12 +71,12 @@ public class ClientAe2PatternTermHook {
         PatternId patternId = Ae2PatternPageGenerator.createPatternIdFromTerminalMenu(termMenu);
         Optional<BoardPage> existing = PatternGraphRegistry.getInstance().getBoundPage(patternId);
         if (existing.isPresent()) {
-            switchToPageAndNotify(existing.get());
+            switchToPageAndNotify(existing.get(), screen);
             return;
         }
 
         BoardPage page = Ae2PatternPageGenerator.createPageFromTerminalMenu(termMenu);
-        openPageAndNotify(page);
+        openPageAndNotify(page, screen);
     }
 
     private static boolean tryCreateFromHoveredSlot(AbstractContainerScreen<?> screen, Level level) {
@@ -88,12 +88,12 @@ public class ClientAe2PatternTermHook {
 
         Optional<BoardPage> existing = PatternGraphRegistry.getInstance().getBoundPage(stack);
         if (existing.isPresent()) {
-            switchToPageAndNotify(existing.get());
+            switchToPageAndNotify(existing.get(), screen);
             return true;
         }
 
         BoardPage page = Ae2PatternPageGenerator.createPageFromPatternStack(stack, level);
-        return openPageAndNotify(page);
+        return openPageAndNotify(page, screen);
     }
 
     private static boolean tryCreateFromTerminal(AbstractContainerScreen<?> screen) {
@@ -104,7 +104,7 @@ public class ClientAe2PatternTermHook {
         return true;
     }
 
-    private static boolean openPageAndNotify(BoardPage page) {
+    private static boolean openPageAndNotify(BoardPage page, Screen screen) {
         if (page == null) return false;
 
         Minecraft mc = Minecraft.getInstance();
@@ -113,11 +113,11 @@ public class ClientAe2PatternTermHook {
             mc.player.sendSystemMessage(Component.translatable("gui.gtcalcboard.ae2.pattern_page_created", page.getName()));
         }
 
-        mc.setScreen(new BoardScreen());
+        BoardScreen.openScreen(screen);
         return true;
     }
 
-    private static void switchToPageAndNotify(BoardPage page) {
+    private static void switchToPageAndNotify(BoardPage page, Screen screen) {
         if (page == null) return;
         BoardManager.getInstance().openPage(page.getId());
 
@@ -127,7 +127,7 @@ public class ClientAe2PatternTermHook {
             mc.player.sendSystemMessage(Component.translatable("gui.gtcalcboard.toast.switched_to_page", page.getName()));
         }
 
-        mc.setScreen(new BoardScreen());
+        BoardScreen.openScreen(screen);
     }
 
     private static boolean isPatternEncodingScreen(Screen screen) {

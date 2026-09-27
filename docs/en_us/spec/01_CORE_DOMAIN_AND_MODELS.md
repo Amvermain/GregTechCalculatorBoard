@@ -47,64 +47,148 @@ public class IngredientStack {
 ---
 
 ### 1.3 `RecipeNode` (Pure Domain Node Model)
-Holds the operational and calculation state of machines, generators, or compound modules on the canvas, delegating mod-specific behaviors to `IModAdapter`.
+Holds the operational and calculation state of machines, junctions, subpage modules, or boundary pins on the canvas, delegating role-specific behaviors to `INodeRole` implementations and mod-specific operations to `IModAdapter`.
 
 ```mermaid
 classDiagram
     class RecipeNode {
-        +String id
-        +double posX, posY
-        +String name
-        +List~IngredientStack~ inputs
-        +List~IngredientStack~ outputs
+        -String id
+        -double posX, posY
+        -int cardWidth, cardHeight
+        -boolean isFlipped
+        -boolean isBaseNode
+        -List~IngredientStack~ inputs
+        -List~IngredientStack~ outputs
+        -NodePortVisibility portVisibility
+        -NodePropertyStore properties
+        -FlowGraph parentGraph
+        -INodeRole role
+        -RecipeSpec baseSpec
+        -List~ProjectedPort~ projectedInputs
+        -List~ProjectedPort~ projectedOutputs
+        +getRole() INodeRole
+        +setRole(INodeRole) void
+        +getRole(Class~T~) Optional~T~
+        +isMachine() boolean
+        +isModule() boolean
+        +isJunction() boolean
+        +isBoundaryPin() boolean
+        +asMachine() MachineNodeRole
+        +asModule() SubPageModuleNodeRole
+        +asJunction() JunctionNodeRole
+        +asBoundaryPin() BoundaryPinNodeRole
+        +getBaseSpec() RecipeSpec
+        +setBaseSpec(RecipeSpec) void
+        +getProjectedInputs() List~ProjectedPort~
+        +getProjectedOutputs() List~ProjectedPort~
+        +markPortsDirty() void
+    }
+
+    class INodeRole {
+        <<interface>>
+        +getRoleType() NodeRoleType
+        +attach(RecipeNode) void
+        +detach() void
+        +getOwner() RecipeNode
+        +serializeRoleNBT() CompoundTag
+        +deserializeRoleNBT(CompoundTag) void
+        +copy() INodeRole
+    }
+
+    class MachineNodeRole {
+        -double baseDurationTicks
+        -double baseEUt
+        -GTVoltageTier recipeTier
+        -GTVoltageTier targetTier
+        -OverclockMode overclockMode
+        -double machineCount
+        -int parallel
+        -int customParallel
+        -boolean isMultiblock
+        -boolean isGenerator
+        -SteamMode steamMode
+        -List~MachineAddon~ addons
+        -ResourceLocation machineIcon
+        -ResourceLocation recipeCategoryId
+        -List~ResourceLocation~ availableWorkstations
+        -double efficiency
+    }
+
+    class JunctionNodeRole {
+        -SupplyMode supplyMode
+        -double externalSupplyRate
+        -double fixedFlowLimit
+        -FlowSplitMode splitMode
+        -Set~Integer~ voidedOutputIndices
+        -List~CrossPageExportTarget~ exportTargets
+        -String linkedSourcePageId
+        -String linkedSourceNodeId
+        -double allocatedInputRate
+    }
+
+    class CrossPageExportTarget {
+        <<record>>
+        +String targetPageId
+        +int priority
+        +double fixedLimit
+    }
+
+    class SubPageModuleNodeRole {
+        -String subPageId
+        -FlowGraph subGraph
+        -List~String~ inputPinNodeIds
+        -List~String~ outputPinNodeIds
+        -int containedMachineCount
+        -double scaleMultiplier
+        -double efficiency
+        -NodePortOriginManager portOriginManager
+    }
+
+    class BoundaryPinNodeRole {
+        -PinDirection direction
+        -String pinLabel
+        -int targetPortIndex
+        -IngredientStack boundIngredient
+    }
+
+    class RecipeSpec {
+        <<record>>
+        +String recipeId
+        +ResourceLocation categoryId
         +double baseDurationTicks
         +double baseEUt
-        +GTVoltageTier recipeTier
-        +GTVoltageTier targetTier
-        +OverclockMode overclockMode
-        +double machineCount
-        +int parallel
-        +boolean isMultiblock
-        +boolean isGenerator
-        +boolean isFlipped
-        +SteamMode steamMode
-        +List~MachineAddon~ addons
-        +ResourceLocation machineIcon
-        +ResourceLocation recipeCategoryId
-        +List~ResourceLocation~ availableWorkstations
-        +NodePropertyStore properties
-        +double efficiency
-        +Set~Integer~ hiddenInputIndices
-        +Set~Integer~ hiddenOutputIndices
-        +Set~Integer~ voidedOutputIndices
-        +SupplyMode supplyMode
-        +hideInputPort(int) void
-        +unhideInputPort(int) void
-        +hideOutputPort(int) void
-        +unhideOutputPort(int) void
-        +isOutputPortVoided(int) boolean
-        +setOutputPortVoided(int, boolean) void
-        +isVoidSink() boolean
-        +getVisibleInputIndices() List~Integer~
-        +getVisibleOutputIndices() List~Integer~
-        +getTotalHiddenCount() int
-        +setMachineIcon(icon) void
-        +getEnergyType() EnergyType
-        +getOverclockResult() OverclockResult
-        +getSingleMachineEUt() double
-        +getTotalEUt() double
-        +getCyclesPerSecond() double
+        +List~IngredientStack~ baseInputs
+        +List~IngredientStack~ baseOutputs
     }
+
+    RecipeNode *-- INodeRole : role
+    RecipeNode *-- RecipeSpec : baseSpec
+    INodeRole <|.. MachineNodeRole : implements
+    INodeRole <|.. JunctionNodeRole : implements
+    INodeRole <|.. SubPageModuleNodeRole : implements
+    INodeRole <|.. BoundaryPinNodeRole : implements
 ```
 
+* **Role Composition Architecture (`INodeRole`, ADR-045)**:
+  - `RecipeNode` maintains pure graph metadata: coordinates, dimensions, flipped orientation, property stores, and I/O port references.
+  - 4 specialized role components:
+    1. **`MachineNodeRole`**: Processing machines, multiblocks, generators, and boilers. Manages overclocking, parallelism, addons, power (EU/t), and utilization ($\eta$).
+    2. **`JunctionNodeRole`**: Junctions, infinite/fixed external supply sources, void sinks (`VOID_SINK`), priority line splitting, and cross-page flow allocation / virtual linking (`SupplyMode.LINKED_JUNCTION`, `CrossPageExportTarget`, ADR-064).
+    3. **`SubPageModuleNodeRole`**: Compound process modules encapsulating a 1:1 dedicated subpage (`PageType.MODULE`). Aggregates contained machine counts and computes integrated sub-graph power.
+    4. **`BoundaryPinNodeRole`**: Boundary pins contracting physical I/O interfaces between dedicated subpage interiors and parent module card ports.
+  - **Dual-Write NBT Backward Compatibility**: Simultaneously serializes role-specific tags (`RoleTag`) and legacy field tags to ensure 100% lossless backward compatibility with older save files and blueprints.
+* **Immutable Recipe Specification & Dynamic Port Projection (`RecipeSpec`, `IPortProjectionProvider`, ADR-050)**:
+  - **Immutable Original Spec (`RecipeSpec`)**: Uniquely captures recipe ID, category, base duration, base EU/t, and base ingredients in an immutable record, preventing recipe data corruption upon machine reconfiguration or addon swapping.
+  - **Lazy Dynamic Port Projection (`ProjectedPort`)**: Dynamically projects auxiliary hardware ports (steam boiler boosters, oxidizers, coolants) behind core process ports (0..N-1) using pure functions via `IPortProjectionProvider`.
+  - Core port indices for existing wires (`ConnectionEdge`) remain isolated from auxiliary port modifications, ensuring topological wiring integrity.
+* **Immutable Calculation Snapshot (`NodeCalculationSnapshot`, ADR-045)**:
+  - Captures background solver outputs (utilization, CPS, effective EU/t, flow rates) in lock-free immutable snapshot records transmitted to client UI rendering threads, eliminating visual tearing and concurrent data races.
 * **Clean Architecture & SPI Delegation (Pure Domain Model)**:
-  - `RecipeNode` is a pure calculation domain entity across all supported mods (Create, Thermal, GTCEu, Vanilla, etc.).
-  - Contains no hardcoded mod branches; machine icon change handling (`setMachineIcon`), physical energy type resolution (`getEnergyType`), single machine power computation (`computeSingleMachinePower`), node operational validation (`validateNode`), and multiblock BOM calculation (`buildMultiblockBOM`) are delegated dynamically via `ModAdapterRegistry.getAdapterForNode(this)`.
-* **`hiddenInputIndices` / `hiddenOutputIndices`**: Set of integer port indices hidden by the user to reduce visual clutter on cards. Persisted via `RecipeNodeSerializer`. Renderers and wire solvers invoke `getVisibleInputIndices()` / `getVisibleOutputIndices()` to filter rendered and active ports.
-* **`voidedOutputIndices` & `isVoidSink()` (ADR-019)**: Set of output port indices excluded from net product summary, and query method for Junction void sink (`SupplyMode.VOID_SINK`). Integrated with mass balance solvers (`FlowBalanceMatrixSolver`, `FlowSummaryAggregator`) to void surplus byproducts while prioritizing downstream consumers.
-* **`isFlipped`**: Horizontally inverts the input (left) and output (right) socket ports to eliminate wire crossings in complex flowcharts.
-* **`efficiency` ($\eta \in [0.0, 1.0]$)**: Machine utilization computed by solvers (`FlowGraphSolver`, `MassBalanceSolver`) subject to upstream supply limits and closed-loop cycles.
-* **`calculateEffectiveOutputRates()`**: Computes per-second output flow combining machine count, parallel multiplier, overclocking, sub-tick batching, addon compounding, and byproduct tier chance boosts.
+  - Mod-specific operations—machine icon change events (`setMachineIcon`), physical energy type resolution (`getEnergyType`), single machine power computation (`computeSingleMachinePower`), operational validation (`validateNode`), and multiblock BOM calculation (`buildMultiblockBOM`)—are delegated dynamically via `ModAdapterRegistry.getAdapterForNode(this)`.
+* **Port Visibility & Balance Control**:
+  - `NodePortVisibility`: Manages hidden or disabled port indices, ensuring only visible ports are wired and rendered.
+  - `voidedOutputIndices` & `isVoidSink()`: Marks surplus byproduct ports or Junction void sinks (`SupplyMode.VOID_SINK`) to exclude excess flow from net production summaries while fully supplying downstream machines.
+* **`isFlipped`**: Horizontally inverts input (left) and output (right) socket port rendering to minimize wire crossings in complex flowcharts.
 
 ---
 
@@ -339,11 +423,15 @@ Maintains command deltas for all canvas operations with minimal memory overhead 
 
 ---
 
-## 6. Canvas Group Frames & Shared Machine Pools (`CanvasGroupFrame`)
+## 6. Canvas Group Frames & Shared Machine Pools (`CanvasGroupFrame`) (ADR-042, ADR-060)
 
 Manages visual grouping regions and time-sharing machine pools.
 
 * **`isSharedMachineFrame`**: Time-sharing mode where all enclosed machine recipes share a single physical machine pool.
+* **Shared Machine Pool 3-Tier View Modes (`PoolViewMode`, ADR-060)**:
+  - `FOLDED_CARD`: Ultra-compact view collapsed into a single virtual card. External wires route cleanly to the card, minimizing canvas footprint.
+  - `EMBEDDED_PANEL`: Machine-centric embedded panel mode. Manages multiple time-shared recipes cleanly inside a single panel as vertical sub-cards with inline `[+ Add Recipe]` search.
+  - `EXPANDED_FRAME`: Traditional frame mode where all recipes are displayed as individual canvas nodes.
 * **Cumulative Duty Calculation**: $\text{Total Duty} = \sum \text{machineCount}_i$, Required Machines = $\lceil \text{Total Duty} \rceil$.
 * **Batch Hardware Config Synchronization (`syncHardwareConfig`)**: Synchronizes voltage tiers, overclock modes, parallel limits, and equipped addons across all enclosed machines from the frame header.
 * **One-Click Auto-Fit Frame (`autoFit`)**: Automatically adjusts frame bounding box to tightly enclose all contained/intersecting nodes with a 24px padding.

@@ -40,15 +40,20 @@ public final class CanvasWireConnectingState implements CanvasInteractionState {
 
     @Override
     public boolean onMouseUp(CanvasInteractionContext ctx, double canvasX, double canvasY, int button) {
-        if (button == 0) {
-            BoardScreen screen = ctx.getScreen();
-            double screenX = screen != null ? screen.toScreenX(canvasX) : canvasX;
-            double screenY = screen != null ? screen.toScreenY(canvasY) : canvasY;
-            boolean handled = ctx.getWireHandler().handleWireReleased(screenX, screenY, button, screen, ctx.getQuickAddMarkerHandler());
+        if (button != 0) return false;
+
+        BoardScreen screen = ctx.getScreen();
+        if (screen == null) {
+            ctx.getWireHandler().cancelWireDrag();
             ctx.getStateMachine().returnToIdle();
-            return handled;
+            return false;
         }
-        return false;
+
+        double screenX = screen.toScreenX(canvasX);
+        double screenY = screen.toScreenY(canvasY);
+        boolean handled = ctx.getWireHandler().handleWireReleased(screenX, screenY, button, screen, ctx.getQuickAddMarkerHandler());
+        ctx.getStateMachine().returnToIdle();
+        return handled;
     }
 
     @Override

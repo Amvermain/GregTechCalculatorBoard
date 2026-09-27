@@ -6,10 +6,15 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.gtceu.calcboard.api.model.CanvasGroupFrame;
 import com.gtceu.calcboard.api.model.CanvasStickyNote;
+import com.gtceu.calcboard.api.model.CrossPageExportTarget;
 import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.NodeRateCalculator;
 import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.solver.FlowBalanceMatrixSolver;
+import com.gtceu.calcboard.api.solver.WorkspaceFlowCoordinator;
+import com.gtceu.calcboard.api.storage.BoardManager;
+import com.gtceu.calcboard.api.storage.BoardPage;
 
 import java.util.List;
 
@@ -73,9 +78,97 @@ public final class BoardJsonSerializer {
             nodeObj.add("inputs", serializeInputPorts(node));
             nodeObj.add("outputs", serializeOutputPorts(node));
 
+            if (node.isReroute()) {
+                serializeJunctionData(node, graph, nodeObj);
+            }
+
             array.add(nodeObj);
         }
         return array;
+    }
+
+    private static void serializeJunctionData(RecipeNode node, FlowGraph graph, JsonObject nodeObj) {
+        nodeObj.addProperty("supplyMode", node.getSupplyMode() != null ? node.getSupplyMode().name() : "NONE");
+        nodeObj.addProperty("allocatedInputRate", roundThreeDecimals(node.getAllocatedInputRate()));
+        nodeObj.addProperty("allocatedExportRate", roundThreeDecimals(node.getAllocatedExportRate()));
+
+        if (node.isLinkedJunction()) {
+            serializeLinkedSource(node, graph, nodeObj);
+        }
+        if (!node.getExportTargets().isEmpty()) {
+            serializeExportTargets(node, nodeObj);
+        }
+    }
+
+    private static void serializeLinkedSource(RecipeNode node, FlowGraph graph, JsonObject nodeObj) {
+        JsonObject linkObj = new JsonObject();
+        String srcPageId = node.getLinkedSourcePageId();
+        String srcNodeId = node.getLinkedSourceNodeId();
+        linkObj.addProperty("pageId", srcPageId);
+        linkObj.addProperty("nodeId", srcNodeId);
+
+        BoardPage srcPage = (srcPageId != null && !srcPageId.isEmpty())
+                ? BoardManager.getInstance().getPage(srcPageId).orElse(null)
+                : null;
+        RecipeNode srcNode = (srcPage != null && srcNodeId != null)
+                ? srcPage.getGraph().findNodeById(srcNodeId)
+                : null;
+
+        linkObj.addProperty("pageName", resolvePageName(srcPage, srcPageId));
+        linkObj.addProperty("nodeName", resolveNodeName(srcNode, srcNodeId));
+        linkObj.addProperty("isBroken", srcPage == null || srcNode == null);
+
+        WorkspaceFlowCoordinator.WorkspaceFlowResult flowResult = WorkspaceFlowCoordinator.getLastResult();
+        linkObj.addProperty("isCircular", flowResult != null && flowResult.isCircular(node.getId()));
+
+        double demand = graph != null
+                ? FlowBalanceMatrixSolver.calculateTotalConnectedPortDemand(graph, node, 0, null)
+                : 0.0;
+        double alloc = node.getAllocatedInputRate();
+        linkObj.addProperty("demandRate", roundThreeDecimals(demand));
+        linkObj.addProperty("isStarved", demand > 0.0001 && alloc < demand - 0.0001);
+        int reqPri = WorkspaceFlowCoordinator.getOutgoingMaxPriority(graph, node);
+        linkObj.addProperty("priority", reqPri);
+
+        if (srcPage != null && srcNode != null) {
+            WorkspaceFlowCoordinator.SourceJunctionMetrics metrics =
+                    WorkspaceFlowCoordinator.calculateSourceJunctionMetrics(srcPage, srcNode);
+            JsonObject mObj = new JsonObject();
+            mObj.addProperty("totalProduction", roundThreeDecimals(metrics.totalProduction()));
+            mObj.addProperty("totalUsage", roundThreeDecimals(metrics.totalUsage()));
+            mObj.addProperty("availableSurplus", roundThreeDecimals(metrics.availableSurplus()));
+            linkObj.add("metrics", mObj);
+        }
+
+        nodeObj.add("linkedSource", linkObj);
+    }
+
+    private static String resolvePageName(BoardPage page, String fallbackId) {
+        if (page != null && page.getName() != null && !page.getName().isEmpty()) {
+            return page.getName();
+        }
+        return fallbackId != null ? fallbackId : "";
+    }
+
+    private static String resolveNodeName(RecipeNode node, String fallbackId) {
+        if (node != null && node.getName() != null && !node.getName().isEmpty()) {
+            return node.getName();
+        }
+        return fallbackId != null ? fallbackId : "";
+    }
+
+    private static void serializeExportTargets(RecipeNode node, JsonObject nodeObj) {
+        JsonArray expArr = new JsonArray();
+        for (CrossPageExportTarget t : node.getExportTargets()) {
+            JsonObject tObj = new JsonObject();
+            tObj.addProperty("targetPageId", t.targetPageId());
+            BoardPage targetPage = BoardManager.getInstance().getPage(t.targetPageId()).orElse(null);
+            tObj.addProperty("targetPageName", resolvePageName(targetPage, t.targetPageId()));
+            tObj.addProperty("priority", t.priority());
+            tObj.addProperty("fixedLimit", roundThreeDecimals(t.fixedLimit()));
+            expArr.add(tObj);
+        }
+        nodeObj.add("exportTargets", expArr);
     }
 
     private static double resolveCardHeight(RecipeNode node) {

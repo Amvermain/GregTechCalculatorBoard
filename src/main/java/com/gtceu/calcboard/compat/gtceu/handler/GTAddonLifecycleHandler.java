@@ -116,6 +116,7 @@ public final class GTAddonLifecycleHandler {
         if (node == null || addon == null) return;
         if (addon.getCategory() == MachineAddon.Category.PARALLEL) {
             node.setCustomParallel(0);
+            com.gtceu.calcboard.api.model.NodeHardwareReconciler.clampParallel(node);
         } else if (addon.getCategory() == MachineAddon.Category.ENERGY_HATCH) {
             GTEnergyHatchCalculator.updateNodeTierFromEnergyHatches(node);
             if (GTTurbineHelper.isTurbine(node)) {
@@ -142,6 +143,7 @@ public final class GTAddonLifecycleHandler {
             if (GTCombustionAddonHelper.isCombustionBoostAddon(addon)) {
                 GTCombustionAddonHelper.applyCombustionBoostRemoval(node, addon);
             }
+            com.gtceu.calcboard.api.model.NodeHardwareReconciler.clampParallel(node);
         }
         node.markOverclockDirty();
     }

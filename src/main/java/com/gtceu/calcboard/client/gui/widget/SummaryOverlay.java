@@ -150,7 +150,11 @@ public class SummaryOverlay {
 
         // 1. Fixed Header Title
         graphics.fill(x, y, x + effectiveW, y + 22, 0xFF242934);
-        graphics.drawString(font, "§6⚡ " + Component.translatable("gui.gtcalcboard.summary").getString(), x + 8, y + 7, 0xFFFFFFFF, false);
+        int selCount = (screen != null) ? screen.getSelectedNodeIds().size() : 0;
+        String titleStr = (selCount > 0)
+                ? "§6⚡ " + Component.translatable("gui.gtcalcboard.summary").getString() + " §b(" + selCount + ")"
+                : "§6⚡ " + Component.translatable("gui.gtcalcboard.summary").getString();
+        graphics.drawString(font, titleStr, x + 8, y + 7, 0xFFFFFFFF, false);
 
         // Collapse button [>>]
         graphics.drawString(font, "»", x + effectiveW - 16, y + 7, 0xFFAAAAAA, false);
@@ -158,29 +162,21 @@ public class SummaryOverlay {
         // 2. Fixed Total Power, Stress & Machines Section
         int curHeaderY = y + 26;
 
-        // EU Power Line
-        boolean showEU = Math.abs(summary.totalEUt()) > 0.001 || (summary.totalSU() == 0 && summary.totalFE() == 0);
+        // EU Power Section (Average & Peak Lines)
+        boolean showEU = Math.abs(summary.totalEUt()) > 0.001 || Math.abs(summary.peakEUt()) > 0.001 || (summary.totalSU() == 0 && summary.totalFE() == 0);
         int powerY = curHeaderY;
-        int powerH = 13;
         if (showEU) {
             boolean isGen = summary.totalEUt() < -0.001;
-            String pLabel = (isGen ? "§a" : "§e") + Component.translatable(isGen ? "gui.gtcalcboard.total_gen" : "gui.gtcalcboard.total_power").getString();
-            String eutStr = BoardManager.getInstance().getPowerDisplayMode().formatSummaryPower(summary.totalEUt(), summary.highestVoltageTier());
-            int pLabelW = font.width(pLabel) + 6;
-            int eutW = font.width(eutStr);
-            if (pLabelW + eutW <= effectiveW - 16) {
-                graphics.drawString(font, pLabel, x + 8, curHeaderY, 0xFFFFFFFF, false);
-                graphics.drawString(font, eutStr, x + effectiveW - 8 - eutW, curHeaderY, 0xFFFFFFFF, false);
-                curHeaderY += 13;
-                powerH = 13;
-            } else {
-                graphics.drawString(font, pLabel, x + 8, curHeaderY, 0xFFFFFFFF, false);
-                curHeaderY += 11;
-                graphics.drawString(font, "  " + eutStr, x + 8, curHeaderY, 0xFFFFFFFF, false);
-                curHeaderY += 13;
-                powerH = 24;
-            }
+            String avgLabel = (isGen ? "§a" : "§e") + Component.translatable(isGen ? "gui.gtcalcboard.avg_gen" : "gui.gtcalcboard.avg_power").getString();
+            String avgEutStr = BoardManager.getInstance().getPowerDisplayMode().formatSummaryPower(summary.totalEUt(), summary.highestVoltageTier());
+            curHeaderY = renderPowerLine(graphics, font, x, curHeaderY, effectiveW, avgLabel, avgEutStr);
+
+            boolean isPeakGen = summary.peakEUt() < -0.001;
+            String peakLabel = (isPeakGen ? "§a" : "§e") + Component.translatable(isPeakGen ? "gui.gtcalcboard.peak_gen" : "gui.gtcalcboard.peak_power").getString();
+            String peakEutStr = BoardManager.getInstance().getPowerDisplayMode().formatSummaryPower(summary.peakEUt(), summary.highestVoltageTier());
+            curHeaderY = renderPowerLine(graphics, font, x, curHeaderY, effectiveW, peakLabel, peakEutStr);
         }
+        int powerH = Math.max(13, curHeaderY - powerY);
 
         // Stress Capacity Line
         boolean showSU = Math.abs(summary.totalSU()) > 0.001;
@@ -275,23 +271,7 @@ public class SummaryOverlay {
 
         // Section C: Voided Byproducts
         if (summary.hasVoidedOutputs()) {
-            curY += 8;
-            String voidSymbol = voidedCollapsed ? "▶ " : "▼ ";
-            String voidHeader = "§d\uD83D\uDDD1 " + Component.translatable("gui.gtcalcboard.voided_outputs").getString() + " §7" + voidSymbol;
-            graphics.drawString(font, voidHeader, x + 8, curY, 0xFFFFFFFF, false);
-            if (mouseX >= x + 8 && mouseX <= x + effectiveW - 8 && mouseY >= curY - 2 && mouseY <= curY + 12 && mouseY >= contentY && mouseY <= contentY + contentH) {
-                hoveredVoidHeader = true;
-            }
-            curY += 14;
-
-            if (!voidedCollapsed) {
-                for (Map.Entry<IngredientStack, Double> entry : summary.voidedOutputs().entrySet()) {
-                    if (curY >= contentY - 16 && curY <= contentY + contentH) {
-                        renderSummaryRow(graphics, font, x, curY, entry.getKey(), entry.getValue(), 0xFFC084FC, mouseX, mouseY, contentY, contentH, effectiveW, true, true, false);
-                    }
-                    curY += 16;
-                }
-            }
+            curY = renderVoidedOutputsSection(graphics, font, summary, x, curY, mouseX, mouseY, contentY, contentH, effectiveW);
         }
 
         BoardScissorHelper.disableScissor(graphics);
@@ -347,16 +327,45 @@ public class SummaryOverlay {
         }
     }
 
+    private int renderPowerLine(GuiGraphics graphics, Font font, int x, int curY, int effectiveW, String label, String valStr) {
+        int labelW = font.width(label) + 6;
+        int valW = font.width(valStr);
+        if (labelW + valW <= effectiveW - 16) {
+            graphics.drawString(font, label, x + 8, curY, 0xFFFFFFFF, false);
+            graphics.drawString(font, valStr, x + effectiveW - 8 - valW, curY, 0xFFFFFFFF, false);
+            return curY + 13;
+        }
+        graphics.drawString(font, label, x + 8, curY, 0xFFFFFFFF, false);
+        curY += 11;
+        graphics.drawString(font, "  " + valStr, x + 8, curY, 0xFFFFFFFF, false);
+        return curY + 13;
+    }
+
     public void renderTooltips(GuiGraphics graphics, Font font, int mouseX, int mouseY) {
         if (hoveredPower && lastSummary != null) {
             List<Component> tooltip = new ArrayList<>();
-            tooltip.add(Component.literal("§6⚡ " + Component.translatable("gui.gtcalcboard.total_power").getString()));
-            double totEUt = lastSummary.totalEUt();
+            tooltip.add(Component.literal("§6⚡ " + Component.translatable("gui.gtcalcboard.power_summary").getString()));
+
+            int selCount = (screen != null) ? screen.getSelectedNodeIds().size() : 0;
+            if (selCount > 0) {
+                tooltip.add(Component.literal("§bℹ " + Component.translatable("gui.gtcalcboard.tooltip.selection_summary_hint", selCount).getString()));
+            }
+
             var tier = lastSummary.highestVoltageTier();
             if (tier == null) tier = com.gtceu.calcboard.api.type.GTVoltageTier.LV;
-            double amps = Math.abs(totEUt) / (double) tier.getVoltage();
-            tooltip.add(Component.literal(String.format(java.util.Locale.ROOT, "§7EU/t: §f%,.2f EU/t", totEUt)));
-            tooltip.add(Component.literal(String.format(java.util.Locale.ROOT, "§7Current: §f%,.4fA %s", amps, tier.getName())));
+
+            double avgEUt = lastSummary.totalEUt();
+            double avgAmps = Math.abs(avgEUt) / (double) tier.getVoltage();
+            String avgLabel = Component.translatable(avgEUt < -0.001 ? "gui.gtcalcboard.avg_gen" : "gui.gtcalcboard.avg_power").getString();
+            tooltip.add(Component.literal("§e" + avgLabel));
+            tooltip.add(Component.literal(String.format(java.util.Locale.ROOT, "  §7EU/t: §f%,.2f EU/t §7| Current: §f%,.4fA %s", avgEUt, avgAmps, tier.getName())));
+
+            double peakEUt = lastSummary.peakEUt();
+            double peakAmps = Math.abs(peakEUt) / (double) tier.getVoltage();
+            String peakLabel = Component.translatable(peakEUt < -0.001 ? "gui.gtcalcboard.peak_gen" : "gui.gtcalcboard.peak_power").getString();
+            tooltip.add(Component.literal("§e" + peakLabel));
+            tooltip.add(Component.literal(String.format(java.util.Locale.ROOT, "  §7EU/t: §f%,.2f EU/t §7| Current: §f%,.4fA %s", peakEUt, peakAmps, tier.getName())));
+
             tooltip.add(Component.literal("§8" + Component.translatable("gui.gtcalcboard.tooltip.power_mode_hint").getString()));
             BoardTooltipRenderer.renderComponentTooltip(graphics, font, tooltip, mouseX, mouseY);
             return;
@@ -399,6 +408,10 @@ public class SummaryOverlay {
         if (hoveredMachines && lastSummary != null && !lastSummary.machineBreakdown().isEmpty()) {
             List<Component> tooltip = new ArrayList<>();
             tooltip.add(Component.literal("§6▦ " + Component.translatable("gui.gtcalcboard.total_machines_breakdown").getString()));
+            int selCount = (screen != null) ? screen.getSelectedNodeIds().size() : 0;
+            if (selCount > 0) {
+                tooltip.add(Component.literal("§bℹ " + Component.translatable("gui.gtcalcboard.tooltip.selection_summary_hint", selCount).getString()));
+            }
             for (Map.Entry<String, Integer> entry : lastSummary.machineBreakdown().entrySet()) {
                 tooltip.add(Component.literal("§7• " + entry.getKey() + ": §f" + entry.getValue() + Component.translatable("gui.gtcalcboard.machine_unit").getString()));
             }
@@ -517,39 +530,74 @@ public class SummaryOverlay {
         if (ctx == null && Minecraft.getInstance().screen instanceof IBoardScreenContext bs) {
             ctx = bs;
         }
-        if (ctx != null) {
-            if (!ctx.ensureEditPermission()) return;
-            FlowGraph graph = ctx.getGraph();
-            if (graph == null) return;
-            boolean changed = false;
-            for (RecipeNode node : graph.getNodes()) {
-                if (node == null || node.isReroute()) continue;
-                for (int i = 0; i < node.getOutputs().size(); i++) {
-                    IngredientStack out = node.getOutputs().get(i);
-                    if (out != null && out.equals(stack)) {
-                        if (restore) {
-                            if (node.isOutputPortVoided(i)) {
-                                node.setOutputPortVoided(i, false);
-                                changed = true;
-                            }
-                        } else {
-                            if (!node.isOutputPortVoided(i)) {
-                                node.setOutputPortVoided(i, true);
-                                changed = true;
-                            }
-                        }
-                    }
-                }
+        if (ctx == null || !ctx.ensureEditPermission()) {
+            return;
+        }
+        FlowGraph graph = ctx.getGraph();
+        if (graph == null) {
+            return;
+        }
+        boolean changed = updateMatchingOutputPortsVoidState(graph, stack, restore);
+        if (changed) {
+            ctx.markSummaryDirty();
+            Minecraft.getInstance().getSoundManager().play(
+                net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
+                    SoundEvents.UI_BUTTON_CLICK, restore ? 1.4F : 0.9F
+                )
+            );
+        }
+    }
+
+    private boolean updateMatchingOutputPortsVoidState(FlowGraph graph, IngredientStack stack, boolean restore) {
+        boolean changed = false;
+        for (RecipeNode node : graph.getNodes()) {
+            if (node == null || node.isReroute()) {
+                continue;
             }
-            if (changed) {
-                ctx.markSummaryDirty();
-                Minecraft.getInstance().getSoundManager().play(
-                    net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
-                        SoundEvents.UI_BUTTON_CLICK, restore ? 1.4F : 0.9F
-                    )
-                );
+            changed |= updateNodeOutputsVoidState(node, stack, restore);
+        }
+        return changed;
+    }
+
+    private boolean updateNodeOutputsVoidState(RecipeNode node, IngredientStack stack, boolean restore) {
+        boolean changed = false;
+        for (int i = 0; i < node.getOutputs().size(); i++) {
+            IngredientStack out = node.getOutputs().get(i);
+            if (out == null || !out.equals(stack)) {
+                continue;
+            }
+            if (restore && node.isOutputPortVoided(i)) {
+                node.setOutputPortVoided(i, false);
+                changed = true;
+            } else if (!restore && !node.isOutputPortVoided(i)) {
+                node.setOutputPortVoided(i, true);
+                changed = true;
             }
         }
+        return changed;
+    }
+
+    private int renderVoidedOutputsSection(GuiGraphics graphics, Font font, BalanceSummary summary, int x, int curY, int mouseX, int mouseY, int contentY, int contentH, int effectiveW) {
+        curY += 8;
+        String voidSymbol = voidedCollapsed ? "▶ " : "▼ ";
+        String voidHeader = "§d\uD83D\uDDD1 " + Component.translatable("gui.gtcalcboard.voided_outputs").getString() + " §7" + voidSymbol;
+        graphics.drawString(font, voidHeader, x + 8, curY, 0xFFFFFFFF, false);
+        if (mouseX >= x + 8 && mouseX <= x + effectiveW - 8 && mouseY >= curY - 2 && mouseY <= curY + 12 && mouseY >= contentY && mouseY <= contentY + contentH) {
+            hoveredVoidHeader = true;
+        }
+        curY += 14;
+
+        if (voidedCollapsed) {
+            return curY;
+        }
+
+        for (Map.Entry<IngredientStack, Double> entry : summary.voidedOutputs().entrySet()) {
+            if (curY >= contentY - 16 && curY <= contentY + contentH) {
+                renderSummaryRow(graphics, font, x, curY, entry.getKey(), entry.getValue(), 0xFFC084FC, mouseX, mouseY, contentY, contentH, effectiveW, true, true, false);
+            }
+            curY += 16;
+        }
+        return curY;
     }
 }
 

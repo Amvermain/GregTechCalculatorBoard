@@ -42,7 +42,6 @@ public class MultiblockBOMCalculator {
         List<MultiblockBOMSummary.MachineBOMContribution> machineContributions = new ArrayList<>();
         int totalMultiblocks = 0;
 
-        // Process shared machine frames: map primary node -> required machine count, and set of slave nodes to skip
         Map<String, Integer> sharedFrameMasterCounts = new HashMap<>();
         Set<String> sharedFrameSlavesToSkip = new HashSet<>();
         processSharedMachineFrames(frames, nodes, sharedFrameMasterCounts, sharedFrameSlavesToSkip);
@@ -51,28 +50,8 @@ public class MultiblockBOMCalculator {
             if (node == null || node.isReroute()) continue;
             if (sharedFrameSlavesToSkip.contains(node.getId())) continue;
 
-            if (node.isCompoundNode()) {
-                boolean isSingleMultiblockCluster = node.isMultiblock()
-                        || MultiblockDetector.isMultiblock(node.getMachineIcon())
-                        || (node.getMultiblockWorkstation() != null && MultiblockDetector.isMultiblock(node.getMultiblockWorkstation()));
-
-                boolean sharesClusterMachine = false;
-                if (node.getCompoundGroupId() != null) {
-                    RecipeNode master = null;
-                    for (RecipeNode other : nodes) {
-                        if (other != null && node.getCompoundGroupId().equals(other.getCompoundGroupId()) && other.isCompoundMaster()) {
-                            master = other;
-                            break;
-                        }
-                    }
-                    if (master != null && Objects.equals(node.getMachineIcon(), master.getMachineIcon())) {
-                        sharesClusterMachine = true;
-                    }
-                }
-
-                if ((isSingleMultiblockCluster || sharesClusterMachine) && !node.isCompoundMaster()) {
-                    continue;
-                }
+            if (shouldSkipNonMasterCompoundNode(node, nodes)) {
+                continue;
             }
 
             IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
@@ -300,5 +279,39 @@ public class MultiblockBOMCalculator {
         for (int i = 1; i < group.size(); i++) {
             slavesToSkip.add(group.get(i).getId());
         }
+    }
+
+    private static boolean shouldSkipNonMasterCompoundNode(RecipeNode node, Collection<RecipeNode> nodes) {
+        if (!node.isCompoundNode() || node.isCompoundMaster()) {
+            return false;
+        }
+
+        boolean isSingleMultiblockCluster = node.isMultiblock()
+                || MultiblockDetector.isMultiblock(node.getMachineIcon())
+                || (node.getMultiblockWorkstation() != null && MultiblockDetector.isMultiblock(node.getMultiblockWorkstation()));
+
+        if (isSingleMultiblockCluster) {
+            return true;
+        }
+
+        return sharesMachineWithMaster(node, nodes);
+    }
+
+    private static boolean sharesMachineWithMaster(RecipeNode node, Collection<RecipeNode> nodes) {
+        String groupId = node.getCompoundGroupId();
+        if (groupId == null) {
+            return false;
+        }
+        RecipeNode master = findCompoundMaster(groupId, nodes);
+        return master != null && Objects.equals(node.getMachineIcon(), master.getMachineIcon());
+    }
+
+    private static RecipeNode findCompoundMaster(String compoundGroupId, Collection<RecipeNode> nodes) {
+        for (RecipeNode other : nodes) {
+            if (other != null && compoundGroupId.equals(other.getCompoundGroupId()) && other.isCompoundMaster()) {
+                return other;
+            }
+        }
+        return null;
     }
 }

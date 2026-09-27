@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @ExtendWith(MinecraftBootstrapExtension.class)
@@ -307,5 +308,59 @@ public class SharedPoolFoldedTest {
         frame.setFolded(false, graph);
         Assertions.assertFalse(graph.isNodeInFoldedFrame(n1.getId()));
         Assertions.assertFalse(graph.isNodeInFoldedFrame(n2.getId()));
+    }
+
+    @Test
+    public void testFoldedPortSummaryCacheLifecycleAndWireResolutionPerformance() {
+        FlowGraph graph = new FlowGraph();
+        RecipeNode n1 = RecipeNode.create("Centrifuge A", 20, 128, GTVoltageTier.MV);
+        n1.getInputs().add(IngredientStack.item(ResourceLocation.tryParse("gtceu:iron_dust"), "Iron Dust", 1));
+        n1.getOutputs().add(IngredientStack.item(ResourceLocation.tryParse("gtceu:copper_dust"), "Copper Dust", 1));
+
+        RecipeNode n2 = RecipeNode.create("Centrifuge B", 20, 128, GTVoltageTier.MV);
+        n2.getInputs().add(IngredientStack.item(ResourceLocation.tryParse("gtceu:gold_dust"), "Gold Dust", 1));
+        n2.getOutputs().add(IngredientStack.item(ResourceLocation.tryParse("gtceu:copper_dust"), "Copper Dust", 2));
+
+        graph.addNode(n1);
+        graph.addNode(n2);
+
+        CanvasGroupFrame frame = CanvasGroupFrame.createFromNodes("Centrifuge Pool", List.of(n1, n2), CanvasGroupFrame.COLOR_BLUE);
+        frame.setSharedMachineFrame(true);
+        frame.setFolded(true, graph);
+        graph.addFrame(frame);
+
+        FlowGraphTopologyAnalyzer.FoldedPortSummary summary1 = FlowGraphTopologyAnalyzer.aggregateFoldedPorts(graph, frame);
+        FlowGraphTopologyAnalyzer.FoldedPortSummary summary2 = FlowGraphTopologyAnalyzer.aggregateFoldedPorts(graph, frame);
+        Assertions.assertSame(summary1, summary2);
+
+        graph.invalidatePortStatsCache();
+        Assertions.assertNull(frame.getCachedFoldedPortSummary());
+        FlowGraphTopologyAnalyzer.FoldedPortSummary summary3 = FlowGraphTopologyAnalyzer.aggregateFoldedPorts(graph, frame);
+        Assertions.assertNotSame(summary1, summary3);
+        Assertions.assertEquals(summary1.inputs().size(), summary3.inputs().size());
+        Assertions.assertEquals(summary1.outputs().size(), summary3.outputs().size());
+
+        List<FlowGraph.ConnectionEdge> testEdges = new ArrayList<>(200);
+        for (int i = 0; i < 200; i++) {
+            RecipeNode ext = RecipeNode.create("Ext " + i, 20, 10, GTVoltageTier.LV);
+            ext.setPosX(i * 10.0);
+            ext.setPosY(500.0);
+            ext.getInputs().add(IngredientStack.item(ResourceLocation.tryParse("gtceu:copper_dust"), "Copper Dust", 1));
+            graph.addNode(ext);
+
+            FlowGraph.ConnectionEdge edge = new FlowGraph.ConnectionEdge(n1.getId(), 0, ext.getId(), 0);
+            graph.addConnection(edge);
+            testEdges.add(edge);
+        }
+
+        long start = System.nanoTime();
+        for (FlowGraph.ConnectionEdge edge : testEdges) {
+            var endpoints = CanvasWireRenderer.resolveWireEndpoints(graph, null, edge);
+            Assertions.assertNotNull(endpoints);
+            Assertions.assertFalse(endpoints.isInternalCull());
+            Assertions.assertEquals(frame.getPosX() + frame.getWidth() - 5.0, endpoints.x1(), 0.001);
+        }
+        long durationMs = (System.nanoTime() - start) / 1_000_000;
+        Assertions.assertTrue(durationMs < 50, "Resolving 200 cached wire endpoints should take less than 50ms, took " + durationMs + "ms");
     }
 }

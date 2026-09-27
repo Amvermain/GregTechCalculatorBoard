@@ -2,12 +2,14 @@ package com.gtceu.calcboard.integration.emi;
 
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.ParsedQuery;
+import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.QueryTerm;
 import dev.emi.emi.api.recipe.EmiRecipe;
 import dev.emi.emi.api.stack.EmiStack;
 import dev.emi.emi.bom.BoM;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.registries.ForgeRegistries;
 
+import java.util.List;
 import java.util.Locale;
 
 /**
@@ -56,27 +58,8 @@ public final class EmiSearchHelper {
         }
         try {
             for (var out : er.getOutputs()) {
-                EmiRecipe def = BoM.getRecipe(out);
-                boolean matchesDef = (def != null && (def.equals(er) || (def.getId() != null && def.getId().equals(er.getId()))))
-                        || BoM.isDefaultRecipe(out, er);
-                if (matchesDef) {
-                    if (hasQuery && parsedQuery != null) {
-                        String outName = out.getName() != null ? out.getName().getString().toLowerCase(Locale.ROOT) : "";
-                        String outId = out.getId() != null ? out.getId().toString().toLowerCase(Locale.ROOT) : "";
-                        String outPath = out.getId() != null ? out.getId().getPath().toLowerCase(Locale.ROOT) : "";
-                        for (var group : parsedQuery.orGroups()) {
-                            for (var term : group.terms()) {
-                                if (!term.negated()) {
-                                    String t = term.text();
-                                    if (outName.contains(t) || outId.contains(t) || outPath.contains(t)) {
-                                        return true;
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        return true;
-                    }
+                if (isOutputDefaultMatch(out, er, hasQuery, parsedQuery)) {
+                    return true;
                 }
             }
         } catch (Throwable ignored) {}
@@ -90,23 +73,60 @@ public final class EmiSearchHelper {
         }
         try {
             for (var out : er.getOutputs()) {
-                EmiRecipe def = BoM.getRecipe(out);
-                boolean matchesDef = (def != null && (def.equals(er) || (def.getId() != null && def.getId().equals(er.getId()))))
-                        || BoM.isDefaultRecipe(out, er);
-                if (matchesDef) {
-                    String q = searchBoxValue != null ? searchBoxValue.trim().toLowerCase(Locale.ROOT) : "";
-                    if (q.isEmpty()) {
-                        return true;
-                    }
-                    String outName = out.getName() != null ? out.getName().getString().toLowerCase(Locale.ROOT) : "";
-                    String outId = out.getId() != null ? out.getId().toString().toLowerCase(Locale.ROOT) : "";
-                    String outPath = out.getId() != null ? out.getId().getPath().toLowerCase(Locale.ROOT) : "";
-                    if (outName.contains(q) || outId.contains(q) || outPath.contains(q)) {
-                        return true;
-                    }
+                if (isOutputDefaultMatch(out, er, hasQuery, searchBoxValue)) {
+                    return true;
                 }
             }
         } catch (Throwable ignored) {}
         return false;
+    }
+
+    private static boolean isOutputDefaultMatch(EmiStack out, EmiRecipe er, boolean hasQuery, ParsedQuery parsedQuery) {
+        if (!matchesDefault(out, er)) return false;
+        if (!hasQuery || parsedQuery == null) return true;
+        return matchesParsedQuery(out, parsedQuery);
+    }
+
+    private static boolean isOutputDefaultMatch(EmiStack out, EmiRecipe er, boolean hasQuery, String searchBoxValue) {
+        if (!matchesDefault(out, er)) return false;
+        String q = searchBoxValue != null ? searchBoxValue.trim().toLowerCase(Locale.ROOT) : "";
+        if (q.isEmpty()) return true;
+        return matchesQueryString(out, q);
+    }
+
+    private static boolean matchesDefault(EmiStack out, EmiRecipe er) {
+        EmiRecipe def = BoM.getRecipe(out);
+        return (def != null && (def.equals(er) || (def.getId() != null && def.getId().equals(er.getId()))))
+                || BoM.isDefaultRecipe(out, er);
+    }
+
+    private static boolean matchesParsedQuery(EmiStack out, ParsedQuery parsedQuery) {
+        String outName = out.getName() != null ? out.getName().getString().toLowerCase(Locale.ROOT) : "";
+        String outId = out.getId() != null ? out.getId().toString().toLowerCase(Locale.ROOT) : "";
+        String outPath = out.getId() != null ? out.getId().getPath().toLowerCase(Locale.ROOT) : "";
+        for (var group : parsedQuery.orGroups()) {
+            if (matchesAnyTerm(group.terms(), outName, outId, outPath)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean matchesAnyTerm(List<QueryTerm> terms, String outName, String outId, String outPath) {
+        for (var term : terms) {
+            if (term.negated()) continue;
+            String t = term.text();
+            if (outName.contains(t) || outId.contains(t) || outPath.contains(t)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean matchesQueryString(EmiStack out, String query) {
+        String outName = out.getName() != null ? out.getName().getString().toLowerCase(Locale.ROOT) : "";
+        String outId = out.getId() != null ? out.getId().toString().toLowerCase(Locale.ROOT) : "";
+        String outPath = out.getId() != null ? out.getId().getPath().toLowerCase(Locale.ROOT) : "";
+        return outName.contains(query) || outId.contains(query) || outPath.contains(query);
     }
 }

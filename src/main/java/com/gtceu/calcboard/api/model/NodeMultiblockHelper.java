@@ -57,6 +57,9 @@ public final class NodeMultiblockHelper {
                     node.setMachineIcon(sbWs);
                 }
             }
+            if (node.getSteamMode() != null && node.getSteamMode().isSteam() && node.getTargetTier() != null) {
+                node.setSteamMode(SteamMode.NONE);
+            }
             node.setParallel(1);
             node.setCustomParallel(0);
             node.getAddons().removeIf(a -> a.getCategory() == MachineAddon.Category.COIL

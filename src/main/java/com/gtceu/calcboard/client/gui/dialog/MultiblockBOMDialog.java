@@ -526,55 +526,7 @@ public class MultiblockBOMDialog implements IBoardModal {
         int curY = (int) (tableY - itemScrollY);
         for (MultiblockBOMSummary.BOMItemEntry entry : filtered) {
             if (curY + rowH >= tableY && curY <= tableY + tableH) {
-                boolean prepared = preparedItemIds.contains(entry.itemId());
-                boolean rowHover = mouseX >= x && mouseX <= x + w - 4 && mouseY >= curY && mouseY <= curY + rowH;
-
-                int rowBg = prepared ? 0x22114422 : (rowHover ? 0x3335445E : ((curY / rowH) % 2 == 0 ? 0x181A2434 : 0x0A141A26));
-                graphics.fill(x, curY, x + w, curY + rowH, rowBg);
-
-                // Prepared Checkbox
-                int chkX = x + 3;
-                int chkY = curY + 3;
-                graphics.fill(chkX, chkY, chkX + 11, chkY + 11, 0xFF141A24);
-                graphics.renderOutline(chkX, chkY, 11, 11, prepared ? 0xFF55FF55 : 0xFF35445E);
-                if (prepared) {
-                    graphics.drawString(font, "✔", chkX + 2, chkY + 2, 0xFF55FF55, false);
-                }
-
-                // Item Icon (Rendered via Minecraft GuiGraphics)
-                int iconX = x + 17;
-                int iconY = curY + 1;
-                ItemStack is = entry.resolveItemStack();
-                if (!is.isEmpty()) {
-                    graphics.renderItem(is, iconX, iconY);
-                    if (is.getCount() > 1) {
-                        graphics.renderItemDecorations(font, is, iconX, iconY);
-                    }
-                }
-
-                // Item Name
-                String nameStr = entry.displayName();
-                String clippedName = font.plainSubstrByWidth(nameStr, 125);
-                int nameColor = prepared ? 0xFF779977 : 0xFFFFFFFF;
-                graphics.drawString(font, (prepared ? "§m" : "") + clippedName, iconX + 18, curY + 5, nameColor, false);
-
-                // Total Required
-                String reqStr = String.format(Locale.ROOT, "%,d", entry.totalAmount());
-                graphics.drawString(font, (prepared ? "§m" : "§e") + reqStr, x + 165, curY + 5, 0xFFFFAA00, false);
-
-                // Stack Breakdown
-                String stackStr = entry.formatStackCount();
-                String clippedStack = font.plainSubstrByWidth(stackStr, 78);
-                graphics.drawString(font, (prepared ? "§m§8" : "§b") + clippedStack, x + 215, curY + 5, 0xFF66DDFF, false);
-
-                // Used In Summary
-                String usedStr = String.join(", ", entry.usedByMachines());
-                String clippedUsed = font.plainSubstrByWidth(usedStr, w - 305);
-                graphics.drawString(font, (prepared ? "§m§8" : "§7") + clippedUsed, x + 300, curY + 5, 0xFFAAAAAA, false);
-
-                if (rowHover) {
-                    hoveredEntry = entry;
-                }
+                renderBOMItemRow(graphics, font, entry, x, curY, w, rowH, mouseX, mouseY);
             }
             curY += rowH;
         }
@@ -811,19 +763,9 @@ public class MultiblockBOMDialog implements IBoardModal {
         if (mouseX >= mainX && mouseX <= mainX + mainW && mouseY >= tableY && mouseY <= tableY + tableH) {
             List<MultiblockBOMSummary.BOMItemEntry> filtered = new ArrayList<>();
             for (MultiblockBOMSummary.BOMItemEntry entry : cachedSummary.aggregatedItems()) {
-                if (filterCategoryIndex == 1 && entry.category() != PartCategory.CASING) continue;
-                if (filterCategoryIndex == 2 && entry.category() != PartCategory.COIL) continue;
-                if (filterCategoryIndex == 3 && entry.category() != PartCategory.HATCH_BUS) continue;
-                if (filterCategoryIndex == 4 && entry.category() != PartCategory.CONTROLLER) continue;
-
-                if (!searchQuery.isEmpty()) {
-                    String name = entry.displayName().toLowerCase(Locale.ROOT);
-                    String id = entry.itemId() != null ? entry.itemId().toString().toLowerCase(Locale.ROOT) : "";
-                    if (!name.contains(searchQuery) && !id.contains(searchQuery)) {
-                        continue;
-                    }
+                if (matchesBOMFilter(entry)) {
+                    filtered.add(entry);
                 }
-                filtered.add(entry);
             }
 
             int rowH = 18;
@@ -991,6 +933,70 @@ public class MultiblockBOMDialog implements IBoardModal {
                 selectedPageKeys.add(e.key());
             }
         }
+    }
+
+    private void renderBOMItemRow(GuiGraphics graphics, Font font, MultiblockBOMSummary.BOMItemEntry entry, int x, int curY, int w, int rowH, int mouseX, int mouseY) {
+        boolean prepared = preparedItemIds.contains(entry.itemId());
+        boolean rowHover = mouseX >= x && mouseX <= x + w - 4 && mouseY >= curY && mouseY <= curY + rowH;
+
+        int rowBg = prepared ? 0x22114422 : (rowHover ? 0x3335445E : ((curY / rowH) % 2 == 0 ? 0x181A2434 : 0x0A141A26));
+        graphics.fill(x, curY, x + w, curY + rowH, rowBg);
+
+        int chkX = x + 3;
+        int chkY = curY + 3;
+        graphics.fill(chkX, chkY, chkX + 11, chkY + 11, 0xFF141A24);
+        graphics.renderOutline(chkX, chkY, 11, 11, prepared ? 0xFF55FF55 : 0xFF35445E);
+        if (prepared) {
+            graphics.drawString(font, "✔", chkX + 2, chkY + 2, 0xFF55FF55, false);
+        }
+
+        int iconX = x + 17;
+        renderBOMItemIcon(graphics, font, entry, iconX, curY + 1);
+
+        String nameStr = entry.displayName();
+        String clippedName = font.plainSubstrByWidth(nameStr, 125);
+        int nameColor = prepared ? 0xFF779977 : 0xFFFFFFFF;
+        graphics.drawString(font, (prepared ? "§m" : "") + clippedName, iconX + 18, curY + 5, nameColor, false);
+
+        String reqStr = String.format(Locale.ROOT, "%,d", entry.totalAmount());
+        graphics.drawString(font, (prepared ? "§m" : "§e") + reqStr, x + 165, curY + 5, 0xFFFFAA00, false);
+
+        String stackStr = entry.formatStackCount();
+        String clippedStack = font.plainSubstrByWidth(stackStr, 78);
+        graphics.drawString(font, (prepared ? "§m§8" : "§b") + clippedStack, x + 215, curY + 5, 0xFF66DDFF, false);
+
+        String usedStr = String.join(", ", entry.usedByMachines());
+        String clippedUsed = font.plainSubstrByWidth(usedStr, w - 305);
+        graphics.drawString(font, (prepared ? "§m§8" : "§7") + clippedUsed, x + 300, curY + 5, 0xFFAAAAAA, false);
+
+        if (rowHover) {
+            hoveredEntry = entry;
+        }
+    }
+
+    private void renderBOMItemIcon(GuiGraphics graphics, Font font, MultiblockBOMSummary.BOMItemEntry entry, int iconX, int iconY) {
+        ItemStack is = entry.resolveItemStack();
+        if (is.isEmpty()) {
+            return;
+        }
+        graphics.renderItem(is, iconX, iconY);
+        if (is.getCount() > 1) {
+            graphics.renderItemDecorations(font, is, iconX, iconY);
+        }
+    }
+
+    private boolean matchesBOMFilter(MultiblockBOMSummary.BOMItemEntry entry) {
+        if (filterCategoryIndex == 1 && entry.category() != PartCategory.CASING) return false;
+        if (filterCategoryIndex == 2 && entry.category() != PartCategory.COIL) return false;
+        if (filterCategoryIndex == 3 && entry.category() != PartCategory.HATCH_BUS) return false;
+        if (filterCategoryIndex == 4 && entry.category() != PartCategory.CONTROLLER) return false;
+
+        if (searchQuery.isEmpty()) {
+            return true;
+        }
+        String name = entry.displayName().toLowerCase(Locale.ROOT);
+        String id = entry.itemId() != null ? entry.itemId().toString().toLowerCase(Locale.ROOT) : "";
+        return name.contains(searchQuery) || id.contains(searchQuery);
     }
 }
 

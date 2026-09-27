@@ -179,6 +179,8 @@ public class EnergyHatchHelper {
 
         GTEnergyHatchAddon addon = new GTEnergyHatchAddon(hatchId.toString(), name, desc, hatchId, targetTier, amp, false, false, false);
         GTAddonLifecycleHandler.onAddonInstalled(node, addon);
+        node.setTargetTier(targetTier);
+        node.markOverclockDirty();
         return true;
     }
 
@@ -356,18 +358,7 @@ public class EnergyHatchHelper {
         }
 
         Object dummyHolder = getOrCreateDummyHolderProxy();
-        Object machine = null;
-        if (dummyHolder != null) {
-            for (Method m : def.getClass().getMethods()) {
-                if (m.getParameterCount() == 1 && (m.getName().equals("createMetaMachine") || m.getName().equals("createMachine"))) {
-                    try {
-                        m.setAccessible(true);
-                        machine = m.invoke(def, dummyHolder);
-                        if (machine != null) break;
-                    } catch (ReflectiveOperationException | LinkageError ignored) {}
-                }
-            }
-        }
+        Object machine = instantiateDummyMachine(def, dummyHolder);
 
         String simpleName = machine != null ? machine.getClass().getSimpleName() : def.getClass().getSimpleName();
         boolean isEnergyHatch = "EnergyHatchPartMachine".equals(simpleName)
@@ -410,6 +401,20 @@ public class EnergyHatchHelper {
                 || hasToken(path, "substation");
 
         return new EnergyHatchStats(tier, amp, isLaser, isSubstation);
+    }
+
+    private static Object instantiateDummyMachine(Object def, Object dummyHolder) {
+        if (def == null || dummyHolder == null) return null;
+        for (Method m : def.getClass().getMethods()) {
+            if (m.getParameterCount() == 1 && (m.getName().equals("createMetaMachine") || m.getName().equals("createMachine"))) {
+                try {
+                    m.setAccessible(true);
+                    Object machine = m.invoke(def, dummyHolder);
+                    if (machine != null) return machine;
+                } catch (ReflectiveOperationException | LinkageError ignored) {}
+            }
+        }
+        return null;
     }
 
     public static MachineAddon parseEnergyHatch(ItemStack stack, ResourceLocation id) {

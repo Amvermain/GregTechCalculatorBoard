@@ -37,6 +37,7 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -98,17 +99,31 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> implements I
     private final BoardTeamSyncCoordinator teamSyncCoordinator = new BoardTeamSyncCoordinator(this);
 
     private BalanceSummary cachedSummary = null;
+    private BalanceSummary cachedSelectionSummary = null;
+    private Set<String> lastSelectedNodeIds = java.util.Collections.emptySet();
     private boolean summaryDirty = true;
     private double lastMouseX, lastMouseY;
     private boolean summaryAutoCollapsedForInspector = false;
     private int nudgeScanTicks = 0;
 
+    private Screen previousScreen = null;
+    private boolean returningToPreviousScreen = false;
+
     public BoardScreen() {
-        this(new BoardMenu(0, Minecraft.getInstance() != null && Minecraft.getInstance().player != null ? Minecraft.getInstance().player.getInventory() : null));
+        this((Screen) null);
+    }
+
+    public BoardScreen(Screen previousScreen) {
+        this(new BoardMenu(0, Minecraft.getInstance() != null && Minecraft.getInstance().player != null ? Minecraft.getInstance().player.getInventory() : null), previousScreen);
     }
 
     public BoardScreen(BoardMenu menu) {
+        this(menu, null);
+    }
+
+    public BoardScreen(BoardMenu menu, Screen previousScreen) {
         super(menu, Minecraft.getInstance() != null && Minecraft.getInstance().player != null ? Minecraft.getInstance().player.getInventory() : new Inventory(null), Component.translatable("gui.gtcalcboard.title"));
+        this.previousScreen = previousScreen;
         this.imageWidth = 0;
         this.imageHeight = 0;
         BoardPage activePage = BoardManager.getInstance().getActivePage();
@@ -118,6 +133,32 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> implements I
         lastPanX = this.panX;
         lastPanY = this.panY;
         lastZoom = this.zoom;
+    }
+
+    public static void openScreen(Screen previousScreen) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc == null) return;
+        if (previousScreen instanceof BoardScreen existingBoard) {
+            previousScreen = existingBoard.getPreviousScreen();
+        }
+        BoardScreen newScreen = new BoardScreen(previousScreen);
+        if (previousScreen != null) {
+            mc.screen = null;
+        }
+        mc.setScreen(newScreen);
+    }
+
+    public static void openScreen() {
+        Minecraft mc = Minecraft.getInstance();
+        openScreen(mc != null ? mc.screen : null);
+    }
+
+    public Screen getPreviousScreen() {
+        return previousScreen;
+    }
+
+    public void setPreviousScreen(Screen previousScreen) {
+        this.previousScreen = previousScreen;
     }
 
     @Override
@@ -173,11 +214,13 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> implements I
 
     @Override
     public void removed() {
-        super.removed();
         if (this.dialogManager != null) {
             this.dialogManager.destroy();
         }
         teamSyncCoordinator.onScreenRemoved();
+        if (!this.returningToPreviousScreen) {
+            super.removed();
+        }
     }
 
     public void clearForeignWidgets() {
@@ -327,6 +370,10 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> implements I
     public void updateGraphSummaryIfDirty() {
         if (summaryDirty || cachedSummary == null) {
             getGraph().cleanupInvalidConnections();
+            BoardManager bm = BoardManager.getInstance();
+            if (bm != null && bm.getPages() != null && !bm.getPages().isEmpty()) {
+                com.gtceu.calcboard.api.solver.WorkspaceFlowCoordinator.coordinate(bm.getPages());
+            }
             cachedSummary = FlowGraphSolver.computeSummary(getGraph());
             summaryDirty = false;
             com.gtceu.calcboard.client.gui.tutorial.ContextualNudgeManager.getInstance().checkTriggers(com.gtceu.calcboard.api.storage.BoardManager.getInstance().getActivePage());
@@ -645,7 +692,29 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> implements I
     public Font getMinecraftFont() { return this.font; }
     public BalanceSummary getCachedSummary() { return cachedSummary; }
 
+    @Override
+    public BalanceSummary getActiveSummary() {
+        Set<String> selected = getSelectedNodeIds();
+        if (selected.isEmpty()) {
+            return getCachedSummary();
+        }
+        if (cachedSelectionSummary == null || summaryDirty || !selected.equals(lastSelectedNodeIds)) {
+            cachedSelectionSummary = FlowGraphSolver.computeSubsetSummary(getGraph(), selected);
+            lastSelectedNodeIds = new java.util.HashSet<>(selected);
+        }
+        return cachedSelectionSummary;
+    }
+
     public void performAutoRatio() { toolbarWidget.performAutoRatio(); }
+    public void performAutoConnectForSelection() {
+        if (getSelectedNodeIds().size() >= 2) {
+            if (this.toolbarWidget != null) {
+                this.toolbarWidget.performAutoConnectForSelection(getSelectedNodeIds());
+            } else {
+                ToolbarWidget.performAutoConnectForSelection(this, getSelectedNodeIds());
+            }
+        }
+    }
     public void performGroupIntoModule() { toolbarWidget.performGroupIntoModule(); }
 
     public WelcomeTutorialDialog getWelcomeDialog() { return dialogManager.getWelcomeDialog(); }
@@ -697,6 +766,8 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> implements I
     public void openMachineConfigDialog(RecipeNode node, AddonCategory initialCategory) { dialogManager.openMachineConfigDialog(node, initialCategory); }
     public void openMachineConfigDialog(RecipeNode node, AddonCategory initialCategory, Runnable onCloseCallback) { dialogManager.openMachineConfigDialog(node, initialCategory, onCloseCallback); }
     public void openSharedFrameConfigDialog(CanvasGroupFrame frame) { dialogManager.openSharedFrameConfigDialog(frame); }
+    @Override
+    public void openRecipeSearchForSharedFrame(CanvasGroupFrame frame) { dialogManager.openRecipeSearchForSharedFrame(frame); }
     public void openFrameEditDialog(CanvasGroupFrame frame) { dialogManager.openFrameEditDialog(frame); }
     public void openNoteEditDialog(CanvasStickyNote note) { dialogManager.openNoteEditDialog(note); }
     public void openTargetOutputRateDialog(RecipeNode node, int outputIndex) { dialogManager.openTargetOutputRateDialog(node, outputIndex); }
@@ -737,6 +808,20 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> implements I
     public void openPage(UUID pageId) {
         if (pageId != null) {
             openPage(pageId.toString());
+        }
+    }
+
+    public void openPageAndFocusNode(String pageId, String nodeId) {
+        if (pageId == null || pageId.isEmpty()) return;
+        openPage(pageId);
+        if (nodeId == null || nodeId.isEmpty()) return;
+        BoardPage active = BoardManager.getInstance().getActivePage();
+        if (active != null) {
+            RecipeNode node = active.getGraph().findNodeById(nodeId);
+            if (node != null) {
+                setPanX((this.width / 2.0) - ((node.getPosX() + 16.0) * this.zoom));
+                setPanY((this.height / 2.0) - ((node.getPosY() + 16.0) * this.zoom));
+            }
         }
     }
 
@@ -781,7 +866,16 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> implements I
         lastBoardScreenActiveTime = 0;
         GregTechCalcBoard.LOGGER.info("[GTCalcBoard] [UI] BoardScreen closed. State saved.");
         com.gtceu.calcboard.client.web.WebSyncEventBus.publishCurrentBoard();
-        super.onClose();
+        if (this.previousScreen != null && this.minecraft != null && this.minecraft.player != null && this.minecraft.player.isAlive()) {
+            Screen prev = this.previousScreen;
+            this.returningToPreviousScreen = true;
+            this.previousScreen = null;
+            this.minecraft.setScreen(prev);
+        } else {
+            if (this.minecraft != null) {
+                super.onClose();
+            }
+        }
     }
 
     @Override

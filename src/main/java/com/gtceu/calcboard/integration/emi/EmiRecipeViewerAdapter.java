@@ -2,6 +2,7 @@ package com.gtceu.calcboard.integration.emi;
 
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.util.ModCompatHelper;
+import com.gtceu.calcboard.api.model.RecipeFingerprint;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.bom.MultiblockBOMSummary;
 import com.gtceu.calcboard.client.gui.render.IngredientRenderer;
@@ -34,6 +35,8 @@ import java.util.*;
 public class EmiRecipeViewerAdapter implements IRecipeViewerAdapter {
 
     private static final java.lang.reflect.Field CURRENT_PAGE_FIELD;
+    private static final java.lang.reflect.Field SEARCH_IS_FOCUSED_FIELD;
+    private static final java.lang.reflect.Field SEARCH_HIGHLIGHT_FIELD;
 
     static {
         java.lang.reflect.Field field = null;
@@ -42,6 +45,20 @@ public class EmiRecipeViewerAdapter implements IRecipeViewerAdapter {
             field.setAccessible(true);
         } catch (Throwable ignored) {}
         CURRENT_PAGE_FIELD = field;
+
+        java.lang.reflect.Field isFocusedField = null;
+        try {
+            isFocusedField = dev.emi.emi.screen.widget.EmiSearchWidget.class.getDeclaredField("isFocused");
+            isFocusedField.setAccessible(true);
+        } catch (Throwable ignored) {}
+        SEARCH_IS_FOCUSED_FIELD = isFocusedField;
+
+        java.lang.reflect.Field highlightField = null;
+        try {
+            highlightField = dev.emi.emi.screen.widget.EmiSearchWidget.class.getDeclaredField("highlight");
+            highlightField.setAccessible(true);
+        } catch (Throwable ignored) {}
+        SEARCH_HIGHLIGHT_FIELD = highlightField;
     }
 
     @Override
@@ -76,6 +93,29 @@ public class EmiRecipeViewerAdapter implements IRecipeViewerAdapter {
             EmiLifecycleHook.runWhenEmiReady(callback);
         } catch (Throwable t) {
             if (callback != null) callback.run();
+        }
+    }
+
+    @Override
+    public RecipeFingerprint computeFingerprint() {
+        if (!isAvailable() || !isRecipeBakingComplete()) return RecipeFingerprint.EMPTY;
+        try {
+            var emiManager = EmiApi.getRecipeManager();
+            if (emiManager == null || emiManager.getRecipes() == null) return RecipeFingerprint.EMPTY;
+            List<EmiRecipe> recipes = emiManager.getRecipes();
+            int size = recipes.size();
+            if (size == 0) return RecipeFingerprint.EMPTY;
+
+            long hash = 1125899906842597L;
+            for (int i = 0; i < size; i++) {
+                EmiRecipe r = recipes.get(i);
+                if (r != null && r.getId() != null) {
+                    hash = hash * 31L + r.getId().hashCode();
+                }
+            }
+            return new RecipeFingerprint(getViewerId(), size, hash);
+        } catch (Throwable t) {
+            return RecipeFingerprint.EMPTY;
         }
     }
 
@@ -334,8 +374,35 @@ public class EmiRecipeViewerAdapter implements IRecipeViewerAdapter {
     @Override
     public boolean isSearchFieldFocused() {
         if (!isAvailable()) return false;
+        if (isEmiApiSearchFocused()) return true;
+        return isEmiSearchWidgetFocused();
+    }
+
+    private static boolean isEmiApiSearchFocused() {
         try {
-            if (EmiScreenManager.search != null && EmiScreenManager.search.isFocused()) {
+            return EmiApi.isSearchFocused();
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private static boolean isEmiSearchWidgetFocused() {
+        try {
+            var search = EmiScreenManager.search;
+            if (search == null) return false;
+            if (search.isFocused() || search.canConsumeInput()) return true;
+            return isEmiSearchWidgetReflectionFocused(search);
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private static boolean isEmiSearchWidgetReflectionFocused(dev.emi.emi.screen.widget.EmiSearchWidget search) {
+        try {
+            if (SEARCH_IS_FOCUSED_FIELD != null && Boolean.TRUE.equals(SEARCH_IS_FOCUSED_FIELD.get(search))) {
+                return true;
+            }
+            if (SEARCH_HIGHLIGHT_FIELD != null && Boolean.TRUE.equals(SEARCH_HIGHLIGHT_FIELD.get(search))) {
                 return true;
             }
         } catch (Throwable ignored) {}

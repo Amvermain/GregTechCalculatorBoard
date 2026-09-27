@@ -1,5 +1,6 @@
 package com.gtceu.calcboard.api.model.role;
 
+import com.gtceu.calcboard.api.model.CrossPageExportTarget;
 import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.NodeJunctionHelper;
@@ -8,7 +9,11 @@ import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.FlowSplitMode;
 import com.gtceu.calcboard.api.type.SupplyMode;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,6 +34,12 @@ public class JunctionNodeRole implements INodeRole {
     private double bufferSize = 0.0;
     private FlowSplitMode splitMode = FlowSplitMode.PROPORTIONAL;
     private IngredientStack boundIngredient = null;
+
+    private final List<CrossPageExportTarget> exportTargets = new ArrayList<>();
+    private String linkedSourcePageId = "";
+    private String linkedSourceNodeId = "";
+    private double allocatedInputRate = 0.0;
+    private double allocatedExportRate = 0.0;
 
     public JunctionNodeRole() {}
 
@@ -121,6 +132,9 @@ public class JunctionNodeRole implements INodeRole {
 
     public void setSupplyMode(SupplyMode supplyMode) {
         this.supplyMode = supplyMode != null ? supplyMode : SupplyMode.NONE;
+        if (this.supplyMode != SupplyMode.LINKED_JUNCTION) {
+            this.allocatedInputRate = 0.0;
+        }
     }
 
     public boolean isExternalSupply() {
@@ -139,12 +153,80 @@ public class JunctionNodeRole implements INodeRole {
         return getSupplyMode() == SupplyMode.FIXED_DRAIN;
     }
 
+    public boolean isLinkedJunction() {
+        return getSupplyMode() == SupplyMode.LINKED_JUNCTION;
+    }
+
     public double getExternalSupplyRate() {
+        if (supplyMode == SupplyMode.LINKED_JUNCTION) {
+            return allocatedInputRate;
+        }
         return externalSupplyRate;
     }
 
     public void setExternalSupplyRate(double rate) {
         this.externalSupplyRate = Math.max(0.0, rate);
+    }
+
+    public double getAllocatedInputRate() {
+        return allocatedInputRate;
+    }
+
+    public void setAllocatedInputRate(double rate) {
+        this.allocatedInputRate = Math.max(0.0, rate);
+    }
+
+    public double getAllocatedExportRate() {
+        return allocatedExportRate;
+    }
+
+    public void setAllocatedExportRate(double rate) {
+        this.allocatedExportRate = Math.max(0.0, rate);
+    }
+
+    public String getLinkedSourcePageId() {
+        return linkedSourcePageId != null ? linkedSourcePageId : "";
+    }
+
+    public void setLinkedSourcePageId(String pageId) {
+        this.linkedSourcePageId = pageId != null ? pageId.trim() : "";
+    }
+
+    public String getLinkedSourceNodeId() {
+        return linkedSourceNodeId != null ? linkedSourceNodeId : "";
+    }
+
+    public void setLinkedSourceNodeId(String nodeId) {
+        this.linkedSourceNodeId = nodeId != null ? nodeId.trim() : "";
+    }
+
+    public void setLinkedSource(String pageId, String nodeId) {
+        setLinkedSourcePageId(pageId);
+        setLinkedSourceNodeId(nodeId);
+    }
+
+    public List<CrossPageExportTarget> getExportTargets() {
+        return Collections.unmodifiableList(exportTargets);
+    }
+
+    public void setExportTargets(List<CrossPageExportTarget> targets) {
+        this.exportTargets.clear();
+        if (targets != null) {
+            for (CrossPageExportTarget t : targets) {
+                addExportTarget(t);
+            }
+        }
+    }
+
+    public void addExportTarget(CrossPageExportTarget target) {
+        if (target == null) return;
+        this.exportTargets.removeIf(t -> t.targetPageId().equals(target.targetPageId()));
+        this.exportTargets.add(target);
+    }
+
+    public void removeExportTarget(String targetPageId) {
+        if (targetPageId == null || targetPageId.isBlank()) return;
+        this.exportTargets.removeIf(t -> t.targetPageId().equals(targetPageId));
     }
 
     public double getExternalDrainRate() {
@@ -248,6 +330,23 @@ public class JunctionNodeRole implements INodeRole {
         if (boundIngredient != null) {
             tag.put("boundIngredient", boundIngredient.serializeNBT());
         }
+        if (linkedSourcePageId != null && !linkedSourcePageId.isBlank()) {
+            tag.putString("linkedSourcePage", linkedSourcePageId);
+        }
+        if (linkedSourceNodeId != null && !linkedSourceNodeId.isBlank()) {
+            tag.putString("linkedSourceNode", linkedSourceNodeId);
+        }
+        if (!exportTargets.isEmpty()) {
+            ListTag list = new ListTag();
+            for (CrossPageExportTarget target : exportTargets) {
+                CompoundTag targetTag = new CompoundTag();
+                targetTag.putString("pageId", target.targetPageId());
+                targetTag.putInt("priority", target.priority());
+                targetTag.putDouble("limit", target.fixedLimit());
+                list.add(targetTag);
+            }
+            tag.put("exportTargets", list);
+        }
     }
 
     @Override
@@ -278,6 +377,25 @@ public class JunctionNodeRole implements INodeRole {
         if (tag.contains("boundIngredient")) {
             this.boundIngredient = IngredientStack.deserializeNBT(tag.getCompound("boundIngredient"));
         }
+        if (tag.contains("linkedSourcePage")) {
+            this.linkedSourcePageId = tag.getString("linkedSourcePage");
+        }
+        if (tag.contains("linkedSourceNode")) {
+            this.linkedSourceNodeId = tag.getString("linkedSourceNode");
+        }
+        if (tag.contains("exportTargets", Tag.TAG_LIST)) {
+            this.exportTargets.clear();
+            ListTag list = tag.getList("exportTargets", Tag.TAG_COMPOUND);
+            for (int i = 0; i < list.size(); i++) {
+                CompoundTag targetTag = list.getCompound(i);
+                String pageId = targetTag.getString("pageId");
+                int pri = targetTag.getInt("priority");
+                double limit = targetTag.getDouble("limit");
+                if (!pageId.isBlank()) {
+                    this.exportTargets.add(new CrossPageExportTarget(pageId, pri, limit));
+                }
+            }
+        }
     }
 
     @Override
@@ -302,11 +420,18 @@ public class JunctionNodeRole implements INodeRole {
 
     @Override
     public JunctionNodeRole copy(Set<FlowGraph> visitedGraphs, int depth) {
-        JunctionNodeRole cp = new JunctionNodeRole(this.getSupplyMode(), this.getExternalSupplyRate(), this.getExternalDrainRate());
+        JunctionNodeRole cp = new JunctionNodeRole(this.getSupplyMode(), this.externalSupplyRate, this.getExternalDrainRate());
         cp.isBuffer = this.isBuffer();
         cp.bufferSize = this.getBufferSize();
         cp.splitMode = this.getSplitMode();
         cp.boundIngredient = this.getBoundIngredient() != null ? this.getBoundIngredient().copy() : null;
+        cp.linkedSourcePageId = this.linkedSourcePageId;
+        cp.linkedSourceNodeId = this.linkedSourceNodeId;
+        cp.allocatedInputRate = this.allocatedInputRate;
+        cp.allocatedExportRate = this.allocatedExportRate;
+        for (CrossPageExportTarget t : this.exportTargets) {
+            cp.exportTargets.add(new CrossPageExportTarget(t.targetPageId(), t.priority(), t.fixedLimit()));
+        }
         return cp;
     }
 }

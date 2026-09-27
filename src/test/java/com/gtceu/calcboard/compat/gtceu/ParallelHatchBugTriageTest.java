@@ -122,6 +122,6 @@ public class ParallelHatchBugTriageTest {
 
         com.gtceu.calcboard.api.model.NodeHardwareReconciler.clampParallel(node);
         Assertions.assertEquals(0, node.getCustomParallel());
-        Assertions.assertEquals(64, node.getParallel());
+        Assertions.assertEquals(64, node.getTotalParallel());
     }
 }

@@ -596,6 +596,11 @@ public class GTCEuModAdapter implements IModAdapter {
     }
 
     @Override
+    public ResourceLocation getRecipeCategoryIdForMachine(ResourceLocation machineId) {
+        return GTCEuWorkstationResolver.getRecipeCategoryIdForMachine(machineId);
+    }
+
+    @Override
     public GTVoltageTier sanitizeTargetTier(RecipeNode node, GTVoltageTier requestedTier) {
         return GTCEuWorkstationResolver.sanitizeTargetTier(node, requestedTier);
     }
@@ -631,6 +636,7 @@ public class GTCEuModAdapter implements IModAdapter {
         RecipePropertyExtractorPipeline.register(new GTCEuEbfTemperatureExtractor());
         RecipePropertyExtractorPipeline.register(new GTCEuFusionStartEnergyExtractor());
         RecipePropertyExtractorPipeline.register(new GTCEuCleanroomExtractor());
+        RecipePropertyExtractorPipeline.register(new com.gtceu.calcboard.compat.gtceu.extractor.GTCEuCircuitNumberExtractor());
     }
 
     @Override

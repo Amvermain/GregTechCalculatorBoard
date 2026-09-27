@@ -124,7 +124,7 @@ public class GTCEuNodeCardGuiHandler {
                 buttons.add(new com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button(nextRelX, tierBtnW, boilerText, textW, boilerColor, !isOperational, false, com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button.ButtonRole.TIER, null));
                 nextRelX += tierBtnW + 4;
             }
-        } else if ((node.getSteamMode() != null && node.getSteamMode().isSteam()) || MultiblockDetector.isSteamMultiblock(node)) {
+        } else if (isSteamNode(node)) {
             SteamMode mode = (node.getSteamMode() != null && node.getSteamMode().isSteam()) ? node.getSteamMode() : SteamMode.HIGH_PRESSURE;
             String prefix = node.isMultiblock() ? "▦ " : "";
             String steamText = prefix + mode.getDisplayName();
@@ -224,7 +224,7 @@ public class GTCEuNodeCardGuiHandler {
     }
 
     private void populateConsumerButtons(RecipeNode node, int cardW, boolean isOperational, int nextRelX, Font font, List<com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button> buttons) {
-        boolean isSteam = (node.getSteamMode() != null && node.getSteamMode().isSteam()) || MultiblockDetector.isSteamMultiblock(node);
+        boolean isSteam = isSteamNode(node);
         if (!node.isFusion() && node.getEnergyType() != EnergyType.HEAT_OR_SELF && !isSteam) {
             String ocKey = node.getOverclockMode() == OverclockMode.PERFECT ? "gui.gtcalcboard.oc_perf" : "gui.gtcalcboard.oc_std";
             String ocText = Component.translatable(ocKey).getString();
@@ -264,7 +264,7 @@ public class GTCEuNodeCardGuiHandler {
         if (nextRelX + thrBtnW <= cardW - 10) {
             List<Component> thrTooltip = List.of(
                     Component.literal("§e⚡ Throttle: §f" + throttle + "%"),
-                    Component.literal("§8Click to cycle presets (25%, 50%, 75%, 100%)")
+                    Component.translatable("gui.gtcalcboard.compat.gtceu.boiler.throttle_hint").withStyle(net.minecraft.ChatFormatting.DARK_GRAY)
             );
             buttons.add(new com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button(nextRelX, thrBtnW, thrText, thrW, 0xFF58D3FF, false, false, com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button.ButtonRole.BADGE, new NodeBadge(thrText, 0xFF58D3FF, 0xAA1E222D, 0xFF353C4D, thrTooltip, false, () -> cycleThrottle(widget, node))));
             nextRelX += thrBtnW + 4;
@@ -291,7 +291,7 @@ public class GTCEuNodeCardGuiHandler {
         if (nextRelX + wBtnW <= cardW - 10) {
             List<Component> wTooltip = List.of(
                     Component.literal("§b💧 Water Quality: §f" + (waterTier == 1 ? "Distilled Water (1.5x Boost)" : "River Water (1.0x)")),
-                    Component.literal("§8Click to toggle between Standard and Distilled Water")
+                    Component.translatable("gui.gtcalcboard.compat.gtceu.boiler.water_tier_hint").withStyle(net.minecraft.ChatFormatting.DARK_GRAY)
             );
             buttons.add(new com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button(nextRelX, wBtnW, wText, wTextW, waterTier == 1 ? 0xFF38BDF8 : 0xFF88AAFF, false, false, com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button.ButtonRole.BADGE, new NodeBadge(wText, waterTier == 1 ? 0xFF38BDF8 : 0xFF88AAFF, 0xAA1E222D, waterTier == 1 ? 0xFF38BDF8 : 0xFF353C4D, wTooltip, false, () -> {
                 com.gtceu.calcboard.compat.tfg.TFGBoilerPhysics.cycleWaterTier(node);
@@ -475,6 +475,14 @@ public class GTCEuNodeCardGuiHandler {
             }
         }
         return false;
+    }
+
+    public static boolean isSteamNode(RecipeNode node) {
+        if (node == null) return false;
+        if (node.isMultiblock()) {
+            return MultiblockDetector.isSteamMultiblock(node);
+        }
+        return node.getSteamMode() != null && node.getSteamMode().isSteam();
     }
 
     protected static int safeFontWidth(String text, int defaultWidth) {

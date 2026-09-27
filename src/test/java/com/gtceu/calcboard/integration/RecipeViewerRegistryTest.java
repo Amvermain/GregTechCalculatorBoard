@@ -131,10 +131,8 @@ public class RecipeViewerRegistryTest {
 
     @Test
     public void testSearchFieldFocusDetection() {
-        // By default, no search is focused
         Assertions.assertFalse(RecipeViewerRegistry.isAnySearchFocused());
 
-        // Register adapter with search focused
         IRecipeViewerAdapter focusedAdapter = new IRecipeViewerAdapter() {
             @Override public String getViewerId() { return "focused_viewer"; }
             @Override public int getPriority() { return 10000; }
@@ -160,6 +158,11 @@ public class RecipeViewerRegistryTest {
         };
         RecipeViewerRegistry.register(focusedAdapter);
         Assertions.assertTrue(RecipeViewerRegistry.isAnySearchFocused(), "isAnySearchFocused should return true when a registered viewer has search focused");
+    }
+
+    @Test
+    public void testViewerScreenDetectionFallback() {
+        Assertions.assertFalse(RecipeViewerRegistry.isAnyViewerScreen(null));
     }
 }
 

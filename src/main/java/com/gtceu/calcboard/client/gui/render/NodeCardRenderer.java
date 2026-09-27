@@ -8,10 +8,14 @@ import com.gtceu.calcboard.client.gui.editor.NodeTargetBatchEditor;
 import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
 import com.gtceu.calcboard.client.gui.util.FormatUtil;
 import com.gtceu.calcboard.client.gui.widget.NodeWidget;
+import com.gtceu.calcboard.client.gui.layout.NodeLayoutBounds;
 import com.gtceu.calcboard.api.spi.IModAdapter;
 import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 
 import com.gtceu.calcboard.api.storage.BoardManager;
+import com.gtceu.calcboard.api.storage.BoardPage;
+import com.gtceu.calcboard.api.solver.FlowBalanceMatrixSolver;
+import com.gtceu.calcboard.api.solver.WorkspaceFlowCoordinator;
 import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.solver.FlowGraphSolver;
@@ -317,6 +321,37 @@ public class NodeCardRenderer {
         drawBtn(graphics, font, "+", 7, afterCountX, ctrlY, 14, 14, activeMouseX, activeMouseY, countBtnCol, !isOperational, false);
         drawBtn(graphics, font, "/2", 10, afterCountX + 16, ctrlY, 16, 14, activeMouseX, activeMouseY, countBtnCol, !isOperational, false);
         drawBtn(graphics, font, "x2", 11, afterCountX + 34, ctrlY, 16, 14, activeMouseX, activeMouseY, countBtnCol, !isOperational, false);
+
+        var bounds = widget.getLayoutBounds();
+        if (bounds != null && !bounds.getCircuitIconBounds().isEmpty()) {
+            renderCircuitIcon(graphics, font, widget.getNode(), bounds.getCircuitIconBounds(), isCardHovered, mouseX, mouseY);
+        }
+    }
+
+    private static void renderCircuitIcon(GuiGraphics graphics, Font font, RecipeNode node, NodeLayoutBounds.RectBounds bounds, boolean isCardHovered, int mouseX, int mouseY) {
+        int circuit = node.getCircuitNumber();
+        if (circuit < 0) return;
+
+        int cx = bounds.x();
+        int cy = bounds.y();
+        ItemStack stack = IngredientRenderer.getProgrammedCircuitStack(circuit);
+        if (!stack.isEmpty()) {
+            graphics.renderItem(stack, cx, cy);
+            boolean isGtCircuit = !stack.is(net.minecraft.world.item.Items.REPEATER);
+            if (!isGtCircuit) {
+                String numStr = String.valueOf(circuit);
+                graphics.pose().pushPose();
+                graphics.pose().translate(cx + 8, cy + 8, 200.0f);
+                graphics.pose().scale(0.7f, 0.7f, 1.0f);
+                graphics.drawString(font, numStr, -font.width(numStr) / 2, -4, 0xFF55FF55, true);
+                graphics.pose().popPose();
+            }
+        }
+
+        boolean isHovered = isCardHovered && bounds.contains(mouseX, mouseY);
+        if (isHovered) {
+            graphics.renderOutline(cx - 1, cy - 1, bounds.width() + 2, bounds.height() + 2, 0x8055FFFF);
+        }
     }
 
     private static void renderCountBox(GuiGraphics graphics, Font font, NodeCountEditor countEditor, String countText, int countBoxX, int ctrlY, int countBoxW, int countTextW, boolean isCardHovered, int mouseX, int mouseY, boolean isOperational) {
@@ -848,6 +883,65 @@ public class NodeCardRenderer {
             FlowGraph graph = widget.getParent() != null ? widget.getParent().getGraph() : (Minecraft.getInstance().screen instanceof BoardScreen bs ? bs.getGraph() : null);
             renderJunctionTimeBadge(graphics, font, graph, node, x, y);
         }
+
+        if (node.isLinkedJunction()) {
+            renderLinkedJunctionBadge(widget, graphics, font, x, y, mouseX, mouseY);
+        }
+    }
+
+    private record LinkedBadgeVisual(String text, int border, int bg, int textCol) {}
+
+    private static void renderLinkedJunctionBadge(NodeWidget widget, GuiGraphics graphics, Font font, int x, int y, int mouseX, int mouseY) {
+        RecipeNode node = widget.getNode();
+        if (!node.isLinkedJunction()) return;
+
+        LinkedBadgeVisual visual = resolveLinkedBadgeVisual(widget, node);
+        int textW = font.width(visual.text());
+        int badgeW = Math.max(36, textW + 8);
+        int badgeX = x + 16 - badgeW / 2;
+        int badgeY = y - 13;
+
+        boolean isHovered = widget.isLinkedBadgeHovered(mouseX, mouseY);
+        int border = isHovered ? 0xFFFFFFFF : visual.border();
+
+        graphics.fill(badgeX, badgeY, badgeX + badgeW, badgeY + 11, visual.bg());
+        graphics.renderOutline(badgeX, badgeY, badgeW, 11, border);
+        graphics.drawString(font, visual.text(), badgeX + 4, badgeY + 2, visual.textCol(), false);
+    }
+
+    private static LinkedBadgeVisual resolveLinkedBadgeVisual(NodeWidget widget, RecipeNode node) {
+        WorkspaceFlowCoordinator.WorkspaceFlowResult flowResult = WorkspaceFlowCoordinator.getLastResult();
+        String srcPageId = node.getLinkedSourcePageId();
+        String srcNodeId = node.getLinkedSourceNodeId();
+
+        BoardPage srcPage = (srcPageId != null && !srcPageId.isEmpty()) ? BoardManager.getInstance().getPage(srcPageId).orElse(null) : null;
+        RecipeNode srcNode = (srcPage != null && srcNodeId != null) ? srcPage.getGraph().findNodeById(srcNodeId) : null;
+
+        if (srcPage == null || srcNode == null) {
+            String text = "\u26A0 " + Component.translatable("gui.gtcalcboard.junction.badge_broken_link").getString();
+            return new LinkedBadgeVisual(text, 0xFFEF4444, 0xEE3B0707, 0xFFFCA5A5);
+        }
+        if (flowResult != null && flowResult.isCircular(node.getId())) {
+            String text = "\u26A0 " + Component.translatable("gui.gtcalcboard.junction.badge_circular_loop").getString();
+            return new LinkedBadgeVisual(text, 0xFFA855F7, 0xEE2E0854, 0xFFE9D5FF);
+        }
+        return resolveFlowStateVisual(widget, node, srcPage);
+    }
+
+    private static LinkedBadgeVisual resolveFlowStateVisual(NodeWidget widget, RecipeNode node, BoardPage srcPage) {
+        FlowGraph graph = widget.getParent() != null ? widget.getParent().getGraph() : (Minecraft.getInstance().screen instanceof BoardScreen bs ? bs.getGraph() : null);
+        double demand = graph != null ? FlowBalanceMatrixSolver.calculateTotalConnectedPortDemand(graph, node, 0, null) : 0.0;
+        double alloc = node.getAllocatedInputRate();
+
+        if (demand > 0.0001 && alloc < demand - 0.0001) {
+            IngredientStack rStack = node.getRerouteIngredient();
+            String allocStr = FormatUtil.formatRate(alloc, rStack);
+            String demandStr = FormatUtil.formatRate(demand, rStack);
+            String text = "\u26A0 " + allocStr + " / " + demandStr;
+            return new LinkedBadgeVisual(text, 0xFFF97316, 0xEE431407, 0xFFFED7AA);
+        }
+        String pageName = srcPage.getName() != null && !srcPage.getName().isEmpty() ? srcPage.getName() : "Page";
+        return new LinkedBadgeVisual("\uD83D\uDD17 " + pageName, 0xFF38BDF8, 0xEE082F49, 0xFFBAE6FD);
     }
 
     private static void renderJunctionTimeBadge(GuiGraphics graphics, Font font, FlowGraph graph, RecipeNode node, int x, int y) {

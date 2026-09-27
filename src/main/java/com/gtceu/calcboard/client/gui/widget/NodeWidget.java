@@ -80,6 +80,7 @@ public class NodeWidget {
     private boolean lastSlimMode = false;
     private boolean lastTargetBatchEditing = false;
     private String lastCountText = null;
+    private int lastCircuitNumber = -1;
 
     public com.gtceu.calcboard.client.gui.render.NodeCardTextCache getTextCache() {
         return textCache;
@@ -101,6 +102,7 @@ public class NodeWidget {
                 || node.getEnergyType() != lastEnergyType
                 || node.hasTargetBatch() != lastHasTargetBatch
                 || node.isModule() != lastIsModule
+                || node.getCircuitNumber() != lastCircuitNumber
                 || slim != lastSlimMode
                 || targetBatchEditing != lastTargetBatchEditing
                 || !Objects.equals(countText, lastCountText);
@@ -137,6 +139,7 @@ public class NodeWidget {
             this.lastSlimMode = slim;
             this.lastTargetBatchEditing = targetBatchEditing;
             this.lastCountText = countText;
+            this.lastCircuitNumber = node.getCircuitNumber();
         }
         return layoutBounds;
     }
@@ -146,6 +149,7 @@ public class NodeWidget {
         this.cachedOutputRates = null;
         this.layoutBounds = null;
         this.lastPosX = Double.NaN;
+        this.lastCircuitNumber = -1;
         this.textCache.markDirty();
         if (parent != null) {
             parent.markSummaryDirty();
@@ -245,6 +249,10 @@ public class NodeWidget {
         return getLayoutBounds().isTargetBatchBadgeHovered(canvasMouseX, canvasMouseY);
     }
 
+    public boolean isLinkedBadgeHovered(double canvasMouseX, double canvasMouseY) {
+        return getLayoutBounds().isLinkedBadgeHovered(canvasMouseX, canvasMouseY);
+    }
+
     public boolean isHeaderHovered(double canvasMouseX, double canvasMouseY) {
         return getLayoutBounds().isHeaderHovered(canvasMouseX, canvasMouseY);
     }
@@ -312,22 +320,7 @@ public class NodeWidget {
     public void hidePortAndDisconnectWires(boolean isInput, int portIndex) {
         if (parent != null && !parent.ensureEditPermission()) return;
         if (parent != null && parent.getGraph() != null) {
-            com.gtceu.calcboard.api.model.FlowGraph graph = parent.getGraph();
-            List<com.gtceu.calcboard.api.model.FlowGraph.ConnectionEdge> toRemove = new ArrayList<>();
-            for (com.gtceu.calcboard.api.model.FlowGraph.ConnectionEdge e : graph.getConnections()) {
-                if (isInput) {
-                    if (e.toNodeId().equals(node.getId()) && e.inputIndex() == portIndex) {
-                        toRemove.add(e);
-                    }
-                } else {
-                    if (e.fromNodeId().equals(node.getId()) && e.outputIndex() == portIndex) {
-                        toRemove.add(e);
-                    }
-                }
-            }
-            for (com.gtceu.calcboard.api.model.FlowGraph.ConnectionEdge edge : toRemove) {
-                graph.removeConnection(edge);
-            }
+            disconnectPortWires(parent.getGraph(), isInput, portIndex);
         }
 
         if (node.isBoundaryPin() || node.isReroute()) {
@@ -349,6 +342,25 @@ public class NodeWidget {
         Minecraft.getInstance().getSoundManager().play(
             net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 0.9F)
         );
+    }
+
+    private void disconnectPortWires(com.gtceu.calcboard.api.model.FlowGraph graph, boolean isInput, int portIndex) {
+        List<com.gtceu.calcboard.api.model.FlowGraph.ConnectionEdge> toRemove = new ArrayList<>();
+        for (com.gtceu.calcboard.api.model.FlowGraph.ConnectionEdge e : graph.getConnections()) {
+            if (isConnectionMatchingPort(e, isInput, portIndex)) {
+                toRemove.add(e);
+            }
+        }
+        for (com.gtceu.calcboard.api.model.FlowGraph.ConnectionEdge edge : toRemove) {
+            graph.removeConnection(edge);
+        }
+    }
+
+    private boolean isConnectionMatchingPort(com.gtceu.calcboard.api.model.FlowGraph.ConnectionEdge e, boolean isInput, int portIndex) {
+        if (isInput) {
+            return e.toNodeId().equals(node.getId()) && e.inputIndex() == portIndex;
+        }
+        return e.fromNodeId().equals(node.getId()) && e.outputIndex() == portIndex;
     }
 
     public void toggleOutputPortVoid(int portIndex) {

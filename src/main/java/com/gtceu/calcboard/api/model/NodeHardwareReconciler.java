@@ -139,11 +139,7 @@ public final class NodeHardwareReconciler {
         }
 
         if (adapter != null) {
-            List<AddonCategory> applicable = adapter.getApplicableAddonCategories(node);
-            if (!applicable.contains(addon.getCategory())) {
-                return false;
-            }
-            return adapter.canInstallAddon(node, addon);
+            return adapter.isAddonCompatible(node, addon) && adapter.canInstallAddon(node, addon);
         }
         return true;
     }
@@ -194,10 +190,10 @@ public final class NodeHardwareReconciler {
         }
         if (node.getCustomParallel() > 0) {
             node.setParallel(Math.max(1, node.getCustomParallel()));
-        } else if (parallelFromAddons > 1) {
-            node.setParallel(parallelFromAddons);
-        } else if (node.getParallel() < 1) {
-            node.setParallel(1);
+            return;
         }
+
+        int defaultPar = adapter != null ? adapter.getDefaultParallel(node) : MultiblockDetector.getDefaultParallel(node);
+        node.setParallel(Math.max(1, defaultPar));
     }
 }

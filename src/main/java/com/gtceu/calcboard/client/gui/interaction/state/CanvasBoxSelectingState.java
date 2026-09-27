@@ -85,7 +85,7 @@ public final class CanvasBoxSelectingState implements CanvasInteractionState {
             return;
         }
 
-        handler.finishBoxSelection(screen, Screen.hasShiftDown());
+        handler.finishBoxSelection(screen, com.gtceu.calcboard.client.util.ClientSafetyHelper.isShiftDown());
         reconcileInspectorAfterBoxSelection(screen);
     }
 

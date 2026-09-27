@@ -148,7 +148,7 @@ public final class SimulatedGTEnvironment {
                 "Electric Blast Furnace",
                 List.of(),
                 16, 2, 1, 1, 1, 1, 1,
-                Set.of("HEATING_COILS", "IMPORT_ITEMS", "EXPORT_ITEMS", "IMPORT_FLUIDS", "EXPORT_FLUIDS", "INPUT_ENERGY", "MAINTENANCE"),
+                Set.of("HEATING_COILS", "IMPORT_ITEMS", "EXPORT_ITEMS", "IMPORT_FLUIDS", "EXPORT_FLUIDS", "INPUT_ENERGY", "MAINTENANCE", "MUFFLER", "PARALLEL_HATCH"),
                 Set.of()
         );
     }

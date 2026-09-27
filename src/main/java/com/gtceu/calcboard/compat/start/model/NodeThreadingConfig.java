@@ -276,19 +276,27 @@ public class NodeThreadingConfig {
         if (json == null) return;
         if (json.has("active")) active = json.get("active").getAsBoolean();
         if (json.has("helixes") && json.get("helixes").isJsonObject()) {
-            JsonObject counts = json.getAsJsonObject("helixes");
-            for (String key : counts.keySet()) {
-                GTThreadingHelix helix = GTThreadingHelix.fromId(key);
-                if (helix != null) {
-                    int c = counts.get(key).getAsInt();
-                    if (c > 0) helixCounts.put(helix, c);
-                }
-            }
+            readHelixesFromJson(json.getAsJsonObject("helixes"));
         }
         if (json.has("speed")) assignedSpeed = json.get("speed").getAsInt();
         if (json.has("efficiency")) assignedEfficiency = json.get("efficiency").getAsInt();
         if (json.has("parallels")) assignedParallels = json.get("parallels").getAsInt();
         if (json.has("threading")) assignedThreading = json.get("threading").getAsInt();
         clampAssignments();
+    }
+
+    private void readHelixesFromJson(JsonObject counts) {
+        for (String key : counts.keySet()) {
+            readSingleHelixFromJson(counts, key);
+        }
+    }
+
+    private void readSingleHelixFromJson(JsonObject counts, String key) {
+        GTThreadingHelix helix = GTThreadingHelix.fromId(key);
+        if (helix == null) return;
+        int c = counts.get(key).getAsInt();
+        if (c > 0) {
+            helixCounts.put(helix, c);
+        }
     }
 }

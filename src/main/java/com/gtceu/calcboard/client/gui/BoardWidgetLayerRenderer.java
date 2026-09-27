@@ -34,7 +34,7 @@ public class BoardWidgetLayerRenderer {
 
         screen.updateGraphSummaryIfDirty();
         screen.getSummaryOverlay().setRightOffset(screen.getSummaryRightOffset());
-        screen.getSummaryOverlay().render(graphics, screen.width, screen.height, screen.getCachedSummary(), mouseX, mouseY);
+        screen.getSummaryOverlay().render(graphics, screen.width, screen.height, screen.getActiveSummary(), mouseX, mouseY);
 
         screen.getNodeInspectorPanel().render(graphics, mouseX, mouseY, partialTicks);
         screen.getStatusBar().render(graphics, mouseX, mouseY, partialTicks);

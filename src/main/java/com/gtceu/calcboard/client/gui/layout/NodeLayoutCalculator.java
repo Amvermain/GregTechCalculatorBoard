@@ -123,6 +123,10 @@ public final class NodeLayoutCalculator {
         float outAnchorY = (float) (y + 16);
         outputPorts.add(new PortBounds(0, false, outHitBox, outSlotBounds, outAnchorX, outAnchorY));
 
+        RectBounds linkedBadgeBounds = node.isLinkedJunction()
+                ? new RectBounds(x - 12, y - 13, 56, 12)
+                : RectBounds.EMPTY;
+
         return new NodeLayoutBounds(
                 cardBounds,
                 cardBounds,
@@ -145,6 +149,8 @@ public final class NodeLayoutCalculator {
                 RectBounds.EMPTY,
                 RectBounds.EMPTY,
                 RectBounds.EMPTY,
+                RectBounds.EMPTY,
+                linkedBadgeBounds,
                 y,
                 y,
                 REROUTE_SIZE,
@@ -201,6 +207,18 @@ public final class NodeLayoutCalculator {
         if (!node.isModule() && !isSlimMode && !node.getAddons().isEmpty()) {
             int trayW = Math.min(node.getAddons().size(), 3) * 16 + (node.getAddons().size() > 3 ? 16 : 0);
             addonTrayBounds = new RectBounds(x + cardW - 6 - trayW, ctrlY - 2, trayW, 18);
+        }
+
+        RectBounds circuitIconBounds = RectBounds.EMPTY;
+        int circuit = node.getCircuitNumber();
+        if (circuit >= 0) {
+            int circuitX = afterCountX + 54;
+            int rightLimit = !addonTrayBounds.isEmpty()
+                    ? addonTrayBounds.x()
+                    : (!moduleBadgeBounds.isEmpty() ? moduleBadgeBounds.x() : x + cardW - 6);
+            if (circuitX + 16 <= rightLimit) {
+                circuitIconBounds = new RectBounds(circuitX, ctrlY - 1, 16, 16);
+            }
         }
 
         boolean hasRow2 = !isSlimMode && !node.isModule();
@@ -297,6 +315,7 @@ public final class NodeLayoutCalculator {
                 configBtnBounds,
                 addonTrayBounds,
                 moduleBadgeBounds,
+                circuitIconBounds,
                 separatorY,
                 contentStartY,
                 autoHeight,

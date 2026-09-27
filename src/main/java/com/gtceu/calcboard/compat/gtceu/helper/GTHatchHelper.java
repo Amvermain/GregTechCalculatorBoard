@@ -321,6 +321,9 @@ public class GTHatchHelper {
     }
 
     private static void registerDefaultHatches(List<MachineAddon> collector) {
+        registerDefaultHatch(collector, "gtceu:steam_input_bus", "Steam Input Bus", "Steam Item Bus (4 Slots)", HatchType.ITEM_INPUT, GTVoltageTier.ULV, 4, 0L, false, Set.of("STEAM_IMPORT_ITEMS"));
+        registerDefaultHatch(collector, "gtceu:steam_output_bus", "Steam Output Bus", "Steam Item Bus (4 Slots)", HatchType.ITEM_OUTPUT, GTVoltageTier.ULV, 4, 0L, false, Set.of("STEAM_EXPORT_ITEMS"));
+        registerDefaultHatch(collector, "gtceu:steam_input_hatch", "Steam Input Hatch", "Steam Fluid Hatch (16,000 mB)", HatchType.FLUID_INPUT, GTVoltageTier.ULV, 1, 16000L, false, Set.of("STEAM_IMPORT_FLUIDS"));
         registerDefaultHatch(collector, "gtceu:lp_steam_input_bus", "LP Steam Input Bus", "Steam Item Bus (4 Slots)", HatchType.ITEM_INPUT, GTVoltageTier.ULV, 4, 0L, false, Set.of("STEAM_IMPORT_ITEMS"));
         registerDefaultHatch(collector, "gtceu:hp_steam_input_bus", "HP Steam Input Bus", "Steam Item Bus (4 Slots)", HatchType.ITEM_INPUT, GTVoltageTier.ULV, 4, 0L, false, Set.of("STEAM_IMPORT_ITEMS"));
         registerDefaultHatch(collector, "gtceu:lp_steam_output_bus", "LP Steam Output Bus", "Steam Item Bus (4 Slots)", HatchType.ITEM_OUTPUT, GTVoltageTier.ULV, 4, 0L, false, Set.of("STEAM_EXPORT_ITEMS"));

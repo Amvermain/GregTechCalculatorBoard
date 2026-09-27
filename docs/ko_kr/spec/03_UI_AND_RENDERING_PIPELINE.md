@@ -104,6 +104,18 @@ flowchart TD
 ### 3.3 반응형 UI 동기화 (`rebindUI`)
 - 기계 설정 다이얼로그(`MachineConfigDialog`)나 자재 명세서(`MultiblockBOMDialog`)가 열려 있는 상태에서 핫키나 컨텍스트 메뉴를 통해 레시피가 전환되더라도, 열린 창을 닫을 필요 없이 `rebindUI()`를 통해 위젯 계층이 즉시 최신 하드웨어 상태로 재바인딩됩니다.
 
+### 3.4 선언적 노드 인스펙터 컴포지션 및 멀티블록 전력 해치 연동 (`CompositeNodeInspector`) (ADR-061)
+- **컴포지션 패턴 기반 분해**: 과거 모놀리식 단일 클래스였던 `MachineNodeInspector`를 `CompositeNodeInspector` 컨테이너와 10개 독립 섹션(`MultiblockEnergyHatchSection`, `SingleblockTierSection`, `BoilerThrottleSection` 등)으로 모듈화했습니다.
+- **멀티블록 전력 해치 1클릭 장착**: 멀티블록 노드 선택 시 전용 전력 해치 섹션에서 현재 해치 상태를 실시간 확인하고 원하는 전압 티어 칩을 1클릭하여 기본 에너지 해치를 즉시 장착·교체할 수 있습니다.
+
+### 3.5 헤드리스 캔버스 인터랙션 테스트 하네스 및 퍼징 (`CanvasTestHarness`) (ADR-062)
+- **헤드리스 FSM 하네스**: 마인크래프트 클라이언트 그래픽 컨텍스트(GLFW, OpenGL) 없이 순수 JVM 환경에서 마우스 드래그, 다중 선택, 배선 등 복합 조작을 검증하는 `CanvasTestHarness`를 제공합니다.
+- **가역성 퍼징 검증**: 무작위 조작과 하드웨어 변이 후에도 실행 취소(Undo) 시 원본 상태로 100% 무손실 복구됨을 결정론적 퍼징으로 검증합니다.
+
+### 3.6 선택 노드 한정 컨텍스트 자동 연결 (`SelectionFloatingToolbarWidget`) (ADR-063)
+- **국소 배선 워크플로우**: 2개 이상의 노드를 다중 선택한 상태에서 플로팅 툴바의 `[↔ 연결]` 버튼 클릭 또는 단축키 `Shift+C`를 눌러 선택된 노드들 사이에서만 일치하는 포트를 국소 자동 연결합니다.
+- **원자적 실행 취소**: 연결된 모든 간선이 단일 `BatchAddConnectionsCommand`로 묶여 `Ctrl+Z` 1회로 안전하게 원상 복구됩니다.
+
 ---
 
 ## 4. UI 세부 기술 명세서 목차 (UI Spec Series)

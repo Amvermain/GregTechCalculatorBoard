@@ -373,4 +373,18 @@ public class Ae2CraftingPlanEvaluatorTest {
         Assertions.assertEquals("~2m 45s", Ae2CraftingPlanEvaluator.formatEtaDuration(165.0));
         Assertions.assertEquals("~1h 15m 30s", Ae2CraftingPlanEvaluator.formatEtaDuration(4530.0));
     }
+
+    @Test
+    public void testUnboundPatternPlanHasNoBottleneckPage() {
+        PatternId unboundPattern = PatternId.ofKey("gtceu:fine_black_steel_wire", "Fine Black Steel Wire", ItemStack.EMPTY);
+        Map<PatternId, Long> planCounts = Map.of(unboundPattern, 104L);
+
+        Ae2PlanEvaluationResult res = Ae2CraftingPlanEvaluator.evaluatePatternCounts(planCounts, 0);
+
+        Assertions.assertFalse(res.hasBottleneckPage());
+        Assertions.assertEquals("", res.bottleneckPageId());
+        Assertions.assertEquals("Fine Black Steel Wire", res.bottleneckName());
+        Assertions.assertEquals(20L, res.totalDurationTicks());
+        Assertions.assertEquals("~1.0s", res.formattedEta());
+    }
 }

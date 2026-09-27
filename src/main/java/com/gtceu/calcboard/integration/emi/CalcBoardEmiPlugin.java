@@ -80,7 +80,7 @@ public class CalcBoardEmiPlugin implements EmiPlugin {
             boardScreen.rebuildWidgets();
             boardScreen.markSummaryDirty();
         } else if (openBoard) {
-            mc.setScreen(new BoardScreen());
+            BoardScreen.openScreen(mc.screen);
         }
     }
 }

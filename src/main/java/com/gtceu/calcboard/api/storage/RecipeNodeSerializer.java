@@ -5,6 +5,7 @@ import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.ModuleInputPin;
 import com.gtceu.calcboard.api.model.ModuleOutputPin;
+import com.gtceu.calcboard.api.model.NodeJunctionHelper;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.model.RecipeSpec;
 import com.gtceu.calcboard.api.model.role.INodeRole;
@@ -65,7 +66,7 @@ public final class RecipeNodeSerializer {
             tag.put("properties", propTag);
         }
 
-        if (node.getBaseSpec() != null) {
+        if (!node.isReroute() && node.getBaseSpec() != null) {
             tag.put("baseSpec", node.getBaseSpec().serializeNBT());
         }
 
@@ -165,13 +166,17 @@ public final class RecipeNodeSerializer {
             } catch (Throwable ignored) {}
         }
 
-        if (tag.contains("baseSpec", Tag.TAG_COMPOUND)) {
-            RecipeSpec spec = RecipeSpec.deserializeNBT(tag.getCompound("baseSpec"));
-            node.setBaseSpecOnly(spec);
+        if (node.isReroute()) {
+            restoreJunctionPorts(node);
         } else {
-            reconstructLegacyBaseSpec(node, tag);
+            if (tag.contains("baseSpec", Tag.TAG_COMPOUND)) {
+                RecipeSpec spec = RecipeSpec.deserializeNBT(tag.getCompound("baseSpec"));
+                node.setBaseSpecOnly(spec);
+            } else {
+                reconstructLegacyBaseSpec(node, tag);
+            }
+            node.syncProjectedPorts();
         }
-        node.syncProjectedPorts();
         restorePortVisibility(node, tag);
 
         return node;
@@ -299,6 +304,17 @@ public final class RecipeNodeSerializer {
             for (int i = 0; i < outList.size(); i++) {
                 node.getOutputs().add(IngredientStack.deserializeNBT(outList.getCompound(i)));
             }
+        }
+    }
+
+    private static void restoreJunctionPorts(RecipeNode node) {
+        IngredientStack bound = node.asJunction() != null ? node.asJunction().getBoundIngredient() : null;
+        if (bound != null) {
+            NodeJunctionHelper.bindRerouteIngredient(node, bound);
+        } else if (!node.getInputs().isEmpty()) {
+            node.bindRerouteIngredient(node.getInputs().get(0));
+        } else if (!node.getOutputs().isEmpty()) {
+            node.bindRerouteIngredient(node.getOutputs().get(0));
         }
     }
 

@@ -238,6 +238,31 @@ The Core Domain Engine (`com.gtceu.calcboard.api`) and Common Mod Adapters (`com
 * **Defensive Element Snapshotting**: Canvas container returns defensive copies of child collections to prevent concurrent modification during page transitions and graph mutation.
 * **Modal Hotkey Interception**: Blocks background canvas shortcut routing (Delete, Backspace, Ctrl+Z) while modal dialogs or configuration panels are active.
 
+### 2.32 Embedded Local Web Dashboard & One-Way Real-Time Flow Viewer (ADR-059)
+* **Embedded HTTP Server**: Provides an independent browser dashboard observing real-time graph topology and supply rates via an embedded lightweight Netty HTTP server.
+* **One-Way Render Pipeline**: Projects in-game canvas states to the browser via JSON streams while preventing web-side graph mutations to ensure security and thread safety.
+
+### 2.33 Shared Machine Pool Machine-Centric Workflow & Embedded Recipe Panel (ADR-060)
+* **Machine-First Creation**: Enables direct creation of shared machine panels from the canvas with inline recipe management.
+* **Embedded Recipe Panel (`EMBEDDED_PANEL`)**: Vertically stacks isolated sub-cards within the panel to eliminate input ambiguity and optimize canvas footprint.
+* **3-Tier View State Machine**: Supports seamless transitions between `FOLDED_CARD`, `EMBEDDED_PANEL`, and `EXPANDED_FRAME`.
+
+### 2.34 Declarative Node Inspector Composition & Multiblock Energy Hatch Integration (ADR-061)
+* **Composite Inspector Decomposition**: Refactors the monolithic 584-line inspector into `CompositeNodeInspector` and 10 single-responsibility sections.
+* **Multiblock Energy Hatch Section**: Directly inspects and configures multiblock energy hatches, synchronizing voltage tiers and overclocking in real time.
+
+### 2.35 Headless Canvas Interaction Test Harness & Fuzzing System (ADR-062)
+* **Headless Interaction FSM Harness**: Introduces `CanvasTestHarness` to verify mouse dragging, selection, and wiring interactions without GLFW or OpenGL runtime dependencies.
+* **Reversibility & Integrity Fuzzing**: Validates through pseudorandom fuzzing that state machines and recipe specifications remain uncorrupted across random interaction and hardware mutation steps.
+
+### 2.36 Selection-Scoped Contextual Auto-Connect (ADR-063)
+* **Scoped Auto-Wiring**: Limits auto-wiring strictly between user-selected nodes, preventing accidental wiring across the entire canvas or to external junctions.
+* **Multi-Entry Access & Atomic Undo**: Accessible via floating toolbar, hotkey (`Shift+C`), and context menu, fully reversible with a single `Ctrl+Z` undo step.
+
+### 2.37 Cross-Page Junction Flow Allocation & Virtual Linking (ADR-064)
+* **Inter-Page Virtual Linking**: Connects consumer junctions directly to remote producer pages with priority-based allocation rules, real-time supply synchronization, and 1-click source navigation.
+* **Workspace Flow Coordinator (`WorkspaceFlowCoordinator`)**: Organizes cross-page junction references into a directed acyclic graph (DAG), detects inter-page circular dependencies, and deterministically reconciles multi-page mass balances.
+
 ---
 
 > 📑 **Detailed Specifications**:

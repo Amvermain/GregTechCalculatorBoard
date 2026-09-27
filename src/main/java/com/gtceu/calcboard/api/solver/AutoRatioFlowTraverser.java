@@ -68,10 +68,14 @@ public final class AutoRatioFlowTraverser {
     }
 
     private static double computeRerouteDrainDemand(RecipeNode node, DemandHop hop) {
+        double demand = 0.0;
         if (node.isFixedDrain() && node.getExternalDrainRate() > 0.0) {
-            return node.getExternalDrainRate() * hop.weight;
+            demand += node.getExternalDrainRate();
         }
-        return 0.0;
+        if (node.getAllocatedExportRate() > 0.0) {
+            demand += node.getAllocatedExportRate();
+        }
+        return demand * hop.weight;
     }
 
     private static void processRerouteDemandHop(

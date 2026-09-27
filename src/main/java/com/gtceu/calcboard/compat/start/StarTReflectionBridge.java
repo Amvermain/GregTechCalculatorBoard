@@ -23,18 +23,7 @@ public final class StarTReflectionBridge {
         Class<?> startTModifiersCls = loadClassQuietly("com.startechnology.start_core.recipe.StarTRecipeModifiers");
         STAR_T_LOADED = startTModifiersCls != null;
 
-        if (startTModifiersCls != null) {
-            for (Field f : startTModifiersCls.getFields()) {
-                if (Modifier.isStatic(f.getModifiers())) {
-                    try {
-                        Object mod = f.get(null);
-                        if (mod != null) {
-                            modNames.put(mod, f.getName().toUpperCase(Locale.ROOT));
-                        }
-                    } catch (Throwable ignored) {}
-                }
-            }
-        }
+        collectModifiers(startTModifiersCls, modNames);
         START_RECIPE_MODIFIER_NAMES = Collections.unmodifiableMap(modNames);
     }
 
@@ -62,6 +51,23 @@ public final class StarTReflectionBridge {
             }
         } catch (Throwable ignored) {}
         return null;
+    }
+
+    private static void collectModifiers(Class<?> modifiersClass, Map<Object, String> modNames) {
+        if (modifiersClass == null) return;
+        for (Field f : modifiersClass.getFields()) {
+            registerStaticModifier(f, modNames);
+        }
+    }
+
+    private static void registerStaticModifier(Field field, Map<Object, String> modNames) {
+        if (!Modifier.isStatic(field.getModifiers())) return;
+        try {
+            Object mod = field.get(null);
+            if (mod != null) {
+                modNames.put(mod, field.getName().toUpperCase(Locale.ROOT));
+            }
+        } catch (Throwable ignored) {}
     }
 
     private static Class<?> loadClassQuietly(String className) {

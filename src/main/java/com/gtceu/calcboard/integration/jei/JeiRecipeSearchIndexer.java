@@ -173,34 +173,44 @@ public final class JeiRecipeSearchIndexer {
                 }
             }
             if (jeiRuntime != null) {
-                try {
-                    var catalystLookup = jeiRuntime.getRecipeManager().createRecipeCatalystLookup(category.getRecipeType());
-                    if (catalystLookup != null) {
-                        var catalysts = catalystLookup.get().toList();
-                        for (var cat : catalysts) {
-                            if (cat != null) {
-                                ItemStack is = cat.getItemStack().orElse(ItemStack.EMPTY);
-                                if (is.isEmpty() && cat.getIngredient() instanceof ItemStack s) {
-                                    is = s;
-                                }
-                                if (!is.isEmpty()) {
-                                    ResourceLocation iId = ForgeRegistries.ITEMS.getKey(is.getItem());
-                                    if (iId != null) {
-                                        sb.append(' ').append(iId.toString().toLowerCase(Locale.ROOT));
-                                        sb.append(' ').append(iId.getPath().toLowerCase(Locale.ROOT));
-                                        String name = is.getHoverName().getString();
-                                        if (!name.isEmpty()) {
-                                            sb.append(' ').append(name.toLowerCase(Locale.ROOT));
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } catch (Throwable ignored) {}
+                appendCatalystSearchText(category, jeiRuntime, sb);
             }
             return sb.toString();
         });
+    }
+
+    private static void appendCatalystSearchText(IRecipeCategory<?> category, IJeiRuntime jeiRuntime, StringBuilder sb) {
+        try {
+            var catalystLookup = jeiRuntime.getRecipeManager().createRecipeCatalystLookup(category.getRecipeType());
+            if (catalystLookup == null) return;
+            for (var cat : catalystLookup.get().toList()) {
+                indexSingleCatalyst(cat, sb);
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    private static void indexSingleCatalyst(Object cat, StringBuilder sb) {
+        if (cat == null) return;
+        ItemStack is = extractCatalystItemStack(cat);
+        if (is.isEmpty()) return;
+        ResourceLocation iId = ForgeRegistries.ITEMS.getKey(is.getItem());
+        if (iId == null) return;
+
+        sb.append(' ').append(iId.toString().toLowerCase(Locale.ROOT));
+        sb.append(' ').append(iId.getPath().toLowerCase(Locale.ROOT));
+        String name = is.getHoverName().getString();
+        if (!name.isEmpty()) {
+            sb.append(' ').append(name.toLowerCase(Locale.ROOT));
+        }
+    }
+
+    private static ItemStack extractCatalystItemStack(Object cat) {
+        if (cat instanceof mezz.jei.api.ingredients.ITypedIngredient<?> typed) {
+            ItemStack is = typed.getItemStack().orElse(ItemStack.EMPTY);
+            if (!is.isEmpty()) return is;
+            if (typed.getIngredient() instanceof ItemStack s) return s;
+        }
+        return ItemStack.EMPTY;
     }
 
     private static void indexIngredientStack(IngredientStack stack, StringBuilder sb, List<ResourceLocation> ids, List<String> names) {

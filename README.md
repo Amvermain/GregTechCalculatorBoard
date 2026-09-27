@@ -25,6 +25,7 @@ An in-game node graph calculator and flowchart editor for GregTech CEu Modern, E
 - **Pluggable Recipe Viewer Integration**: Native integration with **EMI**, **JEI**, and **JEI++** via pluggable SPI, plus an offline pure vanilla fallback. Add recipes via the collapsible **Favorites Dock (`[⭐ Favorites (N) ▶]`)** or click EMI's native `[+]` button.
 - **Contextual Drag-to-Search & Auto-Wiring**: Drag wires from any port onto empty canvas to instantly search matching producer or consumer recipes and auto-connect with integer ratio matching (`Shift`).
 - **In-Place Recipe Switching**: Switch recipes on existing nodes with one click (`[🔄 Switch Recipe]`) without severing compatible wire connections (`IngredientStack.getId()`).
+- **Selection Contextual Auto-Wiring & Dynamic Summary**: Multi-select machines to auto-wire matching ports exclusively within the selection (`Shift + C`) or inspect localized average/peak power and net materials in the dynamically scoped Process Summary panel.
 - **Port Multi-Selection & Wire Bundling**: Marquee port selection box, `Ctrl`/`Shift` multi-select, and bundle dragging with real-time multi-bezier curve rendering.
 - **Port Hiding & Selective Restore**: Right-click ports to hide unused I/O ports for compact machine cards, with one-click restore via hidden count badge.
 - **Canvas Navigation & Subgraphs**: 16px grid snapping (`G`), quick page switcher (`Ctrl + K`), folder tree drawer, compound submodules (`Ctrl + Shift + G`), visual group frames (`Ctrl + G`), and full Undo/Redo (`Ctrl + Z` / `Ctrl + Y`).
@@ -34,11 +35,12 @@ An in-game node graph calculator and flowchart editor for GregTech CEu Modern, E
 - **Hardware Addons & Multiblocks**: Deductive calculation for heating coils (temperature & duration bonuses), parallel hatches, configurable maintenance hatches, and turbine rotors.
 - **Multi-Mod Energy Systems**: Kinetic calculations for **Create** & **Create: New Age** (SU, RPM, generator coils), RF/t dynamos & tier kits for **Thermal Series**, steam consumption modeling for **Systeams** / Boilers, and **TerraFirmaGreg (TFG)** Large Bronze and Steel Boilers with 9 booster fluids and dual-fuel Super Boiler mode.
 - **Master Anchor & Auto-Ratio Sizing**: Designate bottleneck machines as Base Anchors to automatically scale all upstream production chains backwards using integer ceiling, with full support for expanded group frames and steady-state recirculation balancing.
-- **Recipe Manual Override**: Manually customize base processing duration, power consumption/generation, and input/output ingredient quantities in the machine settings dialog for custom or mod-tweaked recipes with one-click restoration.
+- **Recipe Manual Override & Circuit Display**: Manually customize base duration, power consumption/generation, and input/output quantities in machine settings, with programmed circuit number badges displayed directly on machine cards.
 
 ### 3. Factory Multiblock BOM & Shared Machine Pools
 - **Automated Multiblock Bill of Materials (BOM)**: Aggregates all multiblock and singleblock construction requirements (casings, coils, hatches, controllers) across pages, frames, and compound modules (`B` hotkey). Export shopping lists directly to EMI Recipe Tree, JEI++, or clipboard.
-- **Shared Machine Pools (Time-Sharing Frame)**: Group multiple recipes sharing physical machines into a pool frame (`Ctrl + Shift + S`). Automatically calculates cumulative duty cycles (`Total Duty %`), quantized machine counts (`Ceil`), and de-duplicated multiblock BOM.
+- **Shared Machine Pools & Embedded Recipe Panels**: Group multiple time-shared recipes inside a single machine panel as vertical sub-cards (`EMBEDDED_PANEL`) or pool frame (`Ctrl + Shift + S`), supporting 3-tier view transitions and automated duty cycle calculation.
+- **Cross-Page Junction Flow Allocation**: Link consumer junctions to upstream remote pages with priority rules and flow caps, featuring real-time supply synchronization, starvation indicators, and 1-click source navigation.
 - **Hardware Config Synchronization**: Synchronize voltage tiers, overclock modes, parallel counts, and addons across all enclosed machines from the frame header.
 
 ### 4. AE2 Integration & Batch Production Solvers
@@ -180,7 +182,7 @@ git clone https://github.com/Amvermain/GregTechCalculatorBoard.git
 cd GregTechCalculatorBoard
 ./gradlew build
 ```
-The compiled jar will be located in `build/libs/gtcalcboard-1.20.1-2.3.0.jar`.
+The compiled jar will be located in `build/libs/gtcalcboard-1.20.1-2.4.0-beta.2.jar`.
 
 ---
 

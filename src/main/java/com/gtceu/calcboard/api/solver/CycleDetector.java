@@ -11,74 +11,83 @@ import java.util.*;
 public final class CycleDetector {
 
     private enum Color {
-        WHITE, // Unvisited
-        GRAY,  // Currently in recursion stack (active path)
-        BLACK  // Finished visiting downstream
+        WHITE,
+        GRAY,
+        BLACK
     }
 
     private CycleDetector() {}
 
-    /**
-     * Checks whether the given graph contains any directed feedback cycle among its connections.
-     */
     public static boolean hasCycle(FlowGraph graph) {
         if (graph == null || graph.getNodes().isEmpty() || graph.getConnections().isEmpty()) {
             return false;
         }
 
-        // Build adjacency list: fromNodeId -> list of toNodeIds
+        Map<String, List<String>> adj = buildAdjacencyMap(graph);
+        Map<String, Color> colors = initColorMap(graph.getNodes());
+
+        for (RecipeNode startNode : graph.getNodes()) {
+            if (colors.get(startNode.getId()) == Color.WHITE && traverseComponent(startNode.getId(), adj, colors)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static Map<String, List<String>> buildAdjacencyMap(FlowGraph graph) {
         Map<String, List<String>> adj = new HashMap<>();
         for (RecipeNode node : graph.getNodes()) {
             adj.put(node.getId(), new ArrayList<>());
         }
-
         for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
-            if (adj.containsKey(edge.fromNodeId()) && adj.containsKey(edge.toNodeId())) {
-                adj.get(edge.fromNodeId()).add(edge.toNodeId());
+            List<String> neighbors = adj.get(edge.fromNodeId());
+            if (neighbors != null && adj.containsKey(edge.toNodeId())) {
+                neighbors.add(edge.toNodeId());
             }
         }
+        return adj;
+    }
 
+    private static Map<String, Color> initColorMap(List<RecipeNode> nodes) {
         Map<String, Color> colors = new HashMap<>();
-        for (RecipeNode node : graph.getNodes()) {
+        for (RecipeNode node : nodes) {
             colors.put(node.getId(), Color.WHITE);
         }
+        return colors;
+    }
 
-        for (RecipeNode startNode : graph.getNodes()) {
-            String startId = startNode.getId();
-            if (colors.get(startId) == Color.WHITE) {
-                Deque<String> stack = new ArrayDeque<>();
-                stack.push(startId);
+    private static boolean traverseComponent(String startId, Map<String, List<String>> adj, Map<String, Color> colors) {
+        Deque<String> stack = new ArrayDeque<>();
+        stack.push(startId);
 
-                while (!stack.isEmpty()) {
-                    String curr = stack.peek();
-                    Color currColor = colors.get(curr);
+        while (!stack.isEmpty()) {
+            if (processCurrentNode(stack, adj, colors)) {
+                return true;
+            }
+        }
+        return false;
+    }
 
-                    if (currColor == Color.WHITE) {
-                        colors.put(curr, Color.GRAY);
-                    }
+    private static boolean processCurrentNode(Deque<String> stack, Map<String, List<String>> adj, Map<String, Color> colors) {
+        String curr = stack.peek();
+        if (colors.get(curr) == Color.WHITE) {
+            colors.put(curr, Color.GRAY);
+        }
 
-                    boolean hasUnvisitedChild = false;
-                    List<String> neighbors = adj.getOrDefault(curr, Collections.emptyList());
-                    for (String next : neighbors) {
-                        Color nextColor = colors.get(next);
-                        if (nextColor == Color.GRAY) {
-                            return true; // Back-edge detected!
-                        }
-                        if (nextColor == Color.WHITE) {
-                            stack.push(next);
-                            hasUnvisitedChild = true;
-                            break;
-                        }
-                    }
-
-                    if (!hasUnvisitedChild) {
-                        stack.pop();
-                        colors.put(curr, Color.BLACK);
-                    }
-                }
+        List<String> neighbors = adj.getOrDefault(curr, Collections.emptyList());
+        for (String next : neighbors) {
+            Color nextColor = colors.get(next);
+            if (nextColor == Color.GRAY) {
+                return true;
+            }
+            if (nextColor == Color.WHITE) {
+                stack.push(next);
+                return false;
             }
         }
 
+        stack.pop();
+        colors.put(curr, Color.BLACK);
         return false;
     }
 }

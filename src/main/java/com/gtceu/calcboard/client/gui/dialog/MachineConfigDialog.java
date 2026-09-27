@@ -759,47 +759,13 @@ public class MachineConfigDialog implements IBoardModal {
             return true;
         }
 
-        // Category Machine Default Preset Button Click
         int presetBtnW = 76;
         int presetBtnH = 16;
         int presetBtnX = switchBtnX - presetBtnW - 4;
         if (mX >= presetBtnX && mX <= presetBtnX + presetBtnW && mY >= y + 3 && mY <= y + 3 + presetBtnH) {
             ResourceLocation catId = node.getRecipeCategoryId() != null ? node.getRecipeCategoryId() : node.getMachineIcon();
             if (catId != null) {
-                boolean hasPreset = CategoryMachinePresetManager.getInstance().hasPreset(catId);
-                String catDisplayName = catId.getPath();
-                if (button == 1) {
-                    // Right-Click: Clear Default
-                    if (hasPreset) {
-                        CategoryMachinePresetManager.getInstance().removePreset(catId);
-                        BoardManager.getInstance().saveForCurrentContext();
-                        BoardToast.show(Component.literal("§e↺ ").append(Component.translatable("message.gtcalcboard.preset_cleared", catDisplayName)));
-                        mc.getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 0.9F));
-                    }
-                } else if (Screen.hasAltDown() || Screen.hasShiftDown()) {
-                    // Alt / Shift Click: If preset exists, reapply to this node. If not, set default.
-                    if (hasPreset) {
-                        CategoryMachinePresetManager.getInstance().getPreset(catId).applyTo(node);
-                        syncParallelBox();
-                        invalidateFilteredCatalog();
-                        if (parent != null) parent.markSummaryDirty();
-                        BoardToast.show(Component.literal("§a✔ ").append(Component.translatable("message.gtcalcboard.preset_reapplied", catDisplayName)));
-                        mc.getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F));
-                    } else {
-                        CategoryMachinePreset preset = CategoryMachinePreset.fromNode(node);
-                        CategoryMachinePresetManager.getInstance().setPreset(preset);
-                        BoardManager.getInstance().saveForCurrentContext();
-                        BoardToast.show(Component.literal("§a✔ ").append(Component.translatable("message.gtcalcboard.preset_saved", catDisplayName)));
-                        mc.getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F));
-                    }
-                } else {
-                    // Left-Click: Save current settings as default
-                    CategoryMachinePreset preset = CategoryMachinePreset.fromNode(node);
-                    CategoryMachinePresetManager.getInstance().setPreset(preset);
-                    BoardManager.getInstance().saveForCurrentContext();
-                    BoardToast.show(Component.literal("§a✔ ").append(Component.translatable("message.gtcalcboard.preset_saved", catDisplayName)));
-                    mc.getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F));
-                }
+                handlePresetButtonClick(button, catId);
             }
             return true;
         }
@@ -1038,5 +1004,52 @@ public class MachineConfigDialog implements IBoardModal {
         }
         Minecraft mc = Minecraft.getInstance();
         return mc.getWindow() != null ? mc.getWindow().getGuiScaledHeight() : DIALOG_HEIGHT;
+    }
+
+    private void handlePresetButtonClick(int button, ResourceLocation catId) {
+        boolean hasPreset = CategoryMachinePresetManager.getInstance().hasPreset(catId);
+        String catDisplayName = catId.getPath();
+        if (button == 1) {
+            clearPreset(catId, catDisplayName, hasPreset);
+            return;
+        }
+        if (Screen.hasAltDown() || Screen.hasShiftDown()) {
+            reapplyOrSavePreset(catId, catDisplayName, hasPreset);
+            return;
+        }
+        savePreset(catDisplayName);
+    }
+
+    private void clearPreset(ResourceLocation catId, String catDisplayName, boolean hasPreset) {
+        if (!hasPreset) {
+            return;
+        }
+        CategoryMachinePresetManager.getInstance().removePreset(catId);
+        BoardManager.getInstance().saveForCurrentContext();
+        BoardToast.show(Component.literal("§e↺ ").append(Component.translatable("message.gtcalcboard.preset_cleared", catDisplayName)));
+        Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 0.9F));
+    }
+
+    private void reapplyOrSavePreset(ResourceLocation catId, String catDisplayName, boolean hasPreset) {
+        if (hasPreset) {
+            CategoryMachinePresetManager.getInstance().getPreset(catId).applyTo(node);
+            syncParallelBox();
+            invalidateFilteredCatalog();
+            if (parent != null) {
+                parent.markSummaryDirty();
+            }
+            BoardToast.show(Component.literal("§a✔ ").append(Component.translatable("message.gtcalcboard.preset_reapplied", catDisplayName)));
+            Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F));
+            return;
+        }
+        savePreset(catDisplayName);
+    }
+
+    private void savePreset(String catDisplayName) {
+        CategoryMachinePreset preset = CategoryMachinePreset.fromNode(node);
+        CategoryMachinePresetManager.getInstance().setPreset(preset);
+        BoardManager.getInstance().saveForCurrentContext();
+        BoardToast.show(Component.literal("§a✔ ").append(Component.translatable("message.gtcalcboard.preset_saved", catDisplayName)));
+        Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F));
     }
 }

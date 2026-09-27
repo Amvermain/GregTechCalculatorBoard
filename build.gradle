@@ -129,10 +129,10 @@ dependencies {
     def jeiPlusPlusFileId = System.getenv('jei_plus_plus_file_id') ?: project.findProperty('jei_plus_plus_file_id') ?: '8659409'
     def jeiUnofficialFileId = System.getenv('jei_unofficial_file_id') ?: System.getenv('JEI_UNOFFICIAL_FILE_ID') ?: project.findProperty('jei_unofficial_file_id') ?: '8723054'
 
-    // Team Integration Mod Selection: 'none', 'phoenix' (Phoenix Guilds), or 'ftbteams' (FTB Teams)
+    // Team Integration Mod Selection: 'ftbteams' (Default: FTB Teams), 'phoenix' (Phoenix Guilds), or 'none'
     def envTeam = System.getenv('team_mod') ?: System.getenv('TEAM_MOD') ?: System.getenv('team_provider') ?: System.getenv('TEAM_PROVIDER')
     def propTeam = project.findProperty('team_mod') ?: project.findProperty('team_provider')
-    def teamMod = envTeam ?: propTeam ?: 'none'
+    def teamMod = envTeam ?: propTeam ?: 'ftbteams'
     def phoenixGuildsFileId = System.getenv('phoenix_guilds_file_id') ?: System.getenv('PHOENIX_GUILDS_FILE_ID') ?: project.findProperty('phoenix_guilds_file_id') ?: '8743646'
     def phoenixWikiFileId = System.getenv('phoenix_wiki_file_id') ?: System.getenv('PHOENIX_WIKI_FILE_ID') ?: project.findProperty('phoenix_wiki_file_id') ?: '8735977'
     def ftbTeamsFileId = System.getenv('ftb_teams_file_id') ?: System.getenv('FTB_TEAMS_FILE_ID') ?: project.findProperty('ftb_teams_file_id') ?: '5610363'

@@ -7,6 +7,7 @@ import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.client.gui.api.IBoardScreenContext;
 import com.gtceu.calcboard.client.gui.compat.ModGuiHandlerRegistry;
 import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
+import com.gtceu.calcboard.client.util.ClientSafetyHelper;
 import com.gtceu.calcboard.compat.systeams.SysteamsRecipeHandler;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
@@ -161,9 +162,7 @@ public final class NodeWidgetInteractionHandler {
             parent.rebuildBoardWidgets();
             parent.markSummaryDirty();
             TutorialManager.getInstance().onModuleExpanded();
-            Minecraft.getInstance().getSoundManager().play(
-                SimpleSoundInstance.forUI(SoundEvents.UI_STONECUTTER_TAKE_RESULT, 1.2F)
-            );
+            ClientSafetyHelper.playSoundSafely(SimpleSoundInstance.forUI(SoundEvents.UI_STONECUTTER_TAKE_RESULT, 1.2F));
         }
         return true;
     }
@@ -181,7 +180,7 @@ public final class NodeWidgetInteractionHandler {
         return true;
     }
 
-    private static boolean handleTargetBaseToggle(IBoardScreenContext parent, RecipeNode node) {
+    public static boolean handleTargetBaseToggle(IBoardScreenContext parent, RecipeNode node) {
         if (parent == null || parent.getGraph() == null) return true;
         boolean nowBase = !node.isBaseNode();
         parent.recordCommand(BoardCommand.ModifyPropertyCommand.baseAnchor(node.getId(), !nowBase, nowBase));
@@ -189,11 +188,10 @@ public final class NodeWidgetInteractionHandler {
         parent.rebuildBoardWidgets();
         parent.markSummaryDirty();
 
-        Minecraft mc = Minecraft.getInstance();
         if (nowBase) {
             TutorialManager.getInstance().onAnchorConfigured();
             BoardToast.show(Component.literal("§6⌖ ").append(Component.translatable("message.gtcalcboard.base_set", node.getName())));
-            mc.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.2F));
+            ClientSafetyHelper.playSoundSafely(SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.2F));
         } else {
             BoardToast.show(Component.literal("§7").append(Component.translatable("message.gtcalcboard.base_cleared")));
         }
@@ -204,7 +202,7 @@ public final class NodeWidgetInteractionHandler {
         var bounds = widget.getLayoutBounds();
 
         if (bounds.getCountMinusBtnBounds().contains(mouseX, mouseY)) {
-            return adjustMachineCount(widget, parent, node, -1, net.minecraft.client.gui.screens.Screen.hasShiftDown());
+            return adjustMachineCount(widget, parent, node, -1, ClientSafetyHelper.isShiftDown());
         }
 
         if (button == 0 && widget.getNameEditor().isEditing()) {
@@ -219,14 +217,14 @@ public final class NodeWidgetInteractionHandler {
             } else {
                 var mc = Minecraft.getInstance();
                 if (mc != null && mc.font != null) {
-                    widget.getCountEditor().onClick(mc.font, mouseX, bounds.getCountBoxBounds().x() + 2, net.minecraft.client.gui.screens.Screen.hasShiftDown());
+                    widget.getCountEditor().onClick(mc.font, mouseX, bounds.getCountBoxBounds().x() + 2, ClientSafetyHelper.isShiftDown());
                 }
             }
             return true;
         }
 
         if (bounds.getCountPlusBtnBounds().contains(mouseX, mouseY)) {
-            return adjustMachineCount(widget, parent, node, 1, net.minecraft.client.gui.screens.Screen.hasShiftDown());
+            return adjustMachineCount(widget, parent, node, 1, ClientSafetyHelper.isShiftDown());
         }
 
         if (bounds.getCountHalfBtnBounds().contains(mouseX, mouseY)) {
@@ -235,6 +233,11 @@ public final class NodeWidgetInteractionHandler {
 
         if (bounds.getCountDoubleBtnBounds().contains(mouseX, mouseY)) {
             return scaleMachineCount(widget, parent, node, 2.0);
+        }
+
+        if (bounds.getCircuitIconBounds().contains(mouseX, mouseY)) {
+            playClickSound(1.1F);
+            return true;
         }
 
         return false;
@@ -268,7 +271,7 @@ public final class NodeWidgetInteractionHandler {
         return false;
     }
 
-    private static boolean adjustMachineCount(NodeWidget widget, IBoardScreenContext parent, RecipeNode node, int sign, boolean shift) {
+    public static boolean adjustMachineCount(NodeWidget widget, IBoardScreenContext parent, RecipeNode node, int sign, boolean shift) {
         widget.commitCountEdit();
         double oldVal = node.getMachineCount();
         double step = shift ? 0.1 : (sign > 0 ? (oldVal < 1.0 ? 0.05 : 1.0) : (oldVal <= 1.0 ? 0.05 : 1.0));
@@ -277,7 +280,7 @@ public final class NodeWidgetInteractionHandler {
         return true;
     }
 
-    private static boolean scaleMachineCount(NodeWidget widget, IBoardScreenContext parent, RecipeNode node, double factor) {
+    public static boolean scaleMachineCount(NodeWidget widget, IBoardScreenContext parent, RecipeNode node, double factor) {
         widget.commitCountEdit();
         double oldVal = node.getMachineCount();
         double newVal = factor < 1.0 ? Math.max(0.01, Math.round((oldVal * factor) * 1000.0) / 1000.0) : Math.round((oldVal * factor) * 1000.0) / 1000.0;
@@ -300,6 +303,8 @@ public final class NodeWidgetInteractionHandler {
                     parent.markSummaryDirty();
                 } else if (node.isModule()) {
                     parent.rebuildBoardWidgets();
+                    parent.markSummaryDirty();
+                } else {
                     parent.markSummaryDirty();
                 }
             }
@@ -335,6 +340,17 @@ public final class NodeWidgetInteractionHandler {
             widget.getTargetBatchEditor().startEditing();
             playClickSound(1.1F);
             return true;
+        }
+        if (button == 0 && widget.isLinkedBadgeHovered(mouseX, mouseY)) {
+            if (node.isLinkedJunction() && parent != null) {
+                String srcPageId = node.getLinkedSourcePageId();
+                String srcNodeId = node.getLinkedSourceNodeId();
+                if (srcPageId != null && !srcPageId.isEmpty()) {
+                    parent.openPageAndFocusNode(srcPageId, srcNodeId);
+                    playClickSound(1.1F);
+                    return true;
+                }
+            }
         }
         if (button == 1 && net.minecraft.client.gui.screens.Screen.hasShiftDown() && parent != null) {
             parent.openJunctionSupplyDialog(node);

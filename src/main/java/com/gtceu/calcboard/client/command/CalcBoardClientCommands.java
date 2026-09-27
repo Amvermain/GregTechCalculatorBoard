@@ -18,7 +18,7 @@ public final class CalcBoardClientCommands {
                                 .executes(ctx -> {
                                     ClientPreferenceManager.getInstance().markWelcomeMessageSeen();
                                     Minecraft mc = Minecraft.getInstance();
-                                    mc.tell(() -> mc.setScreen(new BoardScreen()));
+                                    mc.tell(() -> BoardScreen.openScreen(mc.screen));
                                     return 1;
                                 })
                         )

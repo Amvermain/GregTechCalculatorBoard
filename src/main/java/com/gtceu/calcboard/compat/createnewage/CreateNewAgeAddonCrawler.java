@@ -39,69 +39,78 @@ public class CreateNewAgeAddonCrawler {
     }
 
     public static void discoverMagnets(List<MachineAddon> collector) {
-        if (collector == null) return;
-        Set<String> seenIds = new HashSet<>();
-        for (MachineAddon existing : collector) {
-            seenIds.add(existing.getId());
-        }
+        if (collector == null || ForgeRegistries.ITEMS == null) return;
+        Set<String> seenIds = collectExistingIds(collector);
+        TagKey<Item> magnetTag = getMagnetItemTag();
+        TagKey<Block> customMagnetTag = getCustomMagnetBlockTag();
 
         try {
-            TagKey<Item> magnetTag = getMagnetItemTag();
-            TagKey<Block> customMagnetTag = getCustomMagnetBlockTag();
-
-            if (ForgeRegistries.ITEMS != null) {
-                for (Item item : ForgeRegistries.ITEMS) {
-                    if (item == null) continue;
-                    ResourceLocation id = ForgeRegistries.ITEMS.getKey(item);
-                    if (id == null) continue;
-
-                    ItemStack stack = new ItemStack(item);
-                    Block block = (item instanceof BlockItem bi) ? bi.getBlock() : null;
-
-                    boolean isMagnet = (magnetTag != null && stack.is(magnetTag));
-                    if (!isMagnet && block != null && customMagnetTag != null) {
-                        try {
-                            isMagnet = block.defaultBlockState().is(customMagnetTag);
-                        } catch (Throwable ignored) {}
-                    }
-                    if (!isMagnet && block != null) {
-                        try {
-                            for (Class<?> iface : block.getClass().getInterfaces()) {
-                                if (iface.getName().contains("IMagneticBlock") || iface.getSimpleName().equals("IMagneticBlock")) {
-                                    isMagnet = true;
-                                    break;
-                                }
-                            }
-                        } catch (Throwable ignored) {}
-                    }
-
-                    if (isMagnet) {
-                        int force = extractMagneticForce(item, stack, block);
-                        if (force > 0 && !seenIds.contains(id.toString())) {
-                            String name = stack.getHoverName().getString();
-                            if (name.isEmpty() || name.startsWith("item.") || name.startsWith("block.")) {
-                                name = formatDisplayName(id.getPath());
-                            }
-                            CreateMagnetAddon addon = new CreateMagnetAddon(
-                                    id.toString(),
-                                    name,
-                                    "",
-                                    id,
-                                    force
-                            );
-                            addon.setItemStackSample(stack);
-                            addon.setDiscoverySource("create_new_age:magnet_spec");
-                            collector.add(addon);
-                            seenIds.add(id.toString());
-                        }
-                    }
-                }
+            for (Item item : ForgeRegistries.ITEMS) {
+                processItem(item, collector, seenIds, magnetTag, customMagnetTag);
             }
         } catch (Throwable ignored) {}
     }
 
+    private static Set<String> collectExistingIds(List<MachineAddon> collector) {
+        Set<String> seenIds = new HashSet<>();
+        for (MachineAddon existing : collector) {
+            seenIds.add(existing.getId());
+        }
+        return seenIds;
+    }
+
+    private static void processItem(Item item, List<MachineAddon> collector, Set<String> seenIds,
+                                    TagKey<Item> magnetTag, TagKey<Block> customMagnetTag) {
+        if (item == null) return;
+        ResourceLocation id = ForgeRegistries.ITEMS.getKey(item);
+        if (id == null || seenIds.contains(id.toString())) return;
+
+        ItemStack stack = new ItemStack(item);
+        Block block = (item instanceof BlockItem bi) ? bi.getBlock() : null;
+
+        if (!isMagnetItemOrBlock(stack, block, magnetTag, customMagnetTag)) return;
+
+        int force = extractMagneticForce(item, stack, block);
+        if (force <= 0) return;
+
+        CreateMagnetAddon addon = createMagnetAddon(id, stack, force);
+        collector.add(addon);
+        seenIds.add(id.toString());
+    }
+
+    private static boolean isMagnetItemOrBlock(ItemStack stack, Block block, TagKey<Item> magnetTag, TagKey<Block> customMagnetTag) {
+        if (magnetTag != null && stack.is(magnetTag)) return true;
+        if (block == null) return false;
+        if (customMagnetTag != null && block.defaultBlockState().is(customMagnetTag)) return true;
+        return implementsMagneticBlock(block.getClass());
+    }
+
+    private static boolean implementsMagneticBlock(Class<?> blockClass) {
+        for (Class<?> iface : blockClass.getInterfaces()) {
+            if ("IMagneticBlock".equals(iface.getSimpleName()) || iface.getName().endsWith(".IMagneticBlock")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static CreateMagnetAddon createMagnetAddon(ResourceLocation id, ItemStack stack, int force) {
+        String name = resolveDisplayName(stack, id);
+        CreateMagnetAddon addon = new CreateMagnetAddon(id.toString(), name, "", id, force);
+        addon.setItemStackSample(stack);
+        addon.setDiscoverySource("create_new_age:magnet_spec");
+        return addon;
+    }
+
+    private static String resolveDisplayName(ItemStack stack, ResourceLocation id) {
+        String name = stack.getHoverName().getString();
+        if (name.isEmpty() || name.startsWith("item.") || name.startsWith("block.")) {
+            return formatDisplayName(id.getPath());
+        }
+        return name;
+    }
+
     public static int extractMagneticForce(Item item, ItemStack stack, Block block) {
-        // 1. Direct IMagneticBlock.getStrength() official method reflection
         if (block != null) {
             int force = invokeGetStrengthReflection(block);
             if (force > 0) return force;
@@ -111,37 +120,43 @@ public class CreateNewAgeAddonCrawler {
             if (force > 0) return force;
         }
 
-        // 2. Official Create: New Age block tags: create_new_age:magnets/strength_<N>
-        if (block != null) {
-            try {
-                var state = block.defaultBlockState();
-                var tagStream = state.getTags();
-                for (TagKey<Block> tag : tagStream.toList()) {
-                    ResourceLocation tagLoc = tag.location();
-                    if (tagLoc != null && tagLoc.getNamespace().equals(MOD_ID)) {
-                        String path = tagLoc.getPath();
-                        if (path.startsWith("magnets/strength_")) {
-                            try {
-                                int parsed = Integer.parseInt(path.substring("magnets/strength_".length()));
-                                if (parsed > 0) return parsed;
-                            } catch (NumberFormatException ignored) {}
-                        }
-                    }
-                }
-            } catch (Throwable ignored) {}
-        }
+        int tagForce = extractForceFromBlockTags(block);
+        if (tagForce > 0) return tagForce;
 
-        // 3. Deterministic NBT inspection
-        if (stack != null && stack.hasTag()) {
-            var tag = stack.getTag();
-            if (tag != null) {
-                if (tag.contains("Strength")) return tag.getInt("Strength");
-                if (tag.contains("strength")) return tag.getInt("strength");
-                if (tag.contains("MagneticForce")) return tag.getInt("MagneticForce");
-                if (tag.contains("magnetic_force")) return tag.getInt("magnetic_force");
+        return extractForceFromNbt(stack);
+    }
+
+    private static int extractForceFromBlockTags(Block block) {
+        if (block == null) return 0;
+        try {
+            for (TagKey<Block> tag : block.defaultBlockState().getTags().toList()) {
+                int force = parseForceFromTag(tag);
+                if (force > 0) return force;
             }
-        }
+        } catch (Throwable ignored) {}
+        return 0;
+    }
 
+    private static int parseForceFromTag(TagKey<Block> tag) {
+        ResourceLocation tagLoc = tag.location();
+        if (tagLoc == null || !MOD_ID.equals(tagLoc.getNamespace())) return 0;
+        String path = tagLoc.getPath();
+        if (!path.startsWith("magnets/strength_")) return 0;
+        try {
+            return Math.max(0, Integer.parseInt(path.substring("magnets/strength_".length())));
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
+    }
+
+    private static int extractForceFromNbt(ItemStack stack) {
+        if (stack == null || !stack.hasTag()) return 0;
+        var tag = stack.getTag();
+        if (tag == null) return 0;
+        if (tag.contains("Strength")) return tag.getInt("Strength");
+        if (tag.contains("strength")) return tag.getInt("strength");
+        if (tag.contains("MagneticForce")) return tag.getInt("MagneticForce");
+        if (tag.contains("magnetic_force")) return tag.getInt("magnetic_force");
         return 0;
     }
 

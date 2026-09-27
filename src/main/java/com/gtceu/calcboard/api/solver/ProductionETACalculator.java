@@ -109,17 +109,22 @@ public final class ProductionETACalculator {
 
         while (!queue.isEmpty()) {
             String currentId = queue.poll();
-            for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
-                if (edge.toNodeId().equals(currentId)) {
-                    RecipeNode fromNode = graph.findNodeById(edge.fromNodeId());
-                    if (fromNode != null && visited.add(fromNode.getId())) {
-                        if (fromNode.isReroute()) {
-                            queue.add(fromNode.getId());
-                        } else {
-                            maxDuration = Math.max(maxDuration, fromNode.getEffectiveDurationSeconds());
-                        }
-                    }
-                }
+            maxDuration = Math.max(maxDuration, inspectUpstreamCycleEdges(graph, currentId, visited, queue));
+        }
+        return maxDuration;
+    }
+
+    private static double inspectUpstreamCycleEdges(FlowGraph graph, String currentId, Set<String> visited, Queue<String> queue) {
+        double maxDuration = 0.0;
+        for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+            if (!edge.toNodeId().equals(currentId)) continue;
+            RecipeNode fromNode = graph.findNodeById(edge.fromNodeId());
+            if (fromNode == null || !visited.add(fromNode.getId())) continue;
+
+            if (fromNode.isReroute()) {
+                queue.add(fromNode.getId());
+            } else {
+                maxDuration = Math.max(maxDuration, fromNode.getEffectiveDurationSeconds());
             }
         }
         return maxDuration;
@@ -137,17 +142,22 @@ public final class ProductionETACalculator {
 
         while (!queue.isEmpty()) {
             String currentId = queue.poll();
-            for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
-                if (edge.fromNodeId().equals(currentId)) {
-                    RecipeNode toNode = graph.findNodeById(edge.toNodeId());
-                    if (toNode != null && visited.add(toNode.getId())) {
-                        if (toNode.isReroute()) {
-                            queue.add(toNode.getId());
-                        } else {
-                            maxDuration = Math.max(maxDuration, toNode.getEffectiveDurationSeconds());
-                        }
-                    }
-                }
+            maxDuration = Math.max(maxDuration, inspectDownstreamCycleEdges(graph, currentId, visited, queue));
+        }
+        return maxDuration;
+    }
+
+    private static double inspectDownstreamCycleEdges(FlowGraph graph, String currentId, Set<String> visited, Queue<String> queue) {
+        double maxDuration = 0.0;
+        for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+            if (!edge.fromNodeId().equals(currentId)) continue;
+            RecipeNode toNode = graph.findNodeById(edge.toNodeId());
+            if (toNode == null || !visited.add(toNode.getId())) continue;
+
+            if (toNode.isReroute()) {
+                queue.add(toNode.getId());
+            } else {
+                maxDuration = Math.max(maxDuration, toNode.getEffectiveDurationSeconds());
             }
         }
         return maxDuration;
@@ -223,17 +233,26 @@ public final class ProductionETACalculator {
 
         while (!queue.isEmpty()) {
             String currentId = queue.poll();
-            for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
-                if (edge.toNodeId().equals(currentId)) {
-                    RecipeNode fromNode = graph.findNodeById(edge.fromNodeId());
-                    if (fromNode != null && visited.add(fromNode.getId())) {
-                        result.add(fromNode);
-                        queue.add(fromNode.getId());
-                    }
-                }
-            }
+            collectUpstreamProducerEdges(graph, currentId, visited, queue, result);
         }
         return result;
+    }
+
+    private static void collectUpstreamProducerEdges(
+            FlowGraph graph,
+            String currentId,
+            Set<String> visited,
+            Queue<String> queue,
+            Set<RecipeNode> result
+    ) {
+        for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+            if (!edge.toNodeId().equals(currentId)) continue;
+            RecipeNode fromNode = graph.findNodeById(edge.fromNodeId());
+            if (fromNode != null && visited.add(fromNode.getId())) {
+                result.add(fromNode);
+                queue.add(fromNode.getId());
+            }
+        }
     }
 
     /**
@@ -282,38 +301,52 @@ public final class ProductionETACalculator {
         Set<RecipeNode> upstreams = collectUpstreamNodes(graph, targetNode);
         for (RecipeNode n : upstreams) {
             if (n.isReroute()) continue;
-            for (int i = 0; i < n.getInputs().size(); i++) {
-                IngredientStack inStack = n.getInputs().get(i);
-                if (inStack == null) continue;
-
-                boolean hasUpstreamConnection = false;
-                for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
-                    if (edge.toNodeId().equals(n.getId()) && edge.inputIndex() == i) {
-                        hasUpstreamConnection = true;
-                        break;
-                    }
-                }
-
-                if (!hasUpstreamConnection) {
-                    double inputRatePerSec = inStack.getAmount() * n.getOverclockResult().getCyclesPerSecond() * n.getTotalParallel() * n.getMachineCount();
-                    double totalNeeded = inputRatePerSec * etaSec;
-                    
-                    IngredientStack canonical = null;
-                    for (IngredientStack s : result.keySet()) {
-                        if (s.matchesOrAlternative(inStack)) {
-                            canonical = s;
-                            break;
-                        }
-                    }
-                    if (canonical != null) {
-                        result.put(canonical, result.get(canonical) + totalNeeded);
-                    } else {
-                        result.put(inStack.copy(), totalNeeded);
-                    }
-                }
-            }
+            processNodeRawMaterialDemands(graph, n, etaSec, result);
         }
         return result;
+    }
+
+    private static void processNodeRawMaterialDemands(
+            FlowGraph graph,
+            RecipeNode node,
+            double etaSec,
+            Map<IngredientStack, Double> result
+    ) {
+        for (int i = 0; i < node.getInputs().size(); i++) {
+            IngredientStack inStack = node.getInputs().get(i);
+            if (inStack == null || hasIncomingEdge(graph, node.getId(), i)) continue;
+
+            double inputRatePerSec = inStack.getAmount() * node.getOverclockResult().getCyclesPerSecond()
+                    * node.getTotalParallel() * node.getMachineCount();
+            accumulateRawMaterialDemand(result, inStack, inputRatePerSec * etaSec);
+        }
+    }
+
+    private static boolean hasIncomingEdge(FlowGraph graph, String nodeId, int inputIndex) {
+        for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+            if (edge.toNodeId().equals(nodeId) && edge.inputIndex() == inputIndex) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void accumulateRawMaterialDemand(Map<IngredientStack, Double> result, IngredientStack inStack, double totalNeeded) {
+        IngredientStack canonical = findCanonicalMatchingKey(result.keySet(), inStack);
+        if (canonical != null) {
+            result.put(canonical, result.get(canonical) + totalNeeded);
+        } else {
+            result.put(inStack.copy(), totalNeeded);
+        }
+    }
+
+    private static IngredientStack findCanonicalMatchingKey(Set<IngredientStack> keys, IngredientStack inStack) {
+        for (IngredientStack s : keys) {
+            if (s.matchesOrAlternative(inStack)) {
+                return s;
+            }
+        }
+        return null;
     }
 }
 

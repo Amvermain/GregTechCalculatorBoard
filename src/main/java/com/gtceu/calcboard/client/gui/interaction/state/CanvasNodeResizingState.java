@@ -74,7 +74,7 @@ public final class CanvasNodeResizingState implements CanvasInteractionState {
         double origY = resizingNode.getNode().getPosY();
         double rawDeltaX = canvasX - ctx.getResizeStartCanvasX();
         double rawDeltaY = canvasY - ctx.getResizeStartCanvasY();
-        boolean isSnap = Screen.hasControlDown() || BoardManager.getInstance().isGridSnapEnabled();
+        boolean isSnap = com.gtceu.calcboard.client.util.ClientSafetyHelper.isControlDown() || BoardManager.getInstance().isGridSnapEnabled();
         int gridSize = Math.max(16, BoardManager.getInstance().getGridSnapSize());
 
         int newWidth;

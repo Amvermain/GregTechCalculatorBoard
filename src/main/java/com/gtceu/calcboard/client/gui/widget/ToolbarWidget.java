@@ -592,8 +592,16 @@ public class ToolbarWidget {
         actionHandler.performAutoConnect();
     }
 
+    public void performAutoConnectForSelection(Set<String> targetNodeIds) {
+        actionHandler.performAutoConnectForSelection(targetNodeIds);
+    }
+
     public static void performAutoConnectWithFilter(IBoardScreenContext screen, Set<ResourceLocation> allowedItemIds) {
         ToolbarActionHandler.performAutoConnectWithFilter(screen, allowedItemIds);
+    }
+
+    public static void performAutoConnectForSelection(IBoardScreenContext screen, Set<String> targetNodeIds) {
+        ToolbarActionHandler.performAutoConnectForSelection(screen, targetNodeIds);
     }
 
     public static List<FlowGraph.ConnectionEdge> autoConnect(FlowGraph graph, List<com.gtceu.calcboard.api.history.BoardCommand> subCommands) {
@@ -602,6 +610,10 @@ public class ToolbarWidget {
 
     public static List<FlowGraph.ConnectionEdge> autoConnect(FlowGraph graph, List<com.gtceu.calcboard.api.history.BoardCommand> subCommands, Set<ResourceLocation> allowedItemIds) {
         return ToolbarActionHandler.autoConnect(graph, subCommands, allowedItemIds);
+    }
+
+    public static List<FlowGraph.ConnectionEdge> autoConnect(FlowGraph graph, List<com.gtceu.calcboard.api.history.BoardCommand> subCommands, Set<ResourceLocation> allowedItemIds, Set<String> targetNodeIds) {
+        return ToolbarActionHandler.autoConnect(graph, subCommands, allowedItemIds, targetNodeIds);
     }
 
     public void performAutoRatio() {

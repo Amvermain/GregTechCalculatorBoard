@@ -1,7 +1,9 @@
 package com.gtceu.calcboard.api.solver;
 
+import com.gtceu.calcboard.api.model.CrossPageExportTarget;
 import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.storage.BoardPage;
 import com.gtceu.calcboard.api.type.FlowSplitMode;
 
 import java.util.*;
@@ -154,15 +156,32 @@ public final class FlowEdgeAllocator {
 
     public static Map<FlowGraph.ConnectionEdge, Double> calculateOutgoingEdgeAllocations(
             FlowGraph graph, RecipeNode producer, int outputIndex, double totalProducerRate, Map<String, Double> effMap, SolverContext context) {
+        return calculateOutgoingEdgeAllocations(graph, producer, outputIndex, totalProducerRate, effMap, context, null, null);
+    }
+
+    public static Map<FlowGraph.ConnectionEdge, Double> calculateOutgoingEdgeAllocations(
+            FlowGraph graph, RecipeNode producer, int outputIndex, double totalProducerRate, Map<String, Double> effMap, SolverContext context,
+            List<FlowGraph.ConnectionEdge> extraEdges, Map<FlowGraph.ConnectionEdge, Double> extraDemands) {
         Map<FlowGraph.ConnectionEdge, Double> allocations = new LinkedHashMap<>();
-        if (graph == null || producer == null || totalProducerRate <= 0.00001) {
+        if ((graph == null && (extraEdges == null || extraEdges.isEmpty())) || producer == null || totalProducerRate <= 0.00001) {
             return allocations;
         }
 
-        List<FlowGraph.ConnectionEdge> outEdges = collectOutgoingEdgesForPort(graph, producer.getId(), outputIndex, context != null ? context.edgeIndex() : null);
+        List<FlowGraph.ConnectionEdge> outEdges = new ArrayList<>();
+        if (graph != null) {
+            outEdges.addAll(collectOutgoingEdgesForPort(graph, producer.getId(), outputIndex, context != null ? context.edgeIndex() : null));
+        }
+        if (extraEdges != null) {
+            outEdges.addAll(extraEdges);
+        }
         if (outEdges.isEmpty()) return allocations;
 
         if (outEdges.size() == 1 && !outEdges.get(0).hasFixedLimit()) {
+            if (extraDemands != null && extraDemands.containsKey(outEdges.get(0))) {
+                double demand = extraDemands.get(outEdges.get(0));
+                allocations.put(outEdges.get(0), Math.min(totalProducerRate, demand));
+                return allocations;
+            }
             allocations.put(outEdges.get(0), totalProducerRate);
             return allocations;
         }
@@ -175,17 +194,17 @@ public final class FlowEdgeAllocator {
         }
 
         if (hasCustomPriority(outEdges)) {
-            allocateHierarchicalPriorityEdges(graph, outEdges, totalProducerRate, effMap, allocations, splitMode, context);
+            allocateHierarchicalPriorityEdges(graph, outEdges, totalProducerRate, effMap, allocations, splitMode, context, extraDemands);
             return allocations;
         }
 
         if (splitMode == FlowSplitMode.EQUAL) {
-            allocateEqualEdges(graph, outEdges, totalProducerRate, effMap, allocations, context);
+            allocateEqualEdges(graph, outEdges, totalProducerRate, effMap, allocations, context, extraDemands);
             return allocations;
         }
 
         if (splitMode == FlowSplitMode.WEIGHTED) {
-            allocateWeightedEdges(graph, outEdges, totalProducerRate, effMap, allocations, context);
+            allocateWeightedEdges(graph, outEdges, totalProducerRate, effMap, allocations, context, extraDemands);
             return allocations;
         }
 
@@ -210,8 +229,57 @@ public final class FlowEdgeAllocator {
             return allocations;
         }
 
-        allocateProportionalEdges(graph, variableEdges, remainingFlow, effMap, allocations, context);
+        allocateProportionalEdges(graph, variableEdges, remainingFlow, effMap, allocations, context, extraDemands);
         return allocations;
+    }
+
+    public static Map<CrossPageExportTarget, Double> calculateCrossPageAllocations(
+            FlowGraph producerGraph,
+            RecipeNode producerNode,
+            double totalProducerRate,
+            Map<CrossPageExportTarget, Double> targetDemands
+    ) {
+        if (producerNode == null || totalProducerRate <= 0.00001 || targetDemands == null || targetDemands.isEmpty()) {
+            Map<CrossPageExportTarget, Double> zero = new LinkedHashMap<>();
+            if (targetDemands != null) {
+                for (CrossPageExportTarget t : targetDemands.keySet()) {
+                    zero.put(t, 0.0);
+                }
+            }
+            return zero;
+        }
+
+        Map<FlowGraph.ConnectionEdge, CrossPageExportTarget> edgeToTarget = new LinkedHashMap<>();
+        List<FlowGraph.ConnectionEdge> extraEdges = new ArrayList<>(targetDemands.size());
+        Map<FlowGraph.ConnectionEdge, Double> extraDemands = new LinkedHashMap<>();
+
+        for (Map.Entry<CrossPageExportTarget, Double> entry : targetDemands.entrySet()) {
+            CrossPageExportTarget target = entry.getKey();
+            double demand = Math.max(0.0, entry.getValue());
+            double limit = target.hasFixedLimit() ? Math.min(demand, target.fixedLimit()) : demand;
+            FlowGraph.ConnectionEdge edge = new FlowGraph.ConnectionEdge(
+                    producerNode.getId(),
+                    0,
+                    "__cross_page__:" + target.targetPageId(),
+                    0,
+                    limit,
+                    target.priority(),
+                    1.0
+            );
+            edgeToTarget.put(edge, target);
+            extraEdges.add(edge);
+            extraDemands.put(edge, demand);
+        }
+
+        Map<FlowGraph.ConnectionEdge, Double> allAllocations = calculateOutgoingEdgeAllocations(
+                producerGraph, producerNode, 0, totalProducerRate, null, null, extraEdges, extraDemands
+        );
+
+        Map<CrossPageExportTarget, Double> result = new LinkedHashMap<>();
+        for (Map.Entry<FlowGraph.ConnectionEdge, CrossPageExportTarget> entry : edgeToTarget.entrySet()) {
+            result.put(entry.getValue(), allAllocations.getOrDefault(entry.getKey(), 0.0));
+        }
+        return result;
     }
 
     private static boolean hasCustomPriority(List<FlowGraph.ConnectionEdge> outEdges) {
@@ -238,13 +306,40 @@ public final class FlowEdgeAllocator {
         return result;
     }
 
+    private static double getEdgeDemand(FlowGraph graph, FlowGraph.ConnectionEdge edge, Map<String, Double> effMap, SolverContext context, Map<FlowGraph.ConnectionEdge, Double> extraDemands) {
+        if (extraDemands != null && extraDemands.containsKey(edge)) {
+            return extraDemands.get(edge);
+        }
+        if (graph == null) return 0.0;
+        RecipeNode consumer = graph.findNodeById(edge.toNodeId());
+        return getConnectedConsumerDemand(graph, consumer, edge.inputIndex(), effMap, context);
+    }
+
+    private static boolean isEdgeVoidSink(FlowGraph graph, FlowGraph.ConnectionEdge edge, Map<FlowGraph.ConnectionEdge, Double> extraDemands) {
+        if (extraDemands != null && extraDemands.containsKey(edge)) {
+            return false;
+        }
+        if (graph == null) return false;
+        RecipeNode consumer = graph.findNodeById(edge.toNodeId());
+        return consumer != null && consumer.isVoidSink();
+    }
+
+    private static boolean isEdgeFixedCapped(FlowGraph graph, FlowGraph.ConnectionEdge edge, Map<FlowGraph.ConnectionEdge, Double> extraDemands) {
+        if (extraDemands != null && extraDemands.containsKey(edge)) {
+            return true;
+        }
+        if (graph == null) return false;
+        return isFixedCappedConsumer(graph, graph.findNodeById(edge.toNodeId()));
+    }
+
     private static void allocateProportionalEdges(
             FlowGraph graph,
             List<FlowGraph.ConnectionEdge> variableEdges,
             double remainingFlow,
             Map<String, Double> effMap,
             Map<FlowGraph.ConnectionEdge, Double> allocations,
-            SolverContext context
+            SolverContext context,
+            Map<FlowGraph.ConnectionEdge, Double> extraDemands
     ) {
         List<FlowGraph.ConnectionEdge> normalEdges = new ArrayList<>();
         List<FlowGraph.ConnectionEdge> voidEdges = new ArrayList<>();
@@ -252,13 +347,12 @@ public final class FlowEdgeAllocator {
         double totalNormalDemand = 0.0;
 
         for (FlowGraph.ConnectionEdge edge : variableEdges) {
-            RecipeNode consumer = graph.findNodeById(edge.toNodeId());
-            if (consumer != null && consumer.isVoidSink()) {
+            if (isEdgeVoidSink(graph, edge, extraDemands)) {
                 voidEdges.add(edge);
                 demandMap.put(edge, 0.0);
             } else {
                 normalEdges.add(edge);
-                double demand = getConnectedConsumerDemand(graph, consumer, edge.inputIndex(), effMap, context);
+                double demand = getEdgeDemand(graph, edge, effMap, context, extraDemands);
                 demandMap.put(edge, demand);
                 totalNormalDemand += demand;
             }
@@ -278,15 +372,13 @@ public final class FlowEdgeAllocator {
             double surplus = remainingFlow - totalNormalDemand;
             double shareableDemand = 0.0;
             for (FlowGraph.ConnectionEdge edge : normalEdges) {
-                RecipeNode consumer = graph.findNodeById(edge.toNodeId());
-                if (!isFixedCappedConsumer(graph, consumer)) {
+                if (!isEdgeFixedCapped(graph, edge, extraDemands)) {
                     shareableDemand += demandMap.get(edge);
                 }
             }
             for (FlowGraph.ConnectionEdge edge : normalEdges) {
                 double demand = demandMap.get(edge);
-                RecipeNode consumer = graph.findNodeById(edge.toNodeId());
-                boolean isFixedCapped = isFixedCappedConsumer(graph, consumer);
+                boolean isFixedCapped = isEdgeFixedCapped(graph, edge, extraDemands);
                 double surplusShare = (!isFixedCapped && voidEdges.isEmpty() && shareableDemand > 0.0001)
                         ? surplus * (demand / shareableDemand)
                         : 0.0;
@@ -308,7 +400,8 @@ public final class FlowEdgeAllocator {
             double totalProducerRate,
             Map<String, Double> effMap,
             Map<FlowGraph.ConnectionEdge, Double> allocations,
-            SolverContext context
+            SolverContext context,
+            Map<FlowGraph.ConnectionEdge, Double> extraDemands
     ) {
         List<FlowGraph.ConnectionEdge> normalEdges = new ArrayList<>();
         List<FlowGraph.ConnectionEdge> voidEdges = new ArrayList<>();
@@ -317,12 +410,11 @@ public final class FlowEdgeAllocator {
 
         boolean hasUncapped = false;
         for (FlowGraph.ConnectionEdge edge : outEdges) {
-            RecipeNode consumer = graph.findNodeById(edge.toNodeId());
-            if (consumer != null && consumer.isVoidSink()) {
+            if (isEdgeVoidSink(graph, edge, extraDemands)) {
                 voidEdges.add(edge);
             } else {
                 normalEdges.add(edge);
-                double demand = getConnectedConsumerDemand(graph, consumer, edge.inputIndex(), effMap, context);
+                double demand = getEdgeDemand(graph, edge, effMap, context, extraDemands);
                 double cap = edge.hasFixedLimit()
                         ? (demand > 0.0001 ? Math.min(demand, edge.fixedFlowLimit()) : edge.fixedFlowLimit())
                         : (demand > 0.0001 ? demand : Double.MAX_VALUE);
@@ -442,7 +534,8 @@ public final class FlowEdgeAllocator {
             double totalProducerRate,
             Map<String, Double> effMap,
             Map<FlowGraph.ConnectionEdge, Double> allocations,
-            SolverContext context
+            SolverContext context,
+            Map<FlowGraph.ConnectionEdge, Double> extraDemands
     ) {
         List<FlowGraph.ConnectionEdge> normalEdges = new ArrayList<>();
         List<FlowGraph.ConnectionEdge> voidEdges = new ArrayList<>();
@@ -451,12 +544,11 @@ public final class FlowEdgeAllocator {
 
         boolean hasUncapped = false;
         for (FlowGraph.ConnectionEdge edge : outEdges) {
-            RecipeNode consumer = graph.findNodeById(edge.toNodeId());
-            if (consumer != null && consumer.isVoidSink()) {
+            if (isEdgeVoidSink(graph, edge, extraDemands)) {
                 voidEdges.add(edge);
             } else {
                 normalEdges.add(edge);
-                double demand = getConnectedConsumerDemand(graph, consumer, edge.inputIndex(), effMap, context);
+                double demand = getEdgeDemand(graph, edge, effMap, context, extraDemands);
                 double cap = edge.hasFixedLimit()
                         ? (demand > 0.0001 ? Math.min(demand, edge.fixedFlowLimit()) : edge.fixedFlowLimit())
                         : (demand > 0.0001 ? demand : Double.MAX_VALUE);
@@ -618,7 +710,8 @@ public final class FlowEdgeAllocator {
             Map<String, Double> effMap,
             Map<FlowGraph.ConnectionEdge, Double> allocations,
             FlowSplitMode splitMode,
-            SolverContext context
+            SolverContext context,
+            Map<FlowGraph.ConnectionEdge, Double> extraDemands
     ) {
         List<FlowGraph.ConnectionEdge> normalEdges = new ArrayList<>();
         List<FlowGraph.ConnectionEdge> voidEdges = new ArrayList<>();
@@ -627,14 +720,13 @@ public final class FlowEdgeAllocator {
         double totalNormalCap = 0.0;
 
         for (FlowGraph.ConnectionEdge edge : outEdges) {
-            RecipeNode consumer = graph.findNodeById(edge.toNodeId());
-            if (consumer != null && consumer.isVoidSink()) {
+            if (isEdgeVoidSink(graph, edge, extraDemands)) {
                 voidEdges.add(edge);
                 demandMap.put(edge, 0.0);
                 capMap.put(edge, 0.0);
             } else {
                 normalEdges.add(edge);
-                double demand = getConnectedConsumerDemand(graph, consumer, edge.inputIndex(), effMap, context);
+                double demand = getEdgeDemand(graph, edge, effMap, context, extraDemands);
                 demandMap.put(edge, demand);
                 double cap = edge.hasFixedLimit()
                         ? (demand > 0.0001 ? Math.min(demand, edge.fixedFlowLimit()) : edge.fixedFlowLimit())
@@ -680,7 +772,7 @@ public final class FlowEdgeAllocator {
         }
 
         if (currentFlow > 0.0001) {
-            handlePrioritySurplus(graph, normalEdges, voidEdges, demandMap, currentFlow, allocations, splitMode);
+            handlePrioritySurplus(graph, normalEdges, voidEdges, demandMap, currentFlow, allocations, splitMode, extraDemands);
         }
     }
 
@@ -753,7 +845,8 @@ public final class FlowEdgeAllocator {
             Map<FlowGraph.ConnectionEdge, Double> demandMap,
             double surplus,
             Map<FlowGraph.ConnectionEdge, Double> allocations,
-            FlowSplitMode splitMode
+            FlowSplitMode splitMode,
+            Map<FlowGraph.ConnectionEdge, Double> extraDemands
     ) {
         if (!voidEdges.isEmpty()) {
             if (splitMode == FlowSplitMode.WEIGHTED) {
@@ -768,8 +861,7 @@ public final class FlowEdgeAllocator {
         double shareableDemand = 0.0;
         double shareableWeight = 0.0;
         for (FlowGraph.ConnectionEdge edge : normalEdges) {
-            RecipeNode consumer = graph.findNodeById(edge.toNodeId());
-            if (!edge.hasFixedLimit() && !isFixedCappedConsumer(graph, consumer)) {
+            if (!edge.hasFixedLimit() && !isEdgeFixedCapped(graph, edge, extraDemands)) {
                 shareableEdges.add(edge);
                 shareableDemand += demandMap.getOrDefault(edge, 0.0);
                 shareableWeight += getEdgeWeight(edge);
@@ -868,12 +960,114 @@ public final class FlowEdgeAllocator {
                 ? edgeIndex.getOutPortEdges(producer.getId(), targetEdge.outputIndex())
                 : collectOutgoingEdgesForPort(graph, producer.getId(), targetEdge.outputIndex(), null);
 
-        if (outEdges.size() == 1 && !outEdges.get(0).hasFixedLimit()) {
+        String srcPageId = WorkspaceFlowCoordinator.findPageIdForGraph(graph);
+        List<WorkspaceFlowCoordinator.InterPageLink> activeLinks = (srcPageId != null && producer.isReroute())
+                ? WorkspaceFlowCoordinator.getLinksForSource(srcPageId, producer.getId())
+                : Collections.emptyList();
+        boolean hasVirtualTargets = producer.isReroute() && (!producer.getExportTargets().isEmpty() || !activeLinks.isEmpty());
+        if (outEdges.size() == 1 && !outEdges.get(0).hasFixedLimit() && !hasVirtualTargets) {
             return prodActualRate;
         }
 
-        Map<FlowGraph.ConnectionEdge, Double> allocations = calculateOutgoingEdgeAllocations(graph, producer, targetEdge.outputIndex(), prodActualRate, effMap, context);
+        List<FlowGraph.ConnectionEdge> extraEdges = null;
+        Map<FlowGraph.ConnectionEdge, Double> extraDemands = null;
+        if (hasVirtualTargets) {
+            extraEdges = new ArrayList<>();
+            extraDemands = new LinkedHashMap<>();
+            collectVirtualExportEdges(graph, producer, extraEdges, extraDemands, activeLinks);
+        }
+
+        Map<FlowGraph.ConnectionEdge, Double> allocations = calculateOutgoingEdgeAllocations(
+                graph, producer, targetEdge.outputIndex(), prodActualRate, effMap, context, extraEdges, extraDemands
+        );
         return allocations.getOrDefault(targetEdge, 0.0);
+    }
+
+    private static void collectVirtualExportEdges(
+            FlowGraph graph,
+            RecipeNode producer,
+            List<FlowGraph.ConnectionEdge> extraEdges,
+            Map<FlowGraph.ConnectionEdge, Double> extraDemands,
+            List<WorkspaceFlowCoordinator.InterPageLink> activeLinks
+    ) {
+        WorkspaceFlowCoordinator.WorkspaceFlowResult flowResult = WorkspaceFlowCoordinator.getLastResult();
+        String srcPageId = WorkspaceFlowCoordinator.findPageIdForGraph(graph);
+        Set<String> processedPages = new HashSet<>();
+
+        for (CrossPageExportTarget target : producer.getExportTargets()) {
+            processedPages.add(target.targetPageId());
+            int pri = target.priority();
+            BoardPage dstPage = WorkspaceFlowCoordinator.getPage(target.targetPageId());
+            if (dstPage != null && dstPage.getGraph() != null) {
+                RecipeNode consumer = WorkspaceFlowCoordinator.findConsumerNode(dstPage, srcPageId, producer.getId());
+                if (consumer != null) {
+                    pri = Math.max(pri, WorkspaceFlowCoordinator.getOutgoingMaxPriority(dstPage.getGraph(), consumer));
+                }
+            }
+            FlowGraph.ConnectionEdge edge = new FlowGraph.ConnectionEdge(
+                    producer.getId(),
+                    0,
+                    "__cross_page__:" + target.targetPageId(),
+                    0,
+                    target.fixedLimit(),
+                    pri,
+                    1.0
+            );
+            extraEdges.add(edge);
+            double demand = resolveVirtualTargetDemand(flowResult, srcPageId, producer.getId(), target);
+            extraDemands.put(edge, demand);
+        }
+
+        for (WorkspaceFlowCoordinator.InterPageLink link : activeLinks) {
+            if (processedPages.contains(link.targetPageId())) continue;
+            processedPages.add(link.targetPageId());
+            double demand = resolveLinkTargetDemand(flowResult, srcPageId, producer.getId(), link);
+            FlowGraph.ConnectionEdge edge = new FlowGraph.ConnectionEdge(
+                    producer.getId(),
+                    0,
+                    "__cross_page__:" + link.targetPageId(),
+                    0,
+                    link.fixedLimit(),
+                    link.priority(),
+                    1.0
+            );
+            extraEdges.add(edge);
+            extraDemands.put(edge, demand);
+        }
+    }
+
+    private static double resolveLinkTargetDemand(
+            WorkspaceFlowCoordinator.WorkspaceFlowResult flowResult,
+            String srcPageId,
+            String producerId,
+            WorkspaceFlowCoordinator.InterPageLink link
+    ) {
+        BoardPage dstPage = WorkspaceFlowCoordinator.getPage(link.targetPageId());
+        if (dstPage == null || dstPage.getGraph() == null) return 0.0;
+        RecipeNode consumer = (link.targetNodeId() != null && !link.targetNodeId().isBlank())
+                ? dstPage.getGraph().findNodeById(link.targetNodeId())
+                : WorkspaceFlowCoordinator.findConsumerNode(dstPage, srcPageId, producerId);
+        if (consumer == null) return 0.0;
+        if (flowResult != null && flowResult.getDemandRate(consumer.getId()) > 0.0001) {
+            return flowResult.getDemandRate(consumer.getId());
+        }
+        return getConnectedConsumerDemand(dstPage.getGraph(), consumer, 0);
+    }
+
+    private static double resolveVirtualTargetDemand(
+            WorkspaceFlowCoordinator.WorkspaceFlowResult flowResult,
+            String srcPageId,
+            String producerId,
+            CrossPageExportTarget target
+    ) {
+        BoardPage dstPage = WorkspaceFlowCoordinator.getPage(target.targetPageId());
+        if (dstPage == null) return target.hasFixedLimit() ? target.fixedLimit() : 0.0;
+        RecipeNode consumer = WorkspaceFlowCoordinator.findConsumerNode(dstPage, srcPageId, producerId);
+        if (consumer == null) return target.hasFixedLimit() ? target.fixedLimit() : 0.0;
+        if (flowResult != null && flowResult.getDemandRate(consumer.getId()) > 0.0001) {
+            return flowResult.getDemandRate(consumer.getId());
+        }
+        return getConnectedConsumerDemand(dstPage.getGraph(), consumer, 0);
     }
 
     public static double getEffectiveProducerOutputRate(FlowGraph graph, RecipeNode producer, int outputIndex) {

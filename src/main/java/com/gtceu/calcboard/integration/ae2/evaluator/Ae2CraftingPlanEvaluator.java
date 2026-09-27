@@ -87,12 +87,7 @@ public final class Ae2CraftingPlanEvaluator {
                     demand.maxBatches += batches;
                     demand.totalCount += (long) Math.ceil(netNeeded);
 
-                    Map<ResourceLocation, Double> pageOutputs = PatternGraphRegistry.extractPageOutputsForPrimary(page, outId);
-                    for (Map.Entry<ResourceLocation, Double> po : pageOutputs.entrySet()) {
-                        if (!Objects.equals(po.getKey(), outId)) {
-                            byproductPool.put(po.getKey(), byproductPool.getOrDefault(po.getKey(), 0.0) + batches * po.getValue());
-                        }
-                    }
+                    accumulateByproducts(page, outId, batches, byproductPool);
                 }
             }
         }
@@ -184,16 +179,7 @@ public final class Ae2CraftingPlanEvaluator {
             if (requiredInputs.isEmpty()) continue;
 
             for (ResourceLocation reqIn : requiredInputs) {
-                for (int j = 0; j < n; j++) {
-                    if (i == j) continue;
-                    PagePlanDemand producerDemand = demands.get(j);
-                    boolean produces = (producerDemand.page != null)
-                            ? PatternGraphRegistry.pageProducesOutput(producerDemand.page, reqIn)
-                            : Objects.equals(producerDemand.patternId.getPrimaryOutputId(), reqIn);
-                    if (produces) {
-                        predecessors.get(String.valueOf(i)).add(j);
-                    }
-                }
+                collectPredecessorsForInput(i, reqIn, demands, predecessors);
             }
         }
 
@@ -298,6 +284,42 @@ public final class Ae2CraftingPlanEvaluator {
             return String.format(Locale.ROOT, "~%dh %dm %ds", hours, mins, secs);
         }
         return String.format(Locale.ROOT, "~%dm %ds", mins, secs);
+    }
+
+    private static void accumulateByproducts(
+            BoardPage page,
+            ResourceLocation outId,
+            long batches,
+            Map<ResourceLocation, Double> byproductPool
+    ) {
+        Map<ResourceLocation, Double> pageOutputs = PatternGraphRegistry.extractPageOutputsForPrimary(page, outId);
+        for (Map.Entry<ResourceLocation, Double> po : pageOutputs.entrySet()) {
+            if (!Objects.equals(po.getKey(), outId)) {
+                byproductPool.put(po.getKey(), byproductPool.getOrDefault(po.getKey(), 0.0) + batches * po.getValue());
+            }
+        }
+    }
+
+    private static void collectPredecessorsForInput(
+            int consumerIndex,
+            ResourceLocation reqIn,
+            List<PagePlanDemand> demands,
+            Map<String, List<Integer>> predecessors
+    ) {
+        int n = demands.size();
+        for (int j = 0; j < n; j++) {
+            if (consumerIndex == j) continue;
+            if (demandProducesInput(demands.get(j), reqIn)) {
+                predecessors.get(String.valueOf(consumerIndex)).add(j);
+            }
+        }
+    }
+
+    private static boolean demandProducesInput(PagePlanDemand demand, ResourceLocation reqIn) {
+        if (demand.page != null) {
+            return PatternGraphRegistry.pageProducesOutput(demand.page, reqIn);
+        }
+        return Objects.equals(demand.patternId.getPrimaryOutputId(), reqIn);
     }
 
     private static class PagePlanDemand {

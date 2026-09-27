@@ -89,19 +89,8 @@ public final class GTNodeValidator {
             }
         }
 
-        // 3. Turbine 100% Flow Fulfillment Check
-        if (graph != null && GTTurbineHelper.isTurbine(node)) {
-            for (int inIdx = 0; inIdx < node.getInputs().size(); inIdx++) {
-                FlowGraphSolver.PortFlowStats stats = graph.getInputPortStats(node, inIdx);
-                if (stats != null && stats.isConnected() && stats.isNominalDeficit()) {
-                    if (warnings != null) {
-                        IngredientStack inStack = node.getInputs().get(inIdx);
-                        String matName = inStack != null ? inStack.getDisplayName() : "Fluid";
-                        warnings.add(Component.translatable("gui.gtcalcboard.turbine_flow_deficit_warning", matName, (int) Math.round(stats.getPercent())));
-                    }
-                    valid = false;
-                }
-            }
+        if (!validateTurbineFlow(node, graph, warnings)) {
+            valid = false;
         }
 
         // 3. Equipped Custom Hatch / Bus Capacity & Slot Validation
@@ -205,60 +194,95 @@ public final class GTNodeValidator {
             valid = false;
         }
 
-        if (hasCustomFluidOut && maxOutputTankCapacityMB > 0) {
-            for (IngredientStack out : node.getOutputs()) {
-                if (out != null && out.isFluid()) {
-                    double batchMB = out.getAmount() * node.getTotalParallel();
-                    if (batchMB > maxOutputTankCapacityMB) {
-                        if (warnings != null) {
-                            warnings.add(Component.translatable("gui.gtcalcboard.node_warning.tank_capacity_overflow",
-                                    out.getDisplayName(), (int) Math.round(batchMB), maxOutputTankCapacityMB));
-                        }
-                        valid = false;
-                    }
-                }
-            }
+        if (hasCustomFluidOut && maxOutputTankCapacityMB > 0 && !validateTankCapacityOverflow(node, maxOutputTankCapacityMB, warnings)) {
+            valid = false;
         }
 
-        if (GTAddonCompatibilityHandler.isDistillationTower(node)) {
-            int reqFluidOutDT = (int) node.getOutputs().stream().filter(IngredientStack::isFluid).count();
-            int installedFluidOutHatches = 0;
-            for (MachineAddon addon : node.getAddons()) {
-                if (addon instanceof GTHatchAddon h) {
-                    if (h.getHatchType() == GTHatchAddon.HatchType.FLUID_OUTPUT || h.getHatchType() == GTHatchAddon.HatchType.DUAL_OUTPUT) {
-                        if (h.getSlotCapacity() > 1) {
-                            if (warnings != null) {
-                                warnings.add(Component.translatable("gui.gtcalcboard.node_warning.dt_multi_fluid_unsupported", h.getName()));
-                            }
-                            valid = false;
-                        }
-                        installedFluidOutHatches++;
-                    }
-                }
-            }
-            if (installedFluidOutHatches > reqFluidOutDT && reqFluidOutDT > 0) {
-                if (warnings != null) {
-                    warnings.add(Component.translatable("gui.gtcalcboard.node_warning.dt_excess_output_hatches", installedFluidOutHatches, reqFluidOutDT));
-                }
-                valid = false;
-            }
+        if (!validateDistillationTower(node, warnings)) {
+            valid = false;
         }
 
-        if (node.isFusion()) {
-            for (MachineAddon addon : node.getAddons()) {
-                if (addon instanceof GTEnergyHatchAddon eh) {
-                    if (eh.getTier() != node.getTargetTier()) {
-                        if (warnings != null) {
-                            warnings.add(Component.translatable("gui.gtcalcboard.node_warning.fusion_energy_hatch_tier_mismatch",
-                                    node.getTargetTier().getName(), eh.getTier().getName()));
-                        }
-                        valid = false;
-                    }
-                }
-            }
+        if (!validateFusionEnergyHatches(node, warnings)) {
+            valid = false;
         }
 
         return valid;
+    }
+
+    private static boolean validateTurbineFlow(RecipeNode node, FlowGraph graph, List<Component> warnings) {
+        if (graph == null || !GTTurbineHelper.isTurbine(node)) return true;
+        boolean valid = true;
+        for (int inIdx = 0; inIdx < node.getInputs().size(); inIdx++) {
+            FlowGraphSolver.PortFlowStats stats = graph.getInputPortStats(node, inIdx);
+            if (stats != null && stats.isConnected() && stats.isNominalDeficit()) {
+                addWarning(warnings, Component.translatable("gui.gtcalcboard.turbine_flow_deficit_warning",
+                        getTurbineInputName(node, inIdx), (int) Math.round(stats.getPercent())));
+                valid = false;
+            }
+        }
+        return valid;
+    }
+
+    private static String getTurbineInputName(RecipeNode node, int inIdx) {
+        IngredientStack inStack = node.getInputs().get(inIdx);
+        return inStack != null ? inStack.getDisplayName() : "Fluid";
+    }
+
+    private static boolean validateTankCapacityOverflow(RecipeNode node, long maxOutputTankCapacityMB, List<Component> warnings) {
+        boolean valid = true;
+        for (IngredientStack out : node.getOutputs()) {
+            if (out == null || !out.isFluid()) continue;
+            double batchMB = out.getAmount() * node.getTotalParallel();
+            if (batchMB > maxOutputTankCapacityMB) {
+                addWarning(warnings, Component.translatable("gui.gtcalcboard.node_warning.tank_capacity_overflow",
+                        out.getDisplayName(), (int) Math.round(batchMB), maxOutputTankCapacityMB));
+                valid = false;
+            }
+        }
+        return valid;
+    }
+
+    private static boolean validateDistillationTower(RecipeNode node, List<Component> warnings) {
+        if (!GTAddonCompatibilityHandler.isDistillationTower(node)) return true;
+        boolean valid = true;
+        int reqFluidOutDT = (int) node.getOutputs().stream().filter(IngredientStack::isFluid).count();
+        int installedFluidOutHatches = 0;
+
+        for (MachineAddon addon : node.getAddons()) {
+            if (!(addon instanceof GTHatchAddon h)) continue;
+            if (h.getHatchType() != GTHatchAddon.HatchType.FLUID_OUTPUT && h.getHatchType() != GTHatchAddon.HatchType.DUAL_OUTPUT) continue;
+
+            if (h.getSlotCapacity() > 1) {
+                addWarning(warnings, Component.translatable("gui.gtcalcboard.node_warning.dt_multi_fluid_unsupported", h.getName()));
+                valid = false;
+            }
+            installedFluidOutHatches++;
+        }
+
+        if (installedFluidOutHatches > reqFluidOutDT && reqFluidOutDT > 0) {
+            addWarning(warnings, Component.translatable("gui.gtcalcboard.node_warning.dt_excess_output_hatches", installedFluidOutHatches, reqFluidOutDT));
+            valid = false;
+        }
+        return valid;
+    }
+
+    private static boolean validateFusionEnergyHatches(RecipeNode node, List<Component> warnings) {
+        if (!node.isFusion()) return true;
+        boolean valid = true;
+        for (MachineAddon addon : node.getAddons()) {
+            if (addon instanceof GTEnergyHatchAddon eh && eh.getTier() != node.getTargetTier()) {
+                addWarning(warnings, Component.translatable("gui.gtcalcboard.node_warning.fusion_energy_hatch_tier_mismatch",
+                        node.getTargetTier().getName(), eh.getTier().getName()));
+                valid = false;
+            }
+        }
+        return valid;
+    }
+
+    private static void addWarning(List<Component> warnings, Component warning) {
+        if (warnings != null) {
+            warnings.add(warning);
+        }
     }
 
     public static com.gtceu.calcboard.api.type.GTVoltageTier getRequiredRecipeTier(RecipeNode node) {

@@ -66,6 +66,10 @@ public final class CanvasIdleState implements CanvasInteractionState {
             return true;
         }
 
+        if (handleEmbeddedFramePortClick(ctx, canvasX, canvasY, button)) {
+            return true;
+        }
+
         if (screen != null && !isPointInsideAnyNode(ctx, canvasX, canvasY)
                 && ctx.getWireHandler().handleWireClick(canvasX, canvasY, button, screen)) {
             return true;
@@ -165,7 +169,10 @@ public final class CanvasIdleState implements CanvasInteractionState {
             screen.getWireRenderer().markDirty();
         }
         BoardToast.show(Component.literal("§c✕ ").append(Component.translatable("message.gtcalcboard.disconnect_wire")));
-        Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.ITEM_BREAK, 1.2F));
+        Minecraft mc = Minecraft.getInstance();
+        if (mc != null && mc.getSoundManager() != null) {
+            mc.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.ITEM_BREAK, 1.2F));
+        }
         return true;
     }
 
@@ -187,11 +194,87 @@ public final class CanvasIdleState implements CanvasInteractionState {
         return toDisconnect;
     }
 
+    private boolean handleEmbeddedFramePortClick(CanvasInteractionContext ctx, double canvasX, double canvasY, int button) {
+        BoardScreen screen = ctx.getScreen();
+        if (screen == null) return false;
+        FlowGraph graph = screen.getGraph();
+        if (graph == null) return false;
+
+        var hit = com.gtceu.calcboard.client.gui.render.EmbeddedPanelRenderer.findHoveredEmbeddedPort(graph, canvasX, canvasY);
+        if (hit == null || hit.subNode() == null) return false;
+
+        if (!screen.ensureEditPermission()) return true;
+
+        if (button == 0) {
+            return startEmbeddedPortWireDrag(ctx, screen, hit);
+        } else if (button == 1) {
+            return disconnectEmbeddedPortEdges(screen, graph, hit);
+        }
+        return false;
+    }
+
+    private boolean startEmbeddedPortWireDrag(
+            CanvasInteractionContext ctx,
+            BoardScreen screen,
+            com.gtceu.calcboard.client.gui.render.EmbeddedPanelRenderer.EmbeddedPortHit hit
+    ) {
+        NodeWidget originWidget = screen.findWidgetForNode(hit.subNode());
+        if (originWidget == null) return false;
+
+        ctx.getWireHandler().startWireFromEmbedded(originWidget, hit.portIndex(), hit.isInput(), hit.frame());
+        ctx.getStateMachine().transitionTo(new CanvasWireConnectingState());
+        return true;
+    }
+
+    private boolean disconnectEmbeddedPortEdges(
+            BoardScreen screen,
+            FlowGraph graph,
+            com.gtceu.calcboard.client.gui.render.EmbeddedPanelRenderer.EmbeddedPortHit hit
+    ) {
+        Set<FlowGraph.ConnectionEdge> toDisconnect = collectEmbeddedPortEdges(graph, hit);
+        if (toDisconnect.isEmpty()) return false;
+
+        for (FlowGraph.ConnectionEdge edge : toDisconnect) {
+            graph.removeConnection(edge);
+            screen.recordCommand(new BoardCommand.DisconnectWireCommand(edge));
+        }
+        screen.markSummaryDirty();
+        if (screen.getWireRenderer() != null) {
+            screen.getWireRenderer().markDirty();
+        }
+        BoardToast.show(Component.literal("§c✕ ").append(Component.translatable("message.gtcalcboard.disconnect_wire")));
+        Minecraft mc = Minecraft.getInstance();
+        if (mc != null && mc.getSoundManager() != null) {
+            mc.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.ITEM_BREAK, 1.2F));
+        }
+        return true;
+    }
+
+    private Set<FlowGraph.ConnectionEdge> collectEmbeddedPortEdges(
+            FlowGraph graph,
+            com.gtceu.calcboard.client.gui.render.EmbeddedPanelRenderer.EmbeddedPortHit hit
+    ) {
+        Set<FlowGraph.ConnectionEdge> edges = new HashSet<>();
+        String nodeId = hit.subNode().getId();
+        int portIdx = hit.portIndex();
+        boolean isInput = hit.isInput();
+
+        for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+            boolean matches = isInput
+                    ? (edge.toNodeId().equals(nodeId) && edge.inputIndex() == portIdx)
+                    : (edge.fromNodeId().equals(nodeId) && edge.outputIndex() == portIdx);
+            if (matches) {
+                edges.add(edge);
+            }
+        }
+        return edges;
+    }
+
     private boolean isPointInsideAnyNode(CanvasInteractionContext ctx, double canvasX, double canvasY) {
         BoardScreen screen = ctx.getScreen();
         if (screen == null) return false;
         for (NodeWidget nw : screen.getNodeWidgets()) {
-            if (screen.getGraph() != null && screen.getGraph().isNodeInFoldedFrame(nw.getNode().getId())) {
+            if (screen.getGraph() != null && screen.getGraph().isNodeInFoldedOrEmbeddedFrame(nw.getNode().getId())) {
                 continue;
             }
             if (nw.isPointInside(canvasX, canvasY)) {
@@ -207,7 +290,7 @@ public final class CanvasIdleState implements CanvasInteractionState {
         List<NodeWidget> nodeWidgets = screen.getNodeWidgets();
         for (int i = nodeWidgets.size() - 1; i >= 0; i--) {
             NodeWidget widget = nodeWidgets.get(i);
-            if (screen.getGraph() != null && screen.getGraph().isNodeInFoldedFrame(widget.getNode().getId())) {
+            if (screen.getGraph() != null && screen.getGraph().isNodeInFoldedOrEmbeddedFrame(widget.getNode().getId())) {
                 continue;
             }
             var popup = widget.getHiddenPortsPopup();
@@ -229,7 +312,7 @@ public final class CanvasIdleState implements CanvasInteractionState {
         List<NodeWidget> nodeWidgets = screen.getNodeWidgets();
         for (int i = nodeWidgets.size() - 1; i >= 0; i--) {
             NodeWidget widget = nodeWidgets.get(i);
-            if (screen.getGraph() != null && screen.getGraph().isNodeInFoldedFrame(widget.getNode().getId())) {
+            if (screen.getGraph() != null && screen.getGraph().isNodeInFoldedOrEmbeddedFrame(widget.getNode().getId())) {
                 continue;
             }
             if (!widget.isPointInside(canvasX, canvasY)) continue;

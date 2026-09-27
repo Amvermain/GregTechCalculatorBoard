@@ -4,6 +4,7 @@ import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.client.gui.api.IBoardScreenContext;
 import com.gtceu.calcboard.client.gui.inspector.BoundaryPinInspector;
+import com.gtceu.calcboard.client.gui.inspector.CompositeNodeInspector;
 import com.gtceu.calcboard.client.gui.inspector.INodeSubInspector;
 import com.gtceu.calcboard.client.gui.inspector.JunctionNodeInspector;
 import com.gtceu.calcboard.client.gui.inspector.MachineNodeInspector;
@@ -238,6 +239,10 @@ public class NodeInspectorPanel {
     }
 
     public MachineNodeInspector getMachineInspector() {
+        return machineInspector;
+    }
+
+    public CompositeNodeInspector getCompositeInspector() {
         return machineInspector;
     }
 

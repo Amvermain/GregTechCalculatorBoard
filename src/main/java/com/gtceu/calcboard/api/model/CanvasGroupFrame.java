@@ -7,6 +7,7 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceLocation;
 
 import com.gtceu.calcboard.api.solver.FlowGraphTopologyAnalyzer;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 
 import java.util.*;
 
@@ -50,8 +51,13 @@ public class CanvasGroupFrame {
     private boolean isSharedMachineFrame = false;
     private double targetPoolCapacity = 1.0;
     private boolean isFolded = false;
+    private PoolViewMode poolViewMode = PoolViewMode.EXPANDED_FRAME;
+    private ResourceLocation sharedMachineId = null;
+    private ResourceLocation sharedRecipeCategoryId = null;
+    private com.gtceu.calcboard.api.type.GTVoltageTier sharedTier = null;
     private double savedUnfoldedWidth = 0.0;
     private double savedUnfoldedHeight = 0.0;
+    private transient com.gtceu.calcboard.api.solver.FlowGraphTopologyAnalyzer.FoldedPortSummary cachedFoldedPortSummary = null;
 
     public CanvasGroupFrame(String id, String title, int color, double posX, double posY, double width, double height) {
         this.id = id != null ? id : UUID.randomUUID().toString();
@@ -80,6 +86,7 @@ public class CanvasGroupFrame {
         if (nodes != null) {
             for (RecipeNode n : nodes) {
                 frame.addNode(n.getId());
+                frame.initSharedMetadataFromNode(n);
                 minX = Math.min(minX, n.getPosX());
                 minY = Math.min(minY, n.getPosY());
                 int nw = n.getCardWidth() > 0 ? n.getCardWidth() : (n.isReroute() ? 32 : 180);
@@ -109,6 +116,19 @@ public class CanvasGroupFrame {
         return frame;
     }
 
+    private void initSharedMetadataFromNode(RecipeNode node) {
+        if (node == null || node.isReroute()) return;
+        if (this.sharedRecipeCategoryId == null && node.getRecipeCategoryId() != null) {
+            this.sharedRecipeCategoryId = node.getRecipeCategoryId();
+        }
+        if (this.sharedMachineId == null && node.getMachineIcon() != null) {
+            this.sharedMachineId = node.getMachineIcon();
+        }
+        if (this.sharedTier == null && node.getTargetTier() != null) {
+            this.sharedTier = node.getTargetTier();
+        }
+    }
+
     public List<RecipeNode> getEnclosedNodes(Collection<RecipeNode> nodes) {
         List<RecipeNode> result = new ArrayList<>();
         if (nodes == null) return result;
@@ -127,7 +147,7 @@ public class CanvasGroupFrame {
 
     public List<RecipeNode> getEnclosedNodes(FlowGraph graph) {
         if (graph == null) return Collections.emptyList();
-        if (isFolded && !containedNodeIds.isEmpty()) {
+        if ((isFolded() || poolViewMode == PoolViewMode.EMBEDDED_PANEL) && !containedNodeIds.isEmpty()) {
             List<RecipeNode> result = new ArrayList<>();
             for (String id : containedNodeIds) {
                 RecipeNode n = graph.findNodeById(id);
@@ -154,6 +174,7 @@ public class CanvasGroupFrame {
     }
 
     public void recomputeBounds(Collection<RecipeNode> nodes, double padding) {
+        invalidateFoldedPortCache();
         if (nodes == null || nodes.isEmpty()) return;
 
         double minX = Double.MAX_VALUE;
@@ -234,11 +255,26 @@ public class CanvasGroupFrame {
     public void addNode(String nodeId) {
         if (nodeId != null) {
             containedNodeIds.add(nodeId);
+            invalidateFoldedPortCache();
         }
     }
 
     public void removeNode(String nodeId) {
-        containedNodeIds.remove(nodeId);
+        if (containedNodeIds.remove(nodeId)) {
+            invalidateFoldedPortCache();
+        }
+    }
+
+    public com.gtceu.calcboard.api.solver.FlowGraphTopologyAnalyzer.FoldedPortSummary getCachedFoldedPortSummary() {
+        return cachedFoldedPortSummary;
+    }
+
+    public void setCachedFoldedPortSummary(com.gtceu.calcboard.api.solver.FlowGraphTopologyAnalyzer.FoldedPortSummary summary) {
+        this.cachedFoldedPortSummary = summary;
+    }
+
+    public void invalidateFoldedPortCache() {
+        this.cachedFoldedPortSummary = null;
     }
 
     public void cycleColor() {
@@ -280,6 +316,18 @@ public class CanvasGroupFrame {
             tag.putDouble("savedUnfoldedWidth", savedUnfoldedWidth);
             tag.putDouble("savedUnfoldedHeight", savedUnfoldedHeight);
         }
+        if (poolViewMode != null) {
+            tag.putString("poolViewMode", poolViewMode.name());
+        }
+        if (sharedMachineId != null) {
+            tag.putString("sharedMachineId", sharedMachineId.toString());
+        }
+        if (sharedRecipeCategoryId != null) {
+            tag.putString("sharedRecipeCategoryId", sharedRecipeCategoryId.toString());
+        }
+        if (sharedTier != null) {
+            tag.putString("sharedTier", sharedTier.name());
+        }
 
         ListTag nodesTag = new ListTag();
         for (String nid : containedNodeIds) {
@@ -319,6 +367,28 @@ public class CanvasGroupFrame {
             if (tag.contains("savedUnfoldedHeight")) {
                 frame.setSavedUnfoldedHeight(tag.getDouble("savedUnfoldedHeight"));
             }
+        }
+        if (tag.contains("poolViewMode")) {
+            try {
+                frame.setViewMode(PoolViewMode.valueOf(tag.getString("poolViewMode")));
+            } catch (Exception ignored) {
+                frame.setViewMode(PoolViewMode.EXPANDED_FRAME);
+            }
+        } else if (tag.getBoolean("isFolded")) {
+            frame.setViewMode(PoolViewMode.FOLDED_CARD);
+        } else {
+            frame.setViewMode(PoolViewMode.EXPANDED_FRAME);
+        }
+        if (tag.contains("sharedMachineId")) {
+            frame.setSharedMachineId(ResourceLocation.tryParse(tag.getString("sharedMachineId")));
+        }
+        if (tag.contains("sharedRecipeCategoryId")) {
+            frame.setSharedRecipeCategoryId(ResourceLocation.tryParse(tag.getString("sharedRecipeCategoryId")));
+        }
+        if (tag.contains("sharedTier")) {
+            try {
+                frame.setSharedTier(com.gtceu.calcboard.api.type.GTVoltageTier.valueOf(tag.getString("sharedTier")));
+            } catch (Exception ignored) {}
         }
 
         if (tag.contains("nodes", Tag.TAG_LIST)) {
@@ -431,6 +501,14 @@ public class CanvasGroupFrame {
 
     public void setSharedMachineFrame(boolean sharedMachineFrame) {
         this.isSharedMachineFrame = sharedMachineFrame;
+        if (sharedMachineFrame) {
+            if (this.width < MIN_SHARED_FRAME_WIDTH) {
+                this.width = MIN_SHARED_FRAME_WIDTH;
+            }
+            if (this.poolViewMode == PoolViewMode.EXPANDED_FRAME) {
+                this.poolViewMode = PoolViewMode.EMBEDDED_PANEL;
+            }
+        }
     }
 
     public double getTargetPoolCapacity() {
@@ -447,9 +525,14 @@ public class CanvasGroupFrame {
      */
     public double computeTotalMachineDuty(FlowGraph graph) {
         if (graph == null) return 0.0;
+        return computeTotalMachineDuty(getEnclosedNodes(graph), graph);
+    }
+
+    public double computeTotalMachineDuty(Collection<RecipeNode> nodes, FlowGraph graph) {
+        if (nodes == null) return 0.0;
         double totalDuty = 0.0;
-        for (RecipeNode node : getEnclosedNodes(graph)) {
-            if (node != null && !node.isReroute() && node.isOperational(graph)) {
+        for (RecipeNode node : nodes) {
+            if (node != null && !node.isReroute() && (graph == null || node.isOperational(graph))) {
                 totalDuty += node.getMachineCount();
             }
         }
@@ -509,6 +592,15 @@ public class CanvasGroupFrame {
 
     public void syncHardwareConfig(RecipeNode sourceNode, FlowGraph graph) {
         if (sourceNode == null || graph == null) return;
+        if (sourceNode.getRecipeCategoryId() != null) {
+            this.sharedRecipeCategoryId = sourceNode.getRecipeCategoryId();
+        }
+        if (sourceNode.getMachineIcon() != null) {
+            this.sharedMachineId = sourceNode.getMachineIcon();
+        }
+        if (sourceNode.getTargetTier() != null) {
+            this.sharedTier = sourceNode.getTargetTier();
+        }
         for (RecipeNode target : getEnclosedNodes(graph)) {
             if (target == null || target.isReroute() || target == sourceNode) continue;
             if (sourceNode.getMachineIcon() != null) {
@@ -540,8 +632,15 @@ public class CanvasGroupFrame {
     }
 
     public ResourceLocation getSharedMachineIcon(FlowGraph graph) {
+        if (this.sharedMachineId != null) return this.sharedMachineId;
         if (graph == null) return null;
-        for (RecipeNode node : getEnclosedNodes(graph)) {
+        return getSharedMachineIcon(getEnclosedNodes(graph));
+    }
+
+    public ResourceLocation getSharedMachineIcon(Collection<RecipeNode> nodes) {
+        if (this.sharedMachineId != null) return this.sharedMachineId;
+        if (nodes == null) return null;
+        for (RecipeNode node : nodes) {
             if (node == null || node.isReroute()) continue;
             ResourceLocation icon = node.getMachineIcon();
             if (icon != null) return icon;
@@ -554,64 +653,243 @@ public class CanvasGroupFrame {
 
     public String getSharedMachineName(FlowGraph graph) {
         if (graph == null) return "";
-        for (RecipeNode node : getEnclosedNodes(graph)) {
+        return getSharedMachineName(getEnclosedNodes(graph));
+    }
+
+    public String getSharedMachineName(Collection<RecipeNode> nodes) {
+        if (nodes == null) return "";
+        for (RecipeNode node : nodes) {
             if (node == null || node.isReroute()) continue;
             return node.getMachineDisplayName();
         }
         return "";
     }
 
-    /**
-     * Checks if this frame is currently in a folded state (compact virtual card).
-     */
-    public boolean isFolded() {
-        return isFolded;
+    public PoolViewMode getViewMode() {
+        if (this.poolViewMode != null) return this.poolViewMode;
+        return this.isFolded ? PoolViewMode.FOLDED_CARD : (this.isSharedMachineFrame ? PoolViewMode.EMBEDDED_PANEL : PoolViewMode.EXPANDED_FRAME);
     }
 
-    /**
-     * Sets the folded state of this frame, preserving original dimensions and updating layout.
-     *
-     * @param folded true to collapse into a single machine card, false to expand
-     * @param graph the flow graph containing enclosed nodes
-     */
-    public void setFolded(boolean folded, FlowGraph graph) {
-        if (this.isFolded == folded) return;
-        if (folded) {
-            if (graph != null) {
-                for (RecipeNode n : getEnclosedNodes(graph.getNodes())) {
-                    containedNodeIds.add(n.getId());
-                }
-            }
+    public void setViewMode(PoolViewMode mode) {
+        setViewMode(mode, null);
+    }
+
+    public void setViewMode(PoolViewMode mode, FlowGraph graph) {
+        if (mode == null) mode = PoolViewMode.EXPANDED_FRAME;
+        PoolViewMode oldMode = getViewMode();
+        this.poolViewMode = mode;
+        this.isFolded = (mode == PoolViewMode.FOLDED_CARD);
+        invalidateFoldedPortCache();
+
+        if (mode == PoolViewMode.FOLDED_CARD) {
+            transitionToFoldedCard(oldMode, graph);
+        } else if (mode == PoolViewMode.EMBEDDED_PANEL) {
+            transitionToEmbeddedPanel(graph);
+        } else {
+            transitionToExpandedFrame(graph);
+        }
+    }
+
+    private void transitionToFoldedCard(PoolViewMode oldMode, FlowGraph graph) {
+        if (oldMode != PoolViewMode.FOLDED_CARD) {
             this.savedUnfoldedWidth = this.width;
             this.savedUnfoldedHeight = this.height;
-            this.isFolded = true;
-            this.width = Math.max(MIN_SHARED_FRAME_WIDTH, 280.0);
-            int portRows = 1;
-            if (graph != null) {
-                FlowGraphTopologyAnalyzer.FoldedPortSummary summary = FlowGraphTopologyAnalyzer.aggregateFoldedPorts(graph, this);
-                portRows = Math.max(summary.maxPortCount(), 1);
+        }
+        if (graph != null) {
+            for (RecipeNode n : getEnclosedNodes(graph.getNodes())) {
+                containedNodeIds.add(n.getId());
             }
-            this.height = 64.0 + portRows * 18.0 + 6.0;
+        }
+        this.width = Math.max(MIN_SHARED_FRAME_WIDTH, 280.0);
+        int portRows = 1;
+        if (graph != null) {
+            FlowGraphTopologyAnalyzer.FoldedPortSummary summary = FlowGraphTopologyAnalyzer.aggregateFoldedPorts(graph, this);
+            portRows = Math.max(summary.maxPortCount(), 1);
+        }
+        this.height = 64.0 + portRows * 18.0 + 6.0;
+    }
+
+    private void transitionToEmbeddedPanel(FlowGraph graph) {
+        if (this.savedUnfoldedWidth > 0) {
+            this.width = Math.max(MIN_SHARED_FRAME_WIDTH, this.savedUnfoldedWidth);
         } else {
-            this.isFolded = false;
-            if (this.savedUnfoldedWidth > 0) {
-                this.width = Math.max(MIN_SHARED_FRAME_WIDTH, this.savedUnfoldedWidth);
+            this.width = Math.max(MIN_SHARED_FRAME_WIDTH, 320.0);
+        }
+        if (this.savedUnfoldedHeight > 0) {
+            this.height = Math.max(MIN_HEIGHT, this.savedUnfoldedHeight);
+        }
+        relayoutEmbeddedCards(graph);
+    }
+
+    private void transitionToExpandedFrame(FlowGraph graph) {
+        if (this.savedUnfoldedWidth > 0) {
+            this.width = Math.max(MIN_SHARED_FRAME_WIDTH, this.savedUnfoldedWidth);
+        }
+        if (this.savedUnfoldedHeight > 0) {
+            this.height = Math.max(MIN_HEIGHT, this.savedUnfoldedHeight);
+        }
+        if (graph != null && !containedNodeIds.isEmpty()) {
+            recomputeBounds(getEnclosedNodes(graph), DEFAULT_PADDING);
+        }
+    }
+
+    public ResourceLocation getSharedMachineId() {
+        return sharedMachineId;
+    }
+
+    public void setSharedMachineId(ResourceLocation sharedMachineId) {
+        this.sharedMachineId = sharedMachineId;
+    }
+
+    public ResourceLocation getSharedRecipeCategoryId() {
+        return sharedRecipeCategoryId;
+    }
+
+    public void setSharedRecipeCategoryId(ResourceLocation sharedRecipeCategoryId) {
+        this.sharedRecipeCategoryId = sharedRecipeCategoryId;
+    }
+
+    public ResourceLocation getSharedRecipeCategoryId(FlowGraph graph) {
+        if (this.sharedRecipeCategoryId != null) {
+            return this.sharedRecipeCategoryId;
+        }
+        if (graph != null) {
+            for (RecipeNode node : getEnclosedNodes(graph)) {
+                if (node != null && !node.isReroute() && node.getRecipeCategoryId() != null) {
+                    this.sharedRecipeCategoryId = node.getRecipeCategoryId();
+                    return this.sharedRecipeCategoryId;
+                }
             }
+        }
+        if (this.sharedMachineId != null) {
+            ResourceLocation deduced = ModAdapterRegistry.getRecipeCategoryIdForMachine(this.sharedMachineId);
+            if (deduced != null) {
+                this.sharedRecipeCategoryId = deduced;
+                return deduced;
+            }
+        }
+        return null;
+    }
+
+    public com.gtceu.calcboard.api.type.GTVoltageTier getSharedTier() {
+        return sharedTier;
+    }
+
+    public void setSharedTier(com.gtceu.calcboard.api.type.GTVoltageTier sharedTier) {
+        this.sharedTier = sharedTier;
+    }
+
+    public List<RecipeNode> getSubNodes(FlowGraph graph) {
+        return getEnclosedNodes(graph);
+    }
+
+    public void relayoutEmbeddedCards(FlowGraph graph) {
+        if (this.poolViewMode != PoolViewMode.EMBEDDED_PANEL) return;
+        if (this.width < MIN_SHARED_FRAME_WIDTH) {
+            this.width = MIN_SHARED_FRAME_WIDTH;
+        }
+        List<RecipeNode> nodes = getEnclosedNodes(graph);
+        if (nodes.isEmpty()) {
             if (this.savedUnfoldedHeight > 0) {
                 this.height = Math.max(MIN_HEIGHT, this.savedUnfoldedHeight);
             }
+            return;
         }
+        double cardW = Math.max(200.0, this.width - 12.0);
+        double cardX = this.posX + 6.0;
+        double currentY = this.posY + HEADER_HEIGHT + 20.0 + 6.0;
+
+        for (RecipeNode node : nodes) {
+            if (node == null || node.isReroute()) continue;
+            int portRows = Math.max(node.getInputs().size(), node.getOutputs().size());
+            double portRowsH = portRows > 0 ? portRows * 16.0 + 4.0 : 16.0;
+            double cardH = Math.max(40.0, 16.0 + portRowsH + 4.0);
+
+            node.setPosX(cardX);
+            node.setPosY(currentY);
+            node.setCardWidth((int) cardW);
+            node.setCardHeight((int) cardH);
+
+            currentY += cardH + 6.0;
+        }
+
+        double addBtnH = 22.0;
+        this.height = Math.max(MIN_HEIGHT, (currentY + addBtnH + 6.0) - this.posY);
+    }
+
+    public void addRecipeInline(RecipeNode node, FlowGraph graph) {
+        if (node == null) return;
+        double currentDuty = computeTotalMachineDuty(graph);
+        containedNodeIds.add(node.getId());
+
+        if (currentDuty < this.targetPoolCapacity) {
+            double remaining = this.targetPoolCapacity - currentDuty;
+            double assigned = Math.max(0.1, Math.min(1.0, Math.round(remaining * 100.0) / 100.0));
+            node.setMachineCount(assigned);
+        } else {
+            node.setMachineCount(0.1);
+        }
+
+        if (node.getRecipeCategoryId() != null) {
+            if (this.sharedRecipeCategoryId == null) {
+                this.sharedRecipeCategoryId = node.getRecipeCategoryId();
+            }
+        } else if (this.sharedRecipeCategoryId != null) {
+            node.setRecipeCategoryId(this.sharedRecipeCategoryId);
+        }
+
+        if (this.sharedMachineId != null) {
+            node.setMachineIcon(this.sharedMachineId);
+        } else if (node.getMachineIcon() != null) {
+            this.sharedMachineId = node.getMachineIcon();
+        }
+        if (this.sharedTier != null) {
+            node.setTargetTier(this.sharedTier);
+        } else if (node.getTargetTier() != null) {
+            this.sharedTier = node.getTargetTier();
+        }
+        RecipeNode master = getFirstOperationalNode(graph);
+        if (master != null && master != node) {
+            syncHardwareConfig(master, graph);
+        }
+
+        if (this.poolViewMode == PoolViewMode.EMBEDDED_PANEL) {
+            relayoutEmbeddedCards(graph);
+        }
+    }
+
+    public void removeRecipe(String nodeId, FlowGraph graph) {
+        if (nodeId == null) return;
+        containedNodeIds.remove(nodeId);
+        if (graph != null) {
+            RecipeNode n = graph.findNodeById(nodeId);
+            if (n != null) {
+                graph.removeNode(n);
+            }
+        }
+        if (this.poolViewMode == PoolViewMode.EMBEDDED_PANEL) {
+            relayoutEmbeddedCards(graph);
+        }
+    }
+
+    public boolean isFolded() {
+        return getViewMode() == PoolViewMode.FOLDED_CARD;
+    }
+
+    public void setFolded(boolean folded, FlowGraph graph) {
+        setViewMode(folded ? PoolViewMode.FOLDED_CARD : (isSharedMachineFrame ? PoolViewMode.EMBEDDED_PANEL : PoolViewMode.EXPANDED_FRAME), graph);
     }
 
     public void setFolded(boolean folded) {
         setFolded(folded, null);
     }
 
-    /**
-     * Toggles between folded and unfolded states.
-     */
     public void toggleFolded(FlowGraph graph) {
-        setFolded(!isFolded, graph);
+        if (isFolded()) {
+            setViewMode(isSharedMachineFrame ? PoolViewMode.EMBEDDED_PANEL : PoolViewMode.EXPANDED_FRAME, graph);
+        } else {
+            setViewMode(PoolViewMode.FOLDED_CARD, graph);
+        }
     }
 
     public void toggleFolded() {
@@ -644,8 +922,15 @@ public class CanvasGroupFrame {
     }
 
     public com.gtceu.calcboard.api.type.GTVoltageTier getSharedVoltageTier(FlowGraph graph) {
+        if (this.sharedTier != null) return this.sharedTier;
         if (graph == null) return com.gtceu.calcboard.api.type.GTVoltageTier.LV;
-        for (RecipeNode node : getEnclosedNodes(graph)) {
+        return getSharedVoltageTier(getEnclosedNodes(graph));
+    }
+
+    public com.gtceu.calcboard.api.type.GTVoltageTier getSharedVoltageTier(Collection<RecipeNode> nodes) {
+        if (this.sharedTier != null) return this.sharedTier;
+        if (nodes == null) return com.gtceu.calcboard.api.type.GTVoltageTier.LV;
+        for (RecipeNode node : nodes) {
             if (node == null || node.isReroute()) continue;
             com.gtceu.calcboard.api.type.GTVoltageTier tier = node.getTargetTier();
             if (tier != null) return tier;
@@ -655,7 +940,12 @@ public class CanvasGroupFrame {
 
     public com.gtceu.calcboard.api.type.OverclockMode getSharedOverclockMode(FlowGraph graph) {
         if (graph == null) return com.gtceu.calcboard.api.type.OverclockMode.STANDARD;
-        for (RecipeNode node : getEnclosedNodes(graph)) {
+        return getSharedOverclockMode(getEnclosedNodes(graph));
+    }
+
+    public com.gtceu.calcboard.api.type.OverclockMode getSharedOverclockMode(Collection<RecipeNode> nodes) {
+        if (nodes == null) return com.gtceu.calcboard.api.type.OverclockMode.STANDARD;
+        for (RecipeNode node : nodes) {
             if (node == null || node.isReroute()) continue;
             com.gtceu.calcboard.api.type.OverclockMode mode = node.getOverclockMode();
             if (mode != null) return mode;
@@ -665,9 +955,14 @@ public class CanvasGroupFrame {
 
     public double computeSharedTotalEUt(FlowGraph graph) {
         if (graph == null) return 0.0;
+        return computeSharedTotalEUt(getEnclosedNodes(graph), graph);
+    }
+
+    public double computeSharedTotalEUt(Collection<RecipeNode> nodes, FlowGraph graph) {
+        if (nodes == null) return 0.0;
         double total = 0.0;
-        for (RecipeNode node : getEnclosedNodes(graph)) {
-            if (node == null || node.isReroute() || !node.isOperational(graph)) continue;
+        for (RecipeNode node : nodes) {
+            if (node == null || node.isReroute() || (graph != null && !node.isOperational(graph))) continue;
             total += node.getBaseEUt() * node.getMachineCount();
         }
         return total;

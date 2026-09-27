@@ -96,7 +96,7 @@ public final class CanvasNodeDraggingState implements CanvasInteractionState {
     }
 
     private void applyNodeDrag(CanvasInteractionContext ctx, double curCanvasX, double curCanvasY) {
-        boolean isSnap = Screen.hasControlDown() || BoardManager.getInstance().isGridSnapEnabled();
+        boolean isSnap = com.gtceu.calcboard.client.util.ClientSafetyHelper.isControlDown() || BoardManager.getInstance().isGridSnapEnabled();
         int gridSize = Math.max(16, BoardManager.getInstance().getGridSnapSize());
 
         if (isSnap) {

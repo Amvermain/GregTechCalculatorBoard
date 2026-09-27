@@ -288,6 +288,9 @@ public class CanvasContextMenuManager {
 
     public void openForSelection(double screenX, double screenY) {
         this.items.clear();
+        if (screen != null && screen.getSelectedNodeIds().size() >= 2) {
+            this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.auto_connect", "↔", "Shift+C", screen::performAutoConnectForSelection));
+        }
         this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.create_frame", "▤", "Ctrl+G", screen::createFrameFromSelection));
         this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.group_module", "📦", "Ctrl+Shift+G", screen::performGroupIntoModule));
         this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.shared_frame", "⧉", "Ctrl+Shift+S", screen::createSharedMachineFrameFromSelection));
@@ -385,8 +388,10 @@ public class CanvasContextMenuManager {
         this.menuW = calculateMenuWidth(font);
         int menuH = calculateMenuHeight();
 
-        int mx = Math.min(menuX, screen.width - menuW - 8);
-        int my = Math.min(menuY, screen.height - menuH - 8);
+        int screenW = screen != null ? screen.width : 800;
+        int screenH = screen != null ? screen.height : 600;
+        int mx = Math.min(menuX, screenW - menuW - 8);
+        int my = Math.min(menuY, screenH - menuH - 8);
 
         graphics.pose().pushPose();
         graphics.pose().translate(0, 0, 450.0f);
@@ -430,8 +435,10 @@ public class CanvasContextMenuManager {
         if (!open) return false;
 
         int menuH = calculateMenuHeight();
-        int mx = Math.min(menuX, screen.width - menuW - 8);
-        int my = Math.min(menuY, screen.height - menuH - 8);
+        int screenW = screen != null ? screen.width : 800;
+        int screenH = screen != null ? screen.height : 600;
+        int mx = Math.min(menuX, screenW - menuW - 8);
+        int my = Math.min(menuY, screenH - menuH - 8);
 
         if (mouseX < mx || mouseX > mx + menuW || mouseY < my || mouseY > my + menuH) {
             close();

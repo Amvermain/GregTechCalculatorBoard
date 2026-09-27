@@ -105,4 +105,30 @@ public class PatternGraphRegistryTest {
         Assertions.assertTrue(boundOpt.isPresent());
         Assertions.assertEquals(page.getId(), boundOpt.get().getId());
     }
+
+    @Test
+    public void testFallbackAutoDetectionFromExistingPage() {
+        BoardPage wirePage = boardManager.addPage("Black Steel Wire Page");
+        com.gtceu.calcboard.api.model.RecipeNode wiremill = com.gtceu.calcboard.api.model.RecipeNode.create(
+                "Wiremill", 10.0, 32.0, com.gtceu.calcboard.api.type.GTVoltageTier.LV
+        );
+        wiremill.addOutput(com.gtceu.calcboard.api.model.IngredientStack.item(
+                net.minecraft.resources.ResourceLocation.tryParse("gtceu:fine_black_steel_wire"),
+                "Fine Black Steel Wire", 1.0, 1.0
+        ));
+        wirePage.getGraph().addNode(wiremill);
+
+        PatternId wirePattern = PatternId.ofKey("gtceu:fine_black_steel_wire", "Fine Black Steel Wire", ItemStack.EMPTY);
+        Optional<BoardPage> detectedOpt = registry.getBoundPage(wirePattern);
+
+        Assertions.assertTrue(detectedOpt.isPresent());
+        Assertions.assertEquals(wirePage.getId(), detectedOpt.get().getId());
+    }
+
+    @Test
+    public void testUnboundPatternReturnsEmpty() {
+        PatternId missingPattern = PatternId.ofKey("gtceu:non_existent_wire", "Non Existent Wire", ItemStack.EMPTY);
+        Optional<BoardPage> boundOpt = registry.getBoundPage(missingPattern);
+        Assertions.assertTrue(boundOpt.isEmpty());
+    }
 }

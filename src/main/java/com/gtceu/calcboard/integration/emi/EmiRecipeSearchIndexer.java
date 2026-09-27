@@ -76,14 +76,9 @@ public final class EmiRecipeSearchIndexer {
 
         if (er.getInputs() != null) {
             for (EmiIngredient in : er.getInputs()) {
-                if (in != null && in.getEmiStacks() != null) {
-                    for (EmiStack stack : in.getEmiStacks()) {
-                        indexStackCompact(stack, inSb, inputIds, inputNames);
-                    }
-                }
+                indexIngredient(in, inSb, inputIds, inputNames);
             }
         }
-
 
         if (cat != null && cat.getId() != null && com.gtceu.calcboard.api.util.ModCompatHelper.isCreateFamilyNamespace(cat.getId().getNamespace())) {
             inSb.append(" create:stress_units stress_units stress units su kinetic 스트레스");
@@ -93,37 +88,7 @@ public final class EmiRecipeSearchIndexer {
         }
 
         if (cat != null && cat.getId() != null && com.gtceu.calcboard.compat.RecipeCategoryClassifier.isGeneratorOrBoilerCategory(cat.getId())) {
-            try {
-                EmiRecipeConverter.RecipeDetails details = EmiRecipeConverter.extractRecipeDetails(er, null);
-                if (details != null) {
-                    if (details.overrideOutputs && !details.customOutputs.isEmpty()) {
-                        for (com.gtceu.calcboard.api.model.IngredientStack cos : details.customOutputs) {
-                            if (cos != null && cos.getId() != null) {
-                                outputIds.add(cos.getId());
-                                if (cos.getDisplayName() != null) {
-                                    outputNames.add(cos.getDisplayName());
-                                    outSb.append(' ').append(cos.getDisplayName().toLowerCase(Locale.ROOT));
-                                }
-                                outSb.append(' ').append(cos.getId().toString().toLowerCase(Locale.ROOT));
-                                outSb.append(' ').append(cos.getId().getPath().toLowerCase(Locale.ROOT));
-                            }
-                        }
-                    }
-                    if (!details.extraInputs.isEmpty()) {
-                        for (com.gtceu.calcboard.api.model.IngredientStack ein : details.extraInputs) {
-                            if (ein != null && ein.getId() != null) {
-                                inputIds.add(ein.getId());
-                                if (ein.getDisplayName() != null) {
-                                    inputNames.add(ein.getDisplayName());
-                                    inSb.append(' ').append(ein.getDisplayName().toLowerCase(Locale.ROOT));
-                                }
-                                inSb.append(' ').append(ein.getId().toString().toLowerCase(Locale.ROOT));
-                                inSb.append(' ').append(ein.getId().getPath().toLowerCase(Locale.ROOT));
-                            }
-                        }
-                    }
-                }
-            } catch (Throwable ignored) {}
+            indexGeneratorDetails(er, inSb, outSb, inputIds, outputIds, inputNames, outputNames);
         }
 
         if (cat != null) {
@@ -164,31 +129,86 @@ public final class EmiRecipeSearchIndexer {
             StringBuilder sb = new StringBuilder();
             try {
                 var rm = dev.emi.emi.api.EmiApi.getRecipeManager();
-                if (rm != null) {
-                    var workstations = rm.getWorkstations(c);
-                    if (workstations != null) {
-                        for (EmiIngredient wsIng : workstations) {
-                            if (wsIng != null && wsIng.getEmiStacks() != null) {
-                                for (EmiStack wsStack : wsIng.getEmiStacks()) {
-                                    if (wsStack != null) {
-                                        if (wsStack.getId() != null) {
-                                            sb.append(' ').append(wsStack.getId().toString().toLowerCase(Locale.ROOT));
-                                            sb.append(' ').append(wsStack.getId().getPath().toLowerCase(Locale.ROOT));
-                                        }
-                                        try {
-                                            if (wsStack.getName() != null) {
-                                                sb.append(' ').append(wsStack.getName().getString().toLowerCase(Locale.ROOT));
-                                            }
-                                        } catch (Throwable ignored) {}
-                                    }
-                                }
-                            }
-                        }
-                    }
+                if (rm == null) return "";
+                var workstations = rm.getWorkstations(c);
+                if (workstations == null) return "";
+                for (EmiIngredient wsIng : workstations) {
+                    indexWorkstationIngredient(wsIng, sb);
                 }
             } catch (Throwable ignored) {}
             return sb.toString();
         });
+    }
+
+    private static void indexWorkstationIngredient(EmiIngredient wsIng, StringBuilder sb) {
+        if (wsIng == null || wsIng.getEmiStacks() == null) return;
+        for (EmiStack wsStack : wsIng.getEmiStacks()) {
+            indexWorkstationStack(wsStack, sb);
+        }
+    }
+
+    private static void indexWorkstationStack(EmiStack wsStack, StringBuilder sb) {
+        if (wsStack == null) return;
+        if (wsStack.getId() != null) {
+            sb.append(' ').append(wsStack.getId().toString().toLowerCase(Locale.ROOT));
+            sb.append(' ').append(wsStack.getId().getPath().toLowerCase(Locale.ROOT));
+        }
+        try {
+            if (wsStack.getName() != null) {
+                sb.append(' ').append(wsStack.getName().getString().toLowerCase(Locale.ROOT));
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    private static void indexIngredient(
+            EmiIngredient in,
+            StringBuilder inSb,
+            List<ResourceLocation> inputIds,
+            List<String> inputNames
+    ) {
+        if (in == null || in.getEmiStacks() == null) return;
+        for (EmiStack stack : in.getEmiStacks()) {
+            indexStackCompact(stack, inSb, inputIds, inputNames);
+        }
+    }
+
+    private static void indexGeneratorDetails(
+            EmiRecipe er,
+            StringBuilder inSb,
+            StringBuilder outSb,
+            List<ResourceLocation> inputIds,
+            List<ResourceLocation> outputIds,
+            List<String> inputNames,
+            List<String> outputNames
+    ) {
+        try {
+            EmiRecipeConverter.RecipeDetails details = EmiRecipeConverter.extractRecipeDetails(er, null);
+            if (details == null) return;
+            if (details.overrideOutputs) {
+                for (var cos : details.customOutputs) {
+                    indexIngredientStack(cos, outSb, outputIds, outputNames);
+                }
+            }
+            for (var ein : details.extraInputs) {
+                indexIngredientStack(ein, inSb, inputIds, inputNames);
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    private static void indexIngredientStack(
+            com.gtceu.calcboard.api.model.IngredientStack stack,
+            StringBuilder sb,
+            List<ResourceLocation> ids,
+            List<String> names
+    ) {
+        if (stack == null || stack.getId() == null) return;
+        ids.add(stack.getId());
+        if (stack.getDisplayName() != null) {
+            names.add(stack.getDisplayName());
+            sb.append(' ').append(stack.getDisplayName().toLowerCase(Locale.ROOT));
+        }
+        sb.append(' ').append(stack.getId().toString().toLowerCase(Locale.ROOT));
+        sb.append(' ').append(stack.getId().getPath().toLowerCase(Locale.ROOT));
     }
 
     public static String getStackDisplayName(EmiStack stack) {

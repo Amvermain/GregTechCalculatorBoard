@@ -93,7 +93,7 @@ public class CanvasSelectionHandler {
         // Select overlapping Nodes or Ports based on coverage threshold
         for (NodeWidget w : screen.getNodeWidgets()) {
             RecipeNode n = w.getNode();
-            if (screen.getGraph() != null && screen.getGraph().isNodeInFoldedFrame(n.getId())) {
+            if (screen.getGraph() != null && screen.getGraph().isNodeInFoldedOrEmbeddedFrame(n.getId())) {
                 continue;
             }
             double nw = w.getWidth();
@@ -116,19 +116,7 @@ public class CanvasSelectionHandler {
                 if (ratio >= 0.35 || n.isReroute()) {
                     screen.selectNode(n.getId(), true);
                 } else {
-                    boolean portMatched = false;
-                    for (int inIdx : n.getVisibleInputIndices()) {
-                        if (w.isPortOverlapping(true, inIdx, minX, minY, maxX, maxY)) {
-                            screen.selectPort(n.getId(), true, inIdx, true);
-                            portMatched = true;
-                        }
-                    }
-                    for (int outIdx : n.getVisibleOutputIndices()) {
-                        if (w.isPortOverlapping(false, outIdx, minX, minY, maxX, maxY)) {
-                            screen.selectPort(n.getId(), false, outIdx, true);
-                            portMatched = true;
-                        }
-                    }
+                    boolean portMatched = selectOverlappingPorts(screen, n, w, minX, minY, maxX, maxY);
                     if (!portMatched && ratio > 0.15) {
                         screen.selectNode(n.getId(), true);
                     }
@@ -175,7 +163,7 @@ public class CanvasSelectionHandler {
         if (screen == null) return;
         for (NodeWidget w : screen.getNodeWidgets()) {
             RecipeNode n = w.getNode();
-            if (screen.getGraph() != null && screen.getGraph().isNodeInFoldedFrame(n.getId())) {
+            if (screen.getGraph() != null && screen.getGraph().isNodeInFoldedOrEmbeddedFrame(n.getId())) {
                 continue;
             }
             double nx = n.getPosX();
@@ -191,5 +179,22 @@ public class CanvasSelectionHandler {
     private void renderNodeHighlight(GuiGraphics graphics, int x, int y, int w, int h) {
         graphics.fill(x - 2, y - 2, x + w + 2, y + h + 2, 0x2E38BDF8);
         graphics.renderOutline(x - 2, y - 2, w + 4, h + 4, 0xFF38BDF8);
+    }
+
+    private boolean selectOverlappingPorts(BoardScreen screen, RecipeNode n, NodeWidget w, double minX, double minY, double maxX, double maxY) {
+        boolean inputMatched = selectPorts(screen, n, w, true, n.getVisibleInputIndices(), minX, minY, maxX, maxY);
+        boolean outputMatched = selectPorts(screen, n, w, false, n.getVisibleOutputIndices(), minX, minY, maxX, maxY);
+        return inputMatched || outputMatched;
+    }
+
+    private boolean selectPorts(BoardScreen screen, RecipeNode n, NodeWidget w, boolean isInput, List<Integer> indices, double minX, double minY, double maxX, double maxY) {
+        boolean matched = false;
+        for (int idx : indices) {
+            if (w.isPortOverlapping(isInput, idx, minX, minY, maxX, maxY)) {
+                screen.selectPort(n.getId(), isInput, idx, true);
+                matched = true;
+            }
+        }
+        return matched;
     }
 }

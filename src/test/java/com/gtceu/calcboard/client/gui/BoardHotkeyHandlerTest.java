@@ -52,6 +52,15 @@ public class BoardHotkeyHandlerTest {
     }
 
     @Test
+    public void testShiftCAutoConnectWithMultipleSelectedNodes() {
+        BoardScreen screen = new BoardScreen();
+        screen.getSelectedNodeIds().add("n1");
+        screen.getSelectedNodeIds().add("n2");
+        boolean handled = BoardHotkeyHandler.handleKeyPressed(screen, GLFW.GLFW_KEY_C, 0, GLFW.GLFW_MOD_SHIFT, 0, 0);
+        Assertions.assertTrue(handled);
+    }
+
+    @Test
     public void testGridSnapHotkey() {
         BoardScreen screen = new BoardScreen();
         boolean initial = BoardManager.getInstance().isGridSnapEnabled();

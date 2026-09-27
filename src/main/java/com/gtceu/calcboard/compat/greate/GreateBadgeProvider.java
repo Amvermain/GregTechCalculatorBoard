@@ -53,7 +53,10 @@ public final class GreateBadgeProvider {
                 }
             }
 
-            int circuit = store.get(GreateProperties.CIRCUIT_NUMBER);
+            int circuit = store.get(com.gtceu.calcboard.api.property.NodeProperties.CIRCUIT_NUMBER);
+            if (circuit < 0) {
+                circuit = store.get(GreateProperties.CIRCUIT_NUMBER);
+            }
             if (circuit >= 0) {
                 String label = "⚙ [#" + circuit + "]";
                 List<Component> tooltip = List.of(

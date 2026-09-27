@@ -52,12 +52,28 @@ public class CanvasWireInteractionHandler {
         this.wireStartFoldedPortRow = -1;
     }
 
+    public void startWire(NodeWidget widget, int portIdx, boolean isInput) {
+        this.wireStartNode = widget;
+        this.wireStartPortIdx = portIdx;
+        this.wireStartIsInput = isInput;
+        this.wireStartFoldedFrame = null;
+        this.wireStartFoldedPortRow = -1;
+    }
+
     public void startWireFromFolded(NodeWidget widget, int portIdx, boolean isInput, com.gtceu.calcboard.api.model.CanvasGroupFrame frame, int portRow) {
         this.wireStartNode = widget;
         this.wireStartPortIdx = portIdx;
         this.wireStartIsInput = isInput;
         this.wireStartFoldedFrame = frame;
         this.wireStartFoldedPortRow = portRow;
+    }
+
+    public void startWireFromEmbedded(NodeWidget widget, int portIdx, boolean isInput, com.gtceu.calcboard.api.model.CanvasGroupFrame frame) {
+        this.wireStartNode = widget;
+        this.wireStartPortIdx = portIdx;
+        this.wireStartIsInput = isInput;
+        this.wireStartFoldedFrame = null;
+        this.wireStartFoldedPortRow = -1;
     }
 
     public boolean handlePortClick(
@@ -242,7 +258,10 @@ public class CanvasWireInteractionHandler {
     private void notifyDisconnect(String translatableKey, BoardScreen screen) {
         screen.markSummaryDirty();
         BoardToast.show(Component.literal("§c✕ ").append(Component.translatable(translatableKey)));
-        Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.ITEM_BREAK, 1.2F));
+        Minecraft mc = Minecraft.getInstance();
+        if (mc != null && mc.getSoundManager() != null) {
+            mc.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.ITEM_BREAK, 1.2F));
+        }
     }
 
     public boolean handleWireScroll(
@@ -334,6 +353,11 @@ public class CanvasWireInteractionHandler {
                     ? (wireStartFoldedFrame.getPosX() + 6.0)
                     : (wireStartFoldedFrame.getPosX() + wireStartFoldedFrame.getWidth() - 6.0);
             startY = wireStartFoldedFrame.getPosY() + 64.0 + wireStartFoldedPortRow * 18.0 + 8.0;
+        } else if (screen.getGraph() != null && screen.getGraph().isNodeInEmbeddedPanel(wireStartNode.getNode().getId())) {
+            com.gtceu.calcboard.api.model.CanvasGroupFrame embFrame = screen.getGraph().getEmbeddedFrameForNode(wireStartNode.getNode().getId());
+            double[] anchor = com.gtceu.calcboard.client.gui.render.EmbeddedPanelRenderer.getEmbeddedPortAnchor(embFrame, wireStartNode.getNode(), wireStartPortIdx, wireStartIsInput);
+            startX = anchor[0];
+            startY = anchor[1];
         } else {
             startX = wireStartIsInput ? wireStartNode.getInputPortX(wireStartPortIdx) : wireStartNode.getOutputPortX(wireStartPortIdx);
             startY = wireStartIsInput ? wireStartNode.getInputPortY(wireStartPortIdx) : wireStartNode.getOutputPortY(wireStartPortIdx);

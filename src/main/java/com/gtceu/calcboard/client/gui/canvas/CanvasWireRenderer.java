@@ -7,6 +7,7 @@ import com.gtceu.calcboard.api.solver.FlowGraphTopologyAnalyzer;
 import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.client.gui.BoardScreen;
 import com.gtceu.calcboard.client.gui.render.ConnectionRenderer;
+import com.gtceu.calcboard.client.gui.render.EmbeddedPanelRenderer;
 import com.gtceu.calcboard.client.gui.render.ExportRenderScope;
 import com.gtceu.calcboard.client.gui.render.ParticleBatchingEngine;
 import com.gtceu.calcboard.client.gui.render.WireSpatialIndex;
@@ -77,6 +78,9 @@ public class CanvasWireRenderer {
             return new ResolvedWireEndpoints(0, 0, 0, 0, 0, 0, true);
         }
 
+        CanvasGroupFrame fromEmb = graph.getEmbeddedFrameForNode(fromNode.getId());
+        CanvasGroupFrame toEmb = graph.getEmbeddedFrameForNode(toNode.getId());
+
         float x1, y1, fromDirX;
         if (fromFolded != null) {
             FlowGraphTopologyAnalyzer.FoldedPortSummary summary = FlowGraphTopologyAnalyzer.aggregateFoldedPorts(graph, fromFolded);
@@ -84,6 +88,11 @@ public class CanvasWireRenderer {
             if (outIdx < 0) outIdx = 0;
             x1 = (float) (fromFolded.getPosX() + fromFolded.getWidth() - 5.0);
             y1 = (float) (fromFolded.getPosY() + 64.0 + outIdx * 18.0 + 8.0);
+            fromDirX = 1.0f;
+        } else if (fromEmb != null) {
+            double[] pt = EmbeddedPanelRenderer.getEmbeddedPortAnchor(fromEmb, fromNode, edge.outputIndex(), false);
+            x1 = (float) pt[0];
+            y1 = (float) pt[1];
             fromDirX = 1.0f;
         } else {
             NodeWidget fromWidget = widgets.apply(fromNode);
@@ -107,6 +116,11 @@ public class CanvasWireRenderer {
             if (inIdx < 0) inIdx = 0;
             x2 = (float) (toFolded.getPosX() + 5.0);
             y2 = (float) (toFolded.getPosY() + 64.0 + inIdx * 18.0 + 8.0);
+            toDirX = -1.0f;
+        } else if (toEmb != null) {
+            double[] pt = EmbeddedPanelRenderer.getEmbeddedPortAnchor(toEmb, toNode, edge.inputIndex(), true);
+            x2 = (float) pt[0];
+            y2 = (float) pt[1];
             toDirX = -1.0f;
         } else {
             NodeWidget toWidget = widgets.apply(toNode);
@@ -208,52 +222,12 @@ public class CanvasWireRenderer {
             visibleWiresBuffer.add(badgeCode);
         }
 
-        // Render Active Wire Dragging (Single or Multi-Port Bundle)
-        var canvasHandler = screen.getCanvasHandler();
-        NodeWidget wireStart = exporting ? null : canvasHandler.getWireStartNode();
+        NodeWidget wireStart = exporting ? null : screen.getCanvasHandler().getWireStartNode();
         if (wireStart != null) {
-            int matchedColor = BoardManager.getInstance().getMatchedWireColor();
-            int dragWireColor = Screen.hasShiftDown() ? 0xFFFFD700 : matchedColor;
-
-            boolean isCurrentPortSelected = screen.isPortSelected(wireStart.getNode().getId(), canvasHandler.isWireStartInput(), canvasHandler.getWireStartPortIdx());
-            java.util.Set<com.gtceu.calcboard.client.gui.model.PortRef> selectedPorts = (isCurrentPortSelected && screen.getSelectedPorts().size() > 1) ? screen.getSelectedPorts() : null;
-
-            if (selectedPorts != null) {
-                for (com.gtceu.calcboard.client.gui.model.PortRef p : selectedPorts) {
-                    RecipeNode pNode = graph.findNodeById(p.nodeId());
-                    NodeWidget pWidget = screen.findWidgetForNode(pNode);
-                    if (pWidget == null) continue;
-                    float px, py;
-                    if (p.isInput()) {
-                        px = pWidget.getInputPortX(p.portIndex());
-                        py = pWidget.getInputPortY(p.portIndex());
-                        float startDirX = pNode.isFlipped() ? 1.0f : -1.0f;
-                        ConnectionRenderer.addBezierToBatch((float) canvasMouseX, (float) canvasMouseY, px, py, 1.0f, startDirX, 0xFF38BDF8, 2.5f);
-                    } else {
-                        px = pWidget.getOutputPortX(p.portIndex());
-                        py = pWidget.getOutputPortY(p.portIndex());
-                        float startDirX = pNode.isFlipped() ? -1.0f : 1.0f;
-                        ConnectionRenderer.addBezierToBatch(px, py, (float) canvasMouseX, (float) canvasMouseY, startDirX, -1.0f, 0xFF38BDF8, 2.5f);
-                    }
-                }
-            } else {
-                float x1, y1;
-                if (canvasHandler.isWireStartInput()) {
-                    x1 = wireStart.getInputPortX(canvasHandler.getWireStartPortIdx());
-                    y1 = wireStart.getInputPortY(canvasHandler.getWireStartPortIdx());
-                    float startDirX = wireStart.getNode().isFlipped() ? 1.0f : -1.0f;
-                    ConnectionRenderer.addBezierToBatch((float) canvasMouseX, (float) canvasMouseY, x1, y1, 1.0f, startDirX, dragWireColor, 3.0f);
-                } else {
-                    x1 = wireStart.getOutputPortX(canvasHandler.getWireStartPortIdx());
-                    y1 = wireStart.getOutputPortY(canvasHandler.getWireStartPortIdx());
-                    float startDirX = wireStart.getNode().isFlipped() ? -1.0f : 1.0f;
-                    ConnectionRenderer.addBezierToBatch(x1, y1, (float) canvasMouseX, (float) canvasMouseY, startDirX, -1.0f, dragWireColor, 3.0f);
-                }
-            }
+            renderActiveWireDragging(screen, graph, wireStart, canvasMouseX, canvasMouseY);
         }
         ConnectionRenderer.endBatch();
 
-        // Draw animated flow pulse dots (Single-batch GPU rendering)
         var animMode = BoardManager.getInstance().getWireAnimationMode();
         if (!exporting && zoom >= 0.28 && animMode != com.gtceu.calcboard.api.type.WireAnimationMode.DISABLED) {
             ConnectionRenderer.renderPulseDotsBatch(graphics, visibleWiresBuffer, animMode);
@@ -332,5 +306,60 @@ public class CanvasWireRenderer {
             }
         }
         return 1.0f;
+    }
+
+    private static void renderActiveWireDragging(BoardScreen screen, FlowGraph graph, NodeWidget wireStart, double canvasMouseX, double canvasMouseY) {
+        var canvasHandler = screen.getCanvasHandler();
+        int matchedColor = BoardManager.getInstance().getMatchedWireColor();
+        int dragWireColor = Screen.hasShiftDown() ? 0xFFFFD700 : matchedColor;
+
+        boolean isCurrentPortSelected = screen.isPortSelected(wireStart.getNode().getId(), canvasHandler.isWireStartInput(), canvasHandler.getWireStartPortIdx());
+        java.util.Set<com.gtceu.calcboard.client.gui.model.PortRef> selectedPorts = (isCurrentPortSelected && screen.getSelectedPorts().size() > 1) ? screen.getSelectedPorts() : null;
+
+        if (selectedPorts != null) {
+            renderMultiPortDragging(screen, graph, selectedPorts, canvasMouseX, canvasMouseY);
+            return;
+        }
+
+        renderSinglePortDragging(wireStart, canvasHandler, canvasMouseX, canvasMouseY, dragWireColor);
+    }
+
+    private static void renderMultiPortDragging(BoardScreen screen, FlowGraph graph, java.util.Set<com.gtceu.calcboard.client.gui.model.PortRef> selectedPorts, double canvasMouseX, double canvasMouseY) {
+        for (com.gtceu.calcboard.client.gui.model.PortRef p : selectedPorts) {
+            renderSelectedPortDragWire(screen, graph, p, canvasMouseX, canvasMouseY);
+        }
+    }
+
+    private static void renderSelectedPortDragWire(BoardScreen screen, FlowGraph graph, com.gtceu.calcboard.client.gui.model.PortRef p, double canvasMouseX, double canvasMouseY) {
+        RecipeNode pNode = graph.findNodeById(p.nodeId());
+        NodeWidget pWidget = screen.findWidgetForNode(pNode);
+        if (pWidget == null) {
+            return;
+        }
+        if (p.isInput()) {
+            float px = pWidget.getInputPortX(p.portIndex());
+            float py = pWidget.getInputPortY(p.portIndex());
+            float startDirX = pNode.isFlipped() ? 1.0f : -1.0f;
+            ConnectionRenderer.addBezierToBatch((float) canvasMouseX, (float) canvasMouseY, px, py, 1.0f, startDirX, 0xFF38BDF8, 2.5f);
+            return;
+        }
+        float px = pWidget.getOutputPortX(p.portIndex());
+        float py = pWidget.getOutputPortY(p.portIndex());
+        float startDirX = pNode.isFlipped() ? -1.0f : 1.0f;
+        ConnectionRenderer.addBezierToBatch(px, py, (float) canvasMouseX, (float) canvasMouseY, startDirX, -1.0f, 0xFF38BDF8, 2.5f);
+    }
+
+    private static void renderSinglePortDragging(NodeWidget wireStart, com.gtceu.calcboard.client.gui.CanvasInteractionHandler canvasHandler, double canvasMouseX, double canvasMouseY, int dragWireColor) {
+        if (canvasHandler.isWireStartInput()) {
+            float x1 = wireStart.getInputPortX(canvasHandler.getWireStartPortIdx());
+            float y1 = wireStart.getInputPortY(canvasHandler.getWireStartPortIdx());
+            float startDirX = wireStart.getNode().isFlipped() ? 1.0f : -1.0f;
+            ConnectionRenderer.addBezierToBatch((float) canvasMouseX, (float) canvasMouseY, x1, y1, 1.0f, startDirX, dragWireColor, 3.0f);
+            return;
+        }
+        float x1 = wireStart.getOutputPortX(canvasHandler.getWireStartPortIdx());
+        float y1 = wireStart.getOutputPortY(canvasHandler.getWireStartPortIdx());
+        float startDirX = wireStart.getNode().isFlipped() ? -1.0f : 1.0f;
+        ConnectionRenderer.addBezierToBatch(x1, y1, (float) canvasMouseX, (float) canvasMouseY, startDirX, -1.0f, dragWireColor, 3.0f);
     }
 }

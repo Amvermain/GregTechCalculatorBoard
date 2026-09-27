@@ -7,13 +7,16 @@ import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.util.ModCompatHelper;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.bom.MultiblockBOMSummary;
+import com.gtceu.calcboard.api.model.RecipeFingerprint;
 import com.gtceu.calcboard.api.model.SearchableRecipe;
 import com.gtceu.calcboard.client.gui.search.RecipeHoverPreviewRenderer;
 import com.gtceu.calcboard.integration.spi.IRecipeViewerAdapter;
 import mezz.jei.api.constants.VanillaTypes;
 import mezz.jei.api.forge.ForgeTypes;
 import mezz.jei.api.recipe.IFocus;
+import mezz.jei.api.recipe.IRecipeManager;
 import mezz.jei.api.recipe.RecipeIngredientRole;
+import mezz.jei.api.recipe.category.IRecipeCategory;
 import mezz.jei.api.runtime.IJeiRuntime;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -113,6 +116,31 @@ public class JeiRecipeViewerAdapter implements IRecipeViewerAdapter {
     private static final Set<ResourceLocation> FAVORITE_RECIPES = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     @Override
+    public RecipeFingerprint computeFingerprint() {
+        if (!isAvailable() || jeiRuntime == null) return RecipeFingerprint.EMPTY;
+        try {
+            var recipeManager = jeiRuntime.getRecipeManager();
+            var categoryLookup = recipeManager.createRecipeCategoryLookup();
+            if (categoryLookup == null) return RecipeFingerprint.EMPTY;
+
+            int totalCount = 0;
+            long hash = 1125899906842597L;
+            for (var cat : categoryLookup.get().toList()) {
+                if (cat == null || cat.getRecipeType() == null) continue;
+                var lookup = recipeManager.createRecipeLookup(cat.getRecipeType());
+                if (lookup != null) {
+                    var list = lookup.get().toList();
+                    totalCount += list.size();
+                    hash = hash * 31L + cat.getRecipeType().getUid().hashCode();
+                }
+            }
+            return new RecipeFingerprint(getViewerId(), totalCount, hash);
+        } catch (Throwable t) {
+            return RecipeFingerprint.EMPTY;
+        }
+    }
+
+    @Override
     public List<SearchableRecipe> collectSearchableRecipes() {
         if (!isAvailable() || jeiRuntime == null) return Collections.emptyList();
         List<SearchableRecipe> list = new ArrayList<>();
@@ -123,23 +151,7 @@ public class JeiRecipeViewerAdapter implements IRecipeViewerAdapter {
                 var categories = categoryLookup.get().toList();
                 com.gtceu.calcboard.GregTechCalcBoard.LOGGER.info("[GTCalcBoard] [JEI] Discovered {} recipe categories in JEI.", categories.size());
                 for (var category : categories) {
-                    if (category == null || category.getRecipeType() == null) continue;
-                    try {
-                        var recipeLookup = recipeManager.createRecipeLookup(category.getRecipeType());
-                        if (recipeLookup != null) {
-                            var recipes = recipeLookup.get().toList();
-                            for (var recipe : recipes) {
-                                if (recipe != null) {
-                                    SearchableRecipe sr = JeiRecipeSearchIndexer.buildIndexUntyped(category, recipe, jeiRuntime);
-                                    if (sr != null) {
-                                        list.add(sr);
-                                    }
-                                }
-                            }
-                        }
-                    } catch (Throwable t) {
-                        com.gtceu.calcboard.GregTechCalcBoard.LOGGER.warn("[GTCalcBoard] [JEI] Failed to collect recipes for category '{}': {}", category.getRecipeType().getUid(), t.getMessage());
-                    }
+                    collectCategoryRecipes(recipeManager, category, jeiRuntime, list);
                 }
             }
         } catch (Throwable t) {
@@ -290,43 +302,7 @@ public class JeiRecipeViewerAdapter implements IRecipeViewerAdapter {
 
             var outputs = rn.getOutputs();
             if (outputs != null && !outputs.isEmpty()) {
-                var sortedOutputs = new java.util.ArrayList<>(outputs);
-                if (matchedOutputId != null || matchedOutputName != null) {
-                    int matchIdx = -1;
-                    for (int i = 0; i < sortedOutputs.size(); i++) {
-                        var stack = sortedOutputs.get(i);
-                        if (stack == null) continue;
-                        if (matchedOutputId != null && matchedOutputId.equals(stack.getId())) {
-                            matchIdx = i;
-                            break;
-                        }
-                        if (matchedOutputName != null && matchedOutputName.equalsIgnoreCase(stack.getDisplayName())) {
-                            matchIdx = i;
-                            break;
-                        }
-                    }
-                    if (matchIdx > 0) {
-                        var matched = sortedOutputs.remove(matchIdx);
-                        sortedOutputs.add(0, matched);
-                    }
-                }
-
-                int maxDisplay = rn.isGenerator() ? 2 : 3;
-                int count = Math.min(sortedOutputs.size(), maxDisplay);
-                for (int i = 0; i < count; i++) {
-                    var out = sortedOutputs.get(i);
-                    if (out != null) {
-                        com.gtceu.calcboard.client.gui.render.IngredientRenderer.render(graphics, out, currentX, rowY + 8);
-                    }
-                    currentX += 18;
-                }
-
-                if (sortedOutputs.size() > maxDisplay) {
-                    int remaining = sortedOutputs.size() - maxDisplay;
-                    String badge = "+" + remaining;
-                    graphics.drawString(font, badge, currentX, rowY + 12, 0xFF94A3B8, false);
-                    currentX += font.width(badge) + 2;
-                }
+                currentX = renderOutputIngredients(graphics, font, rn, outputs, matchedOutputId, matchedOutputName, currentX, rowY);
             }
             return currentX - listX;
         }
@@ -494,6 +470,101 @@ public class JeiRecipeViewerAdapter implements IRecipeViewerAdapter {
     public boolean isViewerScreen(net.minecraft.client.gui.screens.Screen screen) {
         if (screen == null || RECIPES_GUI_CLASS == null) return false;
         return RECIPES_GUI_CLASS.isInstance(screen);
+    }
+
+    private void collectCategoryRecipes(
+            IRecipeManager recipeManager,
+            IRecipeCategory<?> category,
+            IJeiRuntime jeiRuntime,
+            List<SearchableRecipe> list
+    ) {
+        if (category == null || category.getRecipeType() == null) return;
+        try {
+            var recipeLookup = recipeManager.createRecipeLookup(category.getRecipeType());
+            if (recipeLookup == null) return;
+            for (var recipe : recipeLookup.get().toList()) {
+                indexSingleRecipe(category, recipe, jeiRuntime, list);
+            }
+        } catch (Throwable t) {
+            com.gtceu.calcboard.GregTechCalcBoard.LOGGER.warn("[GTCalcBoard] [JEI] Failed to collect recipes for category '{}': {}", category.getRecipeType().getUid(), t.getMessage());
+        }
+    }
+
+    private void indexSingleRecipe(
+            IRecipeCategory<?> category,
+            Object recipe,
+            IJeiRuntime jeiRuntime,
+            List<SearchableRecipe> list
+    ) {
+        if (recipe == null) return;
+        SearchableRecipe sr = JeiRecipeSearchIndexer.buildIndexUntyped(category, recipe, jeiRuntime);
+        if (sr != null) {
+            list.add(sr);
+        }
+    }
+
+    private int renderOutputIngredients(
+            GuiGraphics graphics,
+            Font font,
+            RecipeNode rn,
+            List<IngredientStack> outputs,
+            ResourceLocation matchedOutputId,
+            String matchedOutputName,
+            int currentX,
+            int rowY
+    ) {
+        List<IngredientStack> sortedOutputs = prioritizeMatchedOutput(outputs, matchedOutputId, matchedOutputName);
+        int maxDisplay = rn.isGenerator() ? 2 : 3;
+        int count = Math.min(sortedOutputs.size(), maxDisplay);
+
+        for (int i = 0; i < count; i++) {
+            IngredientStack out = sortedOutputs.get(i);
+            if (out != null) {
+                com.gtceu.calcboard.client.gui.render.IngredientRenderer.render(graphics, out, currentX, rowY + 8);
+            }
+            currentX += 18;
+        }
+
+        if (sortedOutputs.size() > maxDisplay) {
+            int remaining = sortedOutputs.size() - maxDisplay;
+            String badge = "+" + remaining;
+            graphics.drawString(font, badge, currentX, rowY + 12, 0xFF94A3B8, false);
+            currentX += font.width(badge) + 2;
+        }
+        return currentX;
+    }
+
+    private List<IngredientStack> prioritizeMatchedOutput(
+            List<IngredientStack> outputs,
+            ResourceLocation matchedOutputId,
+            String matchedOutputName
+    ) {
+        var sorted = new java.util.ArrayList<>(outputs);
+        if (matchedOutputId == null && matchedOutputName == null) return sorted;
+        int matchIdx = findMatchedOutputIndex(sorted, matchedOutputId, matchedOutputName);
+        if (matchIdx > 0) {
+            var matched = sorted.remove(matchIdx);
+            sorted.add(0, matched);
+        }
+        return sorted;
+    }
+
+    private int findMatchedOutputIndex(
+            List<IngredientStack> outputs,
+            ResourceLocation matchedOutputId,
+            String matchedOutputName
+    ) {
+        for (int i = 0; i < outputs.size(); i++) {
+            var stack = outputs.get(i);
+            if (stack == null) continue;
+            if (matchedOutputId != null && matchedOutputId.equals(stack.getId())) {
+                return i;
+            }
+            if (matchedOutputName != null && matchedOutputName.equalsIgnoreCase(stack.getDisplayName())) {
+                return i;
+            }
+        }
+        return -1;
     }
 }
 

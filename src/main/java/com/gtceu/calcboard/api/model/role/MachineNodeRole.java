@@ -153,17 +153,22 @@ public class MachineNodeRole implements INodeRole {
     }
 
     public List<ResourceLocation> getAvailableWorkstations() {
-        if (availableWorkstations.isEmpty() && recipeCategoryId != null) {
-            CategoryCapability cap = CategoryCapabilityMatrix.getInstance().getCapability(recipeCategoryId);
-            if (cap != null && cap.availableWorkstations() != null && !cap.availableWorkstations().isEmpty()) {
-                for (ResourceLocation ws : cap.availableWorkstations()) {
-                    if (ws != null && !availableWorkstations.contains(ws)) {
-                        availableWorkstations.add(ws);
-                    }
-                }
-            }
+        if (!availableWorkstations.isEmpty() || recipeCategoryId == null) {
+            return availableWorkstations;
+        }
+        CategoryCapability cap = CategoryCapabilityMatrix.getInstance().getCapability(recipeCategoryId);
+        if (cap != null && cap.availableWorkstations() != null) {
+            populateWorkstationsFromCapability(cap.availableWorkstations());
         }
         return availableWorkstations;
+    }
+
+    private void populateWorkstationsFromCapability(List<ResourceLocation> workstations) {
+        for (ResourceLocation ws : workstations) {
+            if (ws != null && !availableWorkstations.contains(ws)) {
+                availableWorkstations.add(ws);
+            }
+        }
     }
 
     public void setAvailableWorkstations(List<ResourceLocation> availableWorkstations) {

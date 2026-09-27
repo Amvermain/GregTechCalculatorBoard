@@ -123,6 +123,17 @@ classDiagram
         -double fixedFlowLimit
         -FlowSplitMode splitMode
         -Set~Integer~ voidedOutputIndices
+        -List~CrossPageExportTarget~ exportTargets
+        -String linkedSourcePageId
+        -String linkedSourceNodeId
+        -double allocatedInputRate
+    }
+
+    class CrossPageExportTarget {
+        <<record>>
+        +String targetPageId
+        +int priority
+        +double fixedLimit
     }
 
     class SubPageModuleNodeRole {
@@ -165,7 +176,7 @@ classDiagram
   - `RecipeNode`는 좌표, 크기, 반전 여부, 속성 저장소, 입출력 포트 등의 순수 그래프 메타데이터만을 보유합니다.
   - 4대 고유 역할 컴포넌트:
     1. **`MachineNodeRole`**: 일반 가공 기계, 멀티블록, 발전기, 보일러의 오버클록, 병렬 수, 애드온, 전력(EU/t) 및 가동률($\eta$) 관리.
-    2. **`JunctionNodeRole`**: 분기점, 무한/고정 외부 공급원, 보이드 싱크(`VOID_SINK`), 우선순위 선로 분배 관리.
+    2. **`JunctionNodeRole`**: 분기점, 무한/고정 외부 공급원, 보이드 싱크(`VOID_SINK`), 우선순위 선로 분배, 및 페이지 간 유량 분배·가상 연동(`SupplyMode.LINKED_JUNCTION`, `CrossPageExportTarget`, ADR-064) 관리.
     3. **`SubPageModuleNodeRole`**: 1:1 전용 서브페이지(`PageType.MODULE`)를 캡슐화한 복합 공정 모듈. 내부 서브그래프의 기계 수량 집계 및 복합 전력 적분.
     4. **`BoundaryPinNodeRole`**: 전용 서브페이지 내부와 상위 모듈 카드 포트 간의 물리적 I/O 인터페이스를 계약하는 경계 핀.
   - **듀얼 라이트 NBT 역호환성**: 신규 역할별 태그(`RoleTag`)와 기존 레거시 필드 태그를 동시 기록(Dual-Write)하여 구버전 세이브 및 청사진(Blueprint)과의 100% 무손실 상호 호환성을 유지합니다.
@@ -440,11 +451,15 @@ $$\text{Blueprint String} = \text{"GTBOARD:"} + [\text{Title} + \text{":"}] + \t
 
 ---
 
-## 6. 캔버스 그룹 프레임 및 공유 기계 풀 (`CanvasGroupFrame`)
+## 6. 캔버스 그룹 프레임 및 공유 기계 풀 (`CanvasGroupFrame`) (ADR-042, ADR-060)
 
 시각적 그룹화 영역 및 복수 레시피 시간 분할 공유(Time-Sharing Machine Pool)를 관리합니다.
 
 * **`isSharedMachineFrame`**: 프레임 내부의 모든 기계 레시피가 단일 물리 기계를 시간 분할하여 가동하는 모드.
+* **공유 기계 풀 3-Tier 뷰 모드 (`PoolViewMode`, ADR-060)**:
+  - `FOLDED_CARD`: 단일 가상 카드로 완전히 접힌 초소형 뷰 모드. 외부 연결선이 카드로 집약되며 캔버스 점유 면적 최소화.
+  - `EMBEDDED_PANEL`: 머신 중심 임베디드 패널 모드. 단일 패널 내부에서 여러 레시피를 세로 스택 서브 카드로 격리 관리하며, `[+ 레시피 추가]` 인라인 검색 지원.
+  - `EXPANDED_FRAME`: 전체 노드가 캔버스 상에 개별 노드로 펼쳐진 전통적 프레임 모드.
 * **가동 분담률 계산**: $\text{Total Duty} = \sum \text{machineCount}_i$, 필요 기계 대수 = $\lceil \text{Total Duty} \rceil$.
 * **하드웨어 일괄 동기화 (`syncHardwareConfig`)**: 프레임 헤더 설정창을 통해 내부 모든 기계의 전압 티어, 오버클럭 모드, 병렬 수, 장착 애드온을 일괄 전파.
 * **프레임 크기 자동 맞춤 (`autoFit`)**: 프레임 내에 속하거나 걸쳐 있는 모든 노드를 감싸도록 패딩 24px 기준으로 바운딩 박스 자동 계산.

@@ -119,7 +119,6 @@ public class GTCEuMultiblockStructureScanner {
 
                     finalizeAndRegisterStructure(controllerId, def, variants);
 
-                    // Yield CPU every 3 multiblocks to maintain silky smooth 60+ FPS on render thread
                     if ((++count % 3) == 0) {
                         Thread.yield();
                     }
@@ -128,59 +127,15 @@ public class GTCEuMultiblockStructureScanner {
         } catch (Throwable ignored) {}
     }
 
+    private record ScannedPart(ResourceLocation id, String name) {}
+
     private static MultiblockStructureDef parseShapeToDef(ResourceLocation controllerId, Object[][][] blockGrid) {
         try {
             Map<ResourceLocation, Integer> partCounts = new LinkedHashMap<>();
             Map<ResourceLocation, String> partNames = new HashMap<>();
 
             for (Object[][] plane : blockGrid) {
-                if (plane == null) continue;
-                for (Object[] row : plane) {
-                    if (row == null) continue;
-                    for (Object bInfo : row) {
-                        if (bInfo == null) continue;
-                        try {
-                            if (!reflectionMethodsInitialized) {
-                                try {
-                                    mGetItemStackCached = bInfo.getClass().getMethod("getItemStackForm");
-                                } catch (Throwable ignored) {}
-                                try {
-                                    mGetBlockStateCached = bInfo.getClass().getMethod("getBlockState");
-                                } catch (Throwable ignored) {}
-                                reflectionMethodsInitialized = true;
-                            }
-
-                            ItemStack itemStack = null;
-                            if (mGetItemStackCached != null) {
-                                try {
-                                    itemStack = (ItemStack) mGetItemStackCached.invoke(bInfo);
-                                } catch (Throwable ignored) {}
-                            }
-
-                            ResourceLocation itemId = null;
-                            String name = "";
-
-                            if (itemStack != null && !itemStack.isEmpty()) {
-                                itemId = ITEM_ID_CACHE.computeIfAbsent(itemStack.getItem(), ForgeRegistries.ITEMS::getKey);
-                                name = resolveStackDisplayName(itemStack, itemId);
-                            } else if (mGetBlockStateCached != null) {
-                                Object bState = mGetBlockStateCached.invoke(bInfo);
-                                if (bState instanceof BlockState bs) {
-                                    Block blk = bs.getBlock();
-                                    itemId = BLOCK_ID_CACHE.computeIfAbsent(blk, ForgeRegistries.BLOCKS::getKey);
-                                    name = resolveBlockDisplayName(blk, itemId);
-                                }
-                            }
-
-                            if (itemId != null && !itemId.getPath().equals("air")) {
-                                partCounts.merge(itemId, 1, Integer::sum);
-                                if (!name.isEmpty() && !partNames.containsKey(itemId)) {
-                                    partNames.put(itemId, name);
-                                }
-                            }
-                        } catch (Throwable ignored) {}
-                    }
-                }
+                scanGridPlane(plane, partCounts, partNames);
             }
 
             if (partCounts.isEmpty()) return null;
@@ -240,6 +195,71 @@ public class GTCEuMultiblockStructureScanner {
                     outputHatchSlots,
                     maintenanceSlots
             );
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static void scanGridPlane(Object[][] plane, Map<ResourceLocation, Integer> partCounts, Map<ResourceLocation, String> partNames) {
+        if (plane == null) return;
+        for (Object[] row : plane) {
+            if (row == null) continue;
+            for (Object bInfo : row) {
+                processBlockInfo(bInfo, partCounts, partNames);
+            }
+        }
+    }
+
+    private static void processBlockInfo(Object bInfo, Map<ResourceLocation, Integer> partCounts, Map<ResourceLocation, String> partNames) {
+        if (bInfo == null) return;
+        ensureReflectionMethodsInitialized(bInfo);
+
+        ScannedPart part = extractScannedPart(bInfo);
+        if (part == null || part.id() == null || part.id().getPath().equals("air")) return;
+
+        partCounts.merge(part.id(), 1, Integer::sum);
+        if (!part.name().isEmpty() && !partNames.containsKey(part.id())) {
+            partNames.put(part.id(), part.name());
+        }
+    }
+
+    private static void ensureReflectionMethodsInitialized(Object bInfo) {
+        if (reflectionMethodsInitialized) return;
+        try {
+            mGetItemStackCached = bInfo.getClass().getMethod("getItemStackForm");
+        } catch (Throwable ignored) {}
+        try {
+            mGetBlockStateCached = bInfo.getClass().getMethod("getBlockState");
+        } catch (Throwable ignored) {}
+        reflectionMethodsInitialized = true;
+    }
+
+    private static ScannedPart extractScannedPart(Object bInfo) {
+        try {
+            ItemStack itemStack = extractItemStack(bInfo);
+            if (itemStack != null && !itemStack.isEmpty()) {
+                ResourceLocation itemId = ITEM_ID_CACHE.computeIfAbsent(itemStack.getItem(), ForgeRegistries.ITEMS::getKey);
+                String name = resolveStackDisplayName(itemStack, itemId);
+                return new ScannedPart(itemId, name);
+            }
+
+            if (mGetBlockStateCached != null) {
+                Object bState = mGetBlockStateCached.invoke(bInfo);
+                if (bState instanceof BlockState bs) {
+                    Block blk = bs.getBlock();
+                    ResourceLocation blockId = BLOCK_ID_CACHE.computeIfAbsent(blk, ForgeRegistries.BLOCKS::getKey);
+                    String name = resolveBlockDisplayName(blk, blockId);
+                    return new ScannedPart(blockId, name);
+                }
+            }
+        } catch (Throwable ignored) {}
+        return null;
+    }
+
+    private static ItemStack extractItemStack(Object bInfo) {
+        if (mGetItemStackCached == null) return null;
+        try {
+            return (ItemStack) mGetItemStackCached.invoke(bInfo);
         } catch (Throwable ignored) {
             return null;
         }

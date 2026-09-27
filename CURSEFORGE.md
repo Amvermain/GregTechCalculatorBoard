@@ -23,9 +23,11 @@ You can make this directly in-game:
 ## Mod Main Features
 
 * **Effortless Live Flowcharts**: Design dynamic flowcharts with machine inputs and outputs, linking them together to balance and simulate entire production lines.
+* **Cross-Page Flow Allocation**: Link consumer junctions directly to remote producer pages with priority rules, live balance synchronization, and 1-click source navigation.
+* **Selection Summary & Contextual Auto-Wiring**: Multi-select machines to inspect scoped average/peak power and net materials, and auto-wire matching ports exclusively within the selection (`Shift + C`).
+* **Machine-Centric Embedded Pools**: Stack time-shared recipes cleanly inside a single machine panel as vertical sub-cards with seamless 3-tier view transitions.
 * **Batch Run Calculator & Overrides**: Calculate finite batch durations, resource consumption, and energy yields, or manually fine-tune recipe values in machine settings.
 * **Local Web Dashboard**: Monitor active boards and browse blueprints in real time on a secondary monitor or web browser via an embedded local daemon (`/gtcalcboard web`).
-* **Intuitive GUI & Built-in Guide**: Get started quickly with an interactive in-game tutorial and a comprehensive guidebook covering all features and shortcuts.
 * **Instant Bill Of Materials (BOM) Export**: Automatically aggregate required machines and multiblock parts into a Bill of Materials, exportable directly to an EMI Recipe Tree, JEI++, or the clipboard.
 * **Live Multiplayer Collaboration**: Work together with teammates using FTB Teams, Phoenix Guilds, or Vanilla Scoreboards in real-time shared workspaces.
 

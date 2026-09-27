@@ -140,33 +140,26 @@ public final class GaussJordanEliminator {
         }
     }
 
-    private static boolean hasContradictoryRow(double[][] augmented, int rowCount, int colCount, boolean allowSurplus) {
-        return findFirstContradictoryRow(augmented, rowCount, colCount, allowSurplus) >= 0;
-    }
-
     private static int findFirstContradictoryRow(double[][] augmented, int rowCount, int colCount, boolean allowSurplus) {
         for (int r = 0; r < rowCount; r++) {
-            boolean allZero = true;
-            for (int c = 0; c < colCount; c++) {
-                if (Math.abs(augmented[r][c]) > EPSILON) {
-                    allZero = false;
-                    break;
-                }
-            }
-            if (allZero) {
-                double rhs = augmented[r][colCount];
-                if (allowSurplus) {
-                    if (rhs > EPSILON) {
-                        return r;
-                    }
-                } else {
-                    if (Math.abs(rhs) > EPSILON) {
-                        return r;
-                    }
-                }
+            if (isRowZeroCoefficients(augmented[r], colCount) && isContradictoryRhs(augmented[r][colCount], allowSurplus)) {
+                return r;
             }
         }
         return -1;
+    }
+
+    private static boolean isRowZeroCoefficients(double[] row, int colCount) {
+        for (int c = 0; c < colCount; c++) {
+            if (Math.abs(row[c]) > EPSILON) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean isContradictoryRhs(double rhs, boolean allowSurplus) {
+        return allowSurplus ? (rhs > EPSILON) : (Math.abs(rhs) > EPSILON);
     }
 
     private static double[] extractSolutionValues(double[][] augmented, int[] pivotColToRow, int colCount) {

@@ -9,6 +9,7 @@ import com.gtceu.calcboard.client.gui.widget.BoardToast;
 import com.gtceu.calcboard.client.gui.widget.FavoritesDockWidget;
 import com.gtceu.calcboard.integration.spi.RecipeViewerRegistry;
 
+import com.gtceu.calcboard.api.model.CanvasGroupFrame;
 import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.solver.FlowGraphSolver;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
@@ -77,6 +78,7 @@ public class RecipeSearchDialog implements IBoardModal {
     private double targetSpawnCanvasY = 0;
     private ContextualWireTarget contextualWireTarget = null;
     private RecipeNode switchTargetNode = null;
+    private CanvasGroupFrame targetSharedFrame = null;
     private SearchableRecipe stickyHoverRecipe = null;
     private int stickyHoverRowY = 0;
     private int lastMouseX = 0;
@@ -268,6 +270,43 @@ public class RecipeSearchDialog implements IBoardModal {
         return visible;
     }
 
+    public void openForSharedFrame(CanvasGroupFrame frame) {
+        if (frame == null) return;
+        this.targetSharedFrame = frame;
+        this.contextualWireTarget = null;
+        this.switchTargetNode = null;
+        this.hasTargetSpawnPos = false;
+        this.visible = true;
+        this.scrollOffset = 0;
+        this.stickyHoverRecipe = null;
+        this.lastObservedGlobalVersion = RecipeSearchCacheManager.getGlobalVersion();
+
+        String prefill = "";
+        FlowGraph graph = parent != null ? parent.getGraph() : null;
+        ResourceLocation catId = frame.getSharedRecipeCategoryId(graph);
+        if (catId != null) {
+            prefill = "[" + catId.getPath() + "] ";
+        } else {
+            ResourceLocation icon = frame.getSharedMachineIcon(graph);
+            if (icon != null) {
+                prefill = "[" + icon.getPath() + "] ";
+            } else if (frame.getTitle() != null && !frame.getTitle().isEmpty()) {
+                prefill = "[" + frame.getTitle() + "] ";
+            }
+        }
+
+        if (searchBox != null) {
+            searchBox.setValue(prefill);
+            searchBox.setFocused(true);
+        }
+        ensureGlobalRecipesCachedAsync(() -> {
+            if (this.visible) {
+                updateSearchResults(getSearchQuery());
+            }
+        });
+        updateSearchResultsSynchronously(prefill);
+    }
+
     public void setVisible(boolean visible, boolean isLeftClick, double canvasX, double canvasY) {
         this.visible = visible;
         if (visible) {
@@ -290,6 +329,7 @@ public class RecipeSearchDialog implements IBoardModal {
         } else {
             this.contextualWireTarget = null;
             this.switchTargetNode = null;
+            this.targetSharedFrame = null;
             this.stickyHoverRecipe = null;
             this.isDraggingScrollBar = false;
         }
@@ -591,50 +631,86 @@ public class RecipeSearchDialog implements IBoardModal {
             int rowY = listY + i * ROW_HEIGHT;
             if (mouseX >= listX && mouseX <= listX + listW && mouseY >= rowY && mouseY <= rowY + ROW_HEIGHT) {
                 SearchableRecipe sr = filteredRecipes.get(index);
-                int rowBtnW = 44;
-                int btnX = listX + listW - rowBtnW - 6;
-                int favStarX = btnX - 20;
-                int favStarW = 16;
-                int favStarY = rowY + 7;
-                int favStarH = 18;
-
-                // 1. Star button click or Right Click -> Toggle Favorite
-                boolean isStarClicked = (button == 0 && mouseX >= favStarX && mouseX <= favStarX + favStarW && mouseY >= favStarY && mouseY <= favStarY + favStarH);
-                if (isStarClicked || button == 1) {
-                    if (sr.recipe() != null) {
-                        toggleFavoriteRecipe(sr.recipe());
-                        updateSearchResultsSynchronously(getSearchQuery());
-                        Minecraft.getInstance().getSoundManager().play(
-                            SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.2F)
-                        );
-                        return true;
-                    }
-                }
-
-                // 2. Left click -> Switch recipe OR Add recipe to board
-                if (button == 0) {
-                    if (switchTargetNode != null) {
-                        RecipeNode template = com.gtceu.calcboard.integration.spi.RecipeViewerRegistry.getActiveAdapter().convertToNode(sr.recipe());
-                        if (template != null && parent != null) {
-                            parent.switchNodeRecipe(switchTargetNode, template);
-                            Minecraft.getInstance().getSoundManager().play(
-                                SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.1F)
-                            );
-                        }
-                        setVisible(false);
-                        return true;
-                    }
-                    addRecipeAt(sr, screenWidth, screenHeight);
-                    return true;
-                }
+                return handleRecipeRowClick(sr, rowY, mouseX, mouseY, button, listX, listW, screenWidth, screenHeight);
             }
         }
 
         return true;
     }
 
+    private boolean handleRecipeRowClick(SearchableRecipe sr, int rowY, double mouseX, double mouseY, int button, int listX, int listW, int screenWidth, int screenHeight) {
+        int rowBtnW = 44;
+        int btnX = listX + listW - rowBtnW - 6;
+        int favStarX = btnX - 20;
+        int favStarW = 16;
+        int favStarY = rowY + 7;
+        int favStarH = 18;
+
+        boolean isStarClicked = button == 0 && mouseX >= favStarX && mouseX <= favStarX + favStarW && mouseY >= favStarY && mouseY <= favStarY + favStarH;
+        if (isStarClicked || button == 1) {
+            return toggleFavorite(sr);
+        }
+
+        if (button == 0) {
+            return handleRowLeftClick(sr, screenWidth, screenHeight);
+        }
+        return false;
+    }
+
+    private boolean toggleFavorite(SearchableRecipe sr) {
+        if (sr.recipe() == null) {
+            return false;
+        }
+        toggleFavoriteRecipe(sr.recipe());
+        updateSearchResultsSynchronously(getSearchQuery());
+        Minecraft.getInstance().getSoundManager().play(
+            SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.2F)
+        );
+        return true;
+    }
+
+    private boolean handleRowLeftClick(SearchableRecipe sr, int screenWidth, int screenHeight) {
+        if (switchTargetNode != null) {
+            RecipeNode template = com.gtceu.calcboard.integration.spi.RecipeViewerRegistry.getActiveAdapter().convertToNode(sr.recipe());
+            if (template != null && parent != null) {
+                parent.switchNodeRecipe(switchTargetNode, template);
+                Minecraft.getInstance().getSoundManager().play(
+                    SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.1F)
+                );
+            }
+            setVisible(false);
+            return true;
+        }
+        if (targetSharedFrame != null) {
+            return addRecipeToSharedFrame(sr);
+        }
+        addRecipeAt(sr, screenWidth, screenHeight);
+        return true;
+    }
+
     public void addRecipeAt(SearchableRecipe sr, int screenWidth, int screenHeight) {
         RecipeSearchNodeSpawner.spawnRecipeAt(this, sr, screenWidth, screenHeight, parent, contextualWireTarget, hasTargetSpawnPos, targetSpawnCanvasX, targetSpawnCanvasY);
+    }
+
+    private boolean addRecipeToSharedFrame(SearchableRecipe sr) {
+        RecipeNode template = com.gtceu.calcboard.integration.spi.RecipeViewerRegistry.getActiveAdapter().convertToNode(sr.recipe());
+        if (template != null && parent != null && parent.getGraph() != null) {
+            FlowGraph graph = parent.getGraph();
+            graph.addNode(template);
+            targetSharedFrame.addRecipeInline(template, graph);
+            double assignedCount = template.getMachineCount();
+            parent.recordCommand(new BoardCommand.AddRecipeToSharedFrameCommand(targetSharedFrame.getId(), template, assignedCount, "Add Recipe to Shared Frame"));
+            parent.rebuildWidgets();
+            parent.markSummaryDirty();
+            if (parent.getWireRenderer() != null) {
+                parent.getWireRenderer().markDirty();
+            }
+            Minecraft.getInstance().getSoundManager().play(
+                SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.1F)
+            );
+        }
+        setVisible(false);
+        return true;
     }
 
     public void clearContextualWireTarget() {

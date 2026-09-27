@@ -9,6 +9,7 @@ import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.compat.thermal.ThermalModAdapter;
 import com.gtceu.calcboard.compat.thermal.helper.ThermalAugmentHelper;
 import com.gtceu.calcboard.api.model.RecipeDetails;
+import com.gtceu.calcboard.api.model.RecipeSpec;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.material.Fluids;
 import net.minecraftforge.fluids.FluidStack;
@@ -409,17 +410,19 @@ public class SysteamsRecipeHandler {
             List<IngredientStack> fuelInputs = new java.util.ArrayList<>();
             for (IngredientStack in : node.getInputs()) {
                 if (!in.isFluid()) {
-                    fuelInputs.add(in);
+                    fuelInputs.add(in.copy());
                 }
             }
-            node.getInputs().clear();
-            node.getInputs().addAll(fuelInputs);
+            node.clearInputs();
+            for (IngredientStack fuel : fuelInputs) {
+                node.addInput(fuel);
+            }
 
             IngredientStack fluidIn = IngredientStack.fluid(defFluid, "Water", totalWater);
             fluidIn.setAlternatives(getAllBoilingFluidInputs());
             node.addInput(fluidIn);
 
-            node.getOutputs().clear();
+            node.clearOutputs();
             node.addOutput(IngredientStack.fluid(boiled.outputFluidId(), boiled.outputName(), totalSteam));
 
             node.setMachineIcon(ResourceLocation.tryParse("systeams:" + type + "_boiler"));
@@ -435,6 +438,15 @@ public class SysteamsRecipeHandler {
                 String boilerName = Character.toUpperCase(type.charAt(0)) + type.substring(1) + " Boiler";
                 node.setName(boilerName);
             }
+
+            node.setBaseSpec(RecipeSpec.of(
+                    node.getId(),
+                    node.getRecipeCategoryId(),
+                    durationTicks,
+                    0.0,
+                    node.getInputs(),
+                    node.getOutputs()
+            ));
         } else {
             double energyRF = node.getProperties().get(com.gtceu.calcboard.compat.thermal.ThermalProperties.THERMAL_BASE_ENERGY_RF);
             if (energyRF <= 0) {
@@ -453,13 +465,15 @@ public class SysteamsRecipeHandler {
             List<IngredientStack> fuelInputs = new java.util.ArrayList<>();
             for (IngredientStack in : node.getInputs()) {
                 if (!in.isFluid()) {
-                    fuelInputs.add(in);
+                    fuelInputs.add(in.copy());
                 }
             }
-            node.getInputs().clear();
-            node.getInputs().addAll(fuelInputs);
+            node.clearInputs();
+            for (IngredientStack fuel : fuelInputs) {
+                node.addInput(fuel);
+            }
 
-            node.getOutputs().clear();
+            node.clearOutputs();
 
             node.setMachineIcon(ResourceLocation.tryParse("thermal:dynamo_" + type));
             node.setRecipeCategoryId(ResourceLocation.tryParse("thermal:" + type + "_fuel"));
@@ -472,6 +486,15 @@ public class SysteamsRecipeHandler {
                 String dynamoName = Character.toUpperCase(type.charAt(0)) + type.substring(1) + " Dynamo";
                 node.setName(dynamoName);
             }
+
+            node.setBaseSpec(RecipeSpec.of(
+                    node.getId(),
+                    node.getRecipeCategoryId(),
+                    durationTicks,
+                    basePowerRF,
+                    node.getInputs(),
+                    node.getOutputs()
+            ));
         }
     }
 
@@ -514,9 +537,17 @@ public class SysteamsRecipeHandler {
             }
         }
 
-        node.getOutputs().clear();
+        node.clearOutputs();
         node.addOutput(IngredientStack.fluid(boiled.outputFluidId(), boiled.outputName(), totalBoiledFluid));
         node.setBaseDurationTicks(durationTicks);
+        node.setBaseSpec(RecipeSpec.of(
+                node.getId(),
+                node.getRecipeCategoryId(),
+                durationTicks,
+                node.getBaseEUt(),
+                node.getInputs(),
+                node.getOutputs()
+        ));
     }
 
     public static double getSteamDynamoBasePowerRF() {

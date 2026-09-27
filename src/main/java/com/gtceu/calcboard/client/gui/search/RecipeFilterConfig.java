@@ -172,30 +172,41 @@ public class RecipeFilterConfig {
         try (FileReader reader = new FileReader(file)) {
             com.google.gson.JsonElement element = com.google.gson.JsonParser.parseReader(reader);
             if (element.isJsonObject()) {
-                ConfigData data = GSON.fromJson(element, ConfigData.class);
-                if (data != null) {
-                    if (data.excludedCategories != null) {
-                        excludedCategories.clear();
-                        for (String s : data.excludedCategories) {
-                            if (s != null) excludedCategories.add(s.toLowerCase(Locale.ROOT));
-                        }
-                    }
-                    if (data.includeUnsupported != null) {
-                        this.includeUnsupported = data.includeUnsupported;
-                    }
-                }
+                loadFromJsonObject(element);
             } else if (element.isJsonArray()) {
-                Type type = new TypeToken<Set<String>>() {}.getType();
-                Set<String> loaded = GSON.fromJson(element, type);
-                if (loaded != null) {
-                    excludedCategories.clear();
-                    for (String s : loaded) {
-                        if (s != null) excludedCategories.add(s.toLowerCase(Locale.ROOT));
-                    }
-                }
+                loadFromJsonArray(element);
             }
         } catch (Throwable t) {
             t.printStackTrace();
+        }
+    }
+
+    private void loadFromJsonObject(com.google.gson.JsonElement element) {
+        ConfigData data = GSON.fromJson(element, ConfigData.class);
+        if (data == null) {
+            return;
+        }
+        setExcludedCategories(data.excludedCategories);
+        if (data.includeUnsupported != null) {
+            this.includeUnsupported = data.includeUnsupported;
+        }
+    }
+
+    private void loadFromJsonArray(com.google.gson.JsonElement element) {
+        Type type = new TypeToken<Set<String>>() {}.getType();
+        Set<String> loaded = GSON.fromJson(element, type);
+        setExcludedCategories(loaded);
+    }
+
+    private void setExcludedCategories(java.util.Collection<String> categories) {
+        if (categories == null) {
+            return;
+        }
+        excludedCategories.clear();
+        for (String s : categories) {
+            if (s != null) {
+                excludedCategories.add(s.toLowerCase(Locale.ROOT));
+            }
         }
     }
 

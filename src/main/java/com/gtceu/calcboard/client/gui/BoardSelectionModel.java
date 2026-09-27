@@ -199,7 +199,7 @@ public class BoardSelectionModel {
         FlowGraph graph = screen.getGraph();
         if (graph != null) {
             for (RecipeNode n : graph.getNodes()) {
-                if (!graph.isNodeInFoldedFrame(n.getId())) {
+                if (!graph.isNodeInFoldedOrEmbeddedFrame(n.getId())) {
                     selectedNodeIds.add(n.getId());
                 }
             }
@@ -238,15 +238,15 @@ public class BoardSelectionModel {
             }
         }
         for (CanvasGroupFrame frame : graph.getFrames()) {
-            if (selectedFrameIds.contains(frame.getId())) {
-                if (!removedFrames.contains(frame)) {
-                    removedFrames.add(frame);
-                }
-                if (frame.isCompoundFrame()) {
-                    List<RecipeNode> siblings = graph.findCompoundSiblingNodes(frame.getCompoundGroupId());
-                    for (RecipeNode sib : siblings) {
-                        allTargetNodeIds.add(sib.getId());
-                    }
+            if (!selectedFrameIds.contains(frame.getId())) {
+                continue;
+            }
+            if (!removedFrames.contains(frame)) {
+                removedFrames.add(frame);
+            }
+            if (frame.isCompoundFrame()) {
+                for (RecipeNode sib : graph.findCompoundSiblingNodes(frame.getCompoundGroupId())) {
+                    allTargetNodeIds.add(sib.getId());
                 }
             }
         }

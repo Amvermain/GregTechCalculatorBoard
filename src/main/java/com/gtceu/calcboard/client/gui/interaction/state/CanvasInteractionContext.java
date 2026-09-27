@@ -18,7 +18,7 @@ import java.util.Objects;
 /**
  * Shared execution context providing canvas handlers, geometry transforms, and buffers for interaction states.
  */
-public final class CanvasInteractionContext {
+public class CanvasInteractionContext {
 
     private final BoardScreen screen;
     private final CanvasInteractionHandler interactionHandler;

@@ -17,6 +17,15 @@ public final class NodeJunctionHelper {
         if (stack.getAmount() > 0.0) {
             node.setTargetBatchAmount(stack.getAmount());
         }
+        RecipeSpec junctionSpec = new RecipeSpec(
+                node.getId(),
+                node.getRecipeCategoryId(),
+                0.0,
+                0.0,
+                java.util.List.of(stack.copy()),
+                java.util.List.of(stack.copy())
+        );
+        node.setBaseSpecOnly(junctionSpec);
     }
 
     public static void unbindRerouteIngredient(RecipeNode node) {
@@ -24,6 +33,7 @@ public final class NodeJunctionHelper {
         node.getInputs().clear();
         node.getOutputs().clear();
         node.setName("Reroute");
+        node.setBaseSpecOnly(null);
     }
 
     public static double getJunctionChargeDuration(RecipeNode node, FlowGraph graph) {

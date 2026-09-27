@@ -353,6 +353,14 @@ public class BoardDialogManager {
         }
     }
 
+    public void openRecipeSearchForSharedFrame(CanvasGroupFrame frame) {
+        if (!screen.ensureEditPermission() || frame == null) return;
+        if (searchDialog != null) {
+            searchDialog.openForSharedFrame(frame);
+            modalStack.push(searchDialog);
+        }
+    }
+
     public void openMachineConfigDialog(RecipeNode node) {
         openMachineConfigDialog(node, null, null);
     }

@@ -166,6 +166,10 @@ public final class FlowGraphSolver {
         return FlowSummaryAggregator.computeSummaryPreservingEfficiencies(graph);
     }
 
+    public static BalanceSummary computeSubsetSummary(FlowGraph graph, Set<String> nodeIds) {
+        return FlowSummaryAggregator.computeSubsetSummary(graph, nodeIds);
+    }
+
     /**
      * Optimizes all node tiers and machine counts for maximum throughput.
      */

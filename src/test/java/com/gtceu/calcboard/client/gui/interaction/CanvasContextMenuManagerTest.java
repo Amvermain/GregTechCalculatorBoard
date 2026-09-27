@@ -2,6 +2,7 @@ package com.gtceu.calcboard.client.gui.interaction;
 
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
+import com.gtceu.calcboard.client.gui.BoardScreen;
 import com.gtceu.calcboard.client.gui.widget.NodeWidget;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -66,5 +67,21 @@ public class CanvasContextMenuManagerTest {
                 .findFirst();
         Assertions.assertTrue(deleteOpt.isPresent(), "Delete frame menu item should be present");
         Assertions.assertEquals("Del", deleteOpt.get().shortcut());
+    }
+
+    @Test
+    public void testSelectionContextMenuContainsAutoConnectWhenAtLeastTwoNodesSelected() {
+        BoardScreen screen = new BoardScreen();
+        CanvasContextMenuManager menuManager = new CanvasContextMenuManager(screen);
+
+        screen.getSelectedNodeIds().add("n1");
+        menuManager.openForSelection(100, 100);
+        Assertions.assertFalse(menuManager.getItems().stream()
+                .anyMatch(item -> "gui.gtcalcboard.menu.auto_connect".equals(item.labelKey())));
+
+        screen.getSelectedNodeIds().add("n2");
+        menuManager.openForSelection(100, 100);
+        Assertions.assertTrue(menuManager.getItems().stream()
+                .anyMatch(item -> "gui.gtcalcboard.menu.auto_connect".equals(item.labelKey())));
     }
 }

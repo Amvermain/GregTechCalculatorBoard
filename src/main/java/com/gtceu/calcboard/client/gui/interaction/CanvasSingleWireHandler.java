@@ -2,11 +2,14 @@ package com.gtceu.calcboard.client.gui.interaction;
 
 import com.gtceu.calcboard.api.event.FlowGraphEvent;
 import com.gtceu.calcboard.api.history.BoardCommand;
+import com.gtceu.calcboard.api.model.CanvasGroupFrame;
 import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.solver.FlowGraphSolver;
+import com.gtceu.calcboard.api.solver.FlowGraphTopologyAnalyzer;
 import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.render.EmbeddedPanelRenderer;
 import com.gtceu.calcboard.client.gui.editor.NodeCountEditor;
 import com.gtceu.calcboard.client.gui.widget.BoardToast;
 import com.gtceu.calcboard.client.gui.widget.NodeWidget;
@@ -36,7 +39,7 @@ public final class CanvasSingleWireHandler {
         boolean connected = false;
         for (NodeWidget targetWidget : screen.getNodeWidgets()) {
             if (targetWidget != wireStartNode && targetWidget.isPointInside(canvasMouseX, canvasMouseY)) {
-                if (graph != null && graph.isNodeInFoldedFrame(targetWidget.getNode().getId())) {
+                if (graph != null && graph.isNodeInFoldedOrEmbeddedFrame(targetWidget.getNode().getId())) {
                     continue;
                 }
                 connected = tryConnectToPort(wireStartNode, wireStartPortIdx, wireStartIsInput, targetWidget, canvasMouseX, canvasMouseY, graph, screen);
@@ -46,6 +49,10 @@ public final class CanvasSingleWireHandler {
 
         if (!connected && graph != null) {
             connected = tryConnectToFoldedPort(wireStartNode, wireStartPortIdx, wireStartIsInput, canvasMouseX, canvasMouseY, graph, screen);
+        }
+
+        if (!connected && graph != null) {
+            connected = tryConnectToEmbeddedPort(wireStartNode, wireStartPortIdx, wireStartIsInput, canvasMouseX, canvasMouseY, graph, screen);
         }
 
         if (!connected && screen.getSearchDialog() != null) {
@@ -202,16 +209,26 @@ public final class CanvasSingleWireHandler {
             double canvasMouseY,
             CanvasQuickAddMarkerHandler quickAddMarkerHandler
     ) {
-        double startPortX = wireStartIsInput ? wireStartNode.getInputPortX(wireStartPortIdx) : wireStartNode.getOutputPortX(wireStartPortIdx);
-        double startPortY = wireStartIsInput ? wireStartNode.getInputPortY(wireStartPortIdx) : wireStartNode.getOutputPortY(wireStartPortIdx);
-        double dragDist = Math.hypot(canvasMouseX - startPortX, canvasMouseY - startPortY);
+        double[] startPort = getWireStartPortCoordinates(wireStartNode, wireStartPortIdx, wireStartIsInput);
+        double dragDist = Math.hypot(canvasMouseX - startPort[0], canvasMouseY - startPort[1]);
+        if (dragDist < 15.0) return;
 
-        if (dragDist >= 15.0) {
-            RecipeNode srcNode = wireStartNode.getNode();
-            boolean shiftDown = ClientSafetyHelper.isShiftDown();
-            IngredientStack stack = extractWireStartStack(wireStartNode, wireStartPortIdx, wireStartIsInput, srcNode);
-            quickAddMarkerHandler.triggerContextualMarker(canvasMouseX, canvasMouseY, srcNode, wireStartPortIdx, wireStartIsInput, stack, shiftDown);
+        RecipeNode srcNode = wireStartNode.getNode();
+        boolean shiftDown = ClientSafetyHelper.isShiftDown();
+        IngredientStack stack = extractWireStartStack(wireStartNode, wireStartPortIdx, wireStartIsInput, srcNode);
+        quickAddMarkerHandler.triggerContextualMarker(canvasMouseX, canvasMouseY, srcNode, wireStartPortIdx, wireStartIsInput, stack, shiftDown);
+    }
+
+    private static double[] getWireStartPortCoordinates(NodeWidget wireStartNode, int wireStartPortIdx, boolean wireStartIsInput) {
+        RecipeNode srcNode = wireStartNode.getNode();
+        FlowGraph graph = srcNode != null ? srcNode.getParentGraph() : null;
+        if (graph != null && graph.isNodeInEmbeddedPanel(srcNode.getId())) {
+            CanvasGroupFrame frame = graph.getEmbeddedFrameForNode(srcNode.getId());
+            return EmbeddedPanelRenderer.getEmbeddedPortAnchor(frame, srcNode, wireStartPortIdx, wireStartIsInput);
         }
+        double x = wireStartIsInput ? wireStartNode.getInputPortX(wireStartPortIdx) : wireStartNode.getOutputPortX(wireStartPortIdx);
+        double y = wireStartIsInput ? wireStartNode.getInputPortY(wireStartPortIdx) : wireStartNode.getOutputPortY(wireStartPortIdx);
+        return new double[]{x, y};
     }
 
     private static IngredientStack extractWireStartStack(NodeWidget wireStartNode, int wireStartPortIdx, boolean wireStartIsInput, RecipeNode srcNode) {
@@ -302,5 +319,31 @@ public final class CanvasSingleWireHandler {
             }
         }
         return foldedPort.internalOrigins().get(0);
+    }
+
+    private static boolean tryConnectToEmbeddedPort(
+            NodeWidget wireStartNode,
+            int wireStartPortIdx,
+            boolean wireStartIsInput,
+            double canvasMouseX,
+            double canvasMouseY,
+            FlowGraph graph,
+            BoardScreen screen
+    ) {
+        var hit = com.gtceu.calcboard.client.gui.render.EmbeddedPanelRenderer.findHoveredEmbeddedPort(graph, canvasMouseX, canvasMouseY);
+        if (hit == null || hit.subNode() == null) return false;
+
+        NodeWidget targetWidget = screen.findWidgetForNode(hit.subNode());
+        if (targetWidget == null) return false;
+
+        if (!wireStartIsInput) {
+            if (!hit.isInput()) return false;
+            handleForwardWireConnect(wireStartNode, wireStartPortIdx, targetWidget, graph, hit.portIndex(), screen);
+            return true;
+        } else {
+            if (hit.isInput()) return false;
+            handleReverseWireConnect(wireStartNode, wireStartPortIdx, targetWidget, graph, hit.portIndex(), screen);
+            return true;
+        }
     }
 }

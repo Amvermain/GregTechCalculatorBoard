@@ -1,9 +1,11 @@
 package com.gtceu.calcboard.client.gui.interaction;
 
 import com.gtceu.calcboard.api.history.BoardCommand;
+import com.gtceu.calcboard.api.history.command.SetFrameViewModeCommand;
 import com.gtceu.calcboard.api.model.CanvasGroupFrame;
 import com.gtceu.calcboard.api.model.CanvasStickyNote;
 import com.gtceu.calcboard.api.model.FlowGraph;
+import com.gtceu.calcboard.api.model.PoolViewMode;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.client.gui.BoardScreen;
 import com.gtceu.calcboard.client.gui.render.CanvasGroupFrameRenderer;
@@ -80,6 +82,12 @@ public class CanvasFrameInteractionHandler {
                 }
             }
 
+            if (frame.isSharedMachineFrame() && frame.getViewMode() == PoolViewMode.EMBEDDED_PANEL) {
+                if (EmbeddedPanelInteractionHandler.handleMouseClick(screen, graph, frame, canvasMouseX, canvasMouseY, button)) {
+                    return true;
+                }
+            }
+
             if (frame.isPointInHeader(canvasMouseX, canvasMouseY)) {
                 if (button == 0) {
                     return handleFrameHeaderClick(frame, canvasMouseX, canvasMouseY, screen, dragStartPositions);
@@ -125,6 +133,9 @@ public class CanvasFrameInteractionHandler {
         }
         if (action == CanvasGroupFrameRenderer.FrameAction.COLLAPSE && button == 0) {
             return handleFrameCollapse(frame, screen);
+        }
+        if (action == CanvasGroupFrameRenderer.FrameAction.EXPAND && button == 0) {
+            return handleFrameExpand(frame, screen);
         }
         if (action == CanvasGroupFrameRenderer.FrameAction.AUTOFIT && button == 0) {
             return autoFitFrame(frame, screen);
@@ -334,17 +345,34 @@ public class CanvasFrameInteractionHandler {
             return true;
         }
 
-        boolean prevFolded = frame.isFolded();
-        frame.toggleFolded(screen.getGraph());
-        if (frame.isFolded()) {
+        PoolViewMode oldMode = frame.getViewMode();
+        PoolViewMode targetMode = (oldMode == PoolViewMode.EMBEDDED_PANEL) ? PoolViewMode.FOLDED_CARD : PoolViewMode.EMBEDDED_PANEL;
+
+        frame.setViewMode(targetMode, screen.getGraph());
+        if (targetMode != PoolViewMode.EXPANDED_FRAME) {
             deselectFoldedFrameNodes(frame, screen);
         }
-        screen.recordCommand(new BoardCommand.ToggleFrameFoldCommand(frame.getId(), prevFolded, frame.isFolded()));
+        screen.recordCommand(new SetFrameViewModeCommand(frame.getId(), oldMode, targetMode));
         screen.rebuildWidgets();
         screen.markSummaryDirty();
         if (screen.getWireRenderer() != null) {
             screen.getWireRenderer().markDirty();
         }
+        Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F));
+        return true;
+    }
+
+    private boolean handleFrameExpand(CanvasGroupFrame frame, BoardScreen screen) {
+        if (!frame.isSharedMachineFrame()) return false;
+        PoolViewMode oldMode = frame.getViewMode();
+        frame.setViewMode(PoolViewMode.EXPANDED_FRAME, screen.getGraph());
+        screen.recordCommand(new SetFrameViewModeCommand(frame.getId(), oldMode, PoolViewMode.EXPANDED_FRAME));
+        screen.rebuildWidgets();
+        screen.markSummaryDirty();
+        if (screen.getWireRenderer() != null) {
+            screen.getWireRenderer().markDirty();
+        }
+        Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F));
         return true;
     }
 
@@ -441,15 +469,12 @@ public class CanvasFrameInteractionHandler {
         }
         for (String nid : screen.getSelectedNodeIds()) {
             RecipeNode n = graph.findNodeById(nid);
-            if (n != null) {
-                dragStartPositions.put(n.getId(), new double[]{n.getPosX(), n.getPosY()});
-                if (n.isCompoundNode()) {
-                    for (RecipeNode sib : graph.findCompoundSiblingNodes(n.getCompoundGroupId())) {
-                        dragStartPositions.put(sib.getId(), new double[]{sib.getPosX(), sib.getPosY()});
-                    }
-                    CanvasGroupFrame cf = graph.findCompoundFrame(n.getCompoundGroupId());
-                    if (cf != null) dragStartPositions.put(cf.getId(), new double[]{cf.getPosX(), cf.getPosY()});
-                }
+            if (n == null) {
+                continue;
+            }
+            dragStartPositions.put(n.getId(), new double[]{n.getPosX(), n.getPosY()});
+            if (n.isCompoundNode()) {
+                captureCompoundNodePositions(n, graph, dragStartPositions);
             }
         }
         for (String noteId : screen.getSelectedNoteIds()) {
@@ -457,6 +482,16 @@ public class CanvasFrameInteractionHandler {
             if (note != null) {
                 dragStartPositions.put(note.getId(), new double[]{note.getPosX(), note.getPosY()});
             }
+        }
+    }
+
+    private void captureCompoundNodePositions(RecipeNode n, FlowGraph graph, Map<String, double[]> dragStartPositions) {
+        for (RecipeNode sib : graph.findCompoundSiblingNodes(n.getCompoundGroupId())) {
+            dragStartPositions.put(sib.getId(), new double[]{sib.getPosX(), sib.getPosY()});
+        }
+        CanvasGroupFrame cf = graph.findCompoundFrame(n.getCompoundGroupId());
+        if (cf != null) {
+            dragStartPositions.put(cf.getId(), new double[]{cf.getPosX(), cf.getPosY()});
         }
     }
 

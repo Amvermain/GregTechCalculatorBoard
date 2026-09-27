@@ -4,7 +4,7 @@
 
 This directory serves as the official **Architecture Decision Records (ADR) Registry** for the **GregTech Calculator Board (GTCalcBoard)** project, permanently preserving technical context, decision rationale, system architecture, and architectural consequences.
 
-All core architectural decisions, once implemented, are consolidated and structured into the official system specifications ([`docs/en_us/spec/`](../en_us/spec/)). This document provides a complete lifecycle map of all 59 ADRs and their integration with the specifications.
+All core architectural decisions, once implemented, are consolidated and structured into the official system specifications ([`docs/en_us/spec/`](../en_us/spec/)). This document provides a complete lifecycle map of all 64 ADRs and their integration with the specifications.
 
 ---
 
@@ -22,11 +22,11 @@ stateDiagram-v2
 
 | Status | Count | Description |
 | :--- | :---: | :--- |
-| 🟢 **`Active`** | **22** | Active decisions directly governing current system architecture, interfaces, and invariants |
+| 🟢 **`Active`** | **27** | Active decisions directly governing current system architecture, interfaces, and invariants |
 | 🔄 **`Superseded`** | **5** | Decisions replaced by subsequent ADRs due to architectural evolution or model upgrades |
 | 📦 **`Retired / Consolidated`** | **31** | Decisions fully integrated and codified into the official specifications ([`docs/en_us/spec/`](../en_us/spec/)) |
 | ❌ **`Rejected`** | **1** | Proposals permanently rejected during technical review and preserved as gaps (`RFC-046`) |
-| **Total** | **59** | Total registered architecture decision and gap records |
+| **Total** | **64** | Total registered architecture decision and gap records |
 
 ---
 
@@ -50,6 +50,7 @@ flowchart TD
     ADR035 --> ADR041["ADR-041<br/>Junction Equal & Priority Splitting"]
     ADR034 --> ADR041
     ADR041 --> ADR044["ADR-044<br/>Damped Recirculation Analytical Convergence"]
+    ADR041 --> ADR064["ADR-064<br/>Cross-Page Junction Flow Allocation"]
     ADR035 --> ADR054["ADR-054<br/>Solver Control Flow Flattening"]
     ADR044 --> ADR057["ADR-057<br/>TFG Large Boiler Non-Linear Physics"]
     ADR035 --> ADR058["ADR-058<br/>Solver Negative Index Guard"]
@@ -70,9 +71,13 @@ flowchart TD
     ADR025 --> ADR048["ADR-048<br/>Page Target Voltage Auto-Provisioning"]
     ADR048 --> ADR049["ADR-049<br/>Hardware Reconciler & UI Sync"]
     ADR025 --> ADR053["ADR-053<br/>NodeInspectorPanel SRP Decomposition"]
+    ADR053 --> ADR061["ADR-061<br/>Declarative Inspector Composition & Multiblock Energy Hatch"]
     ADR005["ADR-005 (Superseded)<br/>11-Step Linear Tutorial"] -.->|Replaced by| ADR056["ADR-056<br/>3-Track Modular Academy & Nudges"]
     ADR027 --> ADR058["ADR-058<br/>Defensive Copy of children & Modal Hotkey Guard"]
     ADR025 --> ADR059["ADR-059<br/>Local Web Dashboard & SSE Live Sync"]
+    ADR027 --> ADR062["ADR-062<br/>Headless Interaction Harness & Fuzzer"]
+    ADR049 --> ADR062
+    ADR027 --> ADR063["ADR-063<br/>Selection Contextual Auto-Connect"]
 ```
 
 ### 3. Domain Models, SPI & Networking Evolution
@@ -91,13 +96,14 @@ flowchart TD
     ADR045 --> ADR050["ADR-050<br/>Immutable RecipeSpec & Lazy Port Projection"]
     ADR045 --> ADR055["ADR-055<br/>RecipeNode Direct Copy Constructor"]
     ADR031["ADR-031 (Superseded)<br/>Shared Machine Pool Simple Scaling"] -.->|Replaced by| ADR042["ADR-042<br/>Shared Pool In-Place Folding & Ratio Preservation"]
+    ADR042 --> ADR060["ADR-060<br/>Shared Pool Embedded Recipe Panel Rework"]
     ADR003["ADR-003<br/>512KB C2S/S2C Chunk Streaming"] --> ADR051["ADR-051<br/>api.team Model Isolation & Inversion Resolution"]
     ADR003 --> ADR052["ADR-052<br/>128-Chunk / 64MB DoS Defense Guard"]
 ```
 
 ---
 
-## 🟢 Active ADR Registry (22 Active Decisions)
+## 🟢 Active ADR Registry (27 Active Decisions)
 
 These active decisions directly govern the core invariants, data structures, computation algorithms, and interactions of the current codebase.
 
@@ -125,6 +131,11 @@ These active decisions directly govern the core invariants, data structures, com
 | **[ADR-057](ADR_057_TFG_LARGE_BOILER_BOOSTER_MECHANISM.md)** | TFG Large Boiler Booster Mechanism and Non-Linear Physics Model Specification | `v2.3.0` | Compat Physics (`compat.tfg`) | [02. Math & Algorithms](../en_us/spec/02_MATH_AND_ALGORITHMS.md) | TFG Large Boiler (LBB 480PU, LSB 1280PU) 9 booster fluids, water quality tiers (1.5x), $1.5$-power non-linear water consumption curve beyond 480PU, Super Boiler mode. |
 | **[ADR-058](ADR_058_CANVAS_INTERACTION_AND_SOLVER_DEFENSIVE_STABILITY.md)** | Canvas Interaction Lifecycle and Flow Solver Defensive Stability Specification | `v2.3.0` | Client GUI & Solver (`client.gui`, `api.solver`) | [03. UI & Rendering](../en_us/spec/03_UI_AND_RENDERING_PIPELINE.md) | Defensive copy of `children()`, flow solver negative index guards, hotkey interception during active modals, `MachineNodeRole` NBT normalization. |
 | **[ADR-059](ADR_059_LOCAL_WEB_BOARD_DASHBOARD.md)** | Local Embedded Web Dashboard and Read-Only Live Board Viewer Specification | `v2.4.0-beta.1` | Client Web & GUI (`client.web`, `client.gui`) | [03. UI & Rendering](../en_us/spec/03_UI_AND_RENDERING_PIPELINE.md) | Embedded HttpServer (127.0.0.1) live board SPA for second monitors, SSE event streaming, 32×32 icon FBO caching pipeline |
+| **[ADR-060](ADR_060_SHARED_MACHINE_POOL_RECIPE_PANEL_REWORK.md)** | Shared Machine Pool Machine-Centric Workflow and Embedded Recipe Panel Specification | `v2.4.0` | Client GUI & Domain (`client.gui`, `api.model`) | [01. Core Domain](../en_us/spec/01_CORE_DOMAIN_AND_MODELS.md) | Machine-centric pool creation, embedded recipe sub-cards vertical stack (`EMBEDDED_PANEL`), inline recipe search, and 3-tier view state machine. |
+| **[ADR-061](ADR_061_DECLARATIVE_NODE_INSPECTOR_AND_MULTIBLOCK_ENERGY_HATCH.md)** | Declarative Node Inspector Composition and Multiblock Energy Hatch Integration Specification | `v2.4.0` | Client GUI & Domain (`client.gui.inspector`, `api.model`) | [03. UI & Rendering](../en_us/spec/03_UI_AND_RENDERING_PIPELINE.md) | Modular section decomposition, declarative inspector assembly via registry, and 1-click multiblock energy hatch installation & hot-swapping. |
+| **[ADR-062](ADR_062_HEADLESS_CANVAS_INTERACTION_TEST_HARNESS_AND_FUZZER.md)** | Headless Canvas Interaction and Node Hardware Transition Reversibility Test Harness & Fuzzing System Specification | `v2.4.1` | Client GUI & Core Domain (`client.gui.interaction`, `api.model`) | [03. UI & Rendering](../en_us/spec/03_UI_AND_RENDERING_PIPELINE.md) | Headless interaction simulation harness (`CanvasTestHarness`), hardware transition reversibility checker (`NodeHardwareSnapshot`), and dual UI/hardware fuzzing engines. |
+| **[ADR-063](ADR_063_SELECTION_CONTEXTUAL_AUTO_CONNECT.md)** | Selection Contextual Auto-Connect Specification | `v2.4.0` | Client GUI & Action (`client.gui`, `client.gui.action`) | [03. UI & Rendering](../en_us/spec/03_UI_AND_RENDERING_PIPELINE.md) | Scoped auto-connection between multi-selected nodes, floating toolbar Connect button, Shift+C smart hotkey routing, and atomic CompoundCommand undo rollback. |
+| **[ADR-064](ADR_064_CROSS_PAGE_JUNCTION_FLOW_ALLOCATION.md)** | Cross-Page Junction Flow Allocation & Virtual Inter-Page Link System Specification | `v2.4.1` | Domain, Solver & GUI (`api.model`, `api.solver`, `client.gui`) | [02. Math & Algorithms](../en_us/spec/02_MATH_AND_ALGORITHMS.md) | Inter-page resource distribution via 1:N Junction FlowEdgeAllocator, priority tiering, dependency DAG topological sorting, and circular reference defense. |
 
 ---
 
@@ -194,8 +205,7 @@ Proposals permanently rejected during review due to architectural violations, st
 
 ## 💡 Active RFC Proposals (`docs/rfc/`)
 
-RFC proposals currently undergoing technical review and awaiting approval prior to implementation. Once approved and implemented, they are promoted to permanent ADRs.
+*Currently there are no active RFC proposals awaiting review. (All proposals have been promoted to ADR or accepted)*
 
-| ID | Title | Target Ver. | Date | Responsible Layers | Summary |
-| :---: | :--- | :---: | :---: | :--- | :--- |
-| - | *(No active RFC proposals)* | - | - | - | All proposals implemented and promoted to official ADRs. |
+
+

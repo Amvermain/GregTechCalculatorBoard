@@ -4,6 +4,7 @@ import com.gtceu.calcboard.api.model.RecipeDetails;
 import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.item.ItemStack;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -112,6 +113,11 @@ public final class GTCEuRecipeDetailExtractor {
         int recipeTemp = extractRecipeTemperature(backing);
         if (recipeTemp > 0) {
             details.backingRecipeTemp = recipeTemp;
+        }
+
+        int circuit = extractCircuitNumber(backing);
+        if (circuit >= 0) {
+            details.circuitNumber = circuit;
         }
     }
 
@@ -423,5 +429,105 @@ public final class GTCEuRecipeDetailExtractor {
         }
 
         return null;
+    }
+
+    private static final ClassValue<Field> INT_CIRCUIT_CONFIG_FIELD_CACHE = new ClassValue<>() {
+        @Override
+        protected Field computeValue(Class<?> type) {
+            Class<?> cur = type;
+            while (cur != null && cur != Object.class) {
+                try {
+                    Field f = cur.getDeclaredField("configuration");
+                    f.setAccessible(true);
+                    return f;
+                } catch (NoSuchFieldException ignored) {}
+                cur = cur.getSuperclass();
+            }
+            return null;
+        }
+    };
+
+    public static int extractCircuitNumber(Object backing) {
+        if (backing == null) return -1;
+
+        CompoundTag tag = extractRecipeDataTag(backing);
+        if (tag != null) {
+            if (tag.contains("circuit_config")) return tag.getInt("circuit_config");
+            if (tag.contains("circuit_number")) return tag.getInt("circuit_number");
+            if (tag.contains("circuit")) return tag.getInt("circuit");
+            if (tag.contains("Configuration")) return tag.getInt("Configuration");
+        }
+
+        return inspectCircuitInputs(backing);
+    }
+
+    private static int inspectCircuitInputs(Object backing) {
+        Object mapObj = readFieldOrMethod(backing, "inputs");
+        if (!(mapObj instanceof Map<?, ?> map)) {
+            return -1;
+        }
+        for (Object contentList : map.values()) {
+            if (contentList instanceof List<?> list) {
+                int circuit = scanListForCircuit(list);
+                if (circuit >= 0) return circuit;
+            }
+        }
+        return -1;
+    }
+
+    private static int scanListForCircuit(List<?> list) {
+        for (Object contentObj : list) {
+            if (contentObj == null) continue;
+            int circuit = extractCircuitFromContent(contentObj);
+            if (circuit >= 0) return circuit;
+        }
+        return -1;
+    }
+
+    private static int extractCircuitFromContent(Object contentObj) {
+        Object inner = readFieldOrMethod(contentObj, "content");
+        if (inner == null) {
+            inner = readFieldOrMethod(contentObj, "inner");
+        }
+        if (inner == null) {
+            inner = contentObj;
+        }
+
+        Field configField = INT_CIRCUIT_CONFIG_FIELD_CACHE.get(inner.getClass());
+        if (configField != null) {
+            try {
+                Object val = configField.get(inner);
+                if (val instanceof Number n) return n.intValue();
+            } catch (ReflectiveOperationException ignored) {}
+        }
+
+        if (inner instanceof ItemStack stack) {
+            return extractCircuitFromItemStack(stack);
+        }
+
+        if (inner instanceof net.minecraft.world.item.crafting.Ingredient ing) {
+            return extractCircuitFromIngredient(ing);
+        }
+
+        return -1;
+    }
+
+    private static int extractCircuitFromItemStack(ItemStack stack) {
+        if (stack.isEmpty() || !stack.hasTag()) return -1;
+        CompoundTag tag = stack.getTag();
+        if (tag != null && tag.contains("Configuration")) {
+            return tag.getInt("Configuration");
+        }
+        return -1;
+    }
+
+    private static int extractCircuitFromIngredient(net.minecraft.world.item.crafting.Ingredient ing) {
+        ItemStack[] items = ing.getItems();
+        if (items == null) return -1;
+        for (ItemStack item : items) {
+            int circuit = extractCircuitFromItemStack(item);
+            if (circuit >= 0) return circuit;
+        }
+        return -1;
     }
 }

@@ -21,6 +21,10 @@ public interface IBoardScreenContext extends IBoardViewportAccessor, IBoardSelec
 
     BalanceSummary getCachedSummary();
 
+    default BalanceSummary getActiveSummary() {
+        return getCachedSummary();
+    }
+
     List<NodeWidget> getNodeWidgets();
 
     NodeWidget findWidgetForNode(RecipeNode node);
@@ -94,6 +98,8 @@ public interface IBoardScreenContext extends IBoardViewportAccessor, IBoardSelec
     default void openPage(String pageId) {}
 
     default void openPage(java.util.UUID pageId) {}
+
+    default void openPageAndFocusNode(String pageId, String nodeId) {}
 
     void openTutorialLauncher();
 

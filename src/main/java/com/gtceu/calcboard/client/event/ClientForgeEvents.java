@@ -24,6 +24,10 @@ import net.minecraftforge.client.event.RecipesUpdatedEvent;
 import net.minecraftforge.client.event.ScreenEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
+
+import java.lang.reflect.Method;
+import java.util.Locale;
+import java.util.Optional;
 import net.minecraftforge.fml.common.Mod;
 
 import com.gtceu.calcboard.client.command.CalcBoardClientCommands;
@@ -46,22 +50,25 @@ public class ClientForgeEvents {
 
     @SubscribeEvent
     public static void onScreenMouseClicked(ScreenEvent.MouseButtonPressed.Pre event) {
-        if (event.getScreen() instanceof net.minecraft.client.gui.screens.ChatScreen) {
-            Minecraft mc = Minecraft.getInstance();
-            if (mc.gui != null && mc.gui.getChat() != null) {
-                net.minecraft.network.chat.Style style = mc.gui.getChat().getClickedComponentStyleAt(event.getMouseX(), event.getMouseY());
-                if (style != null && style.getClickEvent() != null) {
-                    String val = style.getClickEvent().getValue();
-                    if (val != null && (val.equals("/gtcalcboard open") || val.equals("gtcalcboard open") || val.equals("/gtcalcboard"))) {
-                        event.setCanceled(true);
-                        mc.tell(() -> {
-                            ClientPreferenceManager.getInstance().markWelcomeMessageSeen();
-                            mc.setScreen(new BoardScreen());
-                        });
-                    }
-                }
-            }
+        if (!(event.getScreen() instanceof net.minecraft.client.gui.screens.ChatScreen)) return;
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.gui == null || mc.gui.getChat() == null) return;
+
+        net.minecraft.network.chat.Style style = mc.gui.getChat().getClickedComponentStyleAt(event.getMouseX(), event.getMouseY());
+        if (style == null || style.getClickEvent() == null) return;
+
+        String val = style.getClickEvent().getValue();
+        if (isCalcBoardOpenCommand(val)) {
+            event.setCanceled(true);
+            mc.tell(() -> {
+                ClientPreferenceManager.getInstance().markWelcomeMessageSeen();
+                BoardScreen.openScreen(null);
+            });
         }
+    }
+
+    private static boolean isCalcBoardOpenCommand(String val) {
+        return "/gtcalcboard open".equals(val) || "gtcalcboard open".equals(val) || "/gtcalcboard".equals(val);
     }
 
     @SubscribeEvent
@@ -72,7 +79,7 @@ public class ClientForgeEvents {
             Minecraft mc = Minecraft.getInstance();
             mc.tell(() -> {
                 ClientPreferenceManager.getInstance().markWelcomeMessageSeen();
-                mc.setScreen(new BoardScreen());
+                BoardScreen.openScreen(null);
             });
         }
     }
@@ -125,14 +132,10 @@ public class ClientForgeEvents {
         if (mc != null && mc.screen instanceof BoardScreen) {
             mc.setScreen(null);
         }
-        GregTechCalcBoard.LOGGER.info("[GTCalcBoard] [Lifecycle] Client logged out. Saving local context and resetting caches.");
+        GregTechCalcBoard.LOGGER.info("[GTCalcBoard] [Lifecycle] Client logged out. Saving local context and retaining catalogs.");
         try { BoardManager.getInstance().saveForCurrentContext(); } catch (Throwable t) { GregTechCalcBoard.LOGGER.warn("[GTCalcBoard] Error saving board on logout: {}", t.getMessage()); }
         try { BoardManager.getInstance().resetToDefault(); } catch (Throwable ignored) {}
         try { ClientWorkspaceState.getInstance().clear(); } catch (Throwable ignored) {}
-        try { MachineAddonCatalog.getInstance().reset(); } catch (Throwable ignored) {}
-        try { RecipeSearchDialog.clearGlobalCache(); } catch (Throwable ignored) {}
-        try { CategoryCapabilityMatrix.getInstance().reset(); } catch (Throwable ignored) {}
-        try { MultiblockStructureCatalog.clear(); } catch (Throwable ignored) {}
         if (com.gtceu.calcboard.api.util.ModCompatHelper.isEmiLoaded()) {
             try { com.gtceu.calcboard.integration.emi.EmiLifecycleHook.reset(); } catch (Throwable ignored) {}
         }
@@ -141,10 +144,7 @@ public class ClientForgeEvents {
 
     @SubscribeEvent
     public static void onRecipesUpdated(RecipesUpdatedEvent event) {
-        GregTechCalcBoard.LOGGER.info("[GTCalcBoard] [Lifecycle] RecipesUpdatedEvent received. Refreshing pre-indexes in background...");
-        try { MachineAddonCatalog.getInstance().markDirty(); } catch (Throwable ignored) {}
-        try { RecipeSearchDialog.clearGlobalCache(); } catch (Throwable ignored) {}
-        try { MultiblockStructureCatalog.clear(); } catch (Throwable ignored) {}
+        GregTechCalcBoard.LOGGER.info("[GTCalcBoard] [Lifecycle] RecipesUpdatedEvent received. Verifying recipe fingerprint in background...");
         com.gtceu.calcboard.api.catalog.MultiblockDetector.initializeAsync();
         MultiblockStructureCatalog.initializeAsync();
         MachineAddonCatalog.getInstance().ensureFastLoadedAsync();
@@ -231,42 +231,83 @@ public class ClientForgeEvents {
         if (KeyBindings.OPEN_BOARD.isActiveAndMatches(com.mojang.blaze3d.platform.InputConstants.getKey(event.getKeyCode(), event.getScanCode()))) {
             welcomeMessageDelayTicks = -1;
             ClientPreferenceManager.getInstance().markWelcomeMessageSeen();
-            mc.setScreen(new BoardScreen());
+            BoardScreen.openScreen(screen);
             event.setCanceled(true);
         }
     }
 
     private static boolean isScreenTypingActive(net.minecraft.client.gui.screens.Screen screen) {
         if (screen == null) return false;
-        if (isWidgetFocusedAndTyping(screen.getFocused())) {
+        if (isWidgetFocusedAndTyping(screen.getFocused(), 0)) {
             return true;
         }
         for (var child : screen.children()) {
-            if (isWidgetFocusedAndTyping(child)) {
+            if (isWidgetFocusedAndTyping(child, 0)) {
                 return true;
             }
         }
         return false;
     }
 
-    private static boolean isWidgetFocusedAndTyping(net.minecraft.client.gui.components.events.GuiEventListener listener) {
-        if (listener == null) return false;
+    private static boolean isWidgetFocusedAndTyping(net.minecraft.client.gui.components.events.GuiEventListener listener, int depth) {
+        if (listener == null || depth > 4) return false;
         if (listener instanceof net.minecraft.client.gui.components.EditBox editBox) {
-            return editBox.canConsumeInput();
+            return editBox.canConsumeInput() || editBox.isFocused();
         }
         if (listener instanceof net.minecraft.client.gui.components.events.ContainerEventHandler container) {
-            if (isWidgetFocusedAndTyping(container.getFocused())) {
+            return isContainerFocusedAndTyping(container, depth);
+        }
+        if (!listener.isFocused()) return false;
+        if (listener instanceof net.minecraft.client.gui.components.AbstractButton) return false;
+        return isCustomTypingWidget(listener);
+    }
+
+    private static boolean isContainerFocusedAndTyping(net.minecraft.client.gui.components.events.ContainerEventHandler container, int depth) {
+        if (isWidgetFocusedAndTyping(container.getFocused(), depth + 1)) {
+            return true;
+        }
+        for (var child : container.children()) {
+            if (child != container && child.isFocused() && isWidgetFocusedAndTyping(child, depth + 1)) {
                 return true;
             }
-            for (var nestedChild : container.children()) {
-                if (nestedChild != container && nestedChild.isFocused() && isWidgetFocusedAndTyping(nestedChild)) {
-                    return true;
-                }
+        }
+        return false;
+    }
+
+    private static final ClassValue<Optional<Method>> CAN_CONSUME_INPUT_CACHE = new ClassValue<>() {
+        @Override
+        protected Optional<Method> computeValue(Class<?> type) {
+            try {
+                Method m = type.getMethod("canConsumeInput");
+                m.setAccessible(true);
+                return Optional.of(m);
+            } catch (NoSuchMethodException ignored) {
+                return Optional.empty();
+            } catch (Throwable ignored) {
+                return Optional.empty();
             }
         }
-        String className = listener.getClass().getName().toLowerCase();
-        return (className.contains("editbox") || className.contains("textfield") || className.contains("search") || className.contains("filter"))
-                && listener.isFocused();
+    };
+
+    private static final ClassValue<Boolean> TYPING_CLASS_NAME_CACHE = new ClassValue<>() {
+        @Override
+        protected Boolean computeValue(Class<?> type) {
+            String name = type.getSimpleName().toLowerCase(Locale.ROOT);
+            return name.endsWith("editbox") || name.endsWith("textfield") || name.endsWith("searchbox") || name.endsWith("inputbox")
+                    || name.contains("search") || name.contains("filter");
+        }
+    };
+
+    private static boolean isCustomTypingWidget(net.minecraft.client.gui.components.events.GuiEventListener listener) {
+        if (listener == null) return false;
+        Class<?> cls = listener.getClass();
+        Optional<Method> opt = CAN_CONSUME_INPUT_CACHE.get(cls);
+        if (opt.isPresent()) {
+            try {
+                if (Boolean.TRUE.equals(opt.get().invoke(listener))) return true;
+            } catch (Throwable ignored) {}
+        }
+        return TYPING_CLASS_NAME_CACHE.get(cls);
     }
 
     @SubscribeEvent
@@ -299,7 +340,7 @@ public class ClientForgeEvents {
                 if (mc.screen == null) {
                     welcomeMessageDelayTicks = -1;
                     ClientPreferenceManager.getInstance().markWelcomeMessageSeen();
-                    mc.setScreen(new BoardScreen());
+                    BoardScreen.openScreen(null);
                 }
             }
         }

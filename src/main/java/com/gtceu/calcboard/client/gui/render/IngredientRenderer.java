@@ -22,6 +22,18 @@ public final class IngredientRenderer {
     private static final java.util.Map<net.minecraft.world.level.material.Fluid, net.minecraftforge.fluids.FluidStack> FLUID_STACK_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
     private static final java.util.Map<ResourceLocation, CachedFluid> FLUID_RENDER_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
     private static final java.util.Map<ResourceLocation, CachedItem> ITEM_RENDER_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final java.util.Map<Integer, ItemStack> PROGRAMMED_CIRCUIT_STACK_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final java.lang.reflect.Method INT_CIRCUIT_STACK_METHOD;
+
+    static {
+        java.lang.reflect.Method m = null;
+        try {
+            Class<?> behaviourCls = Class.forName("com.gregtechceu.gtceu.common.item.IntCircuitBehaviour");
+            m = behaviourCls.getMethod("stack", int.class);
+            m.setAccessible(true);
+        } catch (Throwable ignored) {}
+        INT_CIRCUIT_STACK_METHOD = m;
+    }
 
     private IngredientRenderer() {}
 
@@ -30,6 +42,30 @@ public final class IngredientRenderer {
         ITEM_STACK_CACHE.clear();
         FLUID_STACK_CACHE.clear();
         ITEM_RENDER_CACHE.clear();
+        PROGRAMMED_CIRCUIT_STACK_CACHE.clear();
+    }
+
+    public static ItemStack getProgrammedCircuitStack(int circuit) {
+        if (circuit < 0) return ItemStack.EMPTY;
+        return PROGRAMMED_CIRCUIT_STACK_CACHE.computeIfAbsent(circuit, c -> {
+            if (INT_CIRCUIT_STACK_METHOD != null) {
+                try {
+                    Object res = INT_CIRCUIT_STACK_METHOD.invoke(null, (int) c);
+                    if (res instanceof ItemStack is && !is.isEmpty()) {
+                        return is;
+                    }
+                } catch (Throwable ignored) {}
+            }
+            ResourceLocation id = ResourceLocation.tryParse("gtceu:programmed_circuit");
+            var item = ForgeRegistries.ITEMS.getValue(id);
+            if (item == null || item == Items.AIR) {
+                item = Items.REPEATER;
+            }
+            ItemStack stack = new ItemStack(item);
+            net.minecraft.nbt.CompoundTag tag = stack.getOrCreateTag();
+            tag.putInt("Configuration", c);
+            return stack;
+        });
     }
 
     /**

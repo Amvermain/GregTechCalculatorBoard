@@ -422,4 +422,46 @@ Guarantees single-click deterministic mass balance convergence across coupled re
 
 ---
 
+### [Algorithm 14] Finite Batch & Target Production Yield Solver (`BatchRunSolver`)
+
+Calculates overall process duration, raw material requirements, output yields, and energy consumption based on a finite input batch or a target production quota:
+
+##### 1. Total Processing Duration ($T_{\text{sec}}$) Calculation
+- **Finite Raw Input Mode (`BatchMode.FINITE_INPUT`)**:
+  Based on specified input quantity $A_{\text{input}}$ and net consumption rate $R_{\text{consume}}$:
+  $$T_{\text{sec}} = \frac{A_{\text{input}}}{R_{\text{consume}}}$$
+- **Target Output Mode (`BatchMode.TARGET_OUTPUT`)**:
+  Based on desired target yield $A_{\text{target}}$ and net production rate $R_{\text{produce}}$:
+  $$T_{\text{sec}} = \frac{A_{\text{target}}}{R_{\text{produce}}}$$
+
+##### 2. Integrated Material Requirements & Product Yields
+Cumulative resource quantities consumed and produced across all process nodes over duration $T_{\text{sec}}$:
+$$I_k = T_{\text{sec}} \times \text{RawDeficitRate}(k) \quad [\text{Items / mB}]$$
+$$O_k = T_{\text{sec}} \times \text{NetSurplusRate}(k) \quad [\text{Items / mB}]$$
+
+##### 3. Integrated Power & Total Energy
+$$E_{\text{total}} = T_{\text{sec}} \times 20 \times \sum_{m \in \text{Machines}} \Big( m.\text{getEffectiveEUt}() \times m.\text{getMachineCount}() \times m.\text{getEfficiency}() \Big) \quad [\text{EU}]$$
+
+---
+
+### [Algorithm 15] Cross-Page Junction Flow Allocation Solver (`WorkspaceFlowCoordinator`, `FlowEdgeAllocator`) (ADR-064)
+
+Extends the junction node's hierarchical priority (`priority`) and split engine across page boundaries, coordinating resource distribution between separate process pages without canvas clutter:
+
+##### 1. Virtual Edge Integration & Hierarchical Priority Distribution
+When distributing a producer junction's effective output flow $Q_{\text{out}}$, local connections (`ConnectionEdge`) and remote targets (`CrossPageExportTarget`) are unified into a single allocation pool:
+- Each `CrossPageExportTarget` is converted into a virtual edge (demand $D_k = \text{remote junction total demand}$, priority $P_k$, flow cap $L_k$).
+- `FlowEdgeAllocator.allocateHierarchicalPriorityEdges` fulfills higher priority tiers first, applying the junction's `FlowSplitMode` (`PROPORTIONAL` / `EQUAL`) within tied tiers.
+- Allocated rates $q_k$ are dynamically injected into destination consumer junctions via `JunctionNodeRole.allocatedInputRate`.
+
+##### 2. Workspace Dependency DAG & Topological Sorting
+- `WorkspaceFlowCoordinator` builds a directed graph $G = (V, E)$ from cross-page links across all active pages in the workspace.
+- Executes topological sorting using in-degree reduction to evaluate upstream producer pages before downstream consumer pages, executing each page's `FlowGraphSolver` in deterministic sequence.
+
+##### 3. Tarjan Cycle Detection & Clamping Defense
+- Evaluates strongly connected components (SCC) on the inter-page dependency graph via Tarjan's algorithm to detect circular loops of size $\ge 2$ (e.g. Page A ➔ Page B ➔ Page A).
+- Clamps cross-page transferred rates on cyclic links to $0.0$, preventing infinite solver recursion and displaying a `[⚠ Circular Loop]` warning badge on involved junction cards.
+
+---
+
 > ➡ **Next Chapter**: [[03] UI & Canvas Rendering Pipeline](03_UI_AND_RENDERING_PIPELINE.md)

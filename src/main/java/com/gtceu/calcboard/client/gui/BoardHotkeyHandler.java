@@ -11,6 +11,8 @@ import com.gtceu.calcboard.integration.spi.RecipeViewerRegistry;
 
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
+import com.gtceu.calcboard.client.key.KeyBindings;
+import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
@@ -83,6 +85,14 @@ public final class BoardHotkeyHandler {
             }
         }
 
+        InputConstants.Key inputKey = InputConstants.getKey(keyCode, scanCode);
+        if (KeyBindings.OPEN_BOARD.isActiveAndMatches(inputKey)) {
+            if (screen.getActiveFocusedWidget() == null) {
+                screen.onClose();
+                return true;
+            }
+        }
+
         boolean isControl = isControlDown(modifiers);
         boolean isAlt = isAltDown(modifiers);
         boolean isShift = isShiftDown(modifiers);
@@ -97,7 +107,11 @@ public final class BoardHotkeyHandler {
 
         if (keyCode == GLFW.GLFW_KEY_C && isShift && !isControl && !isAlt) {
             closePopups(screen);
-            screen.getToolbarWidget().performAutoConnect();
+            if (screen.getSelectedNodeIds().size() >= 2) {
+                screen.performAutoConnectForSelection();
+            } else if (screen.getToolbarWidget() != null) {
+                screen.getToolbarWidget().performAutoConnect();
+            }
             return true;
         }
 

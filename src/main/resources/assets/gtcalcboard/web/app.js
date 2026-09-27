@@ -336,6 +336,66 @@
         ctx.fill();
 
         ctx.restore();
+
+        if (n.linkedSource) {
+            drawLinkedBadge(n);
+        }
+    }
+
+    function resolveLinkedBadgeVisual(n) {
+        const ls = n.linkedSource;
+        if (!ls) return null;
+        if (ls.isBroken) {
+            return { text: "⚠ Broken Link", border: "#ef4444", bg: "#450a0a", textCol: "#fca5a5" };
+        }
+        if (ls.isCircular) {
+            return { text: "⚠ Circular Loop", border: "#a855f7", bg: "#3b0764", textCol: "#e9d5ff" };
+        }
+        if (ls.isStarved) {
+            const bound = (n.outputs && n.outputs[0]) || (n.inputs && n.inputs[0]);
+            const allocStr = formatRate(ls.allocatedInputRate || 0, bound?.type);
+            const demandStr = formatRate(ls.demandRate || 0, bound?.type);
+            return { text: `⚠ ${allocStr} / ${demandStr}`, border: "#f97316", bg: "#431407", textCol: "#fed7aa" };
+        }
+        const pageTitle = ls.pageName || ls.pageId || "Page";
+        return { text: `🔗 ${pageTitle}`, border: "#38bdf8", bg: "#082f49", textCol: "#bae6fd" };
+    }
+
+    function getLinkedBadgeBounds(n) {
+        if (!n || !n.linkedSource) return null;
+        const visual = resolveLinkedBadgeVisual(n);
+        if (!visual) return null;
+
+        ctx.save();
+        ctx.font = "bold 9px sans-serif";
+        const tw = ctx.measureText(visual.text).width;
+        ctx.restore();
+
+        const badgeW = Math.max(36, tw + 8);
+        const badgeX = n.posX + (n.width || 32) / 2 - badgeW / 2;
+        const badgeY = n.posY - 14;
+        return { x: badgeX, y: badgeY, w: badgeW, h: 12, visual, textWidth: tw };
+    }
+
+    function drawLinkedBadge(n) {
+        const bounds = getLinkedBadgeBounds(n);
+        if (!bounds) return;
+
+        const isBadgeHovered = hoveredObject && hoveredObject.type === "linked_badge" && hoveredObject.node.id === n.id;
+        const border = isBadgeHovered ? "#ffffff" : bounds.visual.border;
+
+        ctx.save();
+        ctx.fillStyle = bounds.visual.bg;
+        ctx.strokeStyle = border;
+        ctx.lineWidth = isBadgeHovered ? 1.5 : 1;
+        roundRect(ctx, bounds.x, bounds.y, bounds.w, bounds.h, 3);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = bounds.visual.textCol;
+        ctx.font = "bold 9px sans-serif";
+        ctx.fillText(bounds.visual.text, bounds.x + 4, bounds.y + 9);
+        ctx.restore();
     }
 
     function resolveNodeDimensions(n) {
@@ -918,11 +978,16 @@
         zoomLevelElem.textContent = Math.round(zoom * 100) + "%";
     }
 
+    let clickStartX = 0;
+    let clickStartY = 0;
+
     canvas.addEventListener("mousedown", (e) => {
         if (e.button === 0) {
             isDragging = true;
             dragStartX = e.clientX - panX;
             dragStartY = e.clientY - panY;
+            clickStartX = e.clientX;
+            clickStartY = e.clientY;
         }
     });
 
@@ -944,6 +1009,28 @@
     window.addEventListener("mouseup", (e) => {
         if (e.button === 0) {
             isDragging = false;
+        }
+    });
+
+    canvas.addEventListener("click", (e) => {
+        const dist = Math.hypot(e.clientX - clickStartX, e.clientY - clickStartY);
+        if (dist > 5) return;
+
+        const rect = canvas.getBoundingClientRect();
+        const sx = e.clientX - rect.left;
+        const sy = e.clientY - rect.top;
+        const pt = screenToCanvas(sx, sy);
+
+        if (boardData.nodes) {
+            for (const n of boardData.nodes) {
+                if (n.linkedSource && n.linkedSource.pageId && !n.linkedSource.isBroken) {
+                    const bBounds = getLinkedBadgeBounds(n);
+                    if (bBounds && pt.x >= bBounds.x && pt.x <= bBounds.x + bBounds.w && pt.y >= bBounds.y && pt.y <= bBounds.y + bBounds.h) {
+                        selectPage(n.linkedSource.pageId, true);
+                        return;
+                    }
+                }
+            }
         }
     });
 
@@ -998,13 +1085,23 @@
         const pt = screenToCanvas(sx, sy);
         let found = null;
 
-        // Check nodes
         if (boardData.nodes) {
             for (const n of boardData.nodes) {
-                const dims = resolveNodeDimensions(n);
-                if (pt.x >= n.posX && pt.x <= n.posX + dims.w && pt.y >= n.posY && pt.y <= n.posY + dims.h) {
-                    found = { type: "node", node: n };
-                    break;
+                if (n.linkedSource) {
+                    const bBounds = getLinkedBadgeBounds(n);
+                    if (bBounds && pt.x >= bBounds.x && pt.x <= bBounds.x + bBounds.w && pt.y >= bBounds.y && pt.y <= bBounds.y + bBounds.h) {
+                        found = { type: "linked_badge", node: n, bounds: bBounds };
+                        break;
+                    }
+                }
+            }
+            if (!found) {
+                for (const n of boardData.nodes) {
+                    const dims = resolveNodeDimensions(n);
+                    if (pt.x >= n.posX && pt.x <= n.posX + dims.w && pt.y >= n.posY && pt.y <= n.posY + dims.h) {
+                        found = { type: "node", node: n };
+                        break;
+                    }
                 }
             }
         }
@@ -1018,10 +1115,86 @@
         } else {
             hideTooltip();
         }
+
+        const isClickableBadge = found && found.type === "linked_badge" && found.node.linkedSource && found.node.linkedSource.pageId && !found.node.linkedSource.isBroken;
+        canvas.style.cursor = isClickableBadge ? "pointer" : "default";
     }
 
     function updateTooltip(sx, sy) {
-        if (!hoveredObject || hoveredObject.type !== "node") {
+        if (!hoveredObject) {
+            hideTooltip();
+            return;
+        }
+
+        if (hoveredObject.type === "linked_badge") {
+            const n = hoveredObject.node;
+            const ls = n.linkedSource;
+            const bound = (n.outputs && n.outputs[0]) || (n.inputs && n.inputs[0]);
+            const boundType = bound?.type;
+
+            let statusColor = "#38bdf8";
+            let statusTitle = "Linked Junction Source";
+            if (ls.isBroken) {
+                statusColor = "#ef4444";
+                statusTitle = "Broken Virtual Link";
+            } else if (ls.isCircular) {
+                statusColor = "#a855f7";
+                statusTitle = "Circular Virtual Link Loop";
+            } else if (ls.isStarved) {
+                statusColor = "#f97316";
+                statusTitle = "Supply Starvation";
+            }
+
+            let html = `
+                <div class="tooltip-header">
+                    <span class="tooltip-title">${statusTitle}</span>
+                    <span class="tooltip-tier" style="color:${statusColor}; border-color:${statusColor}">LINK</span>
+                </div>
+                <div class="tooltip-section">
+                    <div class="tooltip-row"><span class="tooltip-label">Source Page:</span><span class="tooltip-val">${escapeHtml(ls.pageName || ls.pageId || "Unknown")}</span></div>
+                    <div class="tooltip-row"><span class="tooltip-label">Source Junction:</span><span class="tooltip-val">${escapeHtml(ls.nodeName || ls.nodeId || "Unknown")}</span></div>
+            `;
+
+            if (ls.priority && ls.priority > 0) {
+                html += `    <div class="tooltip-row"><span class="tooltip-label">Priority:</span><span class="tooltip-val" style="color:var(--accent-amber);">P${ls.priority}</span></div>\n`;
+            }
+
+            if (ls.metrics) {
+                const totalProd = formatRate(ls.metrics.totalProduction || 0, boundType);
+                const totalUsage = formatRate(ls.metrics.totalUsage || 0, boundType);
+                const available = formatRate(ls.metrics.availableSurplus || 0, boundType);
+                const availColor = (ls.metrics.availableSurplus || 0) <= 0 ? "var(--accent-red)" : "var(--accent-sky)";
+                html += `
+                    <div class="tooltip-row"><span class="tooltip-label">Source Production:</span><span class="tooltip-val" style="color:var(--accent-emerald);">+${totalProd}</span></div>
+                    <div class="tooltip-row"><span class="tooltip-label">Source Usage:</span><span class="tooltip-val" style="color:var(--accent-amber);">${(ls.metrics.totalUsage || 0) > 0 ? "-" : ""}${totalUsage}</span></div>
+                    <div class="tooltip-row"><span class="tooltip-label">Available Surplus:</span><span class="tooltip-val" style="color:${availColor};">${available}</span></div>
+                `;
+            }
+
+            if (ls.demandRate !== undefined) {
+                const demandStr = formatRate(ls.demandRate || 0, boundType);
+                const allocStr = formatRate(ls.allocatedInputRate || 0, boundType);
+                html += `
+                    <div class="tooltip-row"><span class="tooltip-label">Allocated / Demand:</span><span class="tooltip-val">${allocStr} / ${demandStr}</span></div>
+                `;
+            }
+
+            if (!ls.isBroken && ls.pageId) {
+                html += `
+                    <div class="tooltip-row" style="margin-top:6px; font-size:10px; color:var(--text-muted); font-style:italic;">
+                        Click badge to jump to source page
+                    </div>
+                `;
+            }
+
+            html += `</div>`;
+            tooltip.innerHTML = html;
+            tooltip.classList.remove("hidden");
+            positionTooltip(sx, sy);
+            return;
+        }
+
+        if (hoveredObject.type !== "node") {
             hideTooltip();
             return;
         }
@@ -1043,6 +1216,42 @@
                         <div class="tooltip-row"><span class="tooltip-label">Rate:</span><span class="tooltip-val">${rateText}</span></div>
                     </div>
                 `;
+            }
+            if (n.linkedSource) {
+                const ls = n.linkedSource;
+                const boundType = bound?.type;
+                html += `
+                    <div class="tooltip-section" style="border-top:1px solid var(--border-color); margin-top:6px; padding-top:6px;">
+                        <div class="tooltip-row"><strong style="color:#38bdf8; font-size:11px;">Linked Supply Source:</strong></div>
+                        <div class="tooltip-row"><span class="tooltip-label">Page:</span><span class="tooltip-val">${escapeHtml(ls.pageName || ls.pageId || "Unknown")}</span></div>
+                `;
+                if (ls.metrics) {
+                    const totalProd = formatRate(ls.metrics.totalProduction || 0, boundType);
+                    const totalUsage = formatRate(ls.metrics.totalUsage || 0, boundType);
+                    const available = formatRate(ls.metrics.availableSurplus || 0, boundType);
+                    const availColor = (ls.metrics.availableSurplus || 0) <= 0 ? "var(--accent-red)" : "var(--accent-sky)";
+                    html += `
+                        <div class="tooltip-row"><span class="tooltip-label">Total Prod:</span><span class="tooltip-val" style="color:var(--accent-emerald);">+${totalProd}</span></div>
+                        <div class="tooltip-row"><span class="tooltip-label">Total Usage:</span><span class="tooltip-val" style="color:var(--accent-amber);">${(ls.metrics.totalUsage || 0) > 0 ? "-" : ""}${totalUsage}</span></div>
+                        <div class="tooltip-row"><span class="tooltip-label">Available:</span><span class="tooltip-val" style="color:${availColor};">${available}</span></div>
+                    `;
+                }
+                html += `</div>`;
+            }
+            if (n.exportTargets && n.exportTargets.length > 0) {
+                html += `
+                    <div class="tooltip-section" style="border-top:1px solid var(--border-color); margin-top:6px; padding-top:6px;">
+                        <div class="tooltip-row"><strong style="color:#a855f7; font-size:11px;">Export Targets (${n.exportTargets.length}):</strong></div>
+                `;
+                for (const target of n.exportTargets) {
+                    html += `
+                        <div class="tooltip-row" style="font-size:10px;">
+                            <span class="tooltip-label">${escapeHtml(target.pageName || target.pageId)}:</span>
+                            <span class="tooltip-val">Priority ${target.priority}</span>
+                        </div>
+                    `;
+                }
+                html += `</div>`;
             }
             tooltip.innerHTML = html;
             tooltip.classList.remove("hidden");

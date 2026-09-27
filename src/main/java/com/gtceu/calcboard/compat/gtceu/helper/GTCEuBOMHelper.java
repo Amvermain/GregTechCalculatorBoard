@@ -30,7 +30,93 @@ import java.util.*;
  */
 public final class GTCEuBOMHelper {
 
+    public static final ResourceLocation STEAM_INPUT_HATCH_ID = ResourceLocation.tryParse("gtceu:steam_input_hatch");
+    public static final ResourceLocation STEAM_HATCH_ID = ResourceLocation.tryParse("gtceu:steam_hatch");
+    public static final ResourceLocation STEAM_INPUT_BUS_ID = ResourceLocation.tryParse("gtceu:steam_input_bus");
+    public static final ResourceLocation STEAM_OUTPUT_BUS_ID = ResourceLocation.tryParse("gtceu:steam_output_bus");
+
     private GTCEuBOMHelper() {}
+
+    public static boolean isSteamInputHatchId(ResourceLocation id) {
+        if (id == null) return false;
+        return STEAM_INPUT_HATCH_ID.equals(id) || STEAM_HATCH_ID.equals(id);
+    }
+
+    public static boolean isSteamBusId(ResourceLocation id) {
+        if (id == null) return false;
+        return STEAM_INPUT_BUS_ID.equals(id) || STEAM_OUTPUT_BUS_ID.equals(id);
+    }
+
+    private static boolean hasSteamInputHatch(List<MultiblockStructurePart> parts) {
+        if (parts == null) return false;
+        for (MultiblockStructurePart p : parts) {
+            if (p != null && isSteamInputHatchId(p.itemId())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void ensureSteamInputHatch(List<MultiblockStructurePart> list) {
+        if (!hasSteamInputHatch(list)) {
+            list.add(new MultiblockStructurePart(
+                STEAM_INPUT_HATCH_ID,
+                resolveDisplayName(STEAM_INPUT_HATCH_ID, "Steam Input Hatch"),
+                1,
+                PartCategory.HATCH_BUS
+            ));
+        }
+    }
+
+    private static void appendMaintenancePart(List<MultiblockStructurePart> list, MachineAddon equippedMaint, MultiblockStructurePart part) {
+        if (equippedMaint != null && equippedMaint.getItemIcon() != null) {
+            list.add(new MultiblockStructurePart(
+                equippedMaint.getItemIcon(),
+                equippedMaint.getName(),
+                part.amount(),
+                PartCategory.HATCH_BUS
+            ));
+            return;
+        }
+        ResourceLocation defMaint = ResourceLocation.tryParse("gtceu:maintenance_hatch");
+        list.add(new MultiblockStructurePart(
+            defMaint != null ? defMaint : part.itemId(),
+            resolveDisplayName(defMaint != null ? defMaint : part.itemId(), "Maintenance Hatch"),
+            part.amount(),
+            PartCategory.HATCH_BUS
+        ));
+    }
+
+    public static boolean isSteamMachine(RecipeNode node, MultiblockStructureDef def) {
+        if (node == null) return false;
+        if (node.getSteamMode() != null && node.getSteamMode().isSteam()) return true;
+        if (MultiblockDetector.isSteamMultiblock(node)) return true;
+        ResourceLocation icon = node.getMachineIcon();
+        if (icon != null && MultiblockDetector.isSteamMultiblock(icon)) return true;
+        if (node.getMultiblockWorkstation() != null && MultiblockDetector.isSteamMultiblock(node.getMultiblockWorkstation())) return true;
+        if (def != null && isSteamStructureDef(def)) return true;
+        return false;
+    }
+
+    private static boolean isSteamStructureDef(MultiblockStructureDef def) {
+        if (def == null) return false;
+        if (MultiblockDetector.isSteamMultiblock(def.controllerId())) return true;
+        if (def.supportsAbility("STEAM")
+                || def.supportsAbility("STEAM_IMPORT_ITEMS")
+                || def.supportsAbility("STEAM_EXPORT_ITEMS")
+                || def.supportsAbility("STEAM_IMPORT_FLUIDS")
+                || def.supportsAbility("STEAM_EXPORT_FLUIDS")) {
+            return true;
+        }
+        for (MultiblockStructurePart part : def.parts()) {
+            if (part != null && part.itemId() != null) {
+                if (isSteamInputHatchId(part.itemId()) || isSteamBusId(part.itemId())) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
 
     public static List<MultiblockStructurePart> resolveGTMultiblockParts(RecipeNode node, boolean dualLowerTierEnergyHatches) {
         if (node == null) return List.of();
@@ -47,45 +133,15 @@ public final class GTCEuBOMHelper {
         int reqItemOut = (int) node.getOutputs().stream().filter(IngredientStack::isItem).count();
 
         boolean isDT = com.gtceu.calcboard.compat.gtceu.handler.GTAddonCompatibilityHandler.DISTILLATION_TOWER_ID.equals(machineId);
-        for (MachineAddon addon : node.getAddons()) {
-            if (addon instanceof GTHatchAddon gh) {
-                int cap = gh.getSlotCapacity();
-                switch (gh.getHatchType()) {
-                    case FLUID_OUTPUT -> {
-                        if (!isDT) {
-                            reqFluidOut = Math.max(1, 1 + Math.max(0, reqFluidOut - cap));
-                        }
-                    }
-                    case ITEM_OUTPUT -> reqItemOut = Math.max(1, 1 + Math.max(0, reqItemOut - cap));
-                    case FLUID_INPUT -> reqFluidIn = Math.max(1, 1 + Math.max(0, reqFluidIn - cap));
-                    case ITEM_INPUT -> reqItemIn = Math.max(1, 1 + Math.max(0, reqItemIn - cap));
-                    case DUAL_OUTPUT -> {
-                        if (!isDT) {
-                            reqFluidOut = Math.max(1, 1 + Math.max(0, reqFluidOut - cap));
-                        }
-                        reqItemOut = Math.max(1, 1 + Math.max(0, reqItemOut - cap));
-                    }
-                    case DUAL_INPUT -> {
-                        reqFluidIn = Math.max(1, 1 + Math.max(0, reqFluidIn - cap));
-                        reqItemIn = Math.max(1, 1 + Math.max(0, reqItemIn - cap));
-                    }
-                    case ME_PATTERN_PROVIDER -> {
-                        reqFluidIn = 1;
-                        reqItemIn = 1;
-                    }
-                    default -> {}
-                }
-            }
-        }
+        int[] adjustedReqs = computeAdjustedHatchRequirements(node, isDT, reqFluidOut, reqItemOut, reqFluidIn, reqItemIn);
+        reqFluidOut = adjustedReqs[0];
+        reqItemOut = adjustedReqs[1];
+        reqFluidIn = adjustedReqs[2];
+        reqItemIn = adjustedReqs[3];
 
         MultiblockStructureDef def = MultiblockStructureCatalog.getMatchingStructure(machineId, reqFluidOut, reqItemOut, reqFluidIn, reqItemIn);
         if (def == null) {
-            for (ResourceLocation ws : node.getAvailableWorkstations()) {
-                if (ws != null) {
-                    def = MultiblockStructureCatalog.getMatchingStructure(ws, reqFluidOut, reqItemOut, reqFluidIn, reqItemIn);
-                    if (def != null) break;
-                }
-            }
+            def = findMatchingStructureFromWorkstations(node.getAvailableWorkstations(), reqFluidOut, reqItemOut, reqFluidIn, reqItemIn);
         }
 
         List<MultiblockStructurePart> list = resolveMachineParts(node, def, dualLowerTierEnergyHatches);
@@ -95,9 +151,58 @@ public final class GTCEuBOMHelper {
         return list;
     }
 
+    private static int[] computeAdjustedHatchRequirements(RecipeNode node, boolean isDT, int fluidOut, int itemOut, int fluidIn, int itemIn) {
+        int rFluidOut = fluidOut;
+        int rItemOut = itemOut;
+        int rFluidIn = fluidIn;
+        int rItemIn = itemIn;
+
+        for (MachineAddon addon : node.getAddons()) {
+            if (addon instanceof GTHatchAddon gh) {
+                int cap = gh.getSlotCapacity();
+                switch (gh.getHatchType()) {
+                    case FLUID_OUTPUT -> rFluidOut = reduceRequirement(rFluidOut, cap, isDT);
+                    case ITEM_OUTPUT -> rItemOut = reduceRequirement(rItemOut, cap, false);
+                    case FLUID_INPUT -> rFluidIn = reduceRequirement(rFluidIn, cap, false);
+                    case ITEM_INPUT -> rItemIn = reduceRequirement(rItemIn, cap, false);
+                    case DUAL_OUTPUT -> {
+                        rFluidOut = reduceRequirement(rFluidOut, cap, isDT);
+                        rItemOut = reduceRequirement(rItemOut, cap, false);
+                    }
+                    case DUAL_INPUT -> {
+                        rFluidIn = reduceRequirement(rFluidIn, cap, false);
+                        rItemIn = reduceRequirement(rItemIn, cap, false);
+                    }
+                    case ME_PATTERN_PROVIDER -> {
+                        rFluidIn = 1;
+                        rItemIn = 1;
+                    }
+                    default -> {}
+                }
+            }
+        }
+        return new int[]{rFluidOut, rItemOut, rFluidIn, rItemIn};
+    }
+
+    private static int reduceRequirement(int current, int cap, boolean skip) {
+        if (skip) return current;
+        return Math.max(1, 1 + Math.max(0, current - cap));
+    }
+
+    private static MultiblockStructureDef findMatchingStructureFromWorkstations(List<ResourceLocation> workstations, int fluidOut, int itemOut, int fluidIn, int itemIn) {
+        if (workstations == null) return null;
+        for (ResourceLocation ws : workstations) {
+            if (ws == null) continue;
+            MultiblockStructureDef def = MultiblockStructureCatalog.getMatchingStructure(ws, fluidOut, itemOut, fluidIn, itemIn);
+            if (def != null) return def;
+        }
+        return null;
+    }
+
     private static List<MultiblockStructurePart> resolveMachineParts(RecipeNode node, MultiblockStructureDef def, boolean dualLowerTierEnergyHatches) {
         List<MultiblockStructurePart> list = new ArrayList<>();
         GTVoltageTier tier = node.getTargetTier() != null ? node.getTargetTier() : GTVoltageTier.LV;
+        boolean isSteam = isSteamMachine(node, def);
 
         int fluidInCount = (int) node.getInputs().stream().filter(IngredientStack::isFluid).count();
         int fluidOutCount = (int) node.getOutputs().stream().filter(IngredientStack::isFluid).count();
@@ -121,7 +226,14 @@ public final class GTCEuBOMHelper {
                 String controllerName = resolveDisplayName(machineId, com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.formatMachineName(machineId.getPath()));
                 list.add(new MultiblockStructurePart(machineId, controllerName, 1, PartCategory.CONTROLLER));
             }
-            if (node.getEnergyType() == EnergyType.ELECTRIC_EU) {
+            if (isSteam) {
+                list.add(new MultiblockStructurePart(
+                    STEAM_INPUT_HATCH_ID,
+                    resolveDisplayName(STEAM_INPUT_HATCH_ID, "Steam Input Hatch"),
+                    1,
+                    PartCategory.HATCH_BUS
+                ));
+            } else if (node.getEnergyType() == EnergyType.ELECTRIC_EU) {
                 ResourceLocation ehId = resolveEnergyHatchId(tier, dualLowerTierEnergyHatches);
                 if (ehId != null) {
                     list.add(new MultiblockStructurePart(ehId, resolveDisplayName(ehId, formatDisplayName(ehId)), dualLowerTierEnergyHatches ? 2 : 1, PartCategory.HATCH_BUS));
@@ -276,36 +388,13 @@ public final class GTCEuBOMHelper {
                     ));
                 }
             } else if (path.contains("data_access") || path.contains("computing_data") || path.contains("optical_data") || path.contains("object_holder")) {
-                boolean equipped = false;
-                for (MachineAddon addon : node.getAddons()) {
-                    if (addon != null && addon.getItemIcon() != null && addon.getItemIcon().equals(part.itemId())) {
-                        list.add(part);
-                        equipped = true;
-                        break;
-                    }
+                if (isDataAccessPartEquipped(node, part.itemId())) {
+                    list.add(part);
                 }
             } else if (path.contains("helix")) {
-                if (equippedHelixes != null && !equippedHelixes.isEmpty()) {
-                    if (!handledHelixes) {
-                        handledHelixes = true;
-                        int totalEquipped = 0;
-                        for (var entry : equippedHelixes.entrySet()) {
-                            if (entry.getValue() > 0) {
-                                totalEquipped += entry.getValue();
-                                list.add(new MultiblockStructurePart(
-                                    entry.getKey().getId(),
-                                    entry.getKey().getEnglishName(),
-                                    entry.getValue(),
-                                    PartCategory.COIL
-                                ));
-                            }
-                        }
-                        if (totalEquipped < part.amount()) {
-                            list.add(new MultiblockStructurePart(part.itemId(), part.displayName(), part.amount() - totalEquipped, PartCategory.COIL));
-                        }
-                    }
-                } else {
-                    list.add(part);
+                if (!handledHelixes) {
+                    handledHelixes = true;
+                    appendHelixParts(list, equippedHelixes, part);
                 }
             } else if (part.category() == PartCategory.COIL || CoilHelper.isHeatingCoil(part.itemId())) {
                 if (equippedCoil != null && equippedCoil.getItemIcon() != null && def.coilSlotCount() > 0) {
@@ -320,23 +409,10 @@ public final class GTCEuBOMHelper {
                 }
             } else if ((path.contains("energy") && path.contains("hatch")) || (path.contains("power") && path.contains("hatch")) || path.contains("laser_target") || path.contains("laser_source")) {
                 handledEnergyHatch = true;
-                if (!equippedEnergyHatches.isEmpty()) {
-                    Map<ResourceLocation, Integer> counts = new LinkedHashMap<>();
-                    Map<ResourceLocation, String> names = new LinkedHashMap<>();
-                    for (MachineAddon h : equippedEnergyHatches) {
-                        if (h.getItemIcon() != null) {
-                            counts.put(h.getItemIcon(), counts.getOrDefault(h.getItemIcon(), 0) + 1);
-                            names.put(h.getItemIcon(), h.getName());
-                        }
-                    }
-                    for (var entry : counts.entrySet()) {
-                        list.add(new MultiblockStructurePart(
-                            entry.getKey(),
-                            names.get(entry.getKey()),
-                            entry.getValue(),
-                            PartCategory.HATCH_BUS
-                        ));
-                    }
+                if (isSteam) {
+                    ensureSteamInputHatch(list);
+                } else if (!equippedEnergyHatches.isEmpty()) {
+                    appendEquippedEnergyHatches(list, equippedEnergyHatches);
                 } else {
                     ResourceLocation ehId = resolveEnergyHatchId(tier, dualLowerTierEnergyHatches);
                     int count = dualLowerTierEnergyHatches ? Math.max(2, part.amount() * 2) : part.amount();
@@ -353,99 +429,20 @@ public final class GTCEuBOMHelper {
                 }
             } else if (path.contains("input_bus") || path.contains("import_bus") || path.contains("item_import")) {
                 handledItemIn = true;
-                boolean isSteamBus = path.contains("steam") || def.supportsAbility("STEAM_IMPORT_ITEMS");
-                int slotsPerBus = isSteamBus ? 4 : GTHatchHelper.getBusSlotCount(tier);
-                if (hasCustomItemIn) {
-                    int neededBuses = (int) Math.ceil((double) neededItemIn / (double) Math.max(1, slotsPerBus));
-                    if (neededBuses > 0) {
-                        ResourceLocation busId = isSteamBus ? part.itemId() : resolveInputBusId(tier);
-                        ResourceLocation targetId = busId != null ? busId : part.itemId();
-                        list.add(new MultiblockStructurePart(targetId, resolveDisplayName(targetId, formatDisplayName(targetId)), neededBuses, PartCategory.HATCH_BUS));
-                    }
-                } else {
-                    int baseRequiredBuses = (int) Math.ceil((double) itemInCount / (double) Math.max(1, slotsPerBus));
-                    int count = Math.max(part.amount(), baseRequiredBuses);
-                    ResourceLocation busId = isSteamBus ? part.itemId() : resolveInputBusId(tier);
-                    if (busId != null) {
-                        list.add(new MultiblockStructurePart(busId, resolveDisplayName(busId, formatDisplayName(busId)), count, PartCategory.HATCH_BUS));
-                    } else {
-                        list.add(new MultiblockStructurePart(part.itemId(), part.displayName(), count, PartCategory.HATCH_BUS));
-                    }
-                }
+                appendInputBusPart(list, part, def, tier, isSteam, hasCustomItemIn, neededItemIn, itemInCount);
             } else if (path.contains("output_bus") || path.contains("export_bus") || path.contains("item_export")) {
                 handledItemOut = true;
-                boolean isSteamBus = path.contains("steam") || def.supportsAbility("STEAM_EXPORT_ITEMS");
-                int slotsPerBus = isSteamBus ? 4 : GTHatchHelper.getBusSlotCount(tier);
-                if (hasCustomItemOut) {
-                    int neededBuses = (int) Math.ceil((double) neededItemOut / (double) Math.max(1, slotsPerBus));
-                    if (neededBuses > 0) {
-                        ResourceLocation busId = isSteamBus ? part.itemId() : resolveOutputBusId(tier);
-                        ResourceLocation targetId = busId != null ? busId : part.itemId();
-                        list.add(new MultiblockStructurePart(targetId, resolveDisplayName(targetId, formatDisplayName(targetId)), neededBuses, PartCategory.HATCH_BUS));
-                    }
-                } else {
-                    int baseRequiredBuses = (int) Math.ceil((double) itemOutCount / (double) Math.max(1, slotsPerBus));
-                    int count = Math.max(part.amount(), baseRequiredBuses);
-                    ResourceLocation busId = isSteamBus ? part.itemId() : resolveOutputBusId(tier);
-                    if (busId != null) {
-                        list.add(new MultiblockStructurePart(busId, resolveDisplayName(busId, formatDisplayName(busId)), count, PartCategory.HATCH_BUS));
-                    } else {
-                        list.add(new MultiblockStructurePart(part.itemId(), part.displayName(), count, PartCategory.HATCH_BUS));
-                    }
-                }
+                appendOutputBusPart(list, part, def, tier, isSteam, hasCustomItemOut, neededItemOut, itemOutCount);
             } else if (path.contains("input_hatch") || path.contains("fluid_import")) {
                 handledFluidIn = true;
-                boolean isSteamHatch = path.contains("steam") || def.supportsAbility("STEAM_IMPORT_FLUIDS");
-                if (hasCustomFluidIn) {
-                    if (neededFluidIn > 0) {
-                        ResourceLocation hatchId = isSteamHatch ? part.itemId() : resolveInputHatchId(tier);
-                        ResourceLocation targetId = hatchId != null ? hatchId : part.itemId();
-                        list.add(new MultiblockStructurePart(targetId, resolveDisplayName(targetId, formatDisplayName(targetId)), neededFluidIn, PartCategory.HATCH_BUS));
-                    }
-                } else {
-                    int count = Math.max(part.amount(), fluidInCount);
-                    ResourceLocation hatchId = isSteamHatch ? part.itemId() : resolveInputHatchId(tier);
-                    if (hatchId != null) {
-                        list.add(new MultiblockStructurePart(hatchId, resolveDisplayName(hatchId, formatDisplayName(hatchId)), count, PartCategory.HATCH_BUS));
-                    } else {
-                        list.add(new MultiblockStructurePart(part.itemId(), part.displayName(), count, PartCategory.HATCH_BUS));
-                    }
-                }
+                appendInputHatchPart(list, part, def, tier, isSteam, hasCustomFluidIn, neededFluidIn, fluidInCount);
             } else if (path.contains("output_hatch") || path.contains("fluid_export")) {
                 handledFluidOut = true;
-                boolean isSteamHatch = path.contains("steam") || def.supportsAbility("STEAM_EXPORT_FLUIDS");
-                if (hasCustomFluidOut) {
-                    if (neededFluidOut > 0) {
-                        ResourceLocation hatchId = isSteamHatch ? part.itemId() : resolveOutputHatchId(tier);
-                        ResourceLocation targetId = hatchId != null ? hatchId : part.itemId();
-                        list.add(new MultiblockStructurePart(targetId, resolveDisplayName(targetId, formatDisplayName(targetId)), neededFluidOut, PartCategory.HATCH_BUS));
-                    }
-                } else {
-                    int count = Math.max(part.amount(), fluidOutCount);
-                    ResourceLocation hatchId = isSteamHatch ? part.itemId() : resolveOutputHatchId(tier);
-                    if (hatchId != null) {
-                        list.add(new MultiblockStructurePart(hatchId, resolveDisplayName(hatchId, formatDisplayName(hatchId)), count, PartCategory.HATCH_BUS));
-                    } else {
-                        list.add(new MultiblockStructurePart(part.itemId(), part.displayName(), count, PartCategory.HATCH_BUS));
-                    }
-                }
+                appendOutputHatchPart(list, part, def, tier, isSteam, hasCustomFluidOut, neededFluidOut, fluidOutCount);
             } else if (path.contains("maintenance")) {
                 handledMaint = true;
-                if (equippedMaint != null && equippedMaint.getItemIcon() != null) {
-                    list.add(new MultiblockStructurePart(
-                        equippedMaint.getItemIcon(),
-                        equippedMaint.getName(),
-                        part.amount(),
-                        PartCategory.HATCH_BUS
-                    ));
-                } else {
-                    ResourceLocation defMaint = ResourceLocation.tryParse("gtceu:maintenance_hatch");
-                    list.add(new MultiblockStructurePart(
-                        defMaint != null ? defMaint : part.itemId(),
-                        resolveDisplayName(defMaint != null ? defMaint : part.itemId(), "Maintenance Hatch"),
-                        part.amount(),
-                        PartCategory.HATCH_BUS
-                    ));
+                if (!isSteam) {
+                    appendMaintenancePart(list, equippedMaint, part);
                 }
             } else if (path.contains("muffler")) {
                 if (equippedMuffler != null && equippedMuffler.getItemIcon() != null) {
@@ -513,24 +510,11 @@ public final class GTCEuBOMHelper {
 
         // Automatic fallback: Add Energy Hatches if not already handled in def.parts
         if (!handledEnergyHatch) {
-            if (!equippedEnergyHatches.isEmpty()) {
-                Map<ResourceLocation, Integer> counts = new LinkedHashMap<>();
-                Map<ResourceLocation, String> names = new LinkedHashMap<>();
-                for (MachineAddon h : equippedEnergyHatches) {
-                    if (h.getItemIcon() != null) {
-                        counts.put(h.getItemIcon(), counts.getOrDefault(h.getItemIcon(), 0) + 1);
-                        names.put(h.getItemIcon(), h.getName());
-                    }
-                }
-                for (var entry : counts.entrySet()) {
-                    list.add(new MultiblockStructurePart(
-                        entry.getKey(),
-                        names.get(entry.getKey()),
-                        entry.getValue(),
-                        PartCategory.HATCH_BUS
-                    ));
-                }
-            } else if (baseHatchCount == 0 && !node.isGenerator() && node.getEnergyType() != com.gtceu.calcboard.api.type.EnergyType.NONE && node.getEnergyType() != com.gtceu.calcboard.api.type.EnergyType.KINETIC_SU && (node.getSteamMode() == null || !node.getSteamMode().isSteam()) && !MultiblockDetector.isSteamMultiblock(def.controllerId())) {
+            if (isSteam) {
+                ensureSteamInputHatch(list);
+            } else if (!equippedEnergyHatches.isEmpty()) {
+                appendEquippedEnergyHatches(list, equippedEnergyHatches);
+            } else if (baseHatchCount == 0 && !node.isGenerator() && node.getEnergyType() != com.gtceu.calcboard.api.type.EnergyType.NONE && node.getEnergyType() != com.gtceu.calcboard.api.type.EnergyType.KINETIC_SU) {
                 ResourceLocation ehId = resolveEnergyHatchId(tier, dualLowerTierEnergyHatches);
                 int count = dualLowerTierEnergyHatches ? 2 : 1;
                 if (ehId != null) {
@@ -546,10 +530,10 @@ public final class GTCEuBOMHelper {
 
         // Automatic fallback: Add missing required Input Bus if not already handled
         if (!handledItemIn && neededItemIn > 0 && !hasCustomItemIn) {
-            boolean isSteamBus = def.supportsAbility("STEAM_IMPORT_ITEMS");
+            boolean isSteamBus = isSteam || def.supportsAbility("STEAM_IMPORT_ITEMS");
             int slotsPerBus = isSteamBus ? 4 : GTHatchHelper.getBusSlotCount(tier);
             int neededBuses = (int) Math.ceil((double) neededItemIn / (double) Math.max(1, slotsPerBus));
-            ResourceLocation busId = isSteamBus ? ResourceLocation.tryParse("gtceu:lp_steam_input_bus") : resolveInputBusId(tier);
+            ResourceLocation busId = isSteamBus ? STEAM_INPUT_BUS_ID : resolveInputBusId(tier);
             if (busId != null && neededBuses > 0) {
                 list.add(new MultiblockStructurePart(busId, resolveDisplayName(busId, formatDisplayName(busId)), neededBuses, PartCategory.HATCH_BUS));
             }
@@ -557,10 +541,10 @@ public final class GTCEuBOMHelper {
 
         // Automatic fallback: Add missing required Output Bus if not already handled
         if (!handledItemOut && neededItemOut > 0 && !hasCustomItemOut) {
-            boolean isSteamBus = def.supportsAbility("STEAM_EXPORT_ITEMS");
+            boolean isSteamBus = isSteam || def.supportsAbility("STEAM_EXPORT_ITEMS");
             int slotsPerBus = isSteamBus ? 4 : GTHatchHelper.getBusSlotCount(tier);
             int neededBuses = (int) Math.ceil((double) neededItemOut / (double) Math.max(1, slotsPerBus));
-            ResourceLocation busId = isSteamBus ? ResourceLocation.tryParse("gtceu:lp_steam_output_bus") : resolveOutputBusId(tier);
+            ResourceLocation busId = isSteamBus ? STEAM_OUTPUT_BUS_ID : resolveOutputBusId(tier);
             if (busId != null && neededBuses > 0) {
                 list.add(new MultiblockStructurePart(busId, resolveDisplayName(busId, formatDisplayName(busId)), neededBuses, PartCategory.HATCH_BUS));
             }
@@ -568,8 +552,8 @@ public final class GTCEuBOMHelper {
 
         // Automatic fallback: Add missing required Input Hatch if not already handled
         if (!handledFluidIn && neededFluidIn > 0 && !hasCustomFluidIn) {
-            boolean isSteamHatch = def.supportsAbility("STEAM_IMPORT_FLUIDS");
-            ResourceLocation hatchId = isSteamHatch ? ResourceLocation.tryParse("gtceu:lp_steam_input_hatch") : resolveInputHatchId(tier);
+            boolean isSteamHatch = isSteam || def.supportsAbility("STEAM_IMPORT_FLUIDS") || def.supportsAbility("STEAM");
+            ResourceLocation hatchId = isSteamHatch ? STEAM_INPUT_HATCH_ID : resolveInputHatchId(tier);
             if (hatchId != null) {
                 list.add(new MultiblockStructurePart(hatchId, resolveDisplayName(hatchId, formatDisplayName(hatchId)), neededFluidIn, PartCategory.HATCH_BUS));
             }
@@ -577,15 +561,15 @@ public final class GTCEuBOMHelper {
 
         // Automatic fallback: Add missing required Output Hatch if not already handled
         if (!handledFluidOut && neededFluidOut > 0 && !hasCustomFluidOut) {
-            boolean isSteamHatch = def.supportsAbility("STEAM_EXPORT_FLUIDS");
-            ResourceLocation hatchId = isSteamHatch ? ResourceLocation.tryParse("gtceu:lp_steam_output_hatch") : resolveOutputHatchId(tier);
+            boolean isSteamHatch = isSteam || def.supportsAbility("STEAM_EXPORT_FLUIDS");
+            ResourceLocation hatchId = isSteamHatch ? STEAM_INPUT_HATCH_ID : resolveOutputHatchId(tier);
             if (hatchId != null) {
                 list.add(new MultiblockStructurePart(hatchId, resolveDisplayName(hatchId, formatDisplayName(hatchId)), neededFluidOut, PartCategory.HATCH_BUS));
             }
         }
 
         // Automatic fallback: Add Maintenance Hatch if not already handled
-        if (!handledMaint) {
+        if (!handledMaint && !isSteam) {
             if (equippedMaint != null && equippedMaint.getItemIcon() != null) {
                 list.add(new MultiblockStructurePart(
                     equippedMaint.getItemIcon(),
@@ -593,7 +577,7 @@ public final class GTCEuBOMHelper {
                     1,
                     PartCategory.HATCH_BUS
                 ));
-            } else if (baseHatchCount == 0 && node.getEnergyType() != com.gtceu.calcboard.api.type.EnergyType.NONE && (node.getSteamMode() == null || !node.getSteamMode().isSteam()) && !MultiblockDetector.isSteamMultiblock(def.controllerId())) {
+            } else if (baseHatchCount == 0 && node.getEnergyType() != com.gtceu.calcboard.api.type.EnergyType.NONE) {
                 ResourceLocation defMaint = ResourceLocation.tryParse("gtceu:maintenance_hatch");
                 if (defMaint != null) {
                     list.add(new MultiblockStructurePart(
@@ -616,18 +600,7 @@ public final class GTCEuBOMHelper {
 
         int extraHatches = resolvedHatchCount - baseHatchCount;
         if (extraHatches != 0) {
-            int maxCasingIdx = -1;
-            int maxCasingAmount = 0;
-            for (int i = 0; i < list.size(); i++) {
-                MultiblockStructurePart p = list.get(i);
-                if (p != null && p.category() == PartCategory.CASING) {
-                    if ((def.isCandidateBlock(p.itemId()) || isReplaceableCasing(p.itemId())) && p.amount() > maxCasingAmount) {
-                        maxCasingAmount = p.amount();
-                        maxCasingIdx = i;
-                    }
-                }
-            }
-
+            int maxCasingIdx = findPrimaryCasingIndex(list, def);
             if (maxCasingIdx >= 0) {
                 MultiblockStructurePart primaryCasing = list.get(maxCasingIdx);
                 int adjustedAmount = Math.max(0, primaryCasing.amount() - extraHatches);
@@ -645,6 +618,146 @@ public final class GTCEuBOMHelper {
         }
 
         return list;
+    }
+
+    private static boolean isDataAccessPartEquipped(RecipeNode node, ResourceLocation itemId) {
+        if (itemId == null) return false;
+        for (MachineAddon addon : node.getAddons()) {
+            if (addon != null && itemId.equals(addon.getItemIcon())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void appendHelixParts(List<MultiblockStructurePart> list, Map<GTThreadingHelix, Integer> equippedHelixes, MultiblockStructurePart part) {
+        if (equippedHelixes == null || equippedHelixes.isEmpty()) {
+            list.add(part);
+            return;
+        }
+        int totalEquipped = 0;
+        for (var entry : equippedHelixes.entrySet()) {
+            if (entry.getValue() > 0) {
+                totalEquipped += entry.getValue();
+                list.add(new MultiblockStructurePart(
+                    entry.getKey().getId(),
+                    entry.getKey().getEnglishName(),
+                    entry.getValue(),
+                    PartCategory.COIL
+                ));
+            }
+        }
+        if (totalEquipped < part.amount()) {
+            list.add(new MultiblockStructurePart(part.itemId(), part.displayName(), part.amount() - totalEquipped, PartCategory.COIL));
+        }
+    }
+
+    private static void appendEquippedEnergyHatches(List<MultiblockStructurePart> list, List<MachineAddon> equippedEnergyHatches) {
+        Map<ResourceLocation, Integer> counts = new LinkedHashMap<>();
+        Map<ResourceLocation, String> names = new LinkedHashMap<>();
+        for (MachineAddon h : equippedEnergyHatches) {
+            if (h.getItemIcon() != null) {
+                counts.put(h.getItemIcon(), counts.getOrDefault(h.getItemIcon(), 0) + 1);
+                names.put(h.getItemIcon(), h.getName());
+            }
+        }
+        for (var entry : counts.entrySet()) {
+            list.add(new MultiblockStructurePart(
+                entry.getKey(),
+                names.get(entry.getKey()),
+                entry.getValue(),
+                PartCategory.HATCH_BUS
+            ));
+        }
+    }
+
+    private static void appendInputBusPart(List<MultiblockStructurePart> list, MultiblockStructurePart part, MultiblockStructureDef def, GTVoltageTier tier, boolean isSteam, boolean hasCustomItemIn, int neededItemIn, int itemInCount) {
+        boolean isSteamBus = isSteam || isSteamBusId(part.itemId()) || def.supportsAbility("STEAM_IMPORT_ITEMS");
+        int slotsPerBus = isSteamBus ? 4 : GTHatchHelper.getBusSlotCount(tier);
+        if (hasCustomItemIn) {
+            int neededBuses = (int) Math.ceil((double) neededItemIn / (double) Math.max(1, slotsPerBus));
+            if (neededBuses > 0) {
+                ResourceLocation busId = isSteamBus ? resolveSteamInputBusId(part.itemId()) : resolveInputBusId(tier);
+                ResourceLocation targetId = busId != null ? busId : part.itemId();
+                list.add(new MultiblockStructurePart(targetId, resolveDisplayName(targetId, formatDisplayName(targetId)), neededBuses, PartCategory.HATCH_BUS));
+            }
+            return;
+        }
+        int baseRequiredBuses = (int) Math.ceil((double) itemInCount / (double) Math.max(1, slotsPerBus));
+        int count = Math.max(part.amount(), baseRequiredBuses);
+        ResourceLocation busId = isSteamBus ? resolveSteamInputBusId(part.itemId()) : resolveInputBusId(tier);
+        ResourceLocation targetId = busId != null ? busId : part.itemId();
+        String name = busId != null ? resolveDisplayName(busId, formatDisplayName(busId)) : part.displayName();
+        list.add(new MultiblockStructurePart(targetId, name, count, PartCategory.HATCH_BUS));
+    }
+
+    private static void appendOutputBusPart(List<MultiblockStructurePart> list, MultiblockStructurePart part, MultiblockStructureDef def, GTVoltageTier tier, boolean isSteam, boolean hasCustomItemOut, int neededItemOut, int itemOutCount) {
+        boolean isSteamBus = isSteam || isSteamBusId(part.itemId()) || def.supportsAbility("STEAM_EXPORT_ITEMS");
+        int slotsPerBus = isSteamBus ? 4 : GTHatchHelper.getBusSlotCount(tier);
+        if (hasCustomItemOut) {
+            int neededBuses = (int) Math.ceil((double) neededItemOut / (double) Math.max(1, slotsPerBus));
+            if (neededBuses > 0) {
+                ResourceLocation busId = isSteamBus ? resolveSteamOutputBusId(part.itemId()) : resolveOutputBusId(tier);
+                ResourceLocation targetId = busId != null ? busId : part.itemId();
+                list.add(new MultiblockStructurePart(targetId, resolveDisplayName(targetId, formatDisplayName(targetId)), neededBuses, PartCategory.HATCH_BUS));
+            }
+            return;
+        }
+        int baseRequiredBuses = (int) Math.ceil((double) itemOutCount / (double) Math.max(1, slotsPerBus));
+        int count = Math.max(part.amount(), baseRequiredBuses);
+        ResourceLocation busId = isSteamBus ? resolveSteamOutputBusId(part.itemId()) : resolveOutputBusId(tier);
+        ResourceLocation targetId = busId != null ? busId : part.itemId();
+        String name = busId != null ? resolveDisplayName(busId, formatDisplayName(busId)) : part.displayName();
+        list.add(new MultiblockStructurePart(targetId, name, count, PartCategory.HATCH_BUS));
+    }
+
+    private static void appendInputHatchPart(List<MultiblockStructurePart> list, MultiblockStructurePart part, MultiblockStructureDef def, GTVoltageTier tier, boolean isSteam, boolean hasCustomFluidIn, int neededFluidIn, int fluidInCount) {
+        boolean isSteamHatch = isSteam || isSteamInputHatchId(part.itemId()) || def.supportsAbility("STEAM_IMPORT_FLUIDS") || def.supportsAbility("STEAM");
+        if (hasCustomFluidIn) {
+            if (neededFluidIn > 0) {
+                ResourceLocation hatchId = isSteamHatch ? resolveSteamInputHatchId(part.itemId()) : resolveInputHatchId(tier);
+                ResourceLocation targetId = hatchId != null ? hatchId : part.itemId();
+                list.add(new MultiblockStructurePart(targetId, resolveDisplayName(targetId, formatDisplayName(targetId)), neededFluidIn, PartCategory.HATCH_BUS));
+            }
+            return;
+        }
+        int count = Math.max(part.amount(), fluidInCount);
+        ResourceLocation hatchId = isSteamHatch ? resolveSteamInputHatchId(part.itemId()) : resolveInputHatchId(tier);
+        ResourceLocation targetId = hatchId != null ? hatchId : part.itemId();
+        String name = hatchId != null ? resolveDisplayName(hatchId, formatDisplayName(hatchId)) : part.displayName();
+        list.add(new MultiblockStructurePart(targetId, name, count, PartCategory.HATCH_BUS));
+    }
+
+    private static void appendOutputHatchPart(List<MultiblockStructurePart> list, MultiblockStructurePart part, MultiblockStructureDef def, GTVoltageTier tier, boolean isSteam, boolean hasCustomFluidOut, int neededFluidOut, int fluidOutCount) {
+        boolean isSteamHatch = isSteam || def.supportsAbility("STEAM_EXPORT_FLUIDS");
+        if (hasCustomFluidOut) {
+            if (neededFluidOut > 0) {
+                ResourceLocation hatchId = isSteamHatch ? resolveSteamInputHatchId(part.itemId()) : resolveOutputHatchId(tier);
+                ResourceLocation targetId = hatchId != null ? hatchId : part.itemId();
+                list.add(new MultiblockStructurePart(targetId, resolveDisplayName(targetId, formatDisplayName(targetId)), neededFluidOut, PartCategory.HATCH_BUS));
+            }
+            return;
+        }
+        int count = Math.max(part.amount(), fluidOutCount);
+        ResourceLocation hatchId = isSteamHatch ? resolveSteamInputHatchId(part.itemId()) : resolveOutputHatchId(tier);
+        ResourceLocation targetId = hatchId != null ? hatchId : part.itemId();
+        String name = hatchId != null ? resolveDisplayName(hatchId, formatDisplayName(hatchId)) : part.displayName();
+        list.add(new MultiblockStructurePart(targetId, name, count, PartCategory.HATCH_BUS));
+    }
+
+    private static int findPrimaryCasingIndex(List<MultiblockStructurePart> list, MultiblockStructureDef def) {
+        int maxCasingIdx = -1;
+        int maxCasingAmount = 0;
+        for (int i = 0; i < list.size(); i++) {
+            MultiblockStructurePart p = list.get(i);
+            if (p == null || p.category() != PartCategory.CASING) continue;
+            boolean isCandidate = def.isCandidateBlock(p.itemId()) || isReplaceableCasing(p.itemId());
+            if (isCandidate && p.amount() > maxCasingAmount) {
+                maxCasingAmount = p.amount();
+                maxCasingIdx = i;
+            }
+        }
+        return maxCasingIdx;
     }
 
     private static List<MultiblockStructurePart> appendMCFModuleParts(RecipeNode node, List<MultiblockStructurePart> list, boolean dualLowerTierEnergyHatches) {
@@ -760,6 +873,27 @@ public final class GTCEuBOMHelper {
         GTVoltageTier target = (tier == null || tier.ordinal() < GTVoltageTier.LV.ordinal()) ? GTVoltageTier.LV : tier;
         String prefix = target.getName().toLowerCase(Locale.ROOT);
         return ResourceLocation.tryParse("gtceu:" + prefix + "_muffler_hatch");
+    }
+
+    public static ResourceLocation resolveSteamInputHatchId(ResourceLocation fallback) {
+        if (fallback != null && isSteamInputHatchId(fallback)) {
+            return fallback;
+        }
+        return STEAM_INPUT_HATCH_ID;
+    }
+
+    public static ResourceLocation resolveSteamInputBusId(ResourceLocation fallback) {
+        if (fallback != null && STEAM_INPUT_BUS_ID.equals(fallback)) {
+            return fallback;
+        }
+        return STEAM_INPUT_BUS_ID;
+    }
+
+    public static ResourceLocation resolveSteamOutputBusId(ResourceLocation fallback) {
+        if (fallback != null && STEAM_OUTPUT_BUS_ID.equals(fallback)) {
+            return fallback;
+        }
+        return STEAM_OUTPUT_BUS_ID;
     }
 
     public static boolean isReplaceableCasing(ResourceLocation itemId) {

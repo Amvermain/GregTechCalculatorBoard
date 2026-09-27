@@ -68,6 +68,9 @@ public class FlowGraph {
         for (RecipeNode n : nodes) {
             n.markOperationalDirty();
         }
+        for (CanvasGroupFrame frame : frames) {
+            frame.invalidateFoldedPortCache();
+        }
     }
 
     public void markSummaryDirty() {
@@ -264,6 +267,30 @@ public class FlowGraph {
             }
         }
         return null;
+    }
+
+    public boolean isNodeInEmbeddedPanel(String nodeId) {
+        if (nodeId == null || frames.isEmpty()) return false;
+        for (CanvasGroupFrame frame : frames) {
+            if (frame != null && frame.getViewMode() == PoolViewMode.EMBEDDED_PANEL && frame.containsNode(nodeId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public CanvasGroupFrame getEmbeddedFrameForNode(String nodeId) {
+        if (nodeId == null || frames.isEmpty()) return null;
+        for (CanvasGroupFrame frame : frames) {
+            if (frame != null && frame.getViewMode() == PoolViewMode.EMBEDDED_PANEL && frame.containsNode(nodeId)) {
+                return frame;
+            }
+        }
+        return null;
+    }
+
+    public boolean isNodeInFoldedOrEmbeddedFrame(String nodeId) {
+        return isNodeInFoldedFrame(nodeId) || isNodeInEmbeddedPanel(nodeId);
     }
 
     public boolean isNodeInSharedMachineFrame(RecipeNode node) {
@@ -853,24 +880,9 @@ public class FlowGraph {
         List<IngredientStack> newOutputs = targetNode.getOutputs();
 
         for (ConnectionEdge edge : oldEdges) {
-            if (edge.toNodeId().equals(nodeId)) {
-                int oldInIdx = edge.inputIndex();
-                if (oldInIdx >= 0 && oldInIdx < oldInputs.size()) {
-                    IngredientStack oldStack = oldInputs.get(oldInIdx);
-                    int newInIdx = findMatchingPortIndex(newInputs, oldStack);
-                    if (newInIdx >= 0) {
-                        newEdges.add(new ConnectionEdge(edge.fromNodeId(), edge.outputIndex(), nodeId, newInIdx, edge.fixedFlowLimit(), edge.priority(), edge.weight()));
-                    }
-                }
-            } else if (edge.fromNodeId().equals(nodeId)) {
-                int oldOutIdx = edge.outputIndex();
-                if (oldOutIdx >= 0 && oldOutIdx < oldOutputs.size()) {
-                    IngredientStack oldStack = oldOutputs.get(oldOutIdx);
-                    int newOutIdx = findMatchingPortIndex(newOutputs, oldStack);
-                    if (newOutIdx >= 0) {
-                        newEdges.add(new ConnectionEdge(nodeId, newOutIdx, edge.toNodeId(), edge.inputIndex(), edge.fixedFlowLimit(), edge.priority(), edge.weight()));
-                    }
-                }
+            ConnectionEdge remapped = remapEdgeForSwitchedRecipe(edge, nodeId, oldInputs, newInputs, oldOutputs, newOutputs);
+            if (remapped != null) {
+                newEdges.add(remapped);
             }
         }
 
@@ -883,6 +895,54 @@ public class FlowGraph {
         invalidatePortStatsCache();
 
         return new com.gtceu.calcboard.api.history.BoardCommand.SwitchRecipeCommand(nodeId, oldSnapshot, newSnapshot, oldEdges, newEdges);
+    }
+
+    private static ConnectionEdge remapEdgeForSwitchedRecipe(
+            ConnectionEdge edge,
+            String nodeId,
+            List<IngredientStack> oldInputs,
+            List<IngredientStack> newInputs,
+            List<IngredientStack> oldOutputs,
+            List<IngredientStack> newOutputs) {
+        if (edge.toNodeId().equals(nodeId)) {
+            return remapIncomingEdge(edge, nodeId, oldInputs, newInputs);
+        }
+        if (edge.fromNodeId().equals(nodeId)) {
+            return remapOutgoingEdge(edge, nodeId, oldOutputs, newOutputs);
+        }
+        return null;
+    }
+
+    private static ConnectionEdge remapIncomingEdge(
+            ConnectionEdge edge,
+            String nodeId,
+            List<IngredientStack> oldInputs,
+            List<IngredientStack> newInputs) {
+        int oldInIdx = edge.inputIndex();
+        if (oldInIdx < 0 || oldInIdx >= oldInputs.size()) {
+            return null;
+        }
+        int newInIdx = findMatchingPortIndex(newInputs, oldInputs.get(oldInIdx));
+        if (newInIdx < 0) {
+            return null;
+        }
+        return new ConnectionEdge(edge.fromNodeId(), edge.outputIndex(), nodeId, newInIdx, edge.fixedFlowLimit(), edge.priority(), edge.weight());
+    }
+
+    private static ConnectionEdge remapOutgoingEdge(
+            ConnectionEdge edge,
+            String nodeId,
+            List<IngredientStack> oldOutputs,
+            List<IngredientStack> newOutputs) {
+        int oldOutIdx = edge.outputIndex();
+        if (oldOutIdx < 0 || oldOutIdx >= oldOutputs.size()) {
+            return null;
+        }
+        int newOutIdx = findMatchingPortIndex(newOutputs, oldOutputs.get(oldOutIdx));
+        if (newOutIdx < 0) {
+            return null;
+        }
+        return new ConnectionEdge(nodeId, newOutIdx, edge.toNodeId(), edge.inputIndex(), edge.fixedFlowLimit(), edge.priority(), edge.weight());
     }
 
     private static int findMatchingPortIndex(List<IngredientStack> ports, IngredientStack target) {

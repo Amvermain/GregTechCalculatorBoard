@@ -198,21 +198,19 @@ public final class GTPowerCalculator {
             double stepSpeedFactor = stepPerfect ? 4.0 : speedFactor;
             double nextDuration = Math.floor(runningDuration / stepSpeedFactor);
 
-            if (allowSubtick) {
-                if (isSubticking || nextDuration < 1.0) {
-                    double nextParallel = subtickParallel * stepSpeedFactor;
-                    if (nextParallel > maxParallels) {
-                        break;
-                    }
-                    subtickParallel = nextParallel;
-                    isSubticking = true;
-                } else {
-                    runningDuration = nextDuration;
-                }
-            } else {
+            if (!allowSubtick) {
                 if (nextDuration < 1.0) {
                     break;
                 }
+                runningDuration = nextDuration;
+            } else if (isSubticking || nextDuration < 1.0) {
+                double nextParallel = subtickParallel * stepSpeedFactor;
+                if (nextParallel > maxParallels) {
+                    break;
+                }
+                subtickParallel = nextParallel;
+                isSubticking = true;
+            } else {
                 runningDuration = nextDuration;
             }
 
@@ -309,18 +307,7 @@ public final class GTPowerCalculator {
             if (isCoilParallelNode(node)) {
                 int coilPar = 0;
                 for (MachineAddon addon : node.getAddons()) {
-                    if (addon instanceof GTCoilAddon coil) {
-                        coilPar = Math.max(coilPar, coil.getSmelterParallel());
-                    } else if (addon.getCategory() == MachineAddon.Category.COIL) {
-                        if (addon.getSmelterParallel() > 0) {
-                            coilPar = Math.max(coilPar, addon.getSmelterParallel());
-                        } else {
-                            var stats = CoilHelper.getCoilStats(addon.getId());
-                            if (stats != null && stats.smelterParallel() > 0) {
-                                coilPar = Math.max(coilPar, stats.smelterParallel());
-                            }
-                        }
-                    }
+                    coilPar = Math.max(coilPar, extractCoilSmelterParallel(addon));
                 }
                 int nonCoilParallelMultiplier = 1;
                 for (MachineAddon a : node.getAddons()) {
@@ -342,6 +329,20 @@ public final class GTPowerCalculator {
             par *= RecipeNodeThreadingHelper.getThreadingConfig(node).getEffectiveParallels();
         }
         return par;
+    }
+
+    public static int extractCoilSmelterParallel(MachineAddon addon) {
+        if (addon instanceof GTCoilAddon coil) {
+            return coil.getSmelterParallel();
+        }
+        if (addon.getCategory() != MachineAddon.Category.COIL) {
+            return 0;
+        }
+        if (addon.getSmelterParallel() > 0) {
+            return addon.getSmelterParallel();
+        }
+        var stats = CoilHelper.getCoilStats(addon.getId());
+        return (stats != null && stats.smelterParallel() > 0) ? stats.smelterParallel() : 0;
     }
 
     private static int calculateEnergyParallelCap(RecipeNode node, int defaultCap) {
@@ -401,18 +402,8 @@ public final class GTPowerCalculator {
         if (node == null) return 1;
         if (node.isMultiblock() && isCoilParallelNode(node)) {
             for (MachineAddon addon : node.getAddons()) {
-                if (addon instanceof GTCoilAddon coil) {
-                    return coil.getSmelterParallel();
-                } else if (addon.getCategory() == MachineAddon.Category.COIL) {
-                    if (addon.getSmelterParallel() > 0) {
-                        return addon.getSmelterParallel();
-                    } else {
-                        var stats = CoilHelper.getCoilStats(addon.getId());
-                        if (stats != null && stats.smelterParallel() > 0) {
-                            return stats.smelterParallel();
-                        }
-                    }
-                }
+                int coilPar = extractCoilSmelterParallel(addon);
+                if (coilPar > 0) return coilPar;
             }
         }
         return MultiblockDetector.getDefaultParallel(node);
@@ -666,17 +657,7 @@ public final class GTPowerCalculator {
                 }
 
                 if (GTTurbineHelper.hasRotorAddon(node)) {
-                    double wearPerSec = GTTurbineHelper.calculateRotorWearPerSecond(node);
-                    double lifespanHours = GTTurbineHelper.calculateRotorLifespanHours(node);
-                    double replacementRate = GTTurbineHelper.calculateRotorReplacementRatePerHour(node);
-
-                    tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7" + Component.translatable("gui.gtcalcboard.tooltip.rotor_wear_rate").getString() + ": §c-%,.2f dmg/s", wearPerSec)));
-                    if (!Double.isInfinite(lifespanHours) && lifespanHours > 0) {
-                        tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7" + Component.translatable("gui.gtcalcboard.tooltip.rotor_lifespan").getString() + ": §e%,.2f h", lifespanHours)));
-                        if (replacementRate > 0) {
-                            tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7" + Component.translatable("gui.gtcalcboard.tooltip.rotor_replacement_rate").getString() + ": §6%,.4f /h", replacementRate)));
-                        }
-                    }
+                    appendTurbineRotorWearTooltip(node, tooltipLines);
                 }
 
                 if (node.getEfficiency() < 0.999) {
@@ -709,5 +690,20 @@ public final class GTPowerCalculator {
             tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Duration: §f%.4fs §7(§f%,.4f cycles/s§7)", node.getEffectiveDurationSeconds(), node.getEffectiveCyclesPerSecond())));
         }
         return tooltipLines;
+    }
+
+    private static void appendTurbineRotorWearTooltip(RecipeNode node, List<Component> tooltipLines) {
+        double wearPerSec = GTTurbineHelper.calculateRotorWearPerSecond(node);
+        double lifespanHours = GTTurbineHelper.calculateRotorLifespanHours(node);
+        double replacementRate = GTTurbineHelper.calculateRotorReplacementRatePerHour(node);
+
+        tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7" + Component.translatable("gui.gtcalcboard.tooltip.rotor_wear_rate").getString() + ": §c-%,.2f dmg/s", wearPerSec)));
+        if (Double.isInfinite(lifespanHours) || lifespanHours <= 0) {
+            return;
+        }
+        tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7" + Component.translatable("gui.gtcalcboard.tooltip.rotor_lifespan").getString() + ": §e%,.2f h", lifespanHours)));
+        if (replacementRate > 0) {
+            tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7" + Component.translatable("gui.gtcalcboard.tooltip.rotor_replacement_rate").getString() + ": §6%,.4f /h", replacementRate)));
+        }
     }
 }
