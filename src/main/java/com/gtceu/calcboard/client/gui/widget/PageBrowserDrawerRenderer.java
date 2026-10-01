@@ -51,10 +51,11 @@ public final class PageBrowserDrawerRenderer {
     private static void renderHeader(GuiGraphics graphics, Font font, int topY, int mouseX, int mouseY) {
         graphics.drawString(font, "§6≡ " + Component.translatable("gui.gtcalcboard.browser.title").getString(), PageBrowserDrawer.DRAWER_X + 8, topY + 8, 0xFFFFFFFF, false);
 
+        boolean isTeam = com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance().isTeamMode();
         int btnY = topY + 6;
         int closeX = PageBrowserDrawer.DRAWER_X + PageBrowserDrawer.DRAWER_WIDTH - 20;
-        int importX = closeX - 22;
-        int addPageX = importX - 22;
+        int importX = isTeam ? -999 : (closeX - 22);
+        int addPageX = isTeam ? (closeX - 22) : (importX - 22);
         int addFolderX = addPageX - 24;
 
         boolean addFolderHover = mouseX >= addFolderX && mouseX <= addFolderX + 20 && mouseY >= btnY && mouseY <= btnY + 14;
@@ -67,10 +68,12 @@ public final class PageBrowserDrawerRenderer {
         graphics.renderOutline(addPageX, btnY, 20, 14, addPageHover ? 0xFF55FF88 : 0xFF356B48);
         graphics.drawString(font, "§a+▪", addPageX + 2, btnY + 3, 0xFFFFFFFF, false);
 
-        boolean importHover = mouseX >= importX && mouseX <= importX + 20 && mouseY >= btnY && mouseY <= btnY + 14;
-        graphics.fill(importX, btnY, importX + 20, btnY + 14, importHover ? 0xFF3D3A2A : 0xFF26241C);
-        graphics.renderOutline(importX, btnY, 20, 14, importHover ? 0xFFFFDD55 : 0xFF66582B);
-        graphics.drawString(font, "§e«", importX + 3, btnY + 3, 0xFFFFFFFF, false);
+        if (!isTeam) {
+            boolean importHover = mouseX >= importX && mouseX <= importX + 20 && mouseY >= btnY && mouseY <= btnY + 14;
+            graphics.fill(importX, btnY, importX + 20, btnY + 14, importHover ? 0xFF3D3A2A : 0xFF26241C);
+            graphics.renderOutline(importX, btnY, 20, 14, importHover ? 0xFFFFDD55 : 0xFF66582B);
+            graphics.drawString(font, "§e«", importX + 3, btnY + 3, 0xFFFFFFFF, false);
+        }
 
         boolean closeHover = mouseX >= closeX && mouseX <= closeX + 14 && mouseY >= btnY && mouseY <= btnY + 14;
         graphics.drawString(font, "§c✕", closeX + 2, btnY + 3, closeHover ? 0xFFFF6666 : 0xFFAAAAAA, false);
@@ -96,17 +99,20 @@ public final class PageBrowserDrawerRenderer {
 
         String query = drawer.getSearchBox() != null ? drawer.getSearchBox().getValue().trim().toLowerCase() : "";
         PageBrowserTreeModel.FolderTreeNode root = PageBrowserTreeModel.buildFolderTree(query);
-        int activeIdx = BoardManager.getInstance().getActivePageIndex();
+        com.gtceu.calcboard.client.team.ClientWorkspaceState teamState = com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance();
+        boolean isTeam = teamState.isTeamMode();
+        String activePageId = isTeam ? teamState.getActiveTeamPageId()
+                : (BoardManager.getInstance().getActivePage() != null ? BoardManager.getInstance().getActivePage().getId() : "");
 
         int curY = listY + 4 - (int) drawer.getScrollY();
-        curY = renderTreeNodeRecursive(drawer, graphics, font, root, activeIdx, listX, listW, curY, mouseX, mouseY, query);
+        curY = renderTreeNodeRecursive(drawer, graphics, font, root, activePageId, listX, listW, curY, mouseX, mouseY, query);
 
         int totalContentH = (curY + (int) drawer.getScrollY()) - listY;
         drawer.setMaxScrollY(Math.max(0, totalContentH - listH));
         BoardScissorHelper.disableScissor(graphics);
     }
 
-    private static int renderTreeNodeRecursive(PageBrowserDrawer drawer, GuiGraphics graphics, Font font, PageBrowserTreeModel.FolderTreeNode node, int activeIdx, int listX, int listW, int curY, int mouseX, int mouseY, String query) {
+    private static int renderTreeNodeRecursive(PageBrowserDrawer drawer, GuiGraphics graphics, Font font, PageBrowserTreeModel.FolderTreeNode node, String activePageId, int listX, int listW, int curY, int mouseX, int mouseY, String query) {
         if (!node.folderPath.isEmpty()) {
             curY = renderFolderRow(drawer, graphics, font, node, listX, listW, curY, mouseX, mouseY);
             if (drawer.getCollapsedFolders().contains(node.folderPath) && query.isEmpty()) {
@@ -115,11 +121,11 @@ public final class PageBrowserDrawerRenderer {
         }
 
         for (PageBrowserTreeModel.FolderTreeNode sub : node.subFolders.values()) {
-            curY = renderTreeNodeRecursive(drawer, graphics, font, sub, activeIdx, listX, listW, curY, mouseX, mouseY, query);
+            curY = renderTreeNodeRecursive(drawer, graphics, font, sub, activePageId, listX, listW, curY, mouseX, mouseY, query);
         }
 
         for (PageBrowserTreeModel.IndexedPage ip : node.directPages) {
-            curY = renderPageRow(drawer, graphics, font, ip, node.depth, activeIdx, listX, listW, curY, mouseX, mouseY);
+            curY = renderPageRow(drawer, graphics, font, ip, node.depth, activePageId, listX, listW, curY, mouseX, mouseY);
         }
 
         return curY;
@@ -144,10 +150,10 @@ public final class PageBrowserDrawerRenderer {
         return curY + 18;
     }
 
-    private static int renderPageRow(PageBrowserDrawer drawer, GuiGraphics graphics, Font font, PageBrowserTreeModel.IndexedPage ip, int depth, int activeIdx, int listX, int listW, int curY, int mouseX, int mouseY) {
+    private static int renderPageRow(PageBrowserDrawer drawer, GuiGraphics graphics, Font font, PageBrowserTreeModel.IndexedPage ip, int depth, String activePageId, int listX, int listW, int curY, int mouseX, int mouseY) {
         int pageIdx = ip.index();
         BoardPage page = ip.page();
-        boolean isActive = (pageIdx == activeIdx);
+        boolean isActive = activePageId != null && activePageId.equals(page.getId());
         boolean isSelected = drawer.getSelectedPageIds().contains(page.getId());
         int indent = depth * 10 + 6;
 
@@ -162,40 +168,47 @@ public final class PageBrowserDrawerRenderer {
             graphics.renderOutline(listX + 2, curY, listW - 4, PageBrowserDrawer.ITEM_HEIGHT, border);
         }
 
-        boolean pinHover = mouseX >= listX + indent && mouseX <= listX + indent + 10 && mouseY >= curY + 3 && mouseY <= curY + 15;
-        String pinStr = page.isPinned() ? "§e★" : (pinHover ? "§7★" : "§8·");
-        graphics.drawString(font, pinStr, listX + indent, curY + 5, 0xFFFFFFFF, false);
+        boolean isTeam = com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance().isTeamMode();
+        int iconOffset = isTeam ? 4 : 12;
+        if (!isTeam) {
+            boolean pinHover = mouseX >= listX + indent && mouseX <= listX + indent + 10 && mouseY >= curY + 3 && mouseY <= curY + 15;
+            String pinStr = page.isPinned() ? "§e★" : (pinHover ? "§7★" : "§8·");
+            graphics.drawString(font, pinStr, listX + indent, curY + 5, 0xFFFFFFFF, false);
+        }
 
         ItemStack icon = page.getEffectiveRepresentativeIcon();
         if (!icon.isEmpty()) {
-            graphics.renderItem(icon, listX + indent + 12, curY + 2);
+            graphics.renderItem(icon, listX + indent + iconOffset, curY + 2);
         } else {
-            graphics.drawString(font, "§7▪", listX + indent + 12, curY + 5, 0xFFFFFFFF, false);
+            graphics.drawString(font, "§7▪", listX + indent + iconOffset, curY + 5, 0xFFFFFFFF, false);
         }
 
-        com.gtceu.calcboard.api.type.GTVoltageTier vTier = page.getDefaultVoltageTier();
-        String badgeText = (vTier != null) ? (vTier.getFormatCode() + "⚡" + vTier.getName()) : "⚡Auto";
-        int badgeW = font.width(badgeText) + 4;
-        int badgeX = listX + listW - 6 - badgeW;
-        int badgeY = curY + 4;
-        int badgeH = 12;
+        int badgeX = listX + listW - 6;
+        if (!isTeam) {
+            com.gtceu.calcboard.api.type.GTVoltageTier vTier = page.getDefaultVoltageTier();
+            String badgeText = (vTier != null) ? (vTier.getFormatCode() + "⚡" + vTier.getName()) : "⚡Auto";
+            int badgeW = font.width(badgeText) + 4;
+            badgeX = listX + listW - 6 - badgeW;
+            int badgeY = curY + 4;
+            int badgeH = 12;
 
-        boolean badgeHover = mouseX >= badgeX && mouseX <= badgeX + badgeW && mouseY >= badgeY && mouseY <= badgeY + badgeH;
-        int badgeBg = badgeHover ? 0xCC2A364C : 0x8811151C;
-        int badgeBorder = (vTier != null) ? (vTier.getColor() | 0xFF000000) : (badgeHover ? 0xFF66AACC : 0xFF446688);
-        String badgeRenderStr = (vTier != null) ? badgeText : (badgeHover ? "§b⚡Auto" : "§7⚡§fAuto");
+            boolean badgeHover = mouseX >= badgeX && mouseX <= badgeX + badgeW && mouseY >= badgeY && mouseY <= badgeY + badgeH;
+            int badgeBg = badgeHover ? 0xCC2A364C : 0x8811151C;
+            int badgeBorder = (vTier != null) ? (vTier.getColor() | 0xFF000000) : (badgeHover ? 0xFF66AACC : 0xFF446688);
+            String badgeRenderStr = (vTier != null) ? badgeText : (badgeHover ? "§b⚡Auto" : "§7⚡§fAuto");
 
-        graphics.fill(badgeX, badgeY, badgeX + badgeW, badgeY + badgeH, badgeBg);
-        graphics.renderOutline(badgeX, badgeY, badgeW, badgeH, badgeBorder);
-        graphics.drawString(font, badgeRenderStr, badgeX + 2, badgeY + 2, 0xFFFFFFFF, false);
+            graphics.fill(badgeX, badgeY, badgeX + badgeW, badgeY + badgeH, badgeBg);
+            graphics.renderOutline(badgeX, badgeY, badgeW, badgeH, badgeBorder);
+            graphics.drawString(font, badgeRenderStr, badgeX + 2, badgeY + 2, 0xFFFFFFFF, false);
 
-        if (badgeHover) {
-            drawer.setHoveredBadgePage(page);
+            if (badgeHover) {
+                drawer.setHoveredBadgePage(page);
+            }
         }
 
         boolean isAe2 = com.gtceu.calcboard.integration.ae2.registry.PatternGraphRegistry.getInstance().isPageBound(page.getId());
         String nameColor = isSelected ? "§b" : (isActive ? "§a" : (isAe2 ? "§b" : "§f"));
-        int nameX = listX + indent + 30;
+        int nameX = listX + indent + iconOffset + 18;
         int maxNameW = Math.max(10, badgeX - nameX - 4);
         String prefixTag = isAe2 && !page.getName().startsWith("[AE2]") ? "§b[AE2] " : "";
         String trimmedName = font.plainSubstrByWidth(prefixTag + page.getName(), maxNameW);

@@ -1,5 +1,6 @@
 package com.gtceu.calcboard.client.gui.widget;
 
+import com.gtceu.calcboard.api.solver.WorkspaceFlowCoordinator;
 import com.gtceu.calcboard.client.gui.api.IBoardScreenContext;
 import com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer;
 import com.gtceu.calcboard.client.team.ClientWorkspaceState;
@@ -242,25 +243,10 @@ public class LeftActivityBarWidget {
         ClientWorkspaceState state = ClientWorkspaceState.getInstance();
         if (!state.isCollaborationEnabled()) return;
 
-        Minecraft mc = Minecraft.getInstance();
-        if (state.isTeamMode()) {
-            state.autoCommitAndRelease(screen, state.getActiveTeamPageId());
-            state.setCurrentMode(ClientWorkspaceState.WorkspaceMode.LOCAL);
-            NetworkHandler.sendToServer(new C2SPingPresencePacket(state.getCurrentTeamId(), state.getActiveTeamPageId(), false));
-        } else {
-            if (state.getCurrentTeamId() == null) {
-                NetworkHandler.sendToServer(new C2SRequestWorkspacePacket(new UUID(0L, 0L), "page_main"));
-                com.gtceu.calcboard.client.gui.widget.BoardToast.show("gui.gtcalcboard.toast.team_no_party");
-                return;
-            }
-            state.setCurrentMode(ClientWorkspaceState.WorkspaceMode.TEAM);
-            UUID teamId = state.getCurrentTeamId();
-            String activePageId = state.getActiveTeamPageId() != null ? state.getActiveTeamPageId() : "page_main";
-            NetworkHandler.sendToServer(new C2SRequestWorkspacePacket(teamId, activePageId));
-            NetworkHandler.sendToServer(new C2SPingPresencePacket(teamId, activePageId, true));
-        }
-        screen.rebuildBoardWidgets();
-        screen.markSummaryDirty();
+        ClientWorkspaceState.WorkspaceMode target = state.isTeamMode()
+                ? ClientWorkspaceState.WorkspaceMode.LOCAL
+                : ClientWorkspaceState.WorkspaceMode.TEAM;
+        screen.switchToWorkspaceMode(target);
     }
 
     public void renderTooltips(GuiGraphics graphics, Font font, int mouseX, int mouseY) {

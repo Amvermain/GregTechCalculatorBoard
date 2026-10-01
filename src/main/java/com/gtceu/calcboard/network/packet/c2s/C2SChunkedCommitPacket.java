@@ -33,14 +33,16 @@ public class C2SChunkedCommitPacket {
     private final int addedNodes;
     private final int modifiedNodes;
     private final int deletedNodes;
+    private final String folderPath;
 
-    public C2SChunkedCommitPacket(UUID transferId, UUID teamId, String pageId, String pageTitle, int revision,
+    public C2SChunkedCommitPacket(UUID transferId, UUID teamId, String pageId, String pageTitle, String folderPath, int revision,
                                   String commitMessage, int chunkIndex, int totalChunks, byte[] chunkData,
                                   int addedNodes, int modifiedNodes, int deletedNodes) {
         this.transferId = transferId != null ? transferId : UUID.randomUUID();
         this.teamId = teamId != null ? teamId : new UUID(0L, 0L);
         this.pageId = pageId != null ? pageId : "default";
         this.pageTitle = pageTitle != null ? pageTitle : "Page";
+        this.folderPath = folderPath != null ? folderPath : "";
         this.revision = revision;
         this.commitMessage = commitMessage != null ? commitMessage : "";
         this.chunkIndex = chunkIndex;
@@ -49,6 +51,12 @@ public class C2SChunkedCommitPacket {
         this.addedNodes = addedNodes;
         this.modifiedNodes = modifiedNodes;
         this.deletedNodes = deletedNodes;
+    }
+
+    public C2SChunkedCommitPacket(UUID transferId, UUID teamId, String pageId, String pageTitle, int revision,
+                                  String commitMessage, int chunkIndex, int totalChunks, byte[] chunkData,
+                                  int addedNodes, int modifiedNodes, int deletedNodes) {
+        this(transferId, teamId, pageId, pageTitle, "", revision, commitMessage, chunkIndex, totalChunks, chunkData, addedNodes, modifiedNodes, deletedNodes);
     }
 
     public C2SChunkedCommitPacket(FriendlyByteBuf buf) {
@@ -64,6 +72,7 @@ public class C2SChunkedCommitPacket {
         this.addedNodes = buf.readVarInt();
         this.modifiedNodes = buf.readVarInt();
         this.deletedNodes = buf.readVarInt();
+        this.folderPath = buf.isReadable() ? buf.readUtf(256) : "";
     }
 
     public void encode(FriendlyByteBuf buf) {
@@ -79,6 +88,7 @@ public class C2SChunkedCommitPacket {
         buf.writeVarInt(addedNodes);
         buf.writeVarInt(modifiedNodes);
         buf.writeVarInt(deletedNodes);
+        buf.writeUtf(folderPath != null ? folderPath : "");
     }
 
     public UUID getTransferId() {
@@ -181,11 +191,14 @@ public class C2SChunkedCommitPacket {
             // 3. Update or create page
             int nextRev = (page == null) ? 1 : page.getPageRevision() + 1;
             if (page == null) {
-                page = new TeamWorkspacePage(pageId, pageTitle, nextRev, completeNBT);
+                page = new TeamWorkspacePage(pageId, pageTitle, folderPath, nextRev, completeNBT);
             } else {
                 page.setTitle(pageTitle);
+                page.setFolderPath(folderPath);
                 page.setPageRevision(nextRev);
-                page.setCompressedGraphData(completeNBT);
+                if (completeNBT != null && completeNBT.length > 0) {
+                    page.setCompressedGraphData(completeNBT);
+                }
             }
             ws.addOrUpdatePage(page);
 

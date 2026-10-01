@@ -65,6 +65,97 @@ public class CanvasWireRenderer {
         return resolveWireEndpointsForWidgets(graph, n -> screen != null ? screen.findWidgetForNode(n) : null, edge);
     }
 
+    public record PortAnchor(float x, float y, float dirX) {}
+
+    public static PortAnchor resolvePortAnchor(
+            FlowGraph graph,
+            java.util.function.Function<RecipeNode, NodeWidget> widgets,
+            RecipeNode node,
+            int portIndex,
+            boolean isInput
+    ) {
+        if (node == null) {
+            return new PortAnchor(0, 0, isInput ? -1.0f : 1.0f);
+        }
+        if (graph != null) {
+            CanvasGroupFrame folded = graph.getFoldedFrameForNode(node.getId());
+            if (folded != null) {
+                return resolveFoldedPortAnchor(graph, folded, node, portIndex, isInput);
+            }
+
+            CanvasGroupFrame emb = graph.getEmbeddedFrameForNode(node.getId());
+            if (emb != null) {
+                double[] pt = EmbeddedPanelRenderer.getEmbeddedPortAnchor(emb, node, portIndex, isInput);
+                return new PortAnchor((float) pt[0], (float) pt[1], isInput ? -1.0f : 1.0f);
+            }
+        }
+
+        NodeWidget widget = widgets != null ? widgets.apply(node) : null;
+        return resolveWidgetPortAnchor(widget, node, portIndex, isInput);
+    }
+
+    private static PortAnchor resolveFoldedPortAnchor(
+            FlowGraph graph,
+            CanvasGroupFrame folded,
+            RecipeNode node,
+            int portIndex,
+            boolean isInput
+    ) {
+        FlowGraphTopologyAnalyzer.FoldedPortSummary summary = FlowGraphTopologyAnalyzer.aggregateFoldedPorts(graph, folded);
+        if (isInput) {
+            int inIdx = summary.findInputIndexForOrigin(node.getId(), portIndex);
+            if (inIdx < 0) inIdx = 0;
+            float x = (float) (folded.getPosX() + 5.0);
+            float y = (float) (folded.getPosY() + 64.0 + inIdx * 18.0 + 8.0);
+            return new PortAnchor(x, y, -1.0f);
+        }
+        int outIdx = summary.findOutputIndexForOrigin(node.getId(), portIndex);
+        if (outIdx < 0) outIdx = 0;
+        float x = (float) (folded.getPosX() + folded.getWidth() - 5.0);
+        float y = (float) (folded.getPosY() + 64.0 + outIdx * 18.0 + 8.0);
+        return new PortAnchor(x, y, 1.0f);
+    }
+
+    private static PortAnchor resolveWidgetPortAnchor(
+            NodeWidget widget,
+            RecipeNode node,
+            int portIndex,
+            boolean isInput
+    ) {
+        if (isInput) {
+            return resolveInputWidgetPortAnchor(widget, node, portIndex);
+        }
+        return resolveOutputWidgetPortAnchor(widget, node, portIndex);
+    }
+
+    private static PortAnchor resolveInputWidgetPortAnchor(NodeWidget widget, RecipeNode node, int portIndex) {
+        if (widget != null) {
+            return new PortAnchor(widget.getInputPortX(portIndex), widget.getInputPortY(portIndex), node.isFlipped() ? 1.0f : -1.0f);
+        }
+        if (node.isReroute() || node.isBoundaryPin()) {
+            float x = (float) (node.getPosX() + (node.isFlipped() ? 32 : 0));
+            float y = (float) (node.getPosY() + 16.0);
+            return new PortAnchor(x, y, node.isFlipped() ? 1.0f : -1.0f);
+        }
+        float x = (float) node.getPosX();
+        float y = (float) (node.getPosY() + 20.0);
+        return new PortAnchor(x, y, node.isFlipped() ? 1.0f : -1.0f);
+    }
+
+    private static PortAnchor resolveOutputWidgetPortAnchor(NodeWidget widget, RecipeNode node, int portIndex) {
+        if (widget != null) {
+            return new PortAnchor(widget.getOutputPortX(portIndex), widget.getOutputPortY(portIndex), node.isFlipped() ? -1.0f : 1.0f);
+        }
+        if (node.isReroute() || node.isBoundaryPin()) {
+            float x = (float) (node.getPosX() + (node.isFlipped() ? 0 : 32));
+            float y = (float) (node.getPosY() + 16.0);
+            return new PortAnchor(x, y, node.isFlipped() ? -1.0f : 1.0f);
+        }
+        float x = (float) (node.getPosX() + node.getCardWidth());
+        float y = (float) (node.getPosY() + 20.0);
+        return new PortAnchor(x, y, node.isFlipped() ? -1.0f : 1.0f);
+    }
+
     public static ResolvedWireEndpoints resolveWireEndpointsForWidgets(FlowGraph graph,
             java.util.function.Function<RecipeNode, NodeWidget> widgets, FlowGraph.ConnectionEdge edge) {
         RecipeNode fromNode = graph.findNodeById(edge.fromNodeId());
@@ -78,66 +169,10 @@ public class CanvasWireRenderer {
             return new ResolvedWireEndpoints(0, 0, 0, 0, 0, 0, true);
         }
 
-        CanvasGroupFrame fromEmb = graph.getEmbeddedFrameForNode(fromNode.getId());
-        CanvasGroupFrame toEmb = graph.getEmbeddedFrameForNode(toNode.getId());
+        PortAnchor fromAnchor = resolvePortAnchor(graph, widgets, fromNode, edge.outputIndex(), false);
+        PortAnchor toAnchor = resolvePortAnchor(graph, widgets, toNode, edge.inputIndex(), true);
 
-        float x1, y1, fromDirX;
-        if (fromFolded != null) {
-            FlowGraphTopologyAnalyzer.FoldedPortSummary summary = FlowGraphTopologyAnalyzer.aggregateFoldedPorts(graph, fromFolded);
-            int outIdx = summary.findOutputIndexForOrigin(fromNode.getId(), edge.outputIndex());
-            if (outIdx < 0) outIdx = 0;
-            x1 = (float) (fromFolded.getPosX() + fromFolded.getWidth() - 5.0);
-            y1 = (float) (fromFolded.getPosY() + 64.0 + outIdx * 18.0 + 8.0);
-            fromDirX = 1.0f;
-        } else if (fromEmb != null) {
-            double[] pt = EmbeddedPanelRenderer.getEmbeddedPortAnchor(fromEmb, fromNode, edge.outputIndex(), false);
-            x1 = (float) pt[0];
-            y1 = (float) pt[1];
-            fromDirX = 1.0f;
-        } else {
-            NodeWidget fromWidget = widgets.apply(fromNode);
-            if (fromWidget != null) {
-                x1 = fromWidget.getOutputPortX(edge.outputIndex());
-                y1 = fromWidget.getOutputPortY(edge.outputIndex());
-            } else if (fromNode.isReroute() || fromNode.isBoundaryPin()) {
-                x1 = (float) (fromNode.getPosX() + (fromNode.isFlipped() ? 0 : 32));
-                y1 = (float) (fromNode.getPosY() + 16.0);
-            } else {
-                x1 = (float) (fromNode.getPosX() + fromNode.getCardWidth());
-                y1 = (float) (fromNode.getPosY() + 20.0);
-            }
-            fromDirX = fromNode.isFlipped() ? -1.0f : 1.0f;
-        }
-
-        float x2, y2, toDirX;
-        if (toFolded != null) {
-            FlowGraphTopologyAnalyzer.FoldedPortSummary summary = FlowGraphTopologyAnalyzer.aggregateFoldedPorts(graph, toFolded);
-            int inIdx = summary.findInputIndexForOrigin(toNode.getId(), edge.inputIndex());
-            if (inIdx < 0) inIdx = 0;
-            x2 = (float) (toFolded.getPosX() + 5.0);
-            y2 = (float) (toFolded.getPosY() + 64.0 + inIdx * 18.0 + 8.0);
-            toDirX = -1.0f;
-        } else if (toEmb != null) {
-            double[] pt = EmbeddedPanelRenderer.getEmbeddedPortAnchor(toEmb, toNode, edge.inputIndex(), true);
-            x2 = (float) pt[0];
-            y2 = (float) pt[1];
-            toDirX = -1.0f;
-        } else {
-            NodeWidget toWidget = widgets.apply(toNode);
-            if (toWidget != null) {
-                x2 = toWidget.getInputPortX(edge.inputIndex());
-                y2 = toWidget.getInputPortY(edge.inputIndex());
-            } else if (toNode.isReroute() || toNode.isBoundaryPin()) {
-                x2 = (float) (toNode.getPosX() + (toNode.isFlipped() ? 32 : 0));
-                y2 = (float) (toNode.getPosY() + 16.0);
-            } else {
-                x2 = (float) toNode.getPosX();
-                y2 = (float) (toNode.getPosY() + 20.0);
-            }
-            toDirX = toNode.isFlipped() ? 1.0f : -1.0f;
-        }
-
-        return new ResolvedWireEndpoints(x1, y1, x2, y2, fromDirX, toDirX, false);
+        return new ResolvedWireEndpoints(fromAnchor.x(), fromAnchor.y(), toAnchor.x(), toAnchor.y(), fromAnchor.dirX(), toAnchor.dirX(), false);
     }
 
     public void updateSpatialIndex(BoardScreen screen, FlowGraph graph) {
@@ -261,9 +296,10 @@ public class CanvasWireRenderer {
         if (graph == null || toNode == null) return 1.0f;
         var stats = graph.getInputPortStats(toNode, inputIndex);
         if (stats == null || !stats.isConnected()) return 1.0f;
-        if (stats.requiredOrProducedRate() <= 0.0001) return 1.0f;
+        double targetReq = stats.effectiveRate() > 0.0001 ? stats.effectiveRate() : stats.requiredOrProducedRate();
+        if (targetReq <= 0.0001) return 1.0f;
         if (stats.connectedRate() <= 0.0001) return 0.0f;
-        return (float) Math.min(1.0, stats.connectedRate() / stats.requiredOrProducedRate());
+        return (float) Math.min(1.0, stats.connectedRate() / targetReq);
     }
 
     private record WireStyle(int color, float thickness) {}
@@ -321,7 +357,7 @@ public class CanvasWireRenderer {
             return;
         }
 
-        renderSinglePortDragging(wireStart, canvasHandler, canvasMouseX, canvasMouseY, dragWireColor);
+        renderSinglePortDragging(screen, graph, wireStart, canvasHandler, canvasMouseX, canvasMouseY, dragWireColor);
     }
 
     private static void renderMultiPortDragging(BoardScreen screen, FlowGraph graph, java.util.Set<com.gtceu.calcboard.client.gui.model.PortRef> selectedPorts, double canvasMouseX, double canvasMouseY) {
@@ -332,34 +368,33 @@ public class CanvasWireRenderer {
 
     private static void renderSelectedPortDragWire(BoardScreen screen, FlowGraph graph, com.gtceu.calcboard.client.gui.model.PortRef p, double canvasMouseX, double canvasMouseY) {
         RecipeNode pNode = graph.findNodeById(p.nodeId());
-        NodeWidget pWidget = screen.findWidgetForNode(pNode);
-        if (pWidget == null) {
-            return;
-        }
+        if (pNode == null) return;
+        PortAnchor anchor = resolvePortAnchor(graph, screen::findWidgetForNode, pNode, p.portIndex(), p.isInput());
         if (p.isInput()) {
-            float px = pWidget.getInputPortX(p.portIndex());
-            float py = pWidget.getInputPortY(p.portIndex());
-            float startDirX = pNode.isFlipped() ? 1.0f : -1.0f;
-            ConnectionRenderer.addBezierToBatch((float) canvasMouseX, (float) canvasMouseY, px, py, 1.0f, startDirX, 0xFF38BDF8, 2.5f);
+            ConnectionRenderer.addBezierToBatch((float) canvasMouseX, (float) canvasMouseY, anchor.x(), anchor.y(), 1.0f, anchor.dirX(), 0xFF38BDF8, 2.5f);
             return;
         }
-        float px = pWidget.getOutputPortX(p.portIndex());
-        float py = pWidget.getOutputPortY(p.portIndex());
-        float startDirX = pNode.isFlipped() ? -1.0f : 1.0f;
-        ConnectionRenderer.addBezierToBatch(px, py, (float) canvasMouseX, (float) canvasMouseY, startDirX, -1.0f, 0xFF38BDF8, 2.5f);
+        ConnectionRenderer.addBezierToBatch(anchor.x(), anchor.y(), (float) canvasMouseX, (float) canvasMouseY, anchor.dirX(), -1.0f, 0xFF38BDF8, 2.5f);
     }
 
-    private static void renderSinglePortDragging(NodeWidget wireStart, com.gtceu.calcboard.client.gui.CanvasInteractionHandler canvasHandler, double canvasMouseX, double canvasMouseY, int dragWireColor) {
-        if (canvasHandler.isWireStartInput()) {
-            float x1 = wireStart.getInputPortX(canvasHandler.getWireStartPortIdx());
-            float y1 = wireStart.getInputPortY(canvasHandler.getWireStartPortIdx());
-            float startDirX = wireStart.getNode().isFlipped() ? 1.0f : -1.0f;
-            ConnectionRenderer.addBezierToBatch((float) canvasMouseX, (float) canvasMouseY, x1, y1, 1.0f, startDirX, dragWireColor, 3.0f);
+    private static void renderSinglePortDragging(
+            BoardScreen screen,
+            FlowGraph graph,
+            NodeWidget wireStart,
+            com.gtceu.calcboard.client.gui.CanvasInteractionHandler canvasHandler,
+            double canvasMouseX,
+            double canvasMouseY,
+            int dragWireColor
+    ) {
+        RecipeNode node = wireStart.getNode();
+        boolean isInput = canvasHandler.isWireStartInput();
+        int portIdx = canvasHandler.getWireStartPortIdx();
+        PortAnchor anchor = resolvePortAnchor(graph, screen::findWidgetForNode, node, portIdx, isInput);
+
+        if (isInput) {
+            ConnectionRenderer.addBezierToBatch((float) canvasMouseX, (float) canvasMouseY, anchor.x(), anchor.y(), 1.0f, anchor.dirX(), dragWireColor, 3.0f);
             return;
         }
-        float x1 = wireStart.getOutputPortX(canvasHandler.getWireStartPortIdx());
-        float y1 = wireStart.getOutputPortY(canvasHandler.getWireStartPortIdx());
-        float startDirX = wireStart.getNode().isFlipped() ? -1.0f : 1.0f;
-        ConnectionRenderer.addBezierToBatch(x1, y1, (float) canvasMouseX, (float) canvasMouseY, startDirX, -1.0f, dragWireColor, 3.0f);
+        ConnectionRenderer.addBezierToBatch(anchor.x(), anchor.y(), (float) canvasMouseX, (float) canvasMouseY, anchor.dirX(), -1.0f, dragWireColor, 3.0f);
     }
 }

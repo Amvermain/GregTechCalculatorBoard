@@ -27,8 +27,13 @@ public final class CanvasNodeResizingState implements CanvasInteractionState {
     public void cancel(CanvasInteractionContext ctx) {
         NodeWidget resizingNode = ctx.getResizingNode();
         if (resizingNode != null) {
-            resizingNode.getNode().setCardWidth(ctx.getOrigNodeWidth());
-            resizingNode.getNode().setCardHeight(ctx.getOrigNodeHeight());
+            resizingNode.getNode().setCardWidth(ctx.getOrigCardWidth());
+            resizingNode.getNode().setCardHeight(ctx.getOrigCardHeight());
+            resizingNode.getTextCache().markDirty();
+            BoardScreen screen = ctx.getScreen();
+            if (screen != null && screen.getWireRenderer() != null) {
+                screen.getWireRenderer().markDirty();
+            }
         }
         ctx.setResizingNode(null);
         ctx.getStateMachine().returnToIdle();

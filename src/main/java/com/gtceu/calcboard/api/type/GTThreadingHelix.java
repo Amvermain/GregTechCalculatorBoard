@@ -1,5 +1,6 @@
 package com.gtceu.calcboard.api.type;
 
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 
 /**
@@ -78,6 +79,19 @@ public enum GTThreadingHelix {
 
     public String getEnglishName() {
         return englishName;
+    }
+
+    public Component getDisplayName() {
+        try {
+            if (id != null && net.minecraftforge.registries.ForgeRegistries.ITEMS != null) {
+                net.minecraft.world.item.Item item = net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(id);
+                if (item != null && item != net.minecraft.world.item.Items.AIR) {
+                    return item.getDescription();
+                }
+            }
+        } catch (Throwable ignored) {}
+        String key = "gui.gtcalcboard.threading.helix." + name().toLowerCase(java.util.Locale.ROOT);
+        return Component.translatable(key);
     }
 
     public GTVoltageTier getTier() {

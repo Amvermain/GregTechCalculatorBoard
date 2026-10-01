@@ -45,6 +45,8 @@ public class CanvasInteractionContext {
     private double resizeStartCanvasY;
     private int origNodeWidth;
     private int origNodeHeight;
+    private int origCardWidth;
+    private int origCardHeight;
 
     private double rightClickStartMouseX;
     private double rightClickStartMouseY;
@@ -199,6 +201,22 @@ public class CanvasInteractionContext {
 
     public void setOrigNodeHeight(int origNodeHeight) {
         this.origNodeHeight = origNodeHeight;
+    }
+
+    public int getOrigCardWidth() {
+        return origCardWidth;
+    }
+
+    public void setOrigCardWidth(int origCardWidth) {
+        this.origCardWidth = origCardWidth;
+    }
+
+    public int getOrigCardHeight() {
+        return origCardHeight;
+    }
+
+    public void setOrigCardHeight(int origCardHeight) {
+        this.origCardHeight = origCardHeight;
     }
 
     public double getRightClickStartMouseX() {

@@ -113,6 +113,8 @@ public interface IBoardActionDispatcher {
 
     void openJunctionSupplyDialog(RecipeNode node);
 
+    default void openCrossPageSourceSearchDialog(RecipeNode consumerNode, String initialPageId, String initialNodeId, java.util.function.BiConsumer<String, String> onSelect) {}
+
     void openMachineSelectorDialog(RecipeNode node);
 
     void openMachineConfigDialog(RecipeNode node);
@@ -136,4 +138,6 @@ public interface IBoardActionDispatcher {
     void batchApplyPageTargetVoltage();
 
     default void openRecipeSearchForSharedFrame(CanvasGroupFrame frame) {}
+
+    default void openRecipeSearchForSharedFrameWithWireContext(CanvasGroupFrame frame, RecipeNode sourceNode, int sourcePortIdx, boolean sourceIsInput, com.gtceu.calcboard.api.model.IngredientStack sourceStack, boolean shiftAutoRatio) {}
 }

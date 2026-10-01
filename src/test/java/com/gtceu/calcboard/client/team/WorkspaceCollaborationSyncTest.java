@@ -95,4 +95,28 @@ public class WorkspaceCollaborationSyncTest {
         assertTrue(state.doesHoldLock("page_main"));
         assertTrue(state.isPageDirty("page_main"));
     }
+
+    @Test
+    public void testTeamPageViewportStorageAndClear() {
+        state.setPageViewport("page_alpha", 120.0, -80.0, 1.5);
+        state.setPageViewport("page_beta", 300.0, 150.0, 0.75);
+
+        ClientWorkspaceState.TeamPageViewport vpAlpha = state.getPageViewport("page_alpha");
+        assertNotNull(vpAlpha);
+        assertEquals(120.0, vpAlpha.panX(), 1e-6);
+        assertEquals(-80.0, vpAlpha.panY(), 1e-6);
+        assertEquals(1.5, vpAlpha.zoom(), 1e-6);
+
+        ClientWorkspaceState.TeamPageViewport vpBeta = state.getPageViewport("page_beta");
+        assertNotNull(vpBeta);
+        assertEquals(300.0, vpBeta.panX(), 1e-6);
+        assertEquals(150.0, vpBeta.panY(), 1e-6);
+        assertEquals(0.75, vpBeta.zoom(), 1e-6);
+
+        assertNull(state.getPageViewport("page_unknown"));
+
+        state.clear();
+        assertNull(state.getPageViewport("page_alpha"));
+        assertNull(state.getPageViewport("page_beta"));
+    }
 }

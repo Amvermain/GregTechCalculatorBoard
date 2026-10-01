@@ -9,6 +9,7 @@ import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer;
 import com.gtceu.calcboard.api.storage.BoardPage;
 import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.bom.BOMHatchTierMode;
 import com.gtceu.calcboard.api.bom.MultiblockBOMCalculator;
 import com.gtceu.calcboard.api.bom.MultiblockBOMSummary;
 import com.gtceu.calcboard.api.bom.PartCategory;
@@ -40,6 +41,7 @@ public class MultiblockBOMDialog implements IBoardModal {
 
     private int filterCategoryIndex = 0; // 0: All, 1: Casings, 2: Coils, 3: Hatches/Buses, 4: Controllers
     private boolean dualLowerTierEnergyHatches = false;
+    private BOMHatchTierMode hatchTierMode = BOMHatchTierMode.MATCH_MACHINE;
 
     private String searchQuery = "";
     private EditBox searchBox;
@@ -209,7 +211,7 @@ public class MultiblockBOMDialog implements IBoardModal {
                 }
                 FlowGraph graph = resolveGraphForEntry(entry, teamState);
                 if (graph != null && !graph.getNodes().isEmpty()) {
-                    pageSummaries.add(MultiblockBOMCalculator.calculateBOM(graph, dualLowerTierEnergyHatches));
+                    pageSummaries.add(MultiblockBOMCalculator.calculateBOM(graph, dualLowerTierEnergyHatches, hatchTierMode));
                 }
             }
             cachedSummary = MultiblockBOMSummary.merge(pageSummaries);
@@ -503,6 +505,19 @@ public class MultiblockBOMDialog implements IBoardModal {
         String filterCountStr = String.format(Locale.ROOT, "§8(%d / %d items)", filtered.size(), cachedSummary.totalUniqueItemTypes());
         graphics.drawString(font, filterCountStr, x + 126, row2Y + 3, 0xFF888888, false);
 
+        // Bus/Hatch Tier Mode Button (Right-aligned in Row 2)
+        String hatchStr = getHatchTierModeDisplayName(hatchTierMode);
+        int hatchW = font.width(hatchStr) + 14;
+        int hatchX = x + w - hatchW - 2;
+        boolean hatchHover = mouseX >= hatchX && mouseX <= hatchX + hatchW && mouseY >= row2Y && mouseY <= row2Y + 14;
+
+        int btnBg = hatchTierMode == BOMHatchTierMode.MATCH_MACHINE ? (hatchHover ? 0xFF283446 : 0xFF182230) : (hatchHover ? 0xFF2B4E38 : 0xFF1B3624);
+        int btnBorder = hatchTierMode == BOMHatchTierMode.MATCH_MACHINE ? (hatchHover ? 0xFF55AAFF : 0xFF3A4B62) : (hatchHover ? 0xFF55FF88 : 0xFF35804D);
+        graphics.fill(hatchX, row2Y, hatchX + hatchW, row2Y + 14, btnBg);
+        graphics.renderOutline(hatchX, row2Y, hatchW, 14, btnBorder);
+        String iconPrefix = hatchTierMode == BOMHatchTierMode.MATCH_MACHINE ? "§7📦 " : "§a📦 ";
+        graphics.drawCenteredString(font, iconPrefix + hatchStr, hatchX + hatchW / 2, row2Y + 3, 0xFFFFFFFF);
+
         // Row 3: Table Header Row
         int headerY = row2Y + 17;
         int headerH = 13;
@@ -576,6 +591,32 @@ public class MultiblockBOMDialog implements IBoardModal {
             }
             tip.add(Component.literal("§8[Click to toggle prepared checklist]"));
             BoardTooltipRenderer.renderComponentTooltip(graphics, font, tip, mouseX, mouseY, screenW, screenH);
+            return;
+        }
+
+        int dialogW = Math.min(DIALOG_WIDTH, screenW - 16);
+        int dialogX = (screenW - dialogW) / 2;
+        int dialogH = Math.min(DIALOG_HEIGHT, screenH - 16);
+        int dialogY = (screenH - dialogH) / 2;
+        int bannerY = dialogY + 25;
+        int sidebarY = bannerY + 22 + 4;
+        int mainX = dialogX + SIDEBAR_WIDTH + 14;
+        int mainW = dialogW - (mainX - dialogX) - 8;
+        int row1Y = sidebarY + 1;
+        int row2Y = row1Y + 17;
+
+        String hatchStr = getHatchTierModeDisplayName(hatchTierMode);
+        int hatchW = font.width(hatchStr) + 14;
+        int hatchX = mainX + mainW - hatchW - 2;
+        if (mouseX >= hatchX && mouseX <= hatchX + hatchW && mouseY >= row2Y && mouseY <= row2Y + 14) {
+            List<Component> hatchTip = new ArrayList<>();
+            hatchTip.add(Component.translatable("gui.gtcalcboard.bom.hatch_tier.title"));
+            hatchTip.add(Component.translatable("gui.gtcalcboard.bom.hatch_tier.current", getHatchTierModeDisplayName(hatchTierMode)));
+            hatchTip.add(Component.empty());
+            hatchTip.add(Component.translatable(getHatchTierModeDescriptionKey(hatchTierMode)));
+            hatchTip.add(Component.empty());
+            hatchTip.add(Component.translatable("gui.gtcalcboard.bom.hatch_tier.cycle_hint"));
+            BoardTooltipRenderer.renderComponentTooltip(graphics, font, hatchTip, mouseX, mouseY, screenW, screenH);
         }
     }
 
@@ -729,6 +770,21 @@ public class MultiblockBOMDialog implements IBoardModal {
 
         // Search Box click
         int row2Y = row1Y + 17;
+
+        // Bus/Hatch Tier Mode Button Click (Left click: next, Right click: previous)
+        String hatchStr = getHatchTierModeDisplayName(hatchTierMode);
+        int hatchW = font.width(hatchStr) + 14;
+        int hatchX = mainX + mainW - hatchW - 2;
+        if (mouseX >= hatchX && mouseX <= hatchX + hatchW && mouseY >= row2Y && mouseY <= row2Y + 14) {
+            playClickSound();
+            if (button == GLFW.GLFW_MOUSE_BUTTON_RIGHT) {
+                hatchTierMode = hatchTierMode.previous();
+            } else {
+                hatchTierMode = hatchTierMode.next();
+            }
+            dirty = true;
+            return true;
+        }
         if (searchBox != null) {
             searchBox.setX(mainX);
             searchBox.setY(row2Y);
@@ -997,6 +1053,28 @@ public class MultiblockBOMDialog implements IBoardModal {
         String name = entry.displayName().toLowerCase(Locale.ROOT);
         String id = entry.itemId() != null ? entry.itemId().toString().toLowerCase(Locale.ROOT) : "";
         return name.contains(searchQuery) || id.contains(searchQuery);
+    }
+
+    private String getHatchTierModeDisplayName(BOMHatchTierMode mode) {
+        if (mode == null) mode = BOMHatchTierMode.MATCH_MACHINE;
+        return switch (mode) {
+            case MATCH_MACHINE -> Component.translatable("gui.gtcalcboard.bom.hatch_tier.match_machine").getString();
+            case AUTO_MINIMUM -> Component.translatable("gui.gtcalcboard.bom.hatch_tier.auto_minimum").getString();
+            case FORCE_LV -> Component.translatable("gui.gtcalcboard.bom.hatch_tier.force_lv").getString();
+            case FORCE_MV -> Component.translatable("gui.gtcalcboard.bom.hatch_tier.force_mv").getString();
+            case FORCE_HV -> Component.translatable("gui.gtcalcboard.bom.hatch_tier.force_hv").getString();
+        };
+    }
+
+    private String getHatchTierModeDescriptionKey(BOMHatchTierMode mode) {
+        if (mode == null) mode = BOMHatchTierMode.MATCH_MACHINE;
+        return switch (mode) {
+            case MATCH_MACHINE -> "gui.gtcalcboard.bom.hatch_tier.desc.match_machine";
+            case AUTO_MINIMUM -> "gui.gtcalcboard.bom.hatch_tier.desc.auto_minimum";
+            case FORCE_LV -> "gui.gtcalcboard.bom.hatch_tier.desc.force_lv";
+            case FORCE_MV -> "gui.gtcalcboard.bom.hatch_tier.desc.force_mv";
+            case FORCE_HV -> "gui.gtcalcboard.bom.hatch_tier.desc.force_hv";
+        };
     }
 }
 

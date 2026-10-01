@@ -129,6 +129,10 @@ public final class FlowBalanceMatrixSolver {
         return AutoRatioEngine.calculateTotalConnectedPortDemand(graph, producer, outputIndex, countsMap);
     }
 
+    public static double calculateTotalConnectedPortEffectiveDemand(FlowGraph graph, RecipeNode producer, int outputIndex) {
+        return AutoRatioEngine.calculateTotalConnectedPortEffectiveDemand(graph, producer, outputIndex);
+    }
+
     public static double calculateEffectiveIncomingSupply(FlowGraph graph, RecipeNode consumer, int inIdx, Map<String, Double> countsMap) {
         return AutoRatioEngine.calculateEffectiveIncomingSupply(graph, consumer, inIdx, countsMap);
     }

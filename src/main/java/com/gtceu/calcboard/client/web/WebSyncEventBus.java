@@ -34,25 +34,48 @@ public final class WebSyncEventBus {
         String json = BoardJsonSerializer.serialize(graph, pageId, pageTitle, panX, panY, zoom);
         currentSnapshot.set(json);
         IconPrewarmer.getInstance().enqueue(graph);
-        broadcast("board_updated", "{\"pageId\":\"" + (pageId != null ? pageId : "default") + "\",\"timestamp\":" + System.currentTimeMillis() + "}");
+        com.gtceu.calcboard.client.team.ClientWorkspaceState teamState = com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance();
+        boolean isTeamPage = teamState.getRemotePage(pageId) != null
+                || (teamState.isTeamMode() && pageId != null && pageId.equals(teamState.getActiveTeamPageId()));
+        String wsMode = isTeamPage ? "TEAM" : "LOCAL";
+        broadcast("board_updated", "{\"pageId\":\"" + (pageId != null ? pageId : "default") + "\",\"workspace\":\"" + wsMode + "\",\"timestamp\":" + System.currentTimeMillis() + "}");
     }
 
     public static void publishCurrentBoard() {
         if (!LocalWebServerDaemon.getInstance().isRunning()) {
             return;
         }
+        com.gtceu.calcboard.client.team.ClientWorkspaceState teamState = com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance();
+        boolean isTeam = teamState.isTeamMode();
+
         try {
             if (!java.awt.GraphicsEnvironment.isHeadless()) {
                 net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
                 if (mc != null && mc.screen instanceof com.gtceu.calcboard.client.gui.BoardScreen bs) {
-                    BoardPage active = BoardManager.getInstance().getActivePage();
-                    String pageId = active != null ? active.getId() : "default";
-                    String pageTitle = active != null ? active.getName() : "Untitled Page";
+                    String pageId;
+                    String pageTitle;
+                    if (isTeam) {
+                        pageId = teamState.getActiveTeamPageId();
+                        var remotePage = teamState.getRemotePage(pageId);
+                        pageTitle = (remotePage != null && remotePage.getTitle() != null) ? remotePage.getTitle() : "Main Workspace";
+                    } else {
+                        BoardPage active = BoardManager.getInstance().getActivePage();
+                        pageId = active != null ? active.getId() : "default";
+                        pageTitle = active != null ? active.getName() : "Untitled Page";
+                    }
                     publishSnapshot(bs.getGraph(), pageId, pageTitle, bs.getPanX(), bs.getPanY(), bs.getZoom());
                     return;
                 }
             }
         } catch (Throwable ignored) {}
+
+        if (isTeam) {
+            BoardPage teamPage = teamState.getTeamPageAsBoardPage(teamState.getActiveTeamPageId());
+            if (teamPage != null) {
+                publishSnapshot(teamPage.getGraph(), teamPage.getId(), teamPage.getName(), teamPage.getPanX(), teamPage.getPanY(), teamPage.getZoom());
+                return;
+            }
+        }
 
         BoardPage active = BoardManager.getInstance().getActivePage();
         if (active != null) {

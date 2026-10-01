@@ -101,6 +101,8 @@ public interface IBoardScreenContext extends IBoardViewportAccessor, IBoardSelec
 
     default void openPageAndFocusNode(String pageId, String nodeId) {}
 
+    default void switchToWorkspaceMode(com.gtceu.calcboard.client.team.ClientWorkspaceState.WorkspaceMode targetMode) {}
+
     void openTutorialLauncher();
 
     void onNodeInspectorOpened();

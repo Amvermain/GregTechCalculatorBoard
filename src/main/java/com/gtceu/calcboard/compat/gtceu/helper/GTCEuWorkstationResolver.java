@@ -3,6 +3,7 @@ package com.gtceu.calcboard.compat.gtceu.helper;
 import com.gtceu.calcboard.api.catalog.CategoryCapability;
 import com.gtceu.calcboard.api.catalog.CategoryCapabilityMatrix;
 import com.gtceu.calcboard.api.catalog.MultiblockDetector;
+import com.gtceu.calcboard.api.model.NodeWorkstationResolver;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
@@ -198,6 +199,16 @@ public final class GTCEuWorkstationResolver {
 
     public static ResourceLocation getWorkstationForTier(RecipeNode node, GTVoltageTier tier) {
         if (node == null || tier == null) return null;
+        if (NodeWorkstationResolver.isMultiblockOnly(node)) {
+            return null;
+        }
+        ResourceLocation catId = node.getRecipeCategoryId();
+        if (catId != null) {
+            CategoryCapability cap = CategoryCapabilityMatrix.getInstance().getCapability(catId);
+            if (cap != null && !cap.hasSingleblockOption()) {
+                return null;
+            }
+        }
         if (node.getSteamMode() != null && node.getSteamMode().isSteam()) {
             return null;
         }
@@ -217,7 +228,6 @@ public final class GTCEuWorkstationResolver {
             return fromList;
         }
 
-        ResourceLocation catId = node.getRecipeCategoryId();
         if (catId != null) {
             Map<GTVoltageTier, ResourceLocation> tierMap = DEDUCTED_TIER_WORKSTATIONS.get(catId);
             if (tierMap != null) {

@@ -113,11 +113,12 @@ public class GTCEuCapabilityScanner {
     }
 
     private static void shareRelatedWorkstations(CategoryCapabilityMatrix matrix, ResourceLocation catId, ResourceLocation mId, boolean isMb, boolean usesCoils) {
+        if (!isMb) return;
         ResourceLocation relatedCatId = getRelatedRecipeCategory(catId);
         if (relatedCatId == null || relatedCatId.equals(catId)) return;
 
         CategoryCapabilityMatrix.CategoryBuilder relB = matrix.getOrCreateBuilder(relatedCatId);
-        relB.addWorkstation(mId, isMb);
+        relB.addWorkstation(mId, true);
         if (usesCoils) relB.canUseCoils = true;
     }
 
@@ -127,8 +128,6 @@ public class GTCEuCapabilityScanner {
         String ns = catId.getNamespace();
         if (path.equals("large_chemical_reactor") || path.equals("extreme_chemical_reactor") || path.equals("incomprehensible_chemical_reactor")) {
             return ResourceLocation.tryParse(ns + ":chemical_reactor");
-        } else if (path.equals("chemical_reactor")) {
-            return ResourceLocation.tryParse(ns + ":large_chemical_reactor");
         } else if (path.startsWith("large_")) {
             return ResourceLocation.tryParse(ns + ":" + path.substring(6));
         } else if (path.startsWith("mega_")) {

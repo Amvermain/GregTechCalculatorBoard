@@ -1,5 +1,6 @@
 package com.gtceu.calcboard.client.gui.render;
 
+import com.gtceu.calcboard.api.model.CanvasGroupFrame;
 import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
@@ -52,7 +53,8 @@ public final class BoardTooltipRenderer {
 
     public static void renderComponentTooltip(GuiGraphics graphics, Font font, List<Component> lines, int mouseX, int mouseY, int screenWidth, int screenHeight) {
         if (lines == null || lines.isEmpty() || font == null || graphics == null) return;
-        List<FormattedCharSequence> formatted = lines.stream().map(Component::getVisualOrderText).toList();
+        List<Component> normalizedLines = normalizeTooltipLines(lines);
+        List<FormattedCharSequence> formatted = normalizedLines.stream().map(Component::getVisualOrderText).toList();
 
         graphics.flush();
         RenderSystem.clear(GL11.GL_DEPTH_BUFFER_BIT, Minecraft.ON_OSX);
@@ -89,6 +91,24 @@ public final class BoardTooltipRenderer {
     public static void renderTooltip(GuiGraphics graphics, Font font, Component component, int mouseX, int mouseY) {
         if (component == null) return;
         renderComponentTooltip(graphics, font, List.of(component), mouseX, mouseY);
+    }
+
+    private static List<Component> normalizeTooltipLines(List<Component> lines) {
+        if (lines == null || lines.isEmpty()) return List.of();
+        List<Component> result = new ArrayList<>(lines.size());
+        for (Component comp : lines) {
+            if (comp == null) continue;
+            String text = comp.getString();
+            if (text.contains("\n") || text.contains("\r")) {
+                String sanitized = text.replace("\r\n", "\n").replace('\r', '\n');
+                for (String part : sanitized.split("\n")) {
+                    result.add(Component.literal(part));
+                }
+            } else {
+                result.add(comp);
+            }
+        }
+        return result;
     }
 
     public static void renderTooltips(BoardScreen screen, GuiGraphics graphics, Font font, int mouseX, int mouseY) {
@@ -245,6 +265,9 @@ public final class BoardTooltipRenderer {
 
         NodeWidget wireStart = canvasHandler.getWireStartNode();
         if (wireStart != null) {
+            if (renderSharedFrameWireDragTooltip(screen, graphics, font, canvasMouseX, canvasMouseY, mouseX, mouseY)) {
+                return true;
+            }
             renderWireHintTooltip(screen, graphics, font, mouseX, mouseY);
             return true;
         }
@@ -260,6 +283,39 @@ public final class BoardTooltipRenderer {
         if (mouseY >= screen.getHeaderBottomY()) {
             CanvasGroupFrameRenderer.renderFrameTooltips(graphics, font, screen.getGraph(), canvasMouseX, canvasMouseY, mouseX, mouseY);
             CanvasStickyNoteRenderer.renderNoteTooltips(graphics, font, screen.getGraph(), canvasMouseX, canvasMouseY, mouseX, mouseY);
+        }
+        return false;
+    }
+
+    private static boolean renderSharedFrameWireDragTooltip(BoardScreen screen, GuiGraphics graphics, Font font, double canvasMouseX, double canvasMouseY, int mouseX, int mouseY) {
+        FlowGraph graph = screen.getGraph();
+        if (graph == null) return false;
+
+        for (int i = graph.getFrames().size() - 1; i >= 0; i--) {
+            CanvasGroupFrame f = graph.getFrames().get(i);
+            if (f == null || !f.isSharedMachineFrame() || !f.isPointInside(canvasMouseX, canvasMouseY)) {
+                continue;
+            }
+
+            if (f.getViewMode() == com.gtceu.calcboard.api.model.PoolViewMode.EMBEDDED_PANEL) {
+                var portHit = EmbeddedPanelRenderer.findHoveredEmbeddedPort(graph, canvasMouseX, canvasMouseY);
+                if (portHit != null) {
+                    return false;
+                }
+            }
+
+            boolean shift = Screen.hasShiftDown();
+            Component baseText = Component.literal("§a+ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_add_recipe"));
+            if (shift) {
+                List<Component> lines = List.of(
+                        baseText,
+                        Component.translatable("gui.gtcalcboard.tooltip.wire_mode_shift")
+                );
+                renderComponentTooltip(graphics, font, lines, mouseX, mouseY, screen.width, screen.height);
+            } else {
+                renderTooltip(graphics, font, baseText, mouseX, mouseY, screen.width, screen.height);
+            }
+            return true;
         }
         return false;
     }

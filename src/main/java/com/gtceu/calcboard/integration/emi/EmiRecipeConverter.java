@@ -92,6 +92,10 @@ public class EmiRecipeConverter {
         ResourceLocation catId = recipe.getCategory() != null ? recipe.getCategory().getId() : null;
         if (catId != null) {
             node.setRecipeCategoryId(catId);
+            var cap = com.gtceu.calcboard.api.catalog.CategoryCapabilityMatrix.getInstance().getCapability(catId);
+            if (cap != null && cap.hasMultiblockOption() && !cap.hasSingleblockOption()) {
+                node.setMultiblock(true);
+            }
         }
 
         List<ResourceLocation> allWs = findAllWorkstations(recipe);
@@ -238,6 +242,7 @@ public class EmiRecipeConverter {
                 node.setAvailableWorkstations(new ArrayList<>(cap.availableWorkstations()));
                 if (cap.hasMultiblockOption() && !cap.hasSingleblockOption()) {
                     node.setMultiblock(true);
+                    node.getAvailableWorkstations().removeIf(ws -> !MultiblockDetector.isMultiblock(ws));
                 }
             }
         }

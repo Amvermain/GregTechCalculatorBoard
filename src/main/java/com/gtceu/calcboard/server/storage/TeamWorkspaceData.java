@@ -126,7 +126,8 @@ public class TeamWorkspaceData {
                     p.getPageRevision(),
                     lockUUID,
                     lockName,
-                    lockExpires
+                    lockExpires,
+                    p.getFolderPath()
             ));
         }
 

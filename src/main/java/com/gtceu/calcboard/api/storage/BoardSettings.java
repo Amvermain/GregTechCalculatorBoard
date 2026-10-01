@@ -42,7 +42,7 @@ public class BoardSettings {
     private boolean showDebugInfo = false;
     private boolean autoRatioFractionalDefault = false;
     private boolean preserveFractionalAnchor = true;
-    private boolean slimCardMode = true;
+    private boolean slimCardMode = false;
 
     public void resetToDefault() {
         this.hasSeenWelcomePrompt = false;
@@ -72,7 +72,7 @@ public class BoardSettings {
         this.showDebugInfo = false;
         this.autoRatioFractionalDefault = false;
         this.preserveFractionalAnchor = true;
-        this.slimCardMode = true;
+        this.slimCardMode = false;
     }
 
     public void serializeNBT(CompoundTag tag) {

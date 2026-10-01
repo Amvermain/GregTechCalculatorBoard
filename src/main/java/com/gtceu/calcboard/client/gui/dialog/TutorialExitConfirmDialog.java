@@ -172,33 +172,13 @@ public class TutorialExitConfirmDialog implements IBoardModal {
             bm.addPage("Page " + (bm.getPages().size() + 1));
             parent.rebuildWidgets();
         } else if (targetTeamPageId != null) {
-            var teamState = com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance();
-            teamState.autoCommitAndRelease(parent, teamState.getActiveTeamPageId());
-            teamState.setActiveTeamPageId(targetTeamPageId);
-            com.gtceu.calcboard.network.NetworkHandler.sendToServer(
-                new com.gtceu.calcboard.network.packet.c2s.C2SPingPresencePacket(teamState.getCurrentTeamId(), targetTeamPageId, true)
-            );
-            parent.rebuildWidgets();
-            parent.markSummaryDirty();
+            parent.openPage(targetTeamPageId);
         } else if (targetPageIndex >= 0) {
             BoardManager bm = BoardManager.getInstance();
-            BoardPage cur = bm.getActivePage();
-            if (cur != null) {
-                cur.setPanX(parent.getPanX());
-                cur.setPanY(parent.getPanY());
-                cur.setZoom(parent.getZoom());
+            List<BoardPage> openPages = bm.getOpenPages();
+            if (targetPageIndex < openPages.size()) {
+                parent.openPage(openPages.get(targetPageIndex).getId());
             }
-            bm.switchPage(targetPageIndex);
-            BoardPage next = bm.getActivePage();
-            if (next != null) {
-                parent.setPanX(next.getPanX());
-                parent.setPanY(next.getPanY());
-                parent.setZoom(next.getZoom());
-                BoardScreen.lastPanX = next.getPanX();
-                BoardScreen.lastPanY = next.getPanY();
-                BoardScreen.lastZoom = next.getZoom();
-            }
-            parent.rebuildWidgets();
         }
 
         close();

@@ -11,6 +11,7 @@ import com.gtceu.calcboard.compat.start.model.NodeThreadingConfig;
 
 import com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter;
 import com.gtceu.calcboard.api.spi.extension.IBoosterProvider;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.fml.ModList;
@@ -149,6 +150,28 @@ public class StarTModAdapter extends GTCEuModAdapter {
     }
 
     @Override
+    public void buildAddonTooltip(RecipeNode node, MachineAddon addon, boolean isInstalled, List<Component> tooltip) {
+        if (addon != null && addon.getCategory().equals(AddonCategory.THREADING)) {
+            GTThreadingHelix helix = GTThreadingHelix.fromId(addon.getId());
+            if (helix != null) {
+                int count = 1;
+                if (addon.getItemStackSample() != null && addon.getItemStackSample().getCount() > 0) {
+                    count = addon.getItemStackSample().getCount();
+                } else if (node != null) {
+                    count = RecipeNodeThreadingHelper.getThreadingConfig(node).getHelixCount(helix);
+                }
+                tooltip.clear();
+                tooltip.add(Component.literal("§f" + count + "x ").append(helix.getDisplayName()));
+                if (addon.getDescription() != null && !addon.getDescription().isEmpty()) {
+                    tooltip.add(Component.literal("§7" + addon.getDescription()));
+                }
+                return;
+            }
+        }
+        super.buildAddonTooltip(node, addon, isInstalled, tooltip);
+    }
+
+    @Override
     public String formatAddonSubtitle(RecipeNode node, MachineAddon addon) {
         if (addon != null && addon.getCategory().equals(AddonCategory.THREADING)) {
             return addon.getDescription();
@@ -170,15 +193,15 @@ public class StarTModAdapter extends GTCEuModAdapter {
             int count = entry.getValue();
             if (helix == null || count <= 0) continue;
 
-            String id = helix.getId() != null ? helix.getId().toString() : "start_core:" + helix.name().toLowerCase();
+            String id = helix.getId() != null ? helix.getId().toString() : "start_core:" + helix.name().toLowerCase(java.util.Locale.ROOT);
             String name = count + "x " + helix.getEnglishName();
 
             StringBuilder desc = new StringBuilder();
-            if (helix.getGeneral() > 0) desc.append("+").append(helix.getGeneral() * count).append(" Gen ");
-            if (helix.getSpeed() > 0) desc.append("+").append(helix.getSpeed() * count).append(" Spd ");
-            if (helix.getEfficiency() > 0) desc.append("+").append(helix.getEfficiency() * count).append(" Eff ");
-            if (helix.getParallels() > 0) desc.append("+").append(helix.getParallels() * count).append(" Par ");
-            if (helix.getThreading() > 0) desc.append("+").append(helix.getThreading() * count).append(" Thrd ");
+            if (helix.getGeneral() > 0) desc.append("+").append(helix.getGeneral() * count).append(" ").append(Component.translatable("gui.gtcalcboard.threading.stat.gen").getString()).append(" ");
+            if (helix.getSpeed() > 0) desc.append("+").append(helix.getSpeed() * count).append(" ").append(Component.translatable("gui.gtcalcboard.threading.stat.spd").getString()).append(" ");
+            if (helix.getEfficiency() > 0) desc.append("+").append(helix.getEfficiency() * count).append(" ").append(Component.translatable("gui.gtcalcboard.threading.stat.eff").getString()).append(" ");
+            if (helix.getParallels() > 0) desc.append("+").append(helix.getParallels() * count).append(" ").append(Component.translatable("gui.gtcalcboard.threading.stat.par").getString()).append(" ");
+            if (helix.getThreading() > 0) desc.append("+").append(helix.getThreading() * count).append(" ").append(Component.translatable("gui.gtcalcboard.threading.stat.thrd").getString()).append(" ");
 
             MachineAddon addon = new MachineAddon(id, name, AddonCategory.THREADING, desc.toString().trim(), helix.getId());
             addon.setParallelMultiplier(1);

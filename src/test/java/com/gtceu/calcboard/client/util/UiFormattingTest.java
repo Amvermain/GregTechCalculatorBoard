@@ -902,6 +902,41 @@ public class UiFormattingTest {
         String badge = com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog.formatAddonBadge(boost, null);
         Assertions.assertEquals("§a⚡4x §b⏱1.6x §e⚡0.95x", badge);
     }
+
+    @Test
+    public void testNoBrokenControlOrNewlineCharactersInLangFiles() throws Exception {
+        String[] langFiles = {"en_us.json", "ko_kr.json", "ru_ru.json", "zh_cn.json"};
+        List<String> allowedMultilinePrefixes = List.of(
+                "gui.gtcalcboard.guide.",
+                "gui.gtcalcboard.welcome.desc",
+                "gui.gtcalcboard.search.help_tooltip"
+        );
+
+        List<String> violations = new ArrayList<>();
+        for (String langFile : langFiles) {
+            java.nio.file.Path path = java.nio.file.Paths.get("src/main/resources/assets/gtcalcboard/lang", langFile);
+            String content = java.nio.file.Files.readString(path, java.nio.charset.StandardCharsets.UTF_8);
+            JsonObject json = JsonParser.parseString(content).getAsJsonObject();
+            for (Map.Entry<String, JsonElement> entry : json.entrySet()) {
+                checkLangEntryForBrokenCharacters(langFile, entry.getKey(), entry.getValue().getAsString(), allowedMultilinePrefixes, violations);
+            }
+        }
+
+        Assertions.assertTrue(violations.isEmpty(),
+                "Broken control or newline characters detected in lang files:\n" + String.join("\n", violations));
+    }
+
+    private static void checkLangEntryForBrokenCharacters(String langFile, String key, String value, List<String> allowedPrefixes, List<String> violations) {
+        if (value.contains("\r")) {
+            violations.add(String.format(Locale.ROOT, "[%s] Key '%s' contains Carriage Return (\\r / 0x0D)", langFile, key));
+        }
+        if (value.contains("\\n") || value.contains("\\r")) {
+            violations.add(String.format(Locale.ROOT, "[%s] Key '%s' contains literal escaped newline (\\\\n / \\\\r)", langFile, key));
+        }
+        if (value.contains("\n") && allowedPrefixes.stream().noneMatch(key::startsWith)) {
+            violations.add(String.format(Locale.ROOT, "[%s] UI/Tooltip Key '%s' contains unallowed raw newline (\\n / 0x0A / [LF])", langFile, key));
+        }
+    }
 }
 
 

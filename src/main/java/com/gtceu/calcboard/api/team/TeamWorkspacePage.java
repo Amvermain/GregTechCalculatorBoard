@@ -10,6 +10,7 @@ public class TeamWorkspacePage {
 
     private String pageId;
     private String title;
+    private String folderPath = "";
     private int pageRevision;
     private UUID lockHolderUUID;
     private String lockHolderName = "";
@@ -34,6 +35,11 @@ public class TeamWorkspacePage {
         this.lockHolderName = "";
         this.lockExpiresTimestamp = 0L;
         this.compressedGraphData = compressedGraphData != null ? compressedGraphData : new byte[0];
+    }
+
+    public TeamWorkspacePage(String pageId, String title, String folderPath, int revision, byte[] compressedGraphData) {
+        this(pageId, title, revision, compressedGraphData);
+        this.folderPath = folderPath != null ? folderPath : "";
     }
 
     public String getPageId() {
@@ -100,10 +106,21 @@ public class TeamWorkspacePage {
         this.compressedGraphData = compressedGraphData != null ? compressedGraphData : new byte[0];
     }
 
+    public String getFolderPath() {
+        return folderPath != null ? folderPath : "";
+    }
+
+    public void setFolderPath(String folderPath) {
+        this.folderPath = folderPath != null ? folderPath.trim() : "";
+    }
+
     public CompoundTag toNBT() {
         CompoundTag tag = new CompoundTag();
         tag.putString("PageId", pageId);
         tag.putString("PageTitle", title != null ? title : "Page");
+        if (folderPath != null && !folderPath.isEmpty()) {
+            tag.putString("FolderPath", folderPath);
+        }
         tag.putInt("PageRevision", pageRevision);
         if (lockHolderUUID != null) {
             tag.putUUID("LockHolderUUID", lockHolderUUID);
@@ -119,6 +136,9 @@ public class TeamWorkspacePage {
         String title = tag.getString("PageTitle");
         TeamWorkspacePage page = new TeamWorkspacePage(id, title);
         page.setPageRevision(tag.getInt("PageRevision"));
+        if (tag.contains("FolderPath")) {
+            page.setFolderPath(tag.getString("FolderPath"));
+        }
         if (tag.hasUUID("LockHolderUUID")) {
             page.setLockHolderUUID(tag.getUUID("LockHolderUUID"));
             if (tag.contains("LockHolderName")) {

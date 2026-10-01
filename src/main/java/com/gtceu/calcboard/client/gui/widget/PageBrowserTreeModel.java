@@ -36,8 +36,16 @@ public final class PageBrowserTreeModel {
     }
 
     public static FolderTreeNode buildFolderTree(String query) {
+        com.gtceu.calcboard.client.team.ClientWorkspaceState teamState = com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance();
+        List<BoardPage> pages = teamState.isTeamMode()
+                ? teamState.getTeamPagesAsBoardPages()
+                : BoardManager.getInstance().getPages();
+        return buildFolderTree(pages, query);
+    }
+
+    public static FolderTreeNode buildFolderTree(List<BoardPage> pages, String query) {
         FolderTreeNode root = new FolderTreeNode("", "", 0);
-        List<BoardPage> pages = BoardManager.getInstance().getPages();
+        if (pages == null) return root;
         for (int i = 0; i < pages.size(); i++) {
             BoardPage p = pages.get(i);
             boolean isModule = p.isModuleSubPage();

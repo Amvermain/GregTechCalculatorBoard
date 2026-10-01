@@ -1,5 +1,6 @@
 package com.gtceu.calcboard.client.gui.widget;
 
+import com.gtceu.calcboard.api.solver.WorkspaceFlowCoordinator;
 import com.gtceu.calcboard.client.gui.api.IBoardScreenContext;
 import com.gtceu.calcboard.client.team.ClientWorkspaceState;
 import com.gtceu.calcboard.network.NetworkHandler;
@@ -207,14 +208,7 @@ public class WorkspaceTabBarWidget {
         String personalTxt = "● " + Component.translatable("gui.gtcalcboard.workspace.personal").getString();
         int persW = font.width(personalTxt) + 14;
         if (mouseX >= curX && mouseX <= curX + persW && mouseY >= barY && mouseY <= barY + BAR_HEIGHT - 2) {
-            if (state.isTeamMode()) {
-                state.autoCommitAndRelease(screen, state.getActiveTeamPageId());
-                state.setCurrentMode(ClientWorkspaceState.WorkspaceMode.LOCAL);
-                // Notify server that player left the team board
-                NetworkHandler.sendToServer(new com.gtceu.calcboard.network.packet.c2s.C2SPingPresencePacket(state.getCurrentTeamId(), state.getActiveTeamPageId(), false));
-                screen.rebuildBoardWidgets();
-                screen.markSummaryDirty();
-            }
+            screen.switchToWorkspaceMode(ClientWorkspaceState.WorkspaceMode.LOCAL);
             return true;
         }
 
@@ -228,20 +222,7 @@ public class WorkspaceTabBarWidget {
                 : "■ " + Component.translatable("gui.gtcalcboard.workspace.team_no_party").getString();
         int teamW = font.width(teamTxt) + 14;
         if (mouseX >= curX && mouseX <= curX + teamW && mouseY >= barY && mouseY <= barY + BAR_HEIGHT - 2) {
-            if (!hasTeam) {
-                NetworkHandler.sendToServer(new C2SRequestWorkspacePacket(new UUID(0L, 0L), "page_main"));
-                com.gtceu.calcboard.client.gui.widget.BoardToast.show("gui.gtcalcboard.toast.team_no_party");
-                return true;
-            }
-            if (!state.isTeamMode()) {
-                state.setCurrentMode(ClientWorkspaceState.WorkspaceMode.TEAM);
-                UUID teamId = state.getCurrentTeamId();
-                String activePageId = state.getActiveTeamPageId() != null ? state.getActiveTeamPageId() : "page_main";
-                NetworkHandler.sendToServer(new C2SRequestWorkspacePacket(teamId, activePageId));
-                NetworkHandler.sendToServer(new com.gtceu.calcboard.network.packet.c2s.C2SPingPresencePacket(teamId, activePageId, true));
-                screen.rebuildBoardWidgets();
-                screen.markSummaryDirty();
-            }
+            screen.switchToWorkspaceMode(ClientWorkspaceState.WorkspaceMode.TEAM);
             return true;
         }
 

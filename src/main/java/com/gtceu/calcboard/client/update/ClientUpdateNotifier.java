@@ -23,7 +23,7 @@ public final class ClientUpdateNotifier {
 
     private static final ClientUpdateNotifier INSTANCE = new ClientUpdateNotifier();
     public static final String UPDATE_JSON_URL = "https://raw.githubusercontent.com/Amvermain/GregTechCalculatorBoard/main/update.json";
-    private static final String DEFAULT_UPDATE_URL = "https://www.curseforge.com/minecraft/mc-mods/gregtech-calculator-board";
+    private static final String DEFAULT_UPDATE_URL = "https://modrinth.com/mod/gtcalcboard";
 
     public enum UpdateStatus {
         UNKNOWN,

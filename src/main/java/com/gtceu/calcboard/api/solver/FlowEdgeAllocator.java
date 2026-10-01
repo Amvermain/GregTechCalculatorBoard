@@ -256,7 +256,7 @@ public final class FlowEdgeAllocator {
         for (Map.Entry<CrossPageExportTarget, Double> entry : targetDemands.entrySet()) {
             CrossPageExportTarget target = entry.getKey();
             double demand = Math.max(0.0, entry.getValue());
-            double limit = target.hasFixedLimit() ? Math.min(demand, target.fixedLimit()) : demand;
+            double limit = target.hasFixedLimit() ? Math.min(demand, target.fixedLimit()) : 0.0;
             FlowGraph.ConnectionEdge edge = new FlowGraph.ConnectionEdge(
                     producerNode.getId(),
                     0,
@@ -1190,14 +1190,15 @@ public final class FlowEdgeAllocator {
         try {
             if (consumer.isReroute()) {
                 double drain = consumer.isFixedDrain() ? consumer.getExternalDrainRate() : 0.0;
-                return drain + calculateTotalRerouteOutputDemand(graph, consumer, effMap, context, visited);
+                double downstream = calculateTotalRerouteOutputDemand(graph, consumer, effMap, context, visited);
+                return drain + downstream;
             }
             if (inputIndex < consumer.getInputs().size()) {
                 double nominalRate = context != null ? context.getInputRate(consumer, inputIndex) : consumer.getInputSlotRate(inputIndex, false);
                 if (effMap != null && effMap.containsKey(consumer.getId())) {
                     return nominalRate * effMap.get(consumer.getId());
                 }
-                return nominalRate;
+                return nominalRate * consumer.getEfficiency();
             }
             return 0.0;
         } finally {
@@ -1220,10 +1221,25 @@ public final class FlowEdgeAllocator {
             if (edge.fromNodeId().equals(rerouteNode.getId()) && edge.outputIndex() == 0) {
                 RecipeNode target = graph.findNodeById(edge.toNodeId());
                 if (target != null) {
-                    total += getConnectedConsumerDemand(graph, target, edge.inputIndex(), effMap, context, visited);
+                    double targetDemand = getConnectedConsumerDemand(graph, target, edge.inputIndex(), effMap, context, visited);
+                    int inDegree = countTargetInDegree(graph, target.getId(), edge.inputIndex(), context);
+                    total += targetDemand / Math.max(1, inDegree);
                 }
             }
         }
         return total;
+    }
+
+    private static int countTargetInDegree(FlowGraph graph, String targetId, int inputIndex, SolverContext context) {
+        if (context != null && context.edgeIndex() != null) {
+            return context.edgeIndex().getInPortEdges(targetId, inputIndex).size();
+        }
+        int count = 0;
+        for (FlowGraph.ConnectionEdge inEdge : graph.getConnections()) {
+            if (inEdge.toNodeId().equals(targetId) && inEdge.inputIndex() == inputIndex) {
+                count++;
+            }
+        }
+        return count;
     }
 }

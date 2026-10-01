@@ -268,17 +268,40 @@ public final class LocalWebServerDaemon {
 
             Map<String, String> params = parseQueryParams(exchange.getRequestURI().getQuery());
             String pageId = params.get("pageId");
+            String wsParam = params.get("workspace");
+
+            com.gtceu.calcboard.client.team.ClientWorkspaceState teamState = com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance();
+            boolean isTeamMode = "team".equalsIgnoreCase(wsParam) || (wsParam == null && teamState.isTeamMode());
 
             String json;
             if (pageId != null && !pageId.isEmpty()) {
-                var pageOpt = BoardManager.getInstance().getPage(pageId);
-                if (pageOpt.isPresent()) {
-                    json = BoardJsonSerializer.serialize(pageOpt.get());
+                if (isTeamMode || teamState.getRemotePage(pageId) != null) {
+                    BoardPage tp = teamState.getTeamPageAsBoardPage(pageId);
+                    if (tp != null) {
+                        json = BoardJsonSerializer.serialize(tp);
+                    } else {
+                        var pageOpt = BoardManager.getInstance().getPage(pageId);
+                        json = pageOpt.map(BoardJsonSerializer::serialize).orElseGet(WebSyncEventBus::getCurrentSnapshotJson);
+                    }
+                } else {
+                    var pageOpt = BoardManager.getInstance().getPage(pageId);
+                    if (pageOpt.isPresent()) {
+                        json = BoardJsonSerializer.serialize(pageOpt.get());
+                    } else {
+                        BoardPage tp = teamState.getTeamPageAsBoardPage(pageId);
+                        json = tp != null ? BoardJsonSerializer.serialize(tp) : WebSyncEventBus.getCurrentSnapshotJson();
+                    }
+                }
+            } else {
+                if ("team".equalsIgnoreCase(wsParam)) {
+                    BoardPage tp = teamState.getTeamPageAsBoardPage(teamState.getActiveTeamPageId());
+                    json = tp != null ? BoardJsonSerializer.serialize(tp) : WebSyncEventBus.getCurrentSnapshotJson();
+                } else if ("local".equalsIgnoreCase(wsParam) || "personal".equalsIgnoreCase(wsParam)) {
+                    BoardPage lp = BoardManager.getInstance().getActivePage();
+                    json = lp != null ? BoardJsonSerializer.serialize(lp) : WebSyncEventBus.getCurrentSnapshotJson();
                 } else {
                     json = WebSyncEventBus.getCurrentSnapshotJson();
                 }
-            } else {
-                json = WebSyncEventBus.getCurrentSnapshotJson();
             }
 
             byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
@@ -291,25 +314,62 @@ public final class LocalWebServerDaemon {
         public void handle(HttpExchange exchange) throws IOException {
             if (!handleCorsAndMethodCheck(exchange)) return;
 
-            BoardPage active = BoardManager.getInstance().getActivePage();
-            String activeId = active != null ? active.getId() : "default";
+            Map<String, String> params = parseQueryParams(exchange.getRequestURI().getQuery());
+            String wsParam = params.get("workspace");
 
-            JsonArray pagesArray = new JsonArray();
-            for (BoardPage p : BoardManager.getInstance().getPages()) {
+            com.gtceu.calcboard.client.team.ClientWorkspaceState teamState = com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance();
+            BoardManager bm = BoardManager.getInstance();
+
+            BoardPage activeLocal = bm.getActivePage();
+            String activeLocalId = activeLocal != null ? activeLocal.getId() : "default";
+            String activeTeamId = teamState.getActiveTeamPageId();
+
+            JsonArray localPages = new JsonArray();
+            for (BoardPage p : bm.getPages()) {
                 JsonObject pageObj = new JsonObject();
                 pageObj.addProperty("id", p.getId());
                 pageObj.addProperty("title", p.getName());
                 pageObj.addProperty("folder", p.getFolderPath());
                 pageObj.addProperty("nodeCount", p.getGraph().getNodes().size());
-                pageObj.addProperty("isActive", p.getId().equals(activeId));
+                pageObj.addProperty("isActive", p.getId().equals(activeLocalId));
                 pageObj.addProperty("isPinned", p.isPinned());
                 pageObj.addProperty("isModule", p.isModuleSubPage());
-                pagesArray.add(pageObj);
+                pageObj.addProperty("workspace", "LOCAL");
+                localPages.add(pageObj);
             }
 
+            JsonArray teamPages = new JsonArray();
+            for (BoardPage p : teamState.getTeamPagesAsBoardPages()) {
+                JsonObject pageObj = new JsonObject();
+                pageObj.addProperty("id", p.getId());
+                pageObj.addProperty("title", p.getName());
+                pageObj.addProperty("folder", p.getFolderPath());
+                pageObj.addProperty("nodeCount", p.getGraph().getNodes().size());
+                pageObj.addProperty("isActive", p.getId().equals(activeTeamId));
+                pageObj.addProperty("isPinned", false);
+                pageObj.addProperty("isModule", false);
+                pageObj.addProperty("workspace", "TEAM");
+                var remotePage = teamState.getRemotePage(p.getId());
+                if (remotePage != null) {
+                    pageObj.addProperty("isLocked", remotePage.isLocked());
+                    pageObj.addProperty("lockHolder", remotePage.getLockHolderName() != null ? remotePage.getLockHolderName() : "");
+                }
+                teamPages.add(pageObj);
+            }
+
+            boolean isTeamMode = "team".equalsIgnoreCase(wsParam) || (wsParam == null && teamState.isTeamMode());
+
             JsonObject responseObj = new JsonObject();
-            responseObj.addProperty("activePageId", activeId);
-            responseObj.add("pages", pagesArray);
+            responseObj.addProperty("currentWorkspace", teamState.isTeamMode() ? "TEAM" : "LOCAL");
+            responseObj.addProperty("hasTeam", teamState.isCollaborationEnabled());
+            responseObj.addProperty("teamName", teamState.getCurrentTeamName());
+            if (teamState.getCurrentTeamId() != null) {
+                responseObj.addProperty("teamId", teamState.getCurrentTeamId().toString());
+            }
+            responseObj.addProperty("activePageId", isTeamMode ? activeTeamId : activeLocalId);
+            responseObj.add("pages", isTeamMode ? teamPages : localPages);
+            responseObj.add("localPages", localPages);
+            responseObj.add("teamPages", teamPages);
 
             byte[] bytes = GSON.toJson(responseObj).getBytes(StandardCharsets.UTF_8);
             sendResponse(exchange, 200, "application/json; charset=UTF-8", bytes);
@@ -394,7 +454,15 @@ public final class LocalWebServerDaemon {
             status.addProperty("activeClients", WebSyncEventBus.getActiveClientCount());
             status.addProperty("timestamp", System.currentTimeMillis());
 
-            BoardPage active = BoardManager.getInstance().getActivePage();
+            com.gtceu.calcboard.client.team.ClientWorkspaceState teamState = com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance();
+            status.addProperty("currentWorkspace", teamState.isTeamMode() ? "TEAM" : "LOCAL");
+            status.addProperty("hasTeam", teamState.isCollaborationEnabled());
+            status.addProperty("teamName", teamState.getCurrentTeamName());
+            status.addProperty("teamPagesCount", teamState.getRemotePages().size());
+
+            BoardPage active = teamState.isTeamMode()
+                    ? teamState.getTeamPageAsBoardPage(teamState.getActiveTeamPageId())
+                    : BoardManager.getInstance().getActivePage();
             status.addProperty("activePageId", active != null ? active.getId() : "default");
             status.addProperty("activePageTitle", active != null ? active.getName() : "Untitled Page");
 

@@ -177,6 +177,11 @@ public class CanvasContextMenuManager {
 
     public void openForJunctionNode(double screenX, double screenY, NodeWidget widget) {
         this.items.clear();
+        this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.rename_junction", "✎", null, () -> {
+            if (screen != null) {
+                screen.openJunctionSupplyDialog(widget.getNode());
+            }
+        }));
         this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.configure_junction", "⚙", null, () -> {
             if (screen != null) {
                 screen.openJunctionSupplyDialog(widget.getNode());

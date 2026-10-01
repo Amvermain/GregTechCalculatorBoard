@@ -232,6 +232,30 @@ class InteractionScenarioTest {
         Assertions.assertNull(harness.getContext().getResizingNode());
     }
 
+    @Test
+    void testNodeResizeAndCommit() {
+        RecipeNode nodeA = createStandardNode("nodeA", "Resizable", 100, 100);
+        nodeA.setCardWidth(260);
+        nodeA.setCardHeight(90);
+        page.getGraph().addNode(nodeA);
+        harness.getContext().rebuildWidgets();
+
+        var widget = harness.getWidget("nodeA");
+        Assertions.assertNotNull(widget);
+
+        double rx = widget.getNode().getPosX() + widget.getWidth() - 4;
+        double ry = widget.getNode().getPosY() + widget.getHeight() - 4;
+        harness.mouseDown(rx, ry, 0);
+        harness.assertState(CanvasNodeResizingState.class);
+
+        harness.mouseDrag(rx + 60, ry + 40, 0, 60, 40);
+        harness.mouseUp(rx + 60, ry + 40, 0);
+        harness.assertIdle();
+        Assertions.assertEquals(320, nodeA.getCardWidth());
+        Assertions.assertEquals(146, nodeA.getCardHeight());
+        Assertions.assertNull(harness.getContext().getResizingNode());
+    }
+
     private RecipeNode createStandardNode(String id, String name, double x, double y) {
         RecipeNode node = new RecipeNode(id, name, 100.0, 30.0, GTVoltageTier.LV);
         node.setPosX(x);

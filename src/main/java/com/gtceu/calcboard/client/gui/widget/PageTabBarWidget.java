@@ -8,10 +8,12 @@ import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
 import com.gtceu.calcboard.client.gui.util.BoardScissorHelper;
 import com.gtceu.calcboard.client.team.ClientWorkspaceState;
 import com.gtceu.calcboard.api.team.TeamWorkspacePage;
+import com.gtceu.calcboard.api.storage.BlueprintCodec;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import org.lwjgl.glfw.GLFW;
@@ -50,7 +52,8 @@ public class PageTabBarWidget {
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
         ClientWorkspaceState teamState = ClientWorkspaceState.getInstance();
         boolean isTeam = teamState.isTeamMode();
-        Font font = Minecraft.getInstance().font;
+        Font font = Minecraft.getInstance() != null ? Minecraft.getInstance().font : null;
+        if (font == null) return;
         int browserBtnW = 22;
         int tabY = screen.getPageTabY();
 
@@ -379,7 +382,15 @@ public class PageTabBarWidget {
             }
         }
 
-        if (!isTeam && isDoubleClick) {
+        if (isTeam && isRightClick) {
+            if (!screen.ensureEditPermission()) return true;
+            startRename(index, pageName, curX + 16, tabY + 1, textW + 10);
+            playClickSound();
+            return true;
+        }
+
+        if (isDoubleClick) {
+            if (isTeam && !screen.ensureEditPermission()) return true;
             startRename(index, pageName, curX + 16, tabY + 1, textW + 10);
             lastClickTime = 0;
             lastClickedTabIdx = -1;
@@ -479,17 +490,11 @@ public class PageTabBarWidget {
             List<TeamWorkspacePage> teamPages = new ArrayList<>(teamState.getRemotePages());
             if (index >= teamPages.size()) return true;
             String newPageId = teamPages.get(index).getPageId();
-            if (newPageId.equals(teamState.getActiveTeamPageId())) return true;
-
-            resetCanvasInteraction();
-            teamState.autoCommitAndRelease(screen, teamState.getActiveTeamPageId());
-            teamState.setActiveTeamPageId(newPageId);
-            com.gtceu.calcboard.network.NetworkHandler.sendToServer(
-                new com.gtceu.calcboard.network.packet.c2s.C2SPingPresencePacket(teamState.getCurrentTeamId(), newPageId, true)
-            );
-            screen.rebuildBoardWidgets();
-            screen.markSummaryDirty();
-            playClickSound();
+            if (!newPageId.equals(teamState.getActiveTeamPageId())) {
+                resetCanvasInteraction();
+                screen.openPage(newPageId);
+                playClickSound();
+            }
             return true;
         }
 
@@ -639,7 +644,7 @@ public class PageTabBarWidget {
             screen.getPageBrowserDrawer().clearSearchFocus();
         }
         this.editingPageIndex = index;
-        Font font = Minecraft.getInstance().font;
+        Font font = Minecraft.getInstance() != null ? Minecraft.getInstance().font : null;
         this.renameBox = new EditBox(font, x, y, Math.max(width, 70), 16, Component.literal(""));
         this.renameBox.setValue(currentName);
         this.renameBox.setFocused(true);
@@ -648,33 +653,58 @@ public class PageTabBarWidget {
     private void commitRename() {
         if (editingPageIndex < 0 || renameBox == null) return;
         String newName = renameBox.getValue().trim();
-        if (!newName.isEmpty()) {
-            ClientWorkspaceState teamState = ClientWorkspaceState.getInstance();
-            if (teamState.isTeamMode()) {
-                List<TeamWorkspacePage> teamPages = new ArrayList<>(teamState.getRemotePages());
-                if (editingPageIndex < teamPages.size()) {
-                    TeamWorkspacePage tp = teamPages.get(editingPageIndex);
-                    com.gtceu.calcboard.network.NetworkHandler.sendToServer(
-                        new com.gtceu.calcboard.network.packet.c2s.C2SCommitWorkspacePacket(
-                            teamState.getCurrentTeamId(), tp.getPageId(), newName, tp.getPageRevision(), "Renamed page to " + newName, tp.getCompressedGraphData(), 0, 0, 0
-                        )
-                    );
-                }
-            } else {
-                BoardManager bm = BoardManager.getInstance();
-                List<BoardPage> openPages = bm.getOpenPages();
-                if (editingPageIndex < openPages.size()) {
-                    BoardPage targetPage = openPages.get(editingPageIndex);
-                    int actualIndex = bm.getPages().indexOf(targetPage);
-                    if (actualIndex >= 0) {
-                        bm.renamePage(actualIndex, newName);
-                    }
-                }
-            }
-        }
+        int pageIdx = editingPageIndex;
         editingPageIndex = -1;
         renameBox = null;
+
+        if (newName.isEmpty()) {
+            screen.rebuildBoardWidgets();
+            return;
+        }
+
+        ClientWorkspaceState teamState = ClientWorkspaceState.getInstance();
+        if (teamState.isTeamMode()) {
+            commitTeamPageRename(teamState, pageIdx, newName);
+        } else {
+            commitLocalPageRename(pageIdx, newName);
+        }
         screen.rebuildBoardWidgets();
+    }
+
+    private void commitTeamPageRename(ClientWorkspaceState teamState, int pageIndex, String newName) {
+        List<TeamWorkspacePage> teamPages = new ArrayList<>(teamState.getRemotePages());
+        if (pageIndex < 0 || pageIndex >= teamPages.size()) return;
+
+        TeamWorkspacePage tp = teamPages.get(pageIndex);
+        tp.setTitle(newName);
+        byte[] data = resolvePageCompressedData(teamState, tp);
+
+        com.gtceu.calcboard.network.NetworkHandler.sendToServer(
+                new com.gtceu.calcboard.network.packet.c2s.C2SCommitWorkspacePacket(
+                        teamState.getCurrentTeamId(), tp.getPageId(), newName, tp.getFolderPath(), tp.getPageRevision(), "Renamed page to " + newName, data, 0, 0, 0
+                )
+        );
+    }
+
+    private byte[] resolvePageCompressedData(ClientWorkspaceState teamState, TeamWorkspacePage tp) {
+        byte[] data = tp.getCompressedGraphData();
+        if (data != null && !tp.getPageId().equals(teamState.getActiveTeamPageId())) {
+            return data;
+        }
+        CompoundTag tag = (teamState.getActiveTeamGraph() != null) ? teamState.getActiveTeamGraph().serializeNBT() : new CompoundTag();
+        return BlueprintCodec.compressTag(tag);
+    }
+
+    private void commitLocalPageRename(int pageIndex, String newName) {
+        BoardManager bm = BoardManager.getInstance();
+        List<BoardPage> openPages = bm.getOpenPages();
+        if (pageIndex < 0 || pageIndex >= openPages.size()) return;
+
+        BoardPage targetPage = openPages.get(pageIndex);
+        int actualIndex = bm.getPages().indexOf(targetPage);
+        if (actualIndex >= 0) {
+            bm.renamePage(actualIndex, newName);
+        }
     }
 
     private int calculateTotalWidth(List<String> titles, Font font, int activeIdx, boolean isTeam) {

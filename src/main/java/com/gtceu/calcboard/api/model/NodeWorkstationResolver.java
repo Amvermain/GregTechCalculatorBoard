@@ -26,8 +26,38 @@ public final class NodeWorkstationResolver {
         return MultiblockDetector.isMultiblock(ws);
     }
 
+    public static boolean isMultiblockOnly(RecipeNode node) {
+        if (node == null || node.isModule()) return false;
+        ResourceLocation catId = node.getRecipeCategoryId();
+        if (catId != null) {
+            CategoryCapability cap = CategoryCapabilityMatrix.getInstance().getCapability(catId);
+            if (cap != null && cap.hasMultiblockOption() && !cap.hasSingleblockOption()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static boolean hasSingleblockOption(RecipeNode node) {
+        if (node == null || node.isModule()) return false;
+        if (isMultiblockOnly(node)) return false;
+        ResourceLocation catId = node.getRecipeCategoryId();
+        if (catId != null) {
+            CategoryCapability cap = CategoryCapabilityMatrix.getInstance().getCapability(catId);
+            if (cap != null && cap.hasSingleblockOption()) {
+                return true;
+            }
+        }
+        for (ResourceLocation ws : node.getAvailableWorkstations()) {
+            if (ws != null && !MultiblockDetector.isMultiblock(ws)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static ResourceLocation getWorkstationForTier(RecipeNode node, GTVoltageTier tier) {
-        if (node == null || tier == null) return null;
+        if (node == null || tier == null || isMultiblockOnly(node)) return null;
         IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
         if (adapter != null) {
             ResourceLocation ws = adapter.getWorkstationForTier(node, tier);
@@ -37,7 +67,7 @@ public final class NodeWorkstationResolver {
     }
 
     public static ResourceLocation getWorkstationForTierFromList(RecipeNode node, GTVoltageTier tier) {
-        if (node == null || tier == null) return null;
+        if (node == null || tier == null || isMultiblockOnly(node)) return null;
         String prefix = tier.name().toLowerCase(Locale.ROOT) + "_";
         String catName = node.getRecipeCategoryId() != null ? node.getRecipeCategoryId().getPath().toLowerCase(Locale.ROOT) : null;
         ResourceLocation bestMatch = null;

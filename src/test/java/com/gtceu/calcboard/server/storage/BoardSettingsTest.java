@@ -36,6 +36,7 @@ public class BoardSettingsTest {
         Assertions.assertEquals(WireColorPreset.GREEN, manager.getMatchedWireColorPreset());
         Assertions.assertEquals(0xFF00E5FF, manager.getWireColor());
         Assertions.assertEquals(0xFF00E676, manager.getMatchedWireColor());
+        Assertions.assertFalse(manager.isSlimCardMode());
     }
 
     @Test
@@ -58,6 +59,7 @@ public class BoardSettingsTest {
         manager.setPauseGameInSingleplayer(true);
         manager.setMaxHarmonizeScale(32);
         manager.setHarmonizeSurplusTolerance(0.05);
+        manager.setSlimCardMode(true);
 
         boolean saved = manager.saveToFile(tempFile);
         Assertions.assertTrue(saved);
@@ -68,6 +70,7 @@ public class BoardSettingsTest {
         Assertions.assertEquals(WireColorPreset.CYAN, manager.getWireColorPreset());
         Assertions.assertEquals(16, manager.getMaxHarmonizeScale());
         Assertions.assertEquals(0.02, manager.getHarmonizeSurplusTolerance(), 1e-4);
+        Assertions.assertFalse(manager.isSlimCardMode());
 
         boolean loaded = manager.loadFromFile(tempFile);
         Assertions.assertTrue(loaded);
@@ -90,5 +93,6 @@ public class BoardSettingsTest {
         Assertions.assertTrue(manager.isPauseGameInSingleplayer());
         Assertions.assertEquals(32, manager.getMaxHarmonizeScale());
         Assertions.assertEquals(0.05, manager.getHarmonizeSurplusTolerance(), 1e-4);
+        Assertions.assertTrue(manager.isSlimCardMode());
     }
 }

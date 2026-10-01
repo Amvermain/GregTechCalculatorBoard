@@ -126,10 +126,17 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> implements I
         this.previousScreen = previousScreen;
         this.imageWidth = 0;
         this.imageHeight = 0;
-        BoardPage activePage = BoardManager.getInstance().getActivePage();
-        this.panX = activePage.getPanX();
-        this.panY = activePage.getPanY();
-        this.zoom = activePage.getZoom();
+        ClientWorkspaceState teamState = ClientWorkspaceState.getInstance();
+        if (teamState.isTeamMode()) {
+            restoreTeamViewport(teamState, teamState.getActiveTeamPageId());
+        } else {
+            BoardPage activePage = BoardManager.getInstance().getActivePage();
+            if (activePage != null) {
+                this.panX = activePage.getPanX();
+                this.panY = activePage.getPanY();
+                this.zoom = activePage.getZoom();
+            }
+        }
         lastPanX = this.panX;
         lastPanY = this.panY;
         lastZoom = this.zoom;
@@ -370,13 +377,25 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> implements I
     public void updateGraphSummaryIfDirty() {
         if (summaryDirty || cachedSummary == null) {
             getGraph().cleanupInvalidConnections();
-            BoardManager bm = BoardManager.getInstance();
-            if (bm != null && bm.getPages() != null && !bm.getPages().isEmpty()) {
-                com.gtceu.calcboard.api.solver.WorkspaceFlowCoordinator.coordinate(bm.getPages());
-            }
+            coordinateActiveWorkspaceFlow();
             cachedSummary = FlowGraphSolver.computeSummary(getGraph());
             summaryDirty = false;
             com.gtceu.calcboard.client.gui.tutorial.ContextualNudgeManager.getInstance().checkTriggers(com.gtceu.calcboard.api.storage.BoardManager.getInstance().getActivePage());
+        }
+    }
+
+    private void coordinateActiveWorkspaceFlow() {
+        ClientWorkspaceState teamState = ClientWorkspaceState.getInstance();
+        if (teamState.isTeamMode()) {
+            List<BoardPage> teamPages = teamState.getTeamPagesAsBoardPages();
+            if (!teamPages.isEmpty()) {
+                com.gtceu.calcboard.api.solver.WorkspaceFlowCoordinator.coordinate(teamPages);
+            }
+            return;
+        }
+        BoardManager bm = BoardManager.getInstance();
+        if (bm != null && bm.getPages() != null && !bm.getPages().isEmpty()) {
+            com.gtceu.calcboard.api.solver.WorkspaceFlowCoordinator.coordinate(bm.getPages());
         }
     }
 
@@ -754,6 +773,10 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> implements I
     public void openDeleteMultiplePagesDialog(List<String> pageIds) { dialogManager.openDeleteMultiplePagesDialog(pageIds); }
     public void openDeleteTeamPageDialog(String pageId, String pageName) { dialogManager.openDeleteTeamPageDialog(pageId, pageName); }
     public void openJunctionSupplyDialog(RecipeNode node) { dialogManager.openJunctionSupplyDialog(node); }
+    @Override
+    public void openCrossPageSourceSearchDialog(RecipeNode consumerNode, String initialPageId, String initialNodeId, java.util.function.BiConsumer<String, String> onSelect) {
+        dialogManager.openCrossPageSourceSearchDialog(consumerNode, initialPageId, initialNodeId, onSelect);
+    }
     public void openTutorialExitDialog(int targetPageIndex) { dialogManager.openTutorialExitDialog(targetPageIndex); }
     public void openTutorialExitDialogForNewPage() { dialogManager.openTutorialExitDialogForNewPage(); }
     public void openTutorialExitDialogForTeamPage(String teamPageId) { dialogManager.openTutorialExitDialogForTeamPage(teamPageId); }
@@ -768,6 +791,10 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> implements I
     public void openSharedFrameConfigDialog(CanvasGroupFrame frame) { dialogManager.openSharedFrameConfigDialog(frame); }
     @Override
     public void openRecipeSearchForSharedFrame(CanvasGroupFrame frame) { dialogManager.openRecipeSearchForSharedFrame(frame); }
+    @Override
+    public void openRecipeSearchForSharedFrameWithWireContext(CanvasGroupFrame frame, RecipeNode sourceNode, int sourcePortIdx, boolean sourceIsInput, com.gtceu.calcboard.api.model.IngredientStack sourceStack, boolean shiftAutoRatio) {
+        dialogManager.openRecipeSearchForSharedFrameWithWireContext(frame, sourceNode, sourcePortIdx, sourceIsInput, sourceStack, shiftAutoRatio);
+    }
     public void openFrameEditDialog(CanvasGroupFrame frame) { dialogManager.openFrameEditDialog(frame); }
     public void openNoteEditDialog(CanvasStickyNote note) { dialogManager.openNoteEditDialog(note); }
     public void openTargetOutputRateDialog(RecipeNode node, int outputIndex) { dialogManager.openTargetOutputRateDialog(node, outputIndex); }
@@ -786,6 +813,30 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> implements I
             this.canvasHandler.getStateMachine().returnToIdle();
             this.canvasHandler.getWireHandler().cancelWireDrag();
         }
+        ClientWorkspaceState teamState = ClientWorkspaceState.getInstance();
+        if (teamState.isTeamMode()) {
+            openTeamPage(teamState, pageId);
+            return;
+        }
+        openLocalPage(pageId);
+    }
+
+    private void openTeamPage(ClientWorkspaceState teamState, String pageId) {
+        if (teamState.getRemotePage(pageId) == null) return;
+        if (pageId.equals(teamState.getActiveTeamPageId())) return;
+
+        teamState.setPageViewport(teamState.getActiveTeamPageId(), this.panX, this.panY, this.zoom);
+        teamState.autoCommitAndRelease(this, teamState.getActiveTeamPageId());
+        teamState.setActiveTeamPageId(pageId);
+        restoreTeamViewport(teamState, pageId);
+        com.gtceu.calcboard.network.NetworkHandler.sendToServer(
+            new com.gtceu.calcboard.network.packet.c2s.C2SPingPresencePacket(teamState.getCurrentTeamId(), pageId, true)
+        );
+        rebuildBoardWidgets();
+        markSummaryDirty();
+    }
+
+    private void openLocalPage(String pageId) {
         BoardManager bm = BoardManager.getInstance();
         BoardPage cur = bm.getActivePage();
         if (cur != null) {
@@ -793,16 +844,34 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> implements I
             cur.setPanY(this.panY);
             cur.setZoom(this.zoom);
         }
-        if (bm.openPage(pageId)) {
-            BoardPage next = bm.getActivePage();
-            if (next != null) {
-                this.panX = next.getPanX();
-                this.panY = next.getPanY();
-                this.zoom = next.getZoom();
-            }
-            rebuildBoardWidgets();
-            markSummaryDirty();
+        if (!bm.openPage(pageId)) return;
+        BoardPage next = bm.getActivePage();
+        if (next != null) {
+            this.panX = next.getPanX();
+            this.panY = next.getPanY();
+            this.zoom = next.getZoom();
+            lastPanX = this.panX;
+            lastPanY = this.panY;
+            lastZoom = this.zoom;
         }
+        rebuildBoardWidgets();
+        markSummaryDirty();
+    }
+
+    public void restoreTeamViewport(ClientWorkspaceState teamState, String pageId) {
+        ClientWorkspaceState.TeamPageViewport vp = teamState.getPageViewport(pageId);
+        if (vp != null) {
+            this.panX = vp.panX();
+            this.panY = vp.panY();
+            this.zoom = vp.zoom();
+        } else {
+            this.panX = 40.0;
+            this.panY = 40.0;
+            this.zoom = 1.0;
+        }
+        lastPanX = this.panX;
+        lastPanY = this.panY;
+        lastZoom = this.zoom;
     }
 
     public void openPage(UUID pageId) {
@@ -815,9 +884,9 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> implements I
         if (pageId == null || pageId.isEmpty()) return;
         openPage(pageId);
         if (nodeId == null || nodeId.isEmpty()) return;
-        BoardPage active = BoardManager.getInstance().getActivePage();
-        if (active != null) {
-            RecipeNode node = active.getGraph().findNodeById(nodeId);
+        FlowGraph graph = getGraph();
+        if (graph != null) {
+            RecipeNode node = graph.findNodeById(nodeId);
             if (node != null) {
                 setPanX((this.width / 2.0) - ((node.getPosX() + 16.0) * this.zoom));
                 setPanY((this.height / 2.0) - ((node.getPosY() + 16.0) * this.zoom));
@@ -825,39 +894,114 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> implements I
         }
     }
 
+    public void switchToWorkspaceMode(ClientWorkspaceState.WorkspaceMode targetMode) {
+        ClientWorkspaceState state = ClientWorkspaceState.getInstance();
+        if (state.getCurrentMode() == targetMode) return;
+
+        if (state.isTeamMode()) {
+            state.setPageViewport(state.getActiveTeamPageId(), this.panX, this.panY, this.zoom);
+            state.autoCommitAndRelease(this, state.getActiveTeamPageId());
+            state.setCurrentMode(ClientWorkspaceState.WorkspaceMode.LOCAL);
+            com.gtceu.calcboard.api.solver.WorkspaceFlowCoordinator.invalidate();
+            com.gtceu.calcboard.network.NetworkHandler.sendToServer(
+                new com.gtceu.calcboard.network.packet.c2s.C2SPingPresencePacket(state.getCurrentTeamId(), state.getActiveTeamPageId(), false)
+            );
+
+            BoardPage activeLocal = BoardManager.getInstance().getActivePage();
+            if (activeLocal != null) {
+                this.panX = activeLocal.getPanX();
+                this.panY = activeLocal.getPanY();
+                this.zoom = activeLocal.getZoom();
+            } else {
+                this.panX = 40.0;
+                this.panY = 40.0;
+                this.zoom = 1.0;
+            }
+        } else {
+            if (state.getCurrentTeamId() == null) {
+                com.gtceu.calcboard.network.NetworkHandler.sendToServer(
+                    new com.gtceu.calcboard.network.packet.c2s.C2SRequestWorkspacePacket(new java.util.UUID(0L, 0L), "page_main")
+                );
+                com.gtceu.calcboard.client.gui.widget.BoardToast.show("gui.gtcalcboard.toast.team_no_party");
+                return;
+            }
+            BoardPage activeLocal = BoardManager.getInstance().getActivePage();
+            if (activeLocal != null) {
+                activeLocal.setPanX(this.panX);
+                activeLocal.setPanY(this.panY);
+                activeLocal.setZoom(this.zoom);
+            }
+            state.setCurrentMode(ClientWorkspaceState.WorkspaceMode.TEAM);
+            com.gtceu.calcboard.api.solver.WorkspaceFlowCoordinator.invalidate();
+            java.util.UUID teamId = state.getCurrentTeamId();
+            String activePageId = state.getActiveTeamPageId() != null ? state.getActiveTeamPageId() : "page_main";
+            com.gtceu.calcboard.network.NetworkHandler.sendToServer(
+                new com.gtceu.calcboard.network.packet.c2s.C2SRequestWorkspacePacket(teamId, activePageId)
+            );
+            com.gtceu.calcboard.network.NetworkHandler.sendToServer(
+                new com.gtceu.calcboard.network.packet.c2s.C2SPingPresencePacket(teamId, activePageId, true)
+            );
+
+            restoreTeamViewport(state, activePageId);
+        }
+        rebuildBoardWidgets();
+        markSummaryDirty();
+    }
+
     public double getPanX() { return panX; }
     public void setPanX(double panX) {
         this.panX = panX;
         lastPanX = panX;
-        BoardPage active = BoardManager.getInstance().getActivePage();
-        if (active != null) active.setPanX(panX);
+        ClientWorkspaceState teamState = ClientWorkspaceState.getInstance();
+        if (teamState.isTeamMode()) {
+            teamState.setPageViewport(teamState.getActiveTeamPageId(), panX, this.panY, this.zoom);
+        } else {
+            BoardPage active = BoardManager.getInstance().getActivePage();
+            if (active != null) active.setPanX(panX);
+        }
     }
     public double getPanY() { return panY; }
     public void setPanY(double panY) {
         this.panY = panY;
         lastPanY = panY;
-        BoardPage active = BoardManager.getInstance().getActivePage();
-        if (active != null) active.setPanY(panY);
+        ClientWorkspaceState teamState = ClientWorkspaceState.getInstance();
+        if (teamState.isTeamMode()) {
+            teamState.setPageViewport(teamState.getActiveTeamPageId(), this.panX, panY, this.zoom);
+        } else {
+            BoardPage active = BoardManager.getInstance().getActivePage();
+            if (active != null) active.setPanY(panY);
+        }
     }
     public double getZoom() { return zoom; }
     public void setZoom(double zoom) {
         this.zoom = zoom;
         lastZoom = zoom;
-        BoardPage active = BoardManager.getInstance().getActivePage();
-        if (active != null) active.setZoom(zoom);
+        ClientWorkspaceState teamState = ClientWorkspaceState.getInstance();
+        if (teamState.isTeamMode()) {
+            teamState.setPageViewport(teamState.getActiveTeamPageId(), this.panX, this.panY, zoom);
+        } else {
+            BoardPage active = BoardManager.getInstance().getActivePage();
+            if (active != null) active.setZoom(zoom);
+        }
     }
 
     @Override
     public void onClose() {
+        ClientWorkspaceState teamState = ClientWorkspaceState.getInstance();
+        if (teamState.isTeamMode()) {
+            teamState.setPageViewport(teamState.getActiveTeamPageId(), this.panX, this.panY, this.zoom);
+        }
         teamSyncCoordinator.onScreenClosed();
         lastPanX = this.panX;
         lastPanY = this.panY;
         lastZoom = this.zoom;
-        BoardPage active = BoardManager.getInstance().getActivePage();
-        if (active != null) {
-            active.setPanX(this.panX);
-            active.setPanY(this.panY);
-            active.setZoom(this.zoom);
+        if (!teamState.isTeamMode()) {
+            BoardPage active = BoardManager.getInstance().getActivePage();
+            if (active != null) {
+                active.setPanX(this.panX);
+                active.setPanY(this.panY);
+                active.setZoom(this.zoom);
+            }
         }
         BoardManager.getInstance().setSummaryOverlayCollapsed(this.summaryOverlay.isCollapsed());
         BoardManager.getInstance().setHotkeyHudExpanded(this.hotkeyHudWidget.isExpanded());

@@ -235,4 +235,72 @@ class BoardJsonSerializerTest {
         assertEquals(32.0, pinObj.get("width").getAsDouble(), 0.001);
         assertEquals(32.0, pinObj.get("height").getAsDouble(), 0.001);
     }
+
+    @Test
+    void testSharedMachineEmbeddedPanelSerialization() {
+        FlowGraph graph = new FlowGraph();
+
+        RecipeNode n1 = RecipeNode.create(
+                ResourceLocation.tryParse("gtceu:chemical_reactor"),
+                "Chemical Reactor 1",
+                40.0,
+                30.0,
+                GTVoltageTier.LV
+        );
+        n1.getInputs().add(IngredientStack.item(ResourceLocation.tryParse("minecraft:iron_ingot"), "Iron", 1.0));
+        n1.getOutputs().add(IngredientStack.item(ResourceLocation.tryParse("minecraft:gold_ingot"), "Gold", 1.0));
+
+        RecipeNode n2 = RecipeNode.create(
+                ResourceLocation.tryParse("gtceu:chemical_reactor"),
+                "Chemical Reactor 2",
+                60.0,
+                30.0,
+                GTVoltageTier.LV
+        );
+        n2.getInputs().add(IngredientStack.item(ResourceLocation.tryParse("minecraft:copper_ingot"), "Copper", 1.0));
+        n2.getOutputs().add(IngredientStack.item(ResourceLocation.tryParse("minecraft:gold_ingot"), "Gold", 1.0));
+
+        graph.addNode(n1);
+        graph.addNode(n2);
+
+        CanvasGroupFrame frame = new CanvasGroupFrame("frame_shared", "Chemical Reactor Pool", 0xFF3B82F6, 100.0, 100.0, 300.0, 200.0);
+        frame.setSharedMachineFrame(true);
+        frame.setViewMode(com.gtceu.calcboard.api.model.PoolViewMode.EMBEDDED_PANEL);
+        frame.setTargetPoolCapacity(2.0);
+        frame.addNode(n1.getId());
+        frame.addNode(n2.getId());
+        graph.addFrame(frame);
+
+        String json = BoardJsonSerializer.serialize(graph, "shared_test", "Shared Machine Page", 0, 0, 1);
+        JsonObject root = JsonParser.parseString(json).getAsJsonObject();
+
+        var frames = root.getAsJsonArray("frames");
+        assertEquals(1, frames.size());
+        JsonObject fObj = frames.get(0).getAsJsonObject();
+        assertTrue(fObj.get("isSharedMachine").getAsBoolean());
+        assertEquals("EMBEDDED_PANEL", fObj.get("viewMode").getAsString());
+        assertEquals(2.0, fObj.get("targetCapacity").getAsDouble(), 0.001);
+
+        var nodes = root.getAsJsonArray("nodes");
+        assertEquals(2, nodes.size());
+        for (int i = 0; i < nodes.size(); i++) {
+            JsonObject nObj = nodes.get(i).getAsJsonObject();
+            assertTrue(nObj.get("isEmbedded").getAsBoolean());
+            assertEquals("frame_shared", nObj.get("embeddedFrameId").getAsString());
+            assertFalse(nObj.get("isFoldedInFrame").getAsBoolean());
+            // Compact embedded subcard height: autoHeight = max(40, 16 + 1 * 16 + 4) = 40 or similar compact height
+            assertTrue(nObj.get("height").getAsDouble() <= 60.0);
+        }
+    }
+
+    @Test
+    void testTeamWorkspaceMetadataSerialization() {
+        FlowGraph graph = new FlowGraph();
+        String json = BoardJsonSerializer.serialize(graph, "team_page_1", "Team Circuit Board", 0, 0, 1);
+        JsonObject root = JsonParser.parseString(json).getAsJsonObject();
+
+        assertTrue(root.has("workspace"));
+        assertTrue(root.has("hasTeam"));
+        assertNotNull(root.get("workspace").getAsString());
+    }
 }

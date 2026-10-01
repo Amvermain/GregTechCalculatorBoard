@@ -71,6 +71,7 @@ public class TeamBoardStorageTest {
 
         // Add extra page
         TeamWorkspacePage page2 = new TeamWorkspacePage("page_titanium", "Titanium Processing", 1, "data".getBytes(StandardCharsets.UTF_8));
+        page2.setFolderPath("Metals/HighTier");
         ws.addOrUpdatePage(page2);
         assertEquals(2, ws.getPages().size());
 
@@ -86,6 +87,7 @@ public class TeamBoardStorageTest {
         assertEquals(2, restored.getPages().size());
         assertNotNull(restored.getPage("page_titanium"));
         assertEquals("Titanium Processing", restored.getPage("page_titanium").getTitle());
+        assertEquals("Metals/HighTier", restored.getPage("page_titanium").getFolderPath());
         assertEquals(1, restored.getCommitHistory().size());
         assertEquals("Initial commit", restored.getCommitHistory().get(0).getMessage());
     }

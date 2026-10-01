@@ -17,15 +17,28 @@ import java.util.*;
 public class MultiblockBOMCalculator {
 
     public static MultiblockBOMSummary calculateBOM(List<RecipeNode> nodes, boolean dualLowerTierEnergyHatches) {
-        return calculateBOM(nodes, Collections.emptyList(), dualLowerTierEnergyHatches);
+        return calculateBOM(nodes, Collections.emptyList(), dualLowerTierEnergyHatches, BOMHatchTierMode.MATCH_MACHINE);
+    }
+
+    public static MultiblockBOMSummary calculateBOM(List<RecipeNode> nodes, boolean dualLowerTierEnergyHatches, BOMHatchTierMode hatchTierMode) {
+        return calculateBOM(nodes, Collections.emptyList(), dualLowerTierEnergyHatches, hatchTierMode);
     }
 
     public static MultiblockBOMSummary calculateBOM(FlowGraph graph, boolean dualLowerTierEnergyHatches) {
         if (graph == null) return new MultiblockBOMSummary(List.of(), List.of(), 0, 0);
-        return calculateBOM(graph.getNodes(), graph.getFrames(), dualLowerTierEnergyHatches);
+        return calculateBOM(graph.getNodes(), graph.getFrames(), dualLowerTierEnergyHatches, BOMHatchTierMode.MATCH_MACHINE);
+    }
+
+    public static MultiblockBOMSummary calculateBOM(FlowGraph graph, boolean dualLowerTierEnergyHatches, BOMHatchTierMode hatchTierMode) {
+        if (graph == null) return new MultiblockBOMSummary(List.of(), List.of(), 0, 0);
+        return calculateBOM(graph.getNodes(), graph.getFrames(), dualLowerTierEnergyHatches, hatchTierMode);
     }
 
     public static MultiblockBOMSummary calculateBOM(List<RecipeNode> inputNodes, List<CanvasGroupFrame> inputFrames, boolean dualLowerTierEnergyHatches) {
+        return calculateBOM(inputNodes, inputFrames, dualLowerTierEnergyHatches, BOMHatchTierMode.MATCH_MACHINE);
+    }
+
+    public static MultiblockBOMSummary calculateBOM(List<RecipeNode> inputNodes, List<CanvasGroupFrame> inputFrames, boolean dualLowerTierEnergyHatches, BOMHatchTierMode hatchTierMode) {
         if (inputNodes == null || inputNodes.isEmpty()) {
             return new MultiblockBOMSummary(List.of(), List.of(), 0, 0);
         }
@@ -46,6 +59,8 @@ public class MultiblockBOMCalculator {
         Set<String> sharedFrameSlavesToSkip = new HashSet<>();
         processSharedMachineFrames(frames, nodes, sharedFrameMasterCounts, sharedFrameSlavesToSkip);
 
+        BOMHatchTierMode tierMode = hatchTierMode != null ? hatchTierMode : BOMHatchTierMode.MATCH_MACHINE;
+
         for (RecipeNode node : nodes) {
             if (node == null || node.isReroute()) continue;
             if (sharedFrameSlavesToSkip.contains(node.getId())) continue;
@@ -56,7 +71,7 @@ public class MultiblockBOMCalculator {
 
             IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
             List<MultiblockStructurePart> resolvedParts = adapter != null
-                    ? adapter.resolveStructureParts(node, dualLowerTierEnergyHatches)
+                    ? adapter.resolveStructureParts(node, dualLowerTierEnergyHatches, tierMode)
                     : List.of();
 
             if (resolvedParts.isEmpty()) continue;

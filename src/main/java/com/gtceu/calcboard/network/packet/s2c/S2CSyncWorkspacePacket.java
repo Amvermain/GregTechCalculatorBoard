@@ -76,6 +76,12 @@ public class S2CSyncWorkspacePacket {
             int del = buf.readVarInt();
             this.commits.add(new CommitLogEntry(rev, author, authorName, ts, pageId, msg, add, mod, del));
         }
+
+        if (buf.isReadable()) {
+            for (int i = 0; i < pageCount && buf.isReadable(); i++) {
+                this.pages.get(i).setFolderPath(buf.readUtf(256));
+            }
+        }
     }
 
     public void encode(FriendlyByteBuf buf) {
@@ -114,6 +120,10 @@ public class S2CSyncWorkspacePacket {
             buf.writeVarInt(c.getAddedNodes());
             buf.writeVarInt(c.getModifiedNodes());
             buf.writeVarInt(c.getDeletedNodes());
+        }
+
+        for (TeamWorkspacePage p : pages) {
+            buf.writeUtf(p.getFolderPath() != null ? p.getFolderPath() : "");
         }
     }
 

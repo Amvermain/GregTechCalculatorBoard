@@ -19,11 +19,18 @@
     const zoomLevelElem = document.getElementById("zoomLevel");
     const lastUpdatedElem = document.getElementById("lastUpdated");
     const btnUnitMode = document.getElementById("btnUnitMode");
+    const tabPersonal = document.getElementById("tabPersonal");
+    const tabTeam = document.getElementById("tabTeam");
+    const teamTabLabel = document.getElementById("teamTabLabel");
 
     let currentPageId = "";
+    let currentWorkspace = "LOCAL";
+    let hasTeam = false;
+    let localPages = [];
+    let teamPages = [];
     let liveFollow = true;
     let availablePages = [];
-    let currentUnitMode = localStorage.getItem("gtcalcboard_unit_mode") || "auto"; // "auto", "b", "mb"
+    let currentUnitMode = localStorage.getItem("gtcalcboard_unit_mode") || "auto";
 
     function updateUnitModeUI() {
         if (!btnUnitMode) return;
@@ -169,6 +176,18 @@
         for (const f of boardData.frames) {
             const colorHex = f.color ? "#" + (f.color & 0x00FFFFFF).toString(16).padStart(6, "0") : "#3b82f6";
             ctx.save();
+
+            if (f.isSharedMachine && f.viewMode === "EMBEDDED_PANEL") {
+                drawSharedMachineEmbeddedPanel(f, colorHex);
+                ctx.restore();
+                continue;
+            }
+            if (f.isSharedMachine && f.viewMode === "FOLDED_CARD") {
+                drawSharedMachineFoldedCard(f, colorHex);
+                ctx.restore();
+                continue;
+            }
+
             ctx.fillStyle = colorHex + "1a";
             ctx.strokeStyle = colorHex + "aa";
             ctx.lineWidth = 2;
@@ -185,6 +204,184 @@
             ctx.font = "bold 12px sans-serif";
             ctx.fillText(f.title || "Group Frame", f.posX + 8, f.posY + 16);
             ctx.restore();
+        }
+    }
+
+    function drawSharedMachineEmbeddedPanel(f, colorHex) {
+        ctx.fillStyle = "rgba(20, 23, 30, 0.95)";
+        ctx.strokeStyle = colorHex + "cc";
+        ctx.lineWidth = 2;
+        roundRect(ctx, f.posX, f.posY, f.width, f.height, 8);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = colorHex + "33";
+        roundRect(ctx, f.posX, f.posY, f.width, 24, [8, 8, 0, 0]);
+        ctx.fill();
+        ctx.strokeStyle = colorHex + "55";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(f.posX, f.posY + 24);
+        ctx.lineTo(f.posX + f.width, f.posY + 24);
+        ctx.stroke();
+
+        const icon = getIconImage("item", f.sharedMachineId);
+        if (icon && icon.complete && icon.naturalWidth > 0) {
+            ctx.drawImage(icon, f.posX + 4, f.posY + 4, 16, 16);
+        } else {
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "bold 11px sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText("↔", f.posX + 12, f.posY + 12);
+        }
+
+        const machineName = f.sharedMachineName || f.title || "Shared Machine";
+        const tierName = f.sharedTier ? " [" + f.sharedTier + "]" : "";
+        const titleText = machineName + tierName + " <공유 기계 풀>";
+
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 11px sans-serif";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        ctx.fillText(truncateText(ctx, titleText, f.width - 40), f.posX + 24, f.posY + 12);
+
+        ctx.fillStyle = "#181f2a";
+        ctx.fillRect(f.posX + 1, f.posY + 24, f.width - 2, 20);
+        ctx.strokeStyle = "#334155";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(f.posX, f.posY + 44);
+        ctx.lineTo(f.posX + f.width, f.posY + 44);
+        ctx.stroke();
+
+        ctx.fillStyle = "#94a3b8";
+        ctx.font = "10px sans-serif";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        ctx.fillText("Count:", f.posX + 6, f.posY + 34);
+
+        const countStr = (f.targetCapacity || 1.0).toFixed(2);
+        const countBoxW = Math.max(30, ctx.measureText(countStr).width + 8);
+        ctx.fillStyle = "#1e293b";
+        ctx.strokeStyle = "#475569";
+        roundRect(ctx, f.posX + 42, f.posY + 27, countBoxW, 14, 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = "#ffffaa";
+        ctx.font = "bold 9.5px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(countStr, f.posX + 42 + countBoxW / 2, f.posY + 34);
+
+        const duty = f.totalDuty || 0;
+        const req = f.requiredMachines || 1;
+        const dutyStr = (duty * 100.0).toFixed(1) + "% (" + req + "x)";
+        const isDeficit = duty > (f.targetCapacity || 1.0) + 0.001;
+        ctx.fillStyle = isDeficit ? "#f87171" : "#34d399";
+        ctx.font = "bold 10px sans-serif";
+        ctx.textAlign = "left";
+        ctx.fillText(dutyStr, f.posX + 46 + countBoxW + 6, f.posY + 34);
+
+        const eut = f.totalEUt || 0;
+        const eutStr = eut.toFixed(1) + " EU/t";
+        ctx.fillStyle = "#fcd34d";
+        ctx.font = "bold 10px sans-serif";
+        ctx.textAlign = "right";
+        ctx.fillText(eutStr, f.posX + f.width - 8, f.posY + 34);
+    }
+
+    function drawSharedMachineFoldedCard(f, colorHex) {
+        ctx.fillStyle = "#0d131f";
+        ctx.strokeStyle = colorHex + "dd";
+        ctx.lineWidth = 2;
+        roundRect(ctx, f.posX, f.posY, f.width, f.height, 6);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = "#070b12";
+        roundRect(ctx, f.posX, f.posY, f.width, 22, [6, 6, 0, 0]);
+        ctx.fill();
+        ctx.strokeStyle = "#1e293b";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(f.posX, f.posY + 22);
+        ctx.lineTo(f.posX + f.width, f.posY + 22);
+        ctx.stroke();
+
+        const icon = getIconImage("item", f.sharedMachineId);
+        if (icon && icon.complete && icon.naturalWidth > 0) {
+            ctx.drawImage(icon, f.posX + 3, f.posY + 3, 16, 16);
+        } else {
+            ctx.fillStyle = "#94a3b8";
+            ctx.font = "bold 10px sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText("↔", f.posX + 11, f.posY + 11);
+        }
+
+        const machineName = f.sharedMachineName || f.title || "Shared Machine";
+        const tierName = f.sharedTier ? " [" + f.sharedTier + "]" : "";
+        const titleText = machineName + tierName + " <공유 기계 풀>";
+        ctx.fillStyle = "#f8fafc";
+        ctx.font = "bold 10px sans-serif";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        ctx.fillText(truncateText(ctx, titleText, f.width - 30), f.posX + 23, f.posY + 11);
+
+        const duty = f.totalDuty || 0;
+        const req = f.requiredMachines || 1;
+        const dutyStr = (duty * 100.0).toFixed(1) + "% (" + req + "x)";
+        const isDeficit = duty > (f.targetCapacity || 1.0) + 0.001;
+        ctx.fillStyle = isDeficit ? "#f87171" : "#34d399";
+        ctx.font = "bold 9.5px sans-serif";
+        ctx.textAlign = "left";
+        ctx.fillText(dutyStr, f.posX + 6, f.posY + 32);
+
+        const eut = f.totalEUt || 0;
+        const eutStr = eut.toFixed(1) + " EU/t";
+        ctx.fillStyle = "#fcd34d";
+        ctx.textAlign = "right";
+        ctx.fillText(eutStr, f.posX + f.width - 6, f.posY + 32);
+
+        if (f.foldedPorts) {
+            const inList = f.foldedPorts.inputs || [];
+            const outList = f.foldedPorts.outputs || [];
+            const maxP = Math.max(inList.length, outList.length);
+            for (let i = 0; i < maxP; i++) {
+                const py = f.posY + 44 + i * 18 + 8;
+                if (i < inList.length) {
+                    const port = inList[i];
+                    ctx.fillStyle = "#38bdf8";
+                    ctx.beginPath();
+                    ctx.arc(f.posX + 5, py, 3, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    const portIcon = getIconImage(port.type === "FLUID" ? "fluid" : "item", port.id);
+                    if (portIcon && portIcon.complete && portIcon.naturalWidth > 0) {
+                        ctx.drawImage(portIcon, f.posX + 10, py - 7, 14, 14);
+                    }
+                    ctx.fillStyle = "#94a3b8";
+                    ctx.font = "8.5px sans-serif";
+                    ctx.textAlign = "left";
+                    ctx.fillText(formatRate(port.ratePerSec, port.type), f.posX + 27, py);
+                }
+                if (i < outList.length) {
+                    const port = outList[i];
+                    ctx.fillStyle = "#f59e0b";
+                    ctx.beginPath();
+                    ctx.arc(f.posX + f.width - 5, py, 3, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    const portIcon = getIconImage(port.type === "FLUID" ? "fluid" : "item", port.id);
+                    if (portIcon && portIcon.complete && portIcon.naturalWidth > 0) {
+                        ctx.drawImage(portIcon, f.posX + f.width - 24, py - 7, 14, 14);
+                    }
+                    ctx.fillStyle = "#94a3b8";
+                    ctx.font = "8.5px sans-serif";
+                    ctx.textAlign = "right";
+                    ctx.fillText(formatRate(port.ratePerSec, port.type), f.posX + f.width - 27, py);
+                }
+            }
         }
     }
 
@@ -222,18 +419,40 @@
     function drawConnections() {
         if (!boardData.connections) return;
         for (const c of boardData.connections) {
-            const fromNode = findNode(c.fromNode);
-            const toNode = findNode(c.toNode);
-            if (!fromNode || !toNode) continue;
+            if (c.isInternalFolded) continue;
 
-            const fromIdx = parsePortIndex(c.fromPort);
-            const toIdx = parsePortIndex(c.toPort);
+            let p1 = null;
+            let fromDirX = 1;
+            if (c.fromFoldedFrame) {
+                const fromFrame = findFrame(c.fromFoldedFrame);
+                if (!fromFrame) continue;
+                const pIdx = c.fromFoldedPortIndex || 0;
+                p1 = { x: fromFrame.posX + fromFrame.width - 5, y: fromFrame.posY + 44 + pIdx * 18 + 8 };
+                fromDirX = 1;
+            } else {
+                const fromNode = findNode(c.fromNode);
+                if (!fromNode) continue;
+                const fromIdx = parsePortIndex(c.fromPort);
+                p1 = getNodeOutputPortPos(fromNode, fromIdx);
+                fromDirX = fromNode.isFlipped ? -1 : 1;
+            }
 
-            const p1 = getNodeOutputPortPos(fromNode, fromIdx);
-            const p2 = getNodeInputPortPos(toNode, toIdx);
+            let p2 = null;
+            let toDirX = -1;
+            if (c.toFoldedFrame) {
+                const toFrame = findFrame(c.toFoldedFrame);
+                if (!toFrame) continue;
+                const pIdx = c.toFoldedPortIndex || 0;
+                p2 = { x: toFrame.posX + 5, y: toFrame.posY + 44 + pIdx * 18 + 8 };
+                toDirX = -1;
+            } else {
+                const toNode = findNode(c.toNode);
+                if (!toNode) continue;
+                const toIdx = parsePortIndex(c.toPort);
+                p2 = getNodeInputPortPos(toNode, toIdx);
+                toDirX = toNode.isFlipped ? 1 : -1;
+            }
 
-            const fromDirX = fromNode.isFlipped ? -1 : 1;
-            const toDirX = toNode.isFlipped ? 1 : -1;
             const dx = Math.max(40, Math.abs(p2.x - p1.x) * 0.5);
             const cp1x = p1.x + fromDirX * dx;
             const cp1y = p1.y;
@@ -284,6 +503,13 @@
     function drawNodes() {
         if (!boardData.nodes) return;
         for (const n of boardData.nodes) {
+            if (n.isFoldedInFrame) {
+                continue;
+            }
+            if (n.isEmbedded) {
+                drawEmbeddedSubCard(n);
+                continue;
+            }
             if (n.type === "JUNCTION" || n.type === "PIN") {
                 drawJunctionNode(n);
             } else {
@@ -291,6 +517,107 @@
             }
         }
     }
+
+    function drawEmbeddedSubCard(n) {
+        const dims = resolveNodeDimensions(n);
+        const cardW = dims.w;
+        const cardH = dims.h;
+        const isHovered = hoveredObject && hoveredObject.type === "node" && hoveredObject.node.id === n.id;
+        ctx.save();
+
+        ctx.fillStyle = isHovered ? "#172033" : "#101623";
+        ctx.strokeStyle = isHovered ? "#38bdf8" : "#232d3f";
+        ctx.lineWidth = isHovered ? 1.5 : 1;
+        roundRect(ctx, n.posX, n.posY, cardW, cardH, 4);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = "#070b12";
+        roundRect(ctx, n.posX, n.posY, cardW, 16, [4, 4, 0, 0]);
+        ctx.fill();
+        ctx.strokeStyle = "#1e293b";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(n.posX, n.posY + 16);
+        ctx.lineTo(n.posX + cardW, n.posY + 16);
+        ctx.stroke();
+
+        const recipeName = n.recipeName || n.title || "Recipe";
+        ctx.fillStyle = "#e2e8f0";
+        ctx.font = "bold 9.5px sans-serif";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        ctx.fillText(truncateText(ctx, recipeName, cardW - 55), n.posX + 6, n.posY + 8);
+
+        const count = (n.metrics && typeof n.metrics.machineCount === "number") ? n.metrics.machineCount : 1.0;
+        const countStr = count.toFixed(2) + "x";
+        ctx.fillStyle = "#fcd34d";
+        ctx.font = "bold 9px sans-serif";
+        ctx.textAlign = "right";
+        ctx.fillText(countStr, n.posX + cardW - 6, n.posY + 8);
+
+        const inputs = n.inputs || [];
+        const outputs = n.outputs || [];
+        const maxRows = Math.max(inputs.length, outputs.length);
+
+        for (let i = 0; i < maxRows; i++) {
+            const rowY = n.posY + 16 + i * 16;
+            const py = rowY + 8;
+
+            if (i < inputs.length) {
+                const port = inputs[i];
+                const isFluid = port.type === "FLUID";
+                const portColor = isFluid ? "#06b6d4" : "#38bdf8";
+
+                drawPortPin(ctx, n.posX + 4, py, portColor);
+
+                const icon = getIconImage(isFluid ? "fluid" : "item", port.id);
+                if (icon && icon.complete && icon.naturalWidth > 0) {
+                    ctx.drawImage(icon, n.posX + 8, rowY + 1, 14, 14);
+                } else {
+                    drawPortFallbackIcon(ctx, n.posX + 8, rowY + 1, isFluid);
+                }
+
+                ctx.fillStyle = "#94a3b8";
+                ctx.font = "8.5px sans-serif";
+                ctx.textAlign = "left";
+                ctx.textBaseline = "middle";
+                ctx.fillText(formatRate(port.ratePerSec, port.type), n.posX + 25, py);
+            }
+
+            if (inputs.length > 0 && outputs.length > 0) {
+                ctx.fillStyle = "#475569";
+                ctx.font = "8px sans-serif";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText("──>", n.posX + cardW / 2, py);
+            }
+
+            if (i < outputs.length) {
+                const port = outputs[i];
+                const isFluid = port.type === "FLUID";
+                const portColor = isFluid ? "#06b6d4" : "#f59e0b";
+
+                ctx.fillStyle = "#94a3b8";
+                ctx.font = "8.5px sans-serif";
+                ctx.textAlign = "right";
+                ctx.textBaseline = "middle";
+                ctx.fillText(formatRate(port.ratePerSec, port.type), n.posX + cardW - 25, py);
+
+                const icon = getIconImage(isFluid ? "fluid" : "item", port.id);
+                if (icon && icon.complete && icon.naturalWidth > 0) {
+                    ctx.drawImage(icon, n.posX + cardW - 22, rowY + 1, 14, 14);
+                } else {
+                    drawPortFallbackIcon(ctx, n.posX + cardW - 22, rowY + 1, isFluid);
+                }
+
+                drawPortPin(ctx, n.posX + cardW - 4, py, portColor);
+            }
+        }
+
+        ctx.restore();
+    }
+
 
     function drawJunctionNode(n) {
         const isHovered = hoveredObject && hoveredObject.type === "node" && hoveredObject.node.id === n.id;
@@ -400,6 +727,13 @@
 
     function resolveNodeDimensions(n) {
         if (!n) return { w: 32, h: 32 };
+        if (n.isEmbedded) {
+            const inputCount = n.inputs ? n.inputs.length : 0;
+            const outputCount = n.outputs ? n.outputs.length : 0;
+            const maxRows = Math.max(inputCount, outputCount);
+            const autoHeight = Math.max(40, 16 + maxRows * 16 + 4);
+            return { w: n.width || 245, h: n.height || autoHeight };
+        }
         if (n.type === "JUNCTION" || n.type === "PIN") {
             return { w: n.width || 32, h: n.height || 32 };
         }
@@ -874,6 +1208,10 @@
         return (boardData.nodes || []).find(n => n.id === id);
     }
 
+    function findFrame(id) {
+        return (boardData.frames || []).find(f => f.id === id);
+    }
+
     function parsePortIndex(portStr) {
         if (!portStr) return 0;
         const parts = portStr.split("_");
@@ -882,6 +1220,12 @@
 
     function getNodeInputPortPos(node, portIdx) {
         const dims = resolveNodeDimensions(node);
+        if (node.isEmbedded) {
+            return {
+                x: node.posX + 4,
+                y: node.posY + 16 + portIdx * 16 + 8
+            };
+        }
         if (node.type === "JUNCTION" || node.type === "PIN") {
             return {
                 x: node.posX + (node.isFlipped ? dims.w : 0),
@@ -896,6 +1240,12 @@
 
     function getNodeOutputPortPos(node, portIdx) {
         const dims = resolveNodeDimensions(node);
+        if (node.isEmbedded) {
+            return {
+                x: node.posX + dims.w - 4,
+                y: node.posY + 16 + portIdx * 16 + 8
+            };
+        }
         if (node.type === "JUNCTION" || node.type === "PIN") {
             return {
                 x: node.posX + (node.isFlipped ? 0 : dims.w),
@@ -1097,9 +1447,19 @@
             }
             if (!found) {
                 for (const n of boardData.nodes) {
+                    if (n.isFoldedInFrame) continue;
                     const dims = resolveNodeDimensions(n);
                     if (pt.x >= n.posX && pt.x <= n.posX + dims.w && pt.y >= n.posY && pt.y <= n.posY + dims.h) {
                         found = { type: "node", node: n };
+                        break;
+                    }
+                }
+            }
+            if (!found && boardData.frames) {
+                for (const f of boardData.frames) {
+                    if (f.isSharedMachine && pt.x >= f.posX && pt.x <= f.posX + f.width && pt.y >= f.posY && pt.y <= f.posY + f.height) {
+                        if (f.viewMode === "EMBEDDED_PANEL" && pt.y > f.posY + 44) continue;
+                        found = { type: "frame", frame: f };
                         break;
                     }
                 }
@@ -1123,6 +1483,33 @@
     function updateTooltip(sx, sy) {
         if (!hoveredObject) {
             hideTooltip();
+            return;
+        }
+
+        if (hoveredObject.type === "frame") {
+            const f = hoveredObject.frame;
+            const duty = f.totalDuty || 0;
+            const cap = f.targetCapacity || 1.0;
+            const isDeficit = duty > cap + 0.001;
+            const dutyColor = isDeficit ? "var(--accent-red)" : "var(--accent-emerald)";
+            const tierStr = f.sharedTier ? ` [${f.sharedTier}]` : "";
+
+            let html = `
+                <div class="tooltip-header">
+                    <span class="tooltip-title">${escapeHtml((f.sharedMachineName || f.title || "Shared Machine") + tierStr)}</span>
+                    <span class="tooltip-tier" style="color:var(--accent-sky); border-color:var(--accent-sky)">SHARED</span>
+                </div>
+                <div class="tooltip-section">
+                    <div class="tooltip-row"><span class="tooltip-label">Target Capacity:</span><span class="tooltip-val" style="color:#ffffaa;">${cap.toFixed(2)}x</span></div>
+                    <div class="tooltip-row"><span class="tooltip-label">Total Duty:</span><span class="tooltip-val" style="color:${dutyColor};">${(duty * 100).toFixed(1)}% (${f.requiredMachines || 1}x)</span></div>
+                    <div class="tooltip-row"><span class="tooltip-label">Power Consumption:</span><span class="tooltip-val" style="color:var(--accent-amber);">${(f.totalEUt || 0).toFixed(1)} EU/t</span></div>
+                    <div class="tooltip-row"><span class="tooltip-label">Sub-recipes:</span><span class="tooltip-val">${f.containedNodeIds ? f.containedNodeIds.length : 0} nodes</span></div>
+                    <div class="tooltip-row"><span class="tooltip-label">View Mode:</span><span class="tooltip-val">${f.viewMode || "NORMAL"}</span></div>
+                </div>
+            `;
+            tooltip.innerHTML = html;
+            tooltip.classList.remove("hidden");
+            positionTooltip(sx, sy);
             return;
         }
 
@@ -1340,14 +1727,63 @@
             .replace(/'/g, "&#039;");
     }
 
+    function updateWorkspaceTabsUI() {
+        if (!tabPersonal || !tabTeam) return;
+        tabPersonal.classList.toggle("active", currentWorkspace === "LOCAL");
+        tabTeam.classList.toggle("active", currentWorkspace === "TEAM");
+        if (hasTeam) {
+            tabTeam.style.display = "inline-flex";
+        } else {
+            tabTeam.style.display = "none";
+        }
+    }
+
+    function switchWorkspace(target) {
+        if (currentWorkspace === target) return;
+        currentWorkspace = target;
+        updateWorkspaceTabsUI();
+        currentPageId = "";
+        fetchPagesList().then(() => {
+            return fetchBoardData("");
+        }).then(() => {
+            fitView();
+        });
+    }
+
+    if (tabPersonal) {
+        tabPersonal.addEventListener("click", () => {
+            switchWorkspace("LOCAL");
+        });
+    }
+
+    if (tabTeam) {
+        tabTeam.addEventListener("click", () => {
+            switchWorkspace("TEAM");
+        });
+    }
+
     async function fetchBoardData(pageId) {
         try {
             const targetId = pageId || (liveFollow ? "" : currentPageId);
-            const query = targetId ? ("?pageId=" + encodeURIComponent(targetId)) : "";
+            const params = new URLSearchParams();
+            if (targetId) params.set("pageId", targetId);
+            if (currentWorkspace) params.set("workspace", currentWorkspace.toLowerCase());
+            const query = params.toString() ? ("?" + params.toString()) : "";
             const resp = await fetch("/api/board" + query, { cache: "no-store" });
             if (!resp.ok) throw new Error("HTTP " + resp.status);
             boardData = await resp.json();
             if (boardData.pageId) currentPageId = boardData.pageId;
+            if (boardData.workspace) {
+                currentWorkspace = boardData.workspace;
+                updateWorkspaceTabsUI();
+            }
+            if (boardData.hasTeam !== undefined) {
+                hasTeam = boardData.hasTeam;
+                if (boardData.teamName && teamTabLabel) {
+                    teamTabLabel.textContent = "Team: " + boardData.teamName;
+                }
+                updateWorkspaceTabsUI();
+            }
             updateBoardUI();
             requestRender();
         } catch (err) {
@@ -1356,10 +1792,14 @@
     }
 
     function updateBoardUI() {
+        let titleText = boardData.pageTitle || "Untitled Page";
+        if (currentWorkspace === "TEAM") {
+            titleText = "[Team] " + titleText;
+        }
         if (pageTitleText) {
-            pageTitleText.textContent = boardData.pageTitle || "Untitled Page";
+            pageTitleText.textContent = titleText;
         } else if (pageTitleBadge) {
-            pageTitleBadge.textContent = boardData.pageTitle || "Untitled Page";
+            pageTitleBadge.textContent = titleText;
         }
 
         const nodes = boardData.nodes || [];
@@ -1379,10 +1819,18 @@
 
     async function fetchPagesList() {
         try {
-            const resp = await fetch("/api/pages", { cache: "no-store" });
+            const wsParam = currentWorkspace ? ("?workspace=" + currentWorkspace.toLowerCase()) : "";
+            const resp = await fetch("/api/pages" + wsParam, { cache: "no-store" });
             if (!resp.ok) return;
             const data = await resp.json();
-            availablePages = data.pages || [];
+            hasTeam = !!data.hasTeam;
+            if (data.teamName && teamTabLabel) {
+                teamTabLabel.textContent = "Team: " + data.teamName;
+            }
+            localPages = data.localPages || [];
+            teamPages = data.teamPages || [];
+            availablePages = (currentWorkspace === "TEAM") ? teamPages : (data.pages || localPages);
+            updateWorkspaceTabsUI();
             renderPageList(pageSearchInput ? pageSearchInput.value : "");
         } catch (e) {
             console.warn("Failed to fetch pages:", e);
@@ -1568,6 +2016,11 @@
                 try {
                     const data = evt.data ? JSON.parse(evt.data) : null;
                     const updatedId = data ? data.pageId : null;
+                    const eventWs = data ? data.workspace : null;
+                    if (eventWs && liveFollow && currentWorkspace !== eventWs) {
+                        currentWorkspace = eventWs;
+                        updateWorkspaceTabsUI();
+                    }
                     if (liveFollow || (updatedId && updatedId === currentPageId)) {
                         fetchBoardData(liveFollow ? "" : currentPageId);
                     }
@@ -1592,9 +2045,11 @@
 
     // Initialize
     resizeCanvas();
+    updateWorkspaceTabsUI();
     fetchPagesList();
     fetchBoardData().then(() => {
         fitView();
     });
     initSSE();
 })();
+

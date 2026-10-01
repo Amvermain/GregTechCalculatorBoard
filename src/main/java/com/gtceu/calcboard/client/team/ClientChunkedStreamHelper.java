@@ -21,7 +21,7 @@ public final class ClientChunkedStreamHelper {
     /**
      * Streams the committed page data to the server safely in 512KB chunks.
      */
-    public static void commitPageSafely(UUID teamId, String pageId, String pageTitle, int revision,
+    public static void commitPageSafely(UUID teamId, String pageId, String pageTitle, String folderPath, int revision,
                                         String commitMessage, byte[] compressedNBT,
                                         int addedNodes, int modifiedNodes, int deletedNodes) {
         byte[] payload = compressedNBT != null ? compressedNBT : new byte[0];
@@ -29,7 +29,7 @@ public final class ClientChunkedStreamHelper {
         if (payload.length <= MAX_CHUNK_PAYLOAD_SIZE) {
             UUID transferId = UUID.randomUUID();
             NetworkHandler.sendToServer(new C2SChunkedCommitPacket(
-                    transferId, teamId, pageId, pageTitle, revision, commitMessage,
+                    transferId, teamId, pageId, pageTitle, folderPath, revision, commitMessage,
                     0, 1, payload, addedNodes, modifiedNodes, deletedNodes
             ));
             return;
@@ -44,9 +44,15 @@ public final class ClientChunkedStreamHelper {
             byte[] chunk = Arrays.copyOfRange(payload, start, end);
 
             NetworkHandler.sendToServer(new C2SChunkedCommitPacket(
-                    transferId, teamId, pageId, pageTitle, revision, commitMessage,
+                    transferId, teamId, pageId, pageTitle, folderPath, revision, commitMessage,
                     i, totalChunks, chunk, addedNodes, modifiedNodes, deletedNodes
             ));
         }
+    }
+
+    public static void commitPageSafely(UUID teamId, String pageId, String pageTitle, int revision,
+                                        String commitMessage, byte[] compressedNBT,
+                                        int addedNodes, int modifiedNodes, int deletedNodes) {
+        commitPageSafely(teamId, pageId, pageTitle, "", revision, commitMessage, compressedNBT, addedNodes, modifiedNodes, deletedNodes);
     }
 }

@@ -75,6 +75,17 @@ public final class EmbeddedPanelRenderer {
 
         int addBtnY = y + h - 28;
         renderAddRecipeButton(graphics, font, frame, x + 6, addBtnY, w - 12, 22, mouseX, mouseY);
+
+        // Corner Grips, Resize Grip & Edge Hover Highlight
+        CanvasGroupFrameRenderer.drawCornerGrip(graphics, x, y, borderCol, false, false);
+        CanvasGroupFrameRenderer.drawCornerGrip(graphics, x + w, y, borderCol, true, false);
+        CanvasGroupFrameRenderer.drawCornerGrip(graphics, x, y + h, borderCol, false, true);
+        if (!ExportRenderScope.isActive()) CanvasGroupFrameRenderer.drawResizeGrip(graphics, x + w - 12, y + h - 12, borderCol);
+
+        CanvasGroupFrameRenderer.ResizeDirection hoverDir = CanvasGroupFrameRenderer.getResizeDirection(frame, mouseX, mouseY);
+        if (hoverDir != CanvasGroupFrameRenderer.ResizeDirection.NONE) {
+            CanvasGroupFrameRenderer.renderResizeHighlight(graphics, x, y, w, h, color, hoverDir);
+        }
     }
 
     private static void renderMasterHeader(

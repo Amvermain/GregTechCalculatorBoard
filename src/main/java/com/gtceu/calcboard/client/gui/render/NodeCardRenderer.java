@@ -11,6 +11,7 @@ import com.gtceu.calcboard.client.gui.widget.NodeWidget;
 import com.gtceu.calcboard.client.gui.layout.NodeLayoutBounds;
 import com.gtceu.calcboard.api.spi.IModAdapter;
 import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
+import com.gtceu.calcboard.client.team.ClientWorkspaceState;
 
 import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.api.storage.BoardPage;
@@ -914,7 +915,7 @@ public class NodeCardRenderer {
         String srcPageId = node.getLinkedSourcePageId();
         String srcNodeId = node.getLinkedSourceNodeId();
 
-        BoardPage srcPage = (srcPageId != null && !srcPageId.isEmpty()) ? BoardManager.getInstance().getPage(srcPageId).orElse(null) : null;
+        BoardPage srcPage = (srcPageId != null && !srcPageId.isEmpty()) ? ClientWorkspaceState.resolveActiveWorkspacePage(srcPageId) : null;
         RecipeNode srcNode = (srcPage != null && srcNodeId != null) ? srcPage.getGraph().findNodeById(srcNodeId) : null;
 
         if (srcPage == null || srcNode == null) {
@@ -931,12 +932,13 @@ public class NodeCardRenderer {
     private static LinkedBadgeVisual resolveFlowStateVisual(NodeWidget widget, RecipeNode node, BoardPage srcPage) {
         FlowGraph graph = widget.getParent() != null ? widget.getParent().getGraph() : (Minecraft.getInstance().screen instanceof BoardScreen bs ? bs.getGraph() : null);
         double demand = graph != null ? FlowBalanceMatrixSolver.calculateTotalConnectedPortDemand(graph, node, 0, null) : 0.0;
+        double effectiveDemand = graph != null ? FlowBalanceMatrixSolver.calculateTotalConnectedPortEffectiveDemand(graph, node, 0) : demand;
         double alloc = node.getAllocatedInputRate();
 
-        if (demand > 0.0001 && alloc < demand - 0.0001) {
+        if (effectiveDemand > 0.0001 && alloc < effectiveDemand - 0.0001) {
             IngredientStack rStack = node.getRerouteIngredient();
             String allocStr = FormatUtil.formatRate(alloc, rStack);
-            String demandStr = FormatUtil.formatRate(demand, rStack);
+            String demandStr = FormatUtil.formatRate(effectiveDemand, rStack);
             String text = "\u26A0 " + allocStr + " / " + demandStr;
             return new LinkedBadgeVisual(text, 0xFFF97316, 0xEE431407, 0xFFFED7AA);
         }

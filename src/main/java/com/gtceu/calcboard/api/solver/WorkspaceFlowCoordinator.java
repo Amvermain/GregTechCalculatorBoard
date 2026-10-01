@@ -81,7 +81,7 @@ public final class WorkspaceFlowCoordinator {
         }
         FlowGraph graph = srcPage.getGraph();
         double totalProduction = calculateJunctionProduction(srcNode, graph);
-        double localDemand = FlowBalanceMatrixSolver.calculateTotalConnectedPortDemand(graph, srcNode, 0, null);
+        double localDemand = FlowBalanceMatrixSolver.calculateTotalConnectedPortEffectiveDemand(graph, srcNode, 0);
         if (srcNode.isFixedDrain()) {
             localDemand += srcNode.getExternalDrainRate();
         }
@@ -689,7 +689,36 @@ public final class WorkspaceFlowCoordinator {
 
     private static double calculateConsumerDemand(FlowGraph graph, RecipeNode consumerNode) {
         if (graph == null || consumerNode == null) return 0.0;
-        return FlowEdgeAllocator.getConnectedConsumerDemand(graph, consumerNode, 0);
+        double downstreamDemand = FlowEdgeAllocator.getConnectedConsumerDemand(graph, consumerNode, 0);
+        if (downstreamDemand > 0.0001) {
+            return downstreamDemand;
+        }
+        if (isUnconstrainedRelayConsumer(graph, consumerNode, new HashSet<>())) {
+            return Double.MAX_VALUE;
+        }
+        return 0.0;
+    }
+
+    private static boolean isUnconstrainedRelayConsumer(FlowGraph graph, RecipeNode node, Set<String> visited) {
+        if (node == null || !node.isReroute() || node.isVoidSink()) return false;
+        if (!visited.add(node.getId())) return false;
+
+        List<FlowGraph.ConnectionEdge> outEdges = new ArrayList<>();
+        for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+            if (edge.fromNodeId().equals(node.getId()) && edge.outputIndex() == 0) {
+                outEdges.add(edge);
+            }
+        }
+        if (outEdges.isEmpty()) {
+            return true;
+        }
+        for (FlowGraph.ConnectionEdge edge : outEdges) {
+            RecipeNode next = graph.findNodeById(edge.toNodeId());
+            if (next != null && next.isReroute() && isUnconstrainedRelayConsumer(graph, next, visited)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static RecipeNode findConsumerNode(BoardPage dstPage, String srcPageId, String srcNodeId) {

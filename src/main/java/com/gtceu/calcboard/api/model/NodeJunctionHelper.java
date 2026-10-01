@@ -13,7 +13,9 @@ public final class NodeJunctionHelper {
         node.getOutputs().clear();
         node.getInputs().add(stack.copy());
         node.getOutputs().add(stack.copy());
-        node.setName(stack.getDisplayName());
+        if (!node.hasCustomName()) {
+            node.setName(stack.getDisplayName());
+        }
         if (stack.getAmount() > 0.0) {
             node.setTargetBatchAmount(stack.getAmount());
         }
@@ -32,7 +34,9 @@ public final class NodeJunctionHelper {
         if (node == null || !node.isReroute()) return;
         node.getInputs().clear();
         node.getOutputs().clear();
-        node.setName("Reroute");
+        if (!node.hasCustomName()) {
+            node.setName("Reroute");
+        }
         node.setBaseSpecOnly(null);
     }
 

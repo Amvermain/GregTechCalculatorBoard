@@ -288,6 +288,10 @@ public final class AutoRatioEngine {
         return AutoRatioFlowTraverser.calculateTotalConnectedPortDemand(graph, producer, outputIndex, countsMap);
     }
 
+    public static double calculateTotalConnectedPortEffectiveDemand(FlowGraph graph, RecipeNode producer, int outputIndex) {
+        return AutoRatioFlowTraverser.calculateTotalConnectedPortDemand(graph, producer, outputIndex, null, true);
+    }
+
     public static double calculateEffectiveIncomingSupply(FlowGraph graph, RecipeNode consumer, int inIdx, Map<String, Double> countsMap) {
         return AutoRatioFlowTraverser.calculateEffectiveIncomingSupply(graph, consumer, inIdx, countsMap);
     }

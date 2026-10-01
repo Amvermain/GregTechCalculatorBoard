@@ -23,6 +23,7 @@ import org.lwjgl.glfw.GLFW;
 
 import com.gtceu.calcboard.client.gui.dialog.modal.IBoardModal;
 import com.gtceu.calcboard.client.gui.dialog.modal.ModalRenderContext;
+import com.gtceu.calcboard.client.team.ClientWorkspaceState;
 
 import com.gtceu.calcboard.api.model.CrossPageExportTarget;
 import com.gtceu.calcboard.api.solver.WorkspaceFlowCoordinator;
@@ -51,6 +52,7 @@ public class JunctionSupplyDialog implements IBoardModal {
     private SupplyMode selectedMode = SupplyMode.NONE;
     private FlowSplitMode splitMode = FlowSplitMode.PROPORTIONAL;
     private EditBox rateEditBox;
+    private EditBox nameEditBox;
     private boolean isAnchor = false;
 
     private boolean isBuffer = false;
@@ -93,6 +95,11 @@ public class JunctionSupplyDialog implements IBoardModal {
         int screenHeight = getScreenHeight();
         int x = (screenWidth - DIALOG_WIDTH) / 2;
         int y = (screenHeight - DIALOG_HEIGHT) / 2;
+
+        this.nameEditBox = new EditBox(font, x + 32, y + 24, DIALOG_WIDTH - 42, 16, Component.translatable("gui.gtcalcboard.junction.name_hint"));
+        this.nameEditBox.setMaxLength(48);
+        this.nameEditBox.setValue(node.hasCustomName() ? node.getName() : "");
+        updateNameHintFromBound();
 
         int editBoxX = x + DIALOG_WIDTH - 85;
         int editBoxY = y + 74 + SupplyMode.FIXED_RATE.ordinal() * 18;
@@ -171,6 +178,7 @@ public class JunctionSupplyDialog implements IBoardModal {
     public void close() {
         this.visible = false;
         this.targetNode = null;
+        this.nameEditBox = null;
         this.outgoingScrollOffset = 0;
         this.edgeLimitEditBoxes.clear();
         this.edgePriorityEditBoxes.clear();
@@ -232,11 +240,23 @@ public class JunctionSupplyDialog implements IBoardModal {
         int previewY = y + 24;
         if (boundStack != null) {
             IngredientRenderer.render(graphics, boundStack, x + 10, previewY);
-            String boundText = "§f" + boundStack.getDisplayName();
-            graphics.drawString(font, font.plainSubstrByWidth(boundText, DIALOG_WIDTH - 36), x + 32, previewY + 4, 0xFFFFFFFF, false);
         } else {
-            graphics.drawString(font, "§7" + Component.translatable("gui.gtcalcboard.junction.no_bound_ingredient").getString(), x + 10, previewY + 4, 0xFF888888, false);
+            graphics.drawString(font, "↔", x + 13, previewY + 4, 0xFF94A3B8, false);
         }
+
+        if (nameEditBox != null) {
+            nameEditBox.setX(x + 32);
+            nameEditBox.setY(previewY);
+            nameEditBox.setWidth(DIALOG_WIDTH - 42);
+            nameEditBox.render(graphics, mouseX, mouseY, 0);
+        }
+    }
+
+    private void updateNameHintFromBound() {
+        if (nameEditBox == null || targetNode == null) return;
+        IngredientStack bound = targetNode.getRerouteIngredient();
+        String defaultName = bound != null ? bound.getDisplayName() : Component.translatable("gui.gtcalcboard.tooltip.reroute_junction").getString();
+        nameEditBox.setHint(Component.literal("§8" + defaultName));
     }
 
     private void renderTabs(GuiGraphics graphics, Font font, int x, int y, int mouseX, int mouseY) {
@@ -384,6 +404,10 @@ public class JunctionSupplyDialog implements IBoardModal {
         renderSelectorBox(graphics, font, pBtnLeftX + 16, row1Y, pBoxW, pName);
         renderNavArrow(graphics, font, pBtnRightX, row1Y, "▶", mouseX, mouseY);
 
+        int searchBtnX = pBtnRightX + 18;
+        int searchBtnW = (x + DIALOG_WIDTH - 14) - searchBtnX;
+        renderSearchButton(graphics, font, searchBtnX, row1Y, searchBtnW, mouseX, mouseY);
+
         renderJunctionRowAndRate(graphics, font, x, startY + 20, pBtnLeftX, pBtnRightX, pBoxW, curPage, curJunction, mouseX, mouseY);
     }
 
@@ -473,7 +497,34 @@ public class JunctionSupplyDialog implements IBoardModal {
         graphics.drawString(font, trimmed, bx + 4, by + 3, 0xFFE2E8F0, false);
     }
 
+    private static void renderSearchButton(GuiGraphics graphics, Font font, int bx, int by, int bw, int mouseX, int mouseY) {
+        boolean hover = mouseX >= bx && mouseX <= bx + bw && mouseY >= by && mouseY <= by + 14;
+        graphics.fill(bx, by, bx + bw, by + 14, hover ? 0xFF0284C7 : 0xFF1E293B);
+        graphics.renderOutline(bx, by, bw, 14, hover ? 0xFF38BDF8 : 0xFF475569);
+        String label = "🔍 " + Component.translatable("gui.gtcalcboard.junction.search_source").getString();
+        graphics.drawCenteredString(font, font.plainSubstrByWidth(label, bw - 4), bx + bw / 2, by + 3, hover ? 0xFFFFFFFF : 0xFF94A3B8);
+    }
+
     private List<BoardPage> getCandidatePages() {
+        ClientWorkspaceState teamState = ClientWorkspaceState.getInstance();
+        if (teamState.isTeamMode()) {
+            return collectTeamCandidatePages(teamState);
+        }
+        return collectPersonalCandidatePages();
+    }
+
+    private List<BoardPage> collectTeamCandidatePages(ClientWorkspaceState teamState) {
+        String activeId = teamState.getActiveTeamPageId();
+        List<BoardPage> list = new ArrayList<>();
+        for (BoardPage page : teamState.getTeamPagesAsBoardPages()) {
+            if (!page.getId().equals(activeId)) {
+                list.add(page);
+            }
+        }
+        return list;
+    }
+
+    private List<BoardPage> collectPersonalCandidatePages() {
         BoardManager bm = BoardManager.getInstance();
         if (bm == null || bm.getPages() == null) return Collections.emptyList();
         BoardPage active = bm.getActivePage();
@@ -574,10 +625,26 @@ public class JunctionSupplyDialog implements IBoardModal {
         playClickSound();
     }
 
+    private void openSourceSearchDialog() {
+        if (parent == null || targetNode == null) return;
+        parent.openCrossPageSourceSearchDialog(targetNode, linkedSourcePageId, linkedSourceNodeId, (pageId, nodeId) -> {
+            this.linkedSourcePageId = pageId;
+            this.linkedSourceNodeId = nodeId;
+            syncBoundIngredientFromLinkedSource();
+            updateNameHintFromBound();
+        });
+        playClickSound();
+    }
+
     private boolean checkLinkedSourceSelectorsClicked(int x, int startY, double mouseX, double mouseY) {
         int row1Y = startY + 2;
         int pBtnLeftX = x + SRC_SELECTOR_LEFT_X;
         int pBtnRightX = x + SRC_SELECTOR_RIGHT_X;
+        int pBoxX = pBtnLeftX + 16;
+        int pBoxW = pBtnRightX - pBoxX - 4;
+        int searchBtnX = pBtnRightX + 18;
+        int searchBtnW = (x + DIALOG_WIDTH - 14) - searchBtnX;
+
         if (mouseY >= row1Y && mouseY <= row1Y + 14) {
             if (mouseX >= pBtnLeftX && mouseX <= pBtnLeftX + 14) {
                 cycleSourcePage(-1);
@@ -585,6 +652,10 @@ public class JunctionSupplyDialog implements IBoardModal {
             }
             if (mouseX >= pBtnRightX && mouseX <= pBtnRightX + 14) {
                 cycleSourcePage(1);
+                return true;
+            }
+            if ((mouseX >= pBoxX && mouseX <= pBoxX + pBoxW) || (mouseX >= searchBtnX && mouseX <= searchBtnX + searchBtnW)) {
+                openSourceSearchDialog();
                 return true;
             }
         }
@@ -786,7 +857,7 @@ public class JunctionSupplyDialog implements IBoardModal {
     }
 
     private void renderExportTargetRow(GuiGraphics graphics, Font font, int x, int rowY, CrossPageExportTarget target, int mouseX, int mouseY) {
-        BoardPage targetPage = BoardManager.getInstance().getPage(target.targetPageId()).orElse(null);
+        BoardPage targetPage = ClientWorkspaceState.resolveActiveWorkspacePage(target.targetPageId());
         String pageName = targetPage != null && targetPage.getName() != null && !targetPage.getName().isEmpty() ? targetPage.getName() : target.targetPageId();
         String label = "\uD83D\uDD17 " + pageName;
         boolean labelHover = mouseX >= x + 14 && mouseX <= x + 99 && mouseY >= rowY && mouseY <= rowY + 14;
@@ -960,6 +1031,10 @@ public class JunctionSupplyDialog implements IBoardModal {
 
         if (checkCloseClicked(x, y, mouseX, mouseY)) {
             close();
+            return true;
+        }
+
+        if (checkEditBoxClicked(nameEditBox, mouseX, mouseY, button)) {
             return true;
         }
 
@@ -1260,6 +1335,23 @@ public class JunctionSupplyDialog implements IBoardModal {
 
         targetNode.setSupplyMode(selectedMode);
         targetNode.setJunctionSplitMode(splitMode);
+        if (nameEditBox != null) {
+            String entered = nameEditBox.getValue().trim();
+            String oldName = targetNode.getName();
+            if (entered.isEmpty()) {
+                targetNode.setHasCustomName(false);
+                IngredientStack bound = targetNode.getRerouteIngredient();
+                targetNode.setName(bound != null ? bound.getDisplayName() : "Reroute");
+            } else if (!entered.equals(oldName)) {
+                targetNode.setName(entered);
+                targetNode.setHasCustomName(true);
+                if (parent != null) {
+                    parent.recordCommand(com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.customName(
+                            targetNode.getId(), oldName, entered
+                    ));
+                }
+            }
+        }
         if (selectedMode == SupplyMode.FIXED_RATE && rateEditBox != null) {
             targetNode.setExternalSupplyRate(parseRateInput(rateEditBox.getValue()));
         } else if (selectedMode == SupplyMode.FIXED_DRAIN && rateEditBox != null) {
@@ -1312,9 +1404,17 @@ public class JunctionSupplyDialog implements IBoardModal {
             );
         }
 
-        BoardManager bm = BoardManager.getInstance();
-        if (bm != null && bm.getPages() != null && !bm.getPages().isEmpty()) {
-            WorkspaceFlowCoordinator.coordinate(bm.getPages());
+        ClientWorkspaceState teamState = ClientWorkspaceState.getInstance();
+        if (teamState.isTeamMode()) {
+            List<BoardPage> teamPages = teamState.getTeamPagesAsBoardPages();
+            if (!teamPages.isEmpty()) {
+                WorkspaceFlowCoordinator.coordinate(teamPages);
+            }
+        } else {
+            BoardManager bm = BoardManager.getInstance();
+            if (bm != null && bm.getPages() != null && !bm.getPages().isEmpty()) {
+                WorkspaceFlowCoordinator.coordinate(bm.getPages());
+            }
         }
 
         if (parent != null) {
@@ -1405,6 +1505,10 @@ public class JunctionSupplyDialog implements IBoardModal {
             return true;
         }
 
+        if (nameEditBox != null && nameEditBox.isFocused()) {
+            return nameEditBox.keyPressed(keyCode, scanCode, modifiers);
+        }
+
         if (activeTab == 0 && rateEditBox != null && rateEditBox.isFocused()) {
             return rateEditBox.keyPressed(keyCode, scanCode, modifiers);
         }
@@ -1434,6 +1538,9 @@ public class JunctionSupplyDialog implements IBoardModal {
 
     public boolean charTyped(char codePoint, int modifiers) {
         if (!visible) return false;
+        if (nameEditBox != null && nameEditBox.isFocused()) {
+            return nameEditBox.charTyped(codePoint, modifiers);
+        }
         if (activeTab == 0 && rateEditBox != null && rateEditBox.isFocused()) {
             return rateEditBox.charTyped(codePoint, modifiers);
         }

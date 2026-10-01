@@ -224,6 +224,29 @@ class LocalWebServerDaemonTest {
         conn.disconnect();
     }
 
+    @Test
+    void testPagesApiWithWorkspaceParameter() throws Exception {
+        HttpURLConnection conn = openConnection("/api/pages?workspace=local");
+        assertEquals(200, conn.getResponseCode());
+        assertTrue(conn.getContentType().contains("application/json"));
+
+        String json = readResponseBody(conn);
+        JsonObject root = JsonParser.parseString(json).getAsJsonObject();
+        assertTrue(root.has("pages"));
+        assertTrue(root.has("currentWorkspace"));
+    }
+
+    @Test
+    void testBoardApiWithWorkspaceParameter() throws Exception {
+        HttpURLConnection conn = openConnection("/api/board?workspace=local");
+        assertEquals(200, conn.getResponseCode());
+        assertTrue(conn.getContentType().contains("application/json"));
+
+        String json = readResponseBody(conn);
+        JsonObject root = JsonParser.parseString(json).getAsJsonObject();
+        assertTrue(root.has("workspace"));
+    }
+
     private HttpURLConnection openConnection(String path) throws Exception {
         URL url = URI.create(daemon.getUrl() + (path.startsWith("/") ? path.substring(1) : path)).toURL();
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();

@@ -20,7 +20,11 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
+import com.gtceu.calcboard.client.gui.model.PortRef;
 import net.minecraftforge.common.MinecraftForge;
+
+import java.util.Collections;
+import java.util.Set;
 
 public final class CanvasSingleWireHandler {
 
@@ -53,6 +57,10 @@ public final class CanvasSingleWireHandler {
 
         if (!connected && graph != null) {
             connected = tryConnectToEmbeddedPort(wireStartNode, wireStartPortIdx, wireStartIsInput, canvasMouseX, canvasMouseY, graph, screen);
+        }
+
+        if (!connected && graph != null) {
+            connected = tryDropWireOnSharedFrame(wireStartNode, wireStartPortIdx, wireStartIsInput, canvasMouseX, canvasMouseY, graph, screen);
         }
 
         if (!connected && screen.getSearchDialog() != null) {
@@ -345,5 +353,53 @@ public final class CanvasSingleWireHandler {
             handleReverseWireConnect(wireStartNode, wireStartPortIdx, targetWidget, graph, hit.portIndex(), screen);
             return true;
         }
+    }
+
+    private static boolean tryDropWireOnSharedFrame(
+            NodeWidget wireStartNode,
+            int wireStartPortIdx,
+            boolean wireStartIsInput,
+            double canvasMouseX,
+            double canvasMouseY,
+            FlowGraph graph,
+            BoardScreen screen
+    ) {
+        if (graph == null || wireStartNode == null || wireStartPortIdx < 0) return false;
+
+        CanvasGroupFrame targetFrame = null;
+        for (int i = graph.getFrames().size() - 1; i >= 0; i--) {
+            CanvasGroupFrame f = graph.getFrames().get(i);
+            if (f != null && f.isPointInside(canvasMouseX, canvasMouseY)) {
+                targetFrame = f;
+                break;
+            }
+        }
+        if (targetFrame == null) return false;
+
+        PortRef portRef = new PortRef(wireStartNode.getNode().getId(), wireStartIsInput, wireStartPortIdx);
+        Set<PortRef> singlePortSet = Collections.singleton(portRef);
+
+        boolean autoConnected = CanvasBundleWiringHandler.handleBundleConnectToFrame(targetFrame, singlePortSet, screen);
+        if (autoConnected) {
+            return true;
+        }
+
+        if (targetFrame.isSharedMachineFrame()) {
+            RecipeNode srcNode = wireStartNode.getNode();
+            IngredientStack stack = extractWireStartStack(wireStartNode, wireStartPortIdx, wireStartIsInput, srcNode);
+            boolean shiftDown = ClientSafetyHelper.isShiftDown();
+
+            screen.openRecipeSearchForSharedFrameWithWireContext(
+                    targetFrame,
+                    srcNode,
+                    wireStartPortIdx,
+                    wireStartIsInput,
+                    stack,
+                    shiftDown
+            );
+            return true;
+        }
+
+        return false;
     }
 }

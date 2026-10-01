@@ -43,6 +43,10 @@ public interface IMultiblockBOMProvider extends IModExtension {
     }
 
     default List<MultiblockStructurePart> resolveStructureParts(RecipeNode node, boolean dualLowerTierEnergyHatches) {
+        return resolveStructureParts(node, dualLowerTierEnergyHatches, com.gtceu.calcboard.api.bom.BOMHatchTierMode.MATCH_MACHINE);
+    }
+
+    default List<MultiblockStructurePart> resolveStructureParts(RecipeNode node, boolean dualLowerTierEnergyHatches, com.gtceu.calcboard.api.bom.BOMHatchTierMode hatchTierMode) {
         List<MultiblockStructurePart> list = new ArrayList<>();
         if (node == null) return list;
 

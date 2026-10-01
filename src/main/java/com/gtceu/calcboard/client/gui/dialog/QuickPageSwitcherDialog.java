@@ -285,22 +285,7 @@ public class QuickPageSwitcherDialog implements IBoardModal {
     private void confirmSelection() {
         if (selectedIndex >= 0 && selectedIndex < results.size()) {
             SearchResult sr = results.get(selectedIndex);
-            BoardManager bm = BoardManager.getInstance();
-            BoardPage cur = bm.getActivePage();
-            if (cur != null) {
-                cur.setPanX(screen.getPanX());
-                cur.setPanY(screen.getPanY());
-                cur.setZoom(screen.getZoom());
-            }
-
-            bm.openPage(sr.page.getId());
-            BoardPage next = bm.getActivePage();
-            if (next != null) {
-                screen.setPanX(next.getPanX());
-                screen.setPanY(next.getPanY());
-                screen.setZoom(next.getZoom());
-            }
-            screen.rebuildWidgets();
+            screen.openPage(sr.page.getId());
             Minecraft.getInstance().getSoundManager().play(
                     net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F)
             );

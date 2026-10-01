@@ -22,14 +22,20 @@ public class S2CSyncWorkspaceMetaPacket {
         private final UUID lockHolderUUID;
         private final String lockHolderName;
         private final long lockExpiresTimestamp;
+        private String folderPath;
 
-        public PageMeta(String pageId, String title, int revision, UUID lockHolderUUID, String lockHolderName, long lockExpiresTimestamp) {
+        public PageMeta(String pageId, String title, int revision, UUID lockHolderUUID, String lockHolderName, long lockExpiresTimestamp, String folderPath) {
             this.pageId = pageId != null ? pageId : "default";
             this.title = title != null ? title : "Page";
             this.revision = revision;
             this.lockHolderUUID = lockHolderUUID;
             this.lockHolderName = lockHolderName != null ? lockHolderName : "";
             this.lockExpiresTimestamp = lockExpiresTimestamp;
+            this.folderPath = folderPath != null ? folderPath : "";
+        }
+
+        public PageMeta(String pageId, String title, int revision, UUID lockHolderUUID, String lockHolderName, long lockExpiresTimestamp) {
+            this(pageId, title, revision, lockHolderUUID, lockHolderName, lockExpiresTimestamp, "");
         }
 
         public PageMeta(FriendlyByteBuf buf) {
@@ -39,6 +45,7 @@ public class S2CSyncWorkspaceMetaPacket {
             this.lockHolderUUID = buf.readBoolean() ? buf.readUUID() : null;
             this.lockHolderName = buf.readUtf(256);
             this.lockExpiresTimestamp = buf.readLong();
+            this.folderPath = "";
         }
 
         public void encode(FriendlyByteBuf buf) {
@@ -51,6 +58,14 @@ public class S2CSyncWorkspaceMetaPacket {
             }
             buf.writeUtf(lockHolderName != null ? lockHolderName : "");
             buf.writeLong(lockExpiresTimestamp);
+        }
+
+        public void setFolderPath(String folderPath) {
+            this.folderPath = folderPath != null ? folderPath : "";
+        }
+
+        public String getFolderPath() {
+            return folderPath != null ? folderPath : "";
         }
 
         public String getPageId() {
@@ -99,6 +114,11 @@ public class S2CSyncWorkspaceMetaPacket {
         for (int i = 0; i < count; i++) {
             this.pages.add(new PageMeta(buf));
         }
+        if (buf.isReadable()) {
+            for (int i = 0; i < count && buf.isReadable(); i++) {
+                this.pages.get(i).setFolderPath(buf.readUtf(256));
+            }
+        }
     }
 
     public void encode(FriendlyByteBuf buf) {
@@ -108,6 +128,9 @@ public class S2CSyncWorkspaceMetaPacket {
         buf.writeVarInt(pages.size());
         for (PageMeta pm : pages) {
             pm.encode(buf);
+        }
+        for (PageMeta pm : pages) {
+            buf.writeUtf(pm.getFolderPath());
         }
     }
 

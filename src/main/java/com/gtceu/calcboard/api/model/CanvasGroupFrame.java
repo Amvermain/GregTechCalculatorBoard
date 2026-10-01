@@ -205,6 +205,12 @@ public class CanvasGroupFrame {
 
     public boolean autoFit(FlowGraph graph, double padding) {
         if (graph == null) return false;
+        if (this.poolViewMode == PoolViewMode.EMBEDDED_PANEL) {
+            this.height = computeMinEmbeddedHeight(graph);
+            this.width = Math.max(MIN_SHARED_FRAME_WIDTH, this.width);
+            relayoutEmbeddedCards(graph);
+            return true;
+        }
         List<RecipeNode> targets = new ArrayList<>();
         for (String nid : containedNodeIds) {
             RecipeNode n = graph.findNodeById(nid);
@@ -783,6 +789,20 @@ public class CanvasGroupFrame {
         return getEnclosedNodes(graph);
     }
 
+    public double computeMinEmbeddedHeight(FlowGraph graph) {
+        List<RecipeNode> nodes = getEnclosedNodes(graph);
+        double currentY = this.posY + HEADER_HEIGHT + 20.0 + 6.0;
+        for (RecipeNode node : nodes) {
+            if (node == null || node.isReroute()) continue;
+            int portRows = Math.max(node.getInputs().size(), node.getOutputs().size());
+            double portRowsH = portRows > 0 ? portRows * 16.0 + 4.0 : 16.0;
+            double cardH = Math.max(40.0, 16.0 + portRowsH + 4.0);
+            currentY += cardH + 6.0;
+        }
+        double addBtnH = 22.0;
+        return Math.max(MIN_HEIGHT, (currentY + addBtnH + 6.0) - this.posY);
+    }
+
     public void relayoutEmbeddedCards(FlowGraph graph) {
         if (this.poolViewMode != PoolViewMode.EMBEDDED_PANEL) return;
         if (this.width < MIN_SHARED_FRAME_WIDTH) {
@@ -813,8 +833,8 @@ public class CanvasGroupFrame {
             currentY += cardH + 6.0;
         }
 
-        double addBtnH = 22.0;
-        this.height = Math.max(MIN_HEIGHT, (currentY + addBtnH + 6.0) - this.posY);
+        double minRequiredH = computeMinEmbeddedHeight(graph);
+        this.height = Math.max(minRequiredH, this.height);
     }
 
     public void addRecipeInline(RecipeNode node, FlowGraph graph) {

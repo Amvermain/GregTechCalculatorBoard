@@ -572,4 +572,58 @@ public class CrossPageJunctionFlowTest {
         Assertions.assertFalse(deserialized.getOutputs().isEmpty());
         Assertions.assertEquals("Sand", deserialized.getOutputs().get(0).getDisplayName());
     }
+
+    @Test
+    @DisplayName("RFC-064: Custom junction name is preserved across bind and unbind and survives serialization")
+    void testCustomJunctionNamePreservationOnBindAndUnbind() {
+        RecipeNode junction = createJunction("junc_custom", "Oxygen Bus");
+        junction.setName("Main Oxygen Bus");
+        junction.setHasCustomName(true);
+
+        IngredientStack oxygen = IngredientStack.fluid(ResourceLocation.tryParse("gtceu:oxygen"), "Oxygen", 1000);
+        junction.bindRerouteIngredient(oxygen);
+        Assertions.assertEquals("Main Oxygen Bus", junction.getName());
+        Assertions.assertTrue(junction.hasCustomName());
+        Assertions.assertEquals("Oxygen", junction.getRerouteIngredient().getDisplayName());
+
+        junction.unbindRerouteIngredient();
+        Assertions.assertEquals("Main Oxygen Bus", junction.getName());
+        Assertions.assertTrue(junction.hasCustomName());
+
+        CompoundTag tag = RecipeNodeSerializer.serialize(junction);
+        RecipeNode loaded = RecipeNodeSerializer.deserialize(tag);
+        Assertions.assertEquals("Main Oxygen Bus", loaded.getName());
+        Assertions.assertTrue(loaded.hasCustomName());
+
+        RecipeNode defaultJunc = createJunction("junc_def", "Oak Log");
+        Assertions.assertFalse(defaultJunc.hasCustomName());
+        defaultJunc.bindRerouteIngredient(oxygen);
+        Assertions.assertEquals("Oxygen", defaultJunc.getName());
+        defaultJunc.unbindRerouteIngredient();
+        Assertions.assertEquals("Reroute", defaultJunc.getName());
+    }
+
+    @Test
+    @DisplayName("RFC-064: Source junction metrics and custom name identification for cross-page search")
+    void testSourceJunctionMetricsAndCustomNameIdentification() {
+        BoardPage page = new BoardPage("page_cryo", "Cryogenics Facility", new FlowGraph());
+        RecipeNode producer = RecipeNode.create(ResourceLocation.tryParse("gtceu:cryo_air"), "Air Distillation", 20, 30, GTVoltageTier.MV);
+        producer.setId("cryo_prod");
+        producer.getOutputs().add(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:oxygen"), "Oxygen", 500.0));
+        page.getGraph().addNode(producer);
+
+        RecipeNode junc = createJunction("cryo_junc", "Oxygen");
+        junc.setName("Cryo Oxygen Out");
+        junc.setHasCustomName(true);
+        junc.bindRerouteIngredient(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:oxygen"), "Oxygen", 1.0));
+        page.getGraph().addNode(junc);
+
+        page.getGraph().addConnection(producer.getId(), 0, junc.getId(), 0);
+
+        WorkspaceFlowCoordinator.SourceJunctionMetrics metrics = WorkspaceFlowCoordinator.calculateSourceJunctionMetrics(page, junc);
+        Assertions.assertEquals(500.0, metrics.totalProduction(), 0.001);
+        Assertions.assertEquals(0.0, metrics.totalUsage(), 0.001);
+        Assertions.assertEquals(500.0, metrics.availableSurplus(), 0.001);
+        Assertions.assertEquals("Cryo Oxygen Out", junc.getName());
+    }
 }

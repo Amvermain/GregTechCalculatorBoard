@@ -557,12 +557,17 @@ public class GTCEuModAdapter implements IModAdapter {
 
     @Override
     public List<MultiblockStructurePart> resolveStructureParts(RecipeNode node, boolean dualLowerTierEnergyHatches) {
+        return resolveStructureParts(node, dualLowerTierEnergyHatches, com.gtceu.calcboard.api.bom.BOMHatchTierMode.MATCH_MACHINE);
+    }
+
+    @Override
+    public List<MultiblockStructurePart> resolveStructureParts(RecipeNode node, boolean dualLowerTierEnergyHatches, com.gtceu.calcboard.api.bom.BOMHatchTierMode hatchTierMode) {
         if (node == null) return List.of();
         ResourceLocation machineId = node.getMachineIcon();
         if (node.isMultiblock() || (machineId != null && MultiblockDetector.isMultiblock(machineId))) {
-            return GTMultiblockBOMResolver.resolveStructureParts(node, dualLowerTierEnergyHatches);
+            return GTMultiblockBOMResolver.resolveStructureParts(node, dualLowerTierEnergyHatches, hatchTierMode);
         }
-        return IModAdapter.super.resolveStructureParts(node, dualLowerTierEnergyHatches);
+        return IModAdapter.super.resolveStructureParts(node, dualLowerTierEnergyHatches, hatchTierMode);
     }
 
     @Override

@@ -141,28 +141,18 @@ public class ClientAe2CraftConfirmHook {
     public static void onItemTooltip(ItemTooltipEvent event) {
         if (!ModCompatHelper.isAe2Loaded()) return;
         ItemStack stack = event.getItemStack();
-        if (stack.isEmpty()) return;
+        if (stack.isEmpty() || !isEncodedPattern(stack)) return;
 
         PatternGraphRegistry registry = PatternGraphRegistry.getInstance();
-        boolean isPattern = isEncodedPattern(stack);
-
-        if (isPattern) {
-            PatternId patternId = PatternId.of(stack);
-            Optional<BoardPage> boundOpt = registry.getDirectBoundPage(patternId);
-            if (boundOpt.isPresent()) {
-                BoardPage page = boundOpt.get();
-                event.getToolTip().add(Component.literal("§b⚡ " + Component.translatable("gui.gtcalcboard.ae2.tooltip.linked_page", page.getName()).getString()));
-            } else {
-                event.getToolTip().add(Component.literal("§8• " + Component.translatable("gui.gtcalcboard.ae2.tooltip.create_hint").getString()));
-            }
-            return;
-        }
-
-        Optional<BoardPage> boundOpt = registry.getBoundPage(stack);
+        PatternId patternId = PatternId.of(stack);
+        Optional<BoardPage> boundOpt = registry.getDirectBoundPage(patternId);
         if (boundOpt.isPresent()) {
             BoardPage page = boundOpt.get();
             event.getToolTip().add(Component.literal("§b⚡ " + Component.translatable("gui.gtcalcboard.ae2.tooltip.linked_page", page.getName()).getString()));
+            return;
         }
+
+        event.getToolTip().add(Component.literal("§8• " + Component.translatable("gui.gtcalcboard.ae2.tooltip.create_hint").getString()));
     }
 
     private static boolean isEncodedPattern(ItemStack stack) {

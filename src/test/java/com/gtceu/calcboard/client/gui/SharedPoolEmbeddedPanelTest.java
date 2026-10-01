@@ -20,8 +20,12 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
+import com.gtceu.calcboard.api.storage.BoardManager;
+import com.gtceu.calcboard.client.gui.interaction.CanvasBundleWiringHandler;
+import com.gtceu.calcboard.client.gui.model.PortRef;
 import java.lang.reflect.Proxy;
 import java.util.List;
+import java.util.Set;
 
 @ExtendWith(MinecraftBootstrapExtension.class)
 public class SharedPoolEmbeddedPanelTest {
@@ -201,6 +205,41 @@ public class SharedPoolEmbeddedPanelTest {
         Assertions.assertNotNull(endpoints);
         Assertions.assertEquals((float) subAnchor[0], endpoints.x2(), 0.001f);
         Assertions.assertEquals((float) subAnchor[1], endpoints.y2(), 0.001f);
+    }
+
+    @Test
+    public void testResolvePortAnchorForEmbeddedPanelAndFoldedFrame() {
+        FlowGraph graph = new FlowGraph();
+
+        CanvasGroupFrame frame = new CanvasGroupFrame("sp_anchor_test", "Wiremill Pool", CanvasGroupFrame.COLOR_BLUE, 300, 100, 360, 200);
+        frame.setSharedMachineFrame(true);
+        graph.addFrame(frame);
+
+        RecipeNode sub = RecipeNode.create("Sub Wire", 100, 20, GTVoltageTier.LV);
+        sub.getInputs().add(IngredientStack.item(ResourceLocation.tryParse("minecraft:copper_ingot"), "Copper Ingot", 1.0));
+        sub.getOutputs().add(IngredientStack.item(ResourceLocation.tryParse("minecraft:copper_wire"), "Copper Wire", 2.0));
+        graph.addNode(sub);
+        frame.addRecipeInline(sub, graph);
+        frame.relayoutEmbeddedCards(graph);
+
+        double[] expectedInAnchor = EmbeddedPanelRenderer.getEmbeddedPortAnchor(frame, sub, 0, true);
+        double[] expectedOutAnchor = EmbeddedPanelRenderer.getEmbeddedPortAnchor(frame, sub, 0, false);
+
+        CanvasWireRenderer.PortAnchor inAnchor = CanvasWireRenderer.resolvePortAnchor(graph, n -> null, sub, 0, true);
+        CanvasWireRenderer.PortAnchor outAnchor = CanvasWireRenderer.resolvePortAnchor(graph, n -> null, sub, 0, false);
+
+        Assertions.assertEquals((float) expectedInAnchor[0], inAnchor.x(), 0.001f);
+        Assertions.assertEquals((float) expectedInAnchor[1], inAnchor.y(), 0.001f);
+        Assertions.assertEquals(-1.0f, inAnchor.dirX(), 0.001f);
+
+        Assertions.assertEquals((float) expectedOutAnchor[0], outAnchor.x(), 0.001f);
+        Assertions.assertEquals((float) expectedOutAnchor[1], outAnchor.y(), 0.001f);
+        Assertions.assertEquals(1.0f, outAnchor.dirX(), 0.001f);
+
+        frame.setViewMode(PoolViewMode.FOLDED_CARD, graph);
+        CanvasWireRenderer.PortAnchor foldedOutAnchor = CanvasWireRenderer.resolvePortAnchor(graph, n -> null, sub, 0, false);
+        Assertions.assertEquals((float) (frame.getPosX() + frame.getWidth() - 5.0), foldedOutAnchor.x(), 0.001f);
+        Assertions.assertEquals(1.0f, foldedOutAnchor.dirX(), 0.001f);
     }
 
     @Test
@@ -418,5 +457,125 @@ public class SharedPoolEmbeddedPanelTest {
 
         Assertions.assertTrue(com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.matches(sampleRecipe, parsedCatQuery));
         Assertions.assertFalse(com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.matches(sampleRecipe, parsedIconQuery));
+    }
+
+    @Test
+    public void testEmbeddedPanelResizeDirectionAndAction() {
+        CanvasGroupFrame frame = new CanvasGroupFrame("sp_resize_test", "Cutter Pool", CanvasGroupFrame.COLOR_CYAN, 100, 100, 360, 200);
+        frame.setSharedMachineFrame(true);
+
+        Assertions.assertEquals(PoolViewMode.EMBEDDED_PANEL, frame.getViewMode());
+
+        // Test right edge resize hover
+        var eastDir = com.gtceu.calcboard.client.gui.render.CanvasGroupFrameRenderer.getResizeDirection(frame, 460.0, 150.0);
+        Assertions.assertEquals(com.gtceu.calcboard.client.gui.render.CanvasGroupFrameRenderer.ResizeDirection.EAST, eastDir);
+
+        // Test south-east corner resize hover
+        var seDir = com.gtceu.calcboard.client.gui.render.CanvasGroupFrameRenderer.getResizeDirection(frame, 460.0, 300.0);
+        Assertions.assertEquals(com.gtceu.calcboard.client.gui.render.CanvasGroupFrameRenderer.ResizeDirection.SOUTH_EAST, seDir);
+
+        // Test getClickedAction returns RESIZE
+        var action = com.gtceu.calcboard.client.gui.render.CanvasGroupFrameRenderer.getClickedAction(frame, 460.0, 150.0);
+        Assertions.assertEquals(com.gtceu.calcboard.client.gui.render.CanvasGroupFrameRenderer.FrameAction.RESIZE, action);
+
+        // Folded card must NOT allow resize
+        frame.setViewMode(PoolViewMode.FOLDED_CARD);
+        var foldedDir = com.gtceu.calcboard.client.gui.render.CanvasGroupFrameRenderer.getResizeDirection(frame, 460.0, 150.0);
+        Assertions.assertEquals(com.gtceu.calcboard.client.gui.render.CanvasGroupFrameRenderer.ResizeDirection.NONE, foldedDir);
+    }
+
+    @Test
+    public void testEmbeddedPanelHeightPreservationAndExpansion() {
+        FlowGraph graph = new FlowGraph();
+        CanvasGroupFrame frame = new CanvasGroupFrame("sp_height_test", "LCR Pool", CanvasGroupFrame.COLOR_EMERALD, 100, 100, 360, 80);
+        frame.setSharedMachineFrame(true);
+        graph.addFrame(frame);
+
+        RecipeNode r1 = RecipeNode.create("Recipe 1", 100, 20, GTVoltageTier.HV);
+        r1.getInputs().add(IngredientStack.fluid(ResourceLocation.tryParse("minecraft:water"), "Water", 1000.0));
+        r1.getOutputs().add(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:hydrogen"), "Hydrogen", 2000.0));
+        graph.addNode(r1);
+        frame.addRecipeInline(r1, graph);
+
+        frame.relayoutEmbeddedCards(graph);
+        double minH = frame.computeMinEmbeddedHeight(graph);
+        Assertions.assertEquals(minH, frame.getHeight(), 0.001);
+
+        // User resizes frame height larger
+        frame.setHeight(minH + 100.0);
+        frame.relayoutEmbeddedCards(graph);
+        Assertions.assertEquals(minH + 100.0, frame.getHeight(), 0.001);
+
+        // autoFit resets height back to minRequired
+        boolean fitted = frame.autoFit(graph, CanvasGroupFrame.DEFAULT_PADDING);
+        Assertions.assertTrue(fitted);
+        Assertions.assertEquals(minH, frame.getHeight(), 0.001);
+    }
+
+    @Test
+    public void testContextualWireLinkingToSharedFrameSubNode() {
+        com.gtceu.calcboard.api.storage.BoardManager.getInstance().resetToDefault();
+        FlowGraph graph = com.gtceu.calcboard.api.storage.BoardManager.getInstance().getActiveGraph();
+
+        RecipeNode srcNode = RecipeNode.create("Distillation Tower", 100, 20, GTVoltageTier.HV);
+        srcNode.getOutputs().add(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:heavy_oil"), "Heavy Oil", 480.0));
+        graph.addNode(srcNode);
+
+        CanvasGroupFrame frame = new CanvasGroupFrame("sp_wire_drop", "LCR Pool", CanvasGroupFrame.COLOR_EMERALD, 300, 100, 360, 200);
+        frame.setSharedMachineFrame(true);
+        graph.addFrame(frame);
+
+        RecipeNode lcrSub = RecipeNode.create("Heavy Oil Cracking", 100, 20, GTVoltageTier.HV);
+        lcrSub.getInputs().add(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:heavy_oil"), "Heavy Oil", 120.0));
+        lcrSub.getOutputs().add(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:cracked_heavy_oil"), "Cracked Heavy Oil", 100.0));
+        graph.addNode(lcrSub);
+        frame.addRecipeInline(lcrSub, graph);
+
+        // Contextual wire target from srcNode output port 0
+        com.gtceu.calcboard.client.gui.dialog.RecipeSearchDialog.ContextualWireTarget target =
+                new com.gtceu.calcboard.client.gui.dialog.RecipeSearchDialog.ContextualWireTarget(
+                        srcNode, 0, false, srcNode.getOutputs().get(0), 300, 150, false
+                );
+
+        BoardScreen screen = new BoardScreen();
+        com.gtceu.calcboard.client.gui.dialog.RecipeSearchNodeSpawner.linkContextualWire(screen, target, lcrSub);
+
+        boolean connected = graph.getConnections().stream().anyMatch(e ->
+                e.fromNodeId().equals(srcNode.getId()) && e.outputIndex() == 0 &&
+                e.toNodeId().equals(lcrSub.getId()) && e.inputIndex() == 0
+        );
+        Assertions.assertTrue(connected);
+    }
+
+    @Test
+    public void testSinglePortDropOnSharedFrameAutoConnectsToExistingSubNode() {
+        BoardManager.getInstance().resetToDefault();
+        FlowGraph graph = BoardManager.getInstance().getActiveGraph();
+
+        RecipeNode srcNode = RecipeNode.create("Distillation Tower", 100, 20, GTVoltageTier.HV);
+        srcNode.getOutputs().add(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:heavy_oil"), "Heavy Oil", 100.0));
+        graph.addNode(srcNode);
+
+        CanvasGroupFrame frame = new CanvasGroupFrame("sp_auto_conn", "LCR Pool", CanvasGroupFrame.COLOR_EMERALD, 300, 100, 360, 200);
+        frame.setSharedMachineFrame(true);
+        graph.addFrame(frame);
+
+        RecipeNode lcrSub = RecipeNode.create("Heavy Oil Cracking", 100, 20, GTVoltageTier.HV);
+        lcrSub.getInputs().add(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:heavy_oil"), "Heavy Oil", 120.0));
+        lcrSub.getOutputs().add(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:cracked_heavy_oil"), "Cracked Heavy Oil", 100.0));
+        graph.addNode(lcrSub);
+        frame.addRecipeInline(lcrSub, graph);
+
+        BoardScreen screen = new BoardScreen();
+
+        PortRef portRef = new PortRef(srcNode.getId(), false, 0);
+        boolean handled = CanvasBundleWiringHandler.handleBundleConnectToFrame(frame, Set.of(portRef), screen);
+        Assertions.assertTrue(handled);
+
+        boolean connected = graph.getConnections().stream().anyMatch(e ->
+                e.fromNodeId().equals(srcNode.getId()) && e.outputIndex() == 0 &&
+                e.toNodeId().equals(lcrSub.getId()) && e.inputIndex() == 0
+        );
+        Assertions.assertTrue(connected);
     }
 }

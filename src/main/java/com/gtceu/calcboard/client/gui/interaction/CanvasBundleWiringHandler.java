@@ -12,6 +12,7 @@ import com.gtceu.calcboard.client.gui.model.PortRef;
 import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine;
 import com.gtceu.calcboard.client.gui.widget.BoardToast;
 import com.gtceu.calcboard.client.gui.widget.NodeWidget;
+import com.gtceu.calcboard.client.util.ClientSafetyHelper;
 import com.gtceu.calcboard.integration.spi.RecipeViewerRegistry;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
@@ -154,9 +155,9 @@ public final class CanvasBundleWiringHandler {
         }
     }
 
-    private static void handleBundleConnectToFrame(CanvasGroupFrame frame, Set<PortRef> ports, BoardScreen screen) {
+    public static boolean handleBundleConnectToFrame(CanvasGroupFrame frame, Set<PortRef> ports, BoardScreen screen) {
         FlowGraph graph = screen.getGraph();
-        if (graph == null || frame == null || ports == null || ports.isEmpty()) return;
+        if (graph == null || frame == null || ports == null || ports.isEmpty()) return false;
 
         List<RecipeNode> frameNodes = new ArrayList<>(frame.getEnclosedNodes(graph));
         if (frameNodes.isEmpty()) {
@@ -165,10 +166,15 @@ public final class CanvasBundleWiringHandler {
                 if (n != null && !n.isReroute()) frameNodes.add(n);
             }
         }
-        if (frameNodes.isEmpty()) return;
+        if (frameNodes.isEmpty() && !frame.isSharedMachineFrame()) return false;
 
         RecipeNode templateNode = frame.getFirstOperationalNode(graph);
-        if (templateNode == null) templateNode = frameNodes.get(0);
+        if (templateNode == null && !frameNodes.isEmpty()) templateNode = frameNodes.get(0);
+        if (templateNode == null && frame.isSharedMachineFrame() && frame.getSharedMachineId() != null) {
+            templateNode = RecipeNode.create("Template", 1, 1, frame.getSharedTier() != null ? frame.getSharedTier() : com.gtceu.calcboard.api.type.GTVoltageTier.LV);
+            templateNode.setMachineIcon(frame.getSharedMachineId());
+        }
+        if (templateNode == null && frameNodes.isEmpty()) return false;
 
         double origFrameX = frame.getPosX();
         double origFrameY = frame.getPosY();
@@ -176,14 +182,13 @@ public final class CanvasBundleWiringHandler {
         double origFrameH = frame.getHeight();
 
         double curMaxY = calculateFrameMaxY(frame, frameNodes);
-        double targetPosX = frameNodes.get(0).getPosX();
+        double targetPosX = frameNodes.isEmpty() ? frame.getPosX() + 16.0 : frameNodes.get(0).getPosX();
 
         List<RecipeNode> createdNodes = new ArrayList<>();
         List<FlowGraph.ConnectionEdge> createdEdges = new ArrayList<>();
         List<BoardCommand> subCmds = new ArrayList<>();
         int connectedCount = 0;
-        int spawnedCount = 0;
-        boolean shiftDown = Screen.hasShiftDown();
+        boolean shiftDown = ClientSafetyHelper.isShiftDown();
 
         for (PortRef pref : ports) {
             RecipeNode srcNode = graph.findNodeById(pref.nodeId());
@@ -196,7 +201,8 @@ public final class CanvasBundleWiringHandler {
             }
         }
 
-        finalizeBundleFrameConnection(frame, frameNodes, createdNodes, createdEdges, subCmds, connectedCount, spawnedCount, origFrameX, origFrameY, origFrameW, origFrameH, screen);
+        finalizeBundleFrameConnection(frame, frameNodes, createdNodes, createdEdges, subCmds, connectedCount, createdNodes.size(), origFrameX, origFrameY, origFrameW, origFrameH, screen);
+        return connectedCount > 0 || !createdNodes.isEmpty();
     }
 
     private static double calculateFrameMaxY(CanvasGroupFrame frame, List<RecipeNode> frameNodes) {
@@ -300,7 +306,11 @@ public final class CanvasBundleWiringHandler {
         newNode.setPosY(curMaxY);
 
         graph.addNode(newNode);
-        frame.addNode(newNode.getId());
+        if (frame.isSharedMachineFrame() && frame.getViewMode() == com.gtceu.calcboard.api.model.PoolViewMode.EMBEDDED_PANEL) {
+            frame.addRecipeInline(newNode, graph);
+        } else {
+            frame.addNode(newNode.getId());
+        }
         frameNodes.add(newNode);
         createdNodes.add(newNode);
 
@@ -408,14 +418,18 @@ public final class CanvasBundleWiringHandler {
             BoardScreen screen
     ) {
         if (!createdNodes.isEmpty()) {
-            frame.recomputeBounds(frameNodes, CanvasGroupFrame.DEFAULT_PADDING);
+            if (frame.isSharedMachineFrame() && frame.getViewMode() == com.gtceu.calcboard.api.model.PoolViewMode.EMBEDDED_PANEL) {
+                frame.relayoutEmbeddedCards(screen.getGraph());
+            } else {
+                frame.recomputeBounds(frameNodes, CanvasGroupFrame.DEFAULT_PADDING);
+                if (origFrameX != frame.getPosX() || origFrameY != frame.getPosY() || origFrameW != frame.getWidth() || origFrameH != frame.getHeight()) {
+                    subCmds.add(new BoardCommand.ResizeFrameCommand(
+                            frame.getId(), origFrameX, origFrameY, origFrameW, origFrameH, frame.getPosX(), frame.getPosY(), frame.getWidth(), frame.getHeight(), "Auto-fit Frame"
+                    ));
+                }
+            }
             screen.rebuildWidgets();
             subCmds.add(0, new BoardCommand.AddNodesCommand(createdNodes, createdEdges, "Spawn " + spawnedCount + " Missing Recipes"));
-            if (origFrameX != frame.getPosX() || origFrameY != frame.getPosY() || origFrameW != frame.getWidth() || origFrameH != frame.getHeight()) {
-                subCmds.add(new BoardCommand.ResizeFrameCommand(
-                        frame.getId(), origFrameX, origFrameY, origFrameW, origFrameH, frame.getPosX(), frame.getPosY(), frame.getWidth(), frame.getHeight(), "Auto-fit Frame"
-                ));
-            }
         }
 
         if (!subCmds.isEmpty()) {
@@ -427,9 +441,10 @@ public final class CanvasBundleWiringHandler {
             BoardToast.show(Component.literal("§a🔗 ").append(
                     Component.translatable("gui.gtcalcboard.toast.bundle_frame_connected", connectedCount, frame.getTitle())
             ));
-            Minecraft.getInstance().getSoundManager().play(
-                    SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.2F)
-            );
+            Minecraft mc = Minecraft.getInstance();
+            if (mc != null && mc.getSoundManager() != null) {
+                mc.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.2F));
+            }
         }
     }
 

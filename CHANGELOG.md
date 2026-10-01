@@ -12,6 +12,36 @@
 
 ## [Unreleased]
 
+## [2.4.0-beta.3] - 2026-10-01
+
+### Changed
+- The default card display mode is now Expanded Card Mode instead of Slim Card Mode, allowing players to immediately adjust machine voltage tiers, overclocking, and configs directly from node cards upon initial setup.
+
+### Added
+- Added custom naming for junction nodes and a source search modal for cross-page links: players can now give junctions descriptive custom names in the junction dialog or via right-click, and search for upstream source pages or junctions by page name, junction label, or resource/fluid with real-time surplus rates in a dedicated search popup.
+- Added Folder Browser and folder hierarchy support to Shared Team Workspaces: players can now organize shared team pages into folders and subfolders using the drawer browser (accessible via the `≡` button on the tab bar or the folder icon on the activity bar), add new team pages and folders, drag and drop pages into folders, rename pages/folders, and search team pages across folder trees in real time.
+- Added Shared Team Workspace viewing and tab switching to the web dashboard: players can now switch between personal boards and shared team workspaces directly from the browser header, browse team pages and folders, and inspect shared boards in real time.
+- Added Input/Output Bus and Hatch Tier Mode settings to the Multiblock Bill of Materials (BOM): players can now choose whether buses and hatches should match the machine's voltage tier, automatically scale down to the cheapest minimum tier required by recipe items and fluids, or force a specific tier (LV, MV, or HV) directly from the BOM dialog.
+
+### Fixed
+- Fixed an issue where junctions and connection wires displayed false deficit warnings even when surplus was available, which occurred because flow demands were calculated using nominal rates instead of the reduced effective consumption of downstream machines throttled by other bottlenecks.
+- Fixed an issue where Shared Machine Pool frames rendered with overlapping sub-cards and missing summary headers in the web dashboard, now displaying the complete pool header, machine counts, duty cycle, power usage, and compact recipe cards just like in-game.
+- Fixed an issue where multiblock machines with higher-tier item buses (such as MV buses on Rock Filtrator) calculated more buses than required by the recipe in the Bill of Materials (BOM), now dynamically calculating the exact number of buses required to satisfy the recipe items and automatically restoring extra slots to structure casings.
+- Fixed an issue where the Threading configuration panel in machine settings was missing localized text for sub-tabs, helix stats, stat allocation badges, effect descriptions, and action buttons, as well as fixing a text clipping issue where multi-stat helix descriptions overflowed into the count adjustment buttons.
+- Fixed an issue where cross-page linked junctions could not be configured or coordinated in shared team workspaces, and ensured strict isolation so personal boards and shared team workspaces only link within their own respective pages.
+- Fixed an issue where regular items produced on a calculator board incorrectly displayed an AE2 linked page tooltip.
+- Fixed an issue where cross-page linked junctions failed to combine with local producers when connected to intermediate relay junctions or terminal batch buffers, causing imported flow to be blocked at 0 mB/s.
+- Fixed an issue where multiblock-exclusive recipes (such as Large Chemical Reactor recipes) were erroneously assigned singleblock machines as their default workstation and displayed singleblock machines in the switch machine dialog.
+- Fixed an issue where canceling a node card resize with the Escape key did not properly restore the card's original height.
+- Fixed an issue where the page settings panel repeatedly reopened whenever clicking or dragging on empty canvas areas.
+- Fixed an issue where newline characters in certain tooltips (such as the frame auto-ratio button) rendered as broken [LF] glyph boxes, improving tooltip formatting and control character safety across all languages.
+- Fixed an issue where Shared Machine Pool frames could not be resized while in Embedded Panel view mode, restoring resize handles, multi-edge dragging, and auto-fit.
+- Fixed an issue where dragging an output port onto a Shared Machine Pool frame triggered generic wire drag cancellation instead of adding a recipe: now it automatically connects to matching existing recipes or automatically spawns the recipe into the pool just like multi-port dragging, falling back to the prefiltered recipe search dialog when multiple choices exist.
+- Fixed an issue where the starting anchor of the connecting wire was misaligned with the sub-card port when dragging a wire from a port inside a Shared Machine Pool embedded panel.
+- Fixed an issue where page names could not be renamed via double-click or right-click in shared team workspaces.
+- Fixed an issue in Shared Team Workspaces where camera positions (pan coordinates) and zoom levels were not remembered when switching between team pages or toggling between personal and team workspace tabs.
+- Fixed a network compatibility issue where clients connecting to dedicated servers running older mod versions would disconnect with an IndexOutOfBoundsException error upon login.
+
 ## [2.4.0-beta.2] - 2026-09-27
 
 ### Added

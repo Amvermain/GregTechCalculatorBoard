@@ -32,9 +32,9 @@ graph TD
         RENDER["Two-Pass Z-Order Rendering & Rate-Based Flow Wire Animation Shader"]
         WSI["WireSpatialIndex (128x128 AABB Uniform Grid O(log E) Spatial Indexing)"]
         NCTC["NodeCardTextCache (Dirty-Flag Based Text Truncation & Formatting Cache)"]
-        Widgets["widget.* (NodeWidget, ToolbarWidget, PageTabBarWidget, HotkeyHudWidget, SummaryOverlay, FavoritesDockWidget)"]
-        Dialogs["dialog.* (BoardSettingsDialog, MachineConfigDialog & RecipeOverrideView, BatchRunCalculatorDialog, BOMDialog, SearchDialog, GlobalBalanceDialog, JunctionSupplyDialog, FrameEditDialog)"]
-        Web["web.* (LocalWebServerDaemon, WebSyncEventBus, MicroIconRenderer, IconDiskCache, BoardJsonSerializer)"]
+        Widgets["widget.* (NodeWidget, ToolbarWidget, PageTabBarWidget, PageBrowserDrawer & TreeModel, HotkeyHudWidget, SummaryOverlay, FavoritesDockWidget)"]
+        Dialogs["dialog.* (BoardSettingsDialog, MachineConfigDialog & RecipeOverrideView, BatchRunCalculatorDialog, BOMDialog, SearchDialog, GlobalBalanceDialog, JunctionSupplyDialog, CrossPageSourceSearchDialog, FrameEditDialog)"]
+        Web["web.* (LocalWebServerDaemon with ?workspace=team|local, WebSyncEventBus, MicroIconRenderer, IconDiskCache, BoardJsonSerializer)"]
         Search["search.* (RecipeSearchCacheManager, RecipeSearchQueryEngine & Composable Specification)"]
     end
 
@@ -262,6 +262,9 @@ The Core Domain Engine (`com.gtceu.calcboard.api`) and Common Mod Adapters (`com
 ### 2.37 Cross-Page Junction Flow Allocation & Virtual Linking (ADR-064)
 * **Inter-Page Virtual Linking**: Connects consumer junctions directly to remote producer pages with priority-based allocation rules, real-time supply synchronization, and 1-click source navigation.
 * **Workspace Flow Coordinator (`WorkspaceFlowCoordinator`)**: Organizes cross-page junction references into a directed acyclic graph (DAG), detects inter-page circular dependencies, and deterministically reconciles multi-page mass balances.
+* **Custom Junction Naming & Source Search Modal**: Allows assigning descriptive labels to junctions and searching candidates by page name, junction label, or resource with real-time surplus rates via `CrossPageSourceSearchDialog`.
+* **Strict Workspace Isolation**: Isolates cross-page lookups between personal boards and shared team workspaces to preserve multi-tenant boundary integrity.
+* **Throttled Downstream Effective Demand**: Evaluates flow demands using actual effective throughput ($R_{\text{effective}} = R_{\text{nominal}} \cdot \eta$) when downstream consumers are throttled, preventing false deficit warnings on upstream junctions.
 
 ---
 

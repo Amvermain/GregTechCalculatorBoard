@@ -12,6 +12,7 @@ import com.gtceu.calcboard.api.util.ModCompatHelper;
 import com.gtceu.calcboard.client.gui.BoardScreen;
 import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
 import com.gtceu.calcboard.client.gui.widget.BoardToast;
+import com.gtceu.calcboard.client.util.ClientSafetyHelper;
 import com.gtceu.calcboard.integration.emi.EmiStepRecipeDetector;
 import com.gtceu.calcboard.integration.jei.JeiRecipeConverter;
 import com.gtceu.calcboard.integration.jei.JeiRecipeWrapper;
@@ -117,7 +118,7 @@ public final class RecipeSearchNodeSpawner {
         dialog.setVisible(false);
     }
 
-    private static void linkContextualWire(BoardScreen parent, RecipeSearchDialog.ContextualWireTarget target, RecipeNode node) {
+    public static void linkContextualWire(BoardScreen parent, RecipeSearchDialog.ContextualWireTarget target, RecipeNode node) {
         if (!target.sourceIsInput) {
             connectContextualForwardWire(parent, target, node, target.sourceNode, target.sourceStack);
         } else {
@@ -159,12 +160,12 @@ public final class RecipeSearchNodeSpawner {
                 BoardToast.show(Component.literal("§a⚡ ").append(
                         Component.translatable("message.gtcalcboard.shift_connect_matched", node.getName(), String.format(java.util.Locale.ROOT, "%.0f", matched))
                 ));
-                Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.2F));
+                ClientSafetyHelper.playSoundSafely(SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.2F));
             } else {
                 BoardToast.show(Component.literal("§a✔ ").append(
                         Component.translatable("gui.gtcalcboard.toast.drag_auto_connected", sourceNode.getName(), node.getName())
                 ));
-                Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F));
+                ClientSafetyHelper.playSoundSafely(SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F));
             }
             parent.recordCommand(new BoardCommand.ConnectWireCommand(newEdge, target.shiftAutoRatio ? node.getId() : null, oldMachineCount, newMachineCount));
             TutorialManager.getInstance().onWireConnected(target.shiftAutoRatio);
@@ -202,12 +203,12 @@ public final class RecipeSearchNodeSpawner {
                 BoardToast.show(Component.literal("§a⚡ ").append(
                         Component.translatable("message.gtcalcboard.shift_connect_matched", node.getName(), String.format(java.util.Locale.ROOT, "%.0f", matched))
                 ));
-                Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.2F));
+                ClientSafetyHelper.playSoundSafely(SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.2F));
             } else {
                 BoardToast.show(Component.literal("§a✔ ").append(
                         Component.translatable("gui.gtcalcboard.toast.drag_auto_connected", node.getName(), sourceNode.getName())
                 ));
-                Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F));
+                ClientSafetyHelper.playSoundSafely(SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F));
             }
             parent.recordCommand(new BoardCommand.ConnectWireCommand(newEdge, target.shiftAutoRatio ? node.getId() : null, oldMachineCount, newMachineCount));
             TutorialManager.getInstance().onWireConnected(target.shiftAutoRatio);

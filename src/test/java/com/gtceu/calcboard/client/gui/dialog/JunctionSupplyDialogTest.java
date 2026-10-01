@@ -10,11 +10,18 @@ import com.gtceu.calcboard.client.gui.BoardScreen;
 import com.gtceu.calcboard.client.gui.util.FormatUtil;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.resources.ResourceLocation;
+import com.gtceu.calcboard.api.solver.WorkspaceFlowCoordinator;
+import com.gtceu.calcboard.api.storage.BoardManager;
+import com.gtceu.calcboard.api.storage.BoardPage;
+import com.gtceu.calcboard.api.team.TeamWorkspacePage;
+import com.gtceu.calcboard.client.team.ClientWorkspaceState;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.util.List;
 
 public class JunctionSupplyDialogTest {
 
@@ -264,6 +271,209 @@ public class JunctionSupplyDialogTest {
             Assertions.assertEquals(0.0, junction.getExternalSupplyRate(), 0.001);
         } finally {
             FormatUtil.setActiveTimeUnit(RateTimeUnit.PER_SECOND);
+        }
+    }
+
+    @Test
+    @DisplayName("Candidate pages and junctions are strictly isolated between personal and team workspaces")
+    void testWorkspaceCandidatePagesIsolation() throws Exception {
+        BoardManager bm = BoardManager.getInstance();
+        List<BoardPage> personalPages = bm.getPages();
+        personalPages.clear();
+        BoardPage localA = new BoardPage("local_page_a", "Local Page A", new FlowGraph());
+        BoardPage localB = new BoardPage("local_page_b", "Local Page B", new FlowGraph());
+        personalPages.add(localA);
+        personalPages.add(localB);
+        bm.openPage("local_page_a");
+
+        RecipeNode localJuncA = RecipeNode.create(ResourceLocation.tryParse("gtceu:junction"), "Local Junction A", 0, 0, GTVoltageTier.LV);
+        localJuncA.setReroute(true);
+        localA.getGraph().addNode(localJuncA);
+
+        RecipeNode localJuncB = RecipeNode.create(ResourceLocation.tryParse("gtceu:junction"), "Local Junction B", 0, 0, GTVoltageTier.LV);
+        localJuncB.setReroute(true);
+        localB.getGraph().addNode(localJuncB);
+
+        ClientWorkspaceState teamState = ClientWorkspaceState.getInstance();
+        teamState.clear();
+        teamState.setCurrentTeamId(java.util.UUID.randomUUID());
+        teamState.setCurrentTeamName("Test Team");
+
+        TeamWorkspacePage teamP1 = new TeamWorkspacePage("team_page_1", "Team Page 1");
+        TeamWorkspacePage teamP2 = new TeamWorkspacePage("team_page_2", "Team Page 2");
+        teamState.updateRemotePages(List.of(teamP1, teamP2));
+        teamState.setActiveTeamPageId("team_page_1");
+
+        RecipeNode teamJunc1 = RecipeNode.create(ResourceLocation.tryParse("gtceu:junction"), "Team Junction 1", 0, 0, GTVoltageTier.LV);
+        teamJunc1.setReroute(true);
+        teamState.getTeamGraph("team_page_1").addNode(teamJunc1);
+
+        RecipeNode teamJunc2 = RecipeNode.create(ResourceLocation.tryParse("gtceu:junction"), "Team Junction 2", 0, 0, GTVoltageTier.LV);
+        teamJunc2.setReroute(true);
+        teamState.getTeamGraph("team_page_2").addNode(teamJunc2);
+
+        BoardScreen screen = new BoardScreen();
+        screen.width = 800;
+        screen.height = 600;
+        JunctionSupplyDialog dialog = new JunctionSupplyDialog(screen);
+
+        Method getCandidatePagesMethod = JunctionSupplyDialog.class.getDeclaredMethod("getCandidatePages");
+        getCandidatePagesMethod.setAccessible(true);
+
+        try {
+            teamState.setCurrentMode(ClientWorkspaceState.WorkspaceMode.LOCAL);
+            dialog.open(localJuncA);
+            @SuppressWarnings("unchecked")
+            List<BoardPage> localCandidates = (List<BoardPage>) getCandidatePagesMethod.invoke(dialog);
+            Assertions.assertEquals(1, localCandidates.size());
+            Assertions.assertEquals("local_page_b", localCandidates.get(0).getId());
+
+            teamState.setCurrentMode(ClientWorkspaceState.WorkspaceMode.TEAM);
+            dialog.open(teamJunc1);
+            @SuppressWarnings("unchecked")
+            List<BoardPage> teamCandidates = (List<BoardPage>) getCandidatePagesMethod.invoke(dialog);
+            Assertions.assertEquals(1, teamCandidates.size());
+            Assertions.assertEquals("team_page_2", teamCandidates.get(0).getId());
+
+            BoardPage resolvedTeamP2 = ClientWorkspaceState.resolveActiveWorkspacePage("team_page_2");
+            Assertions.assertNotNull(resolvedTeamP2);
+            Assertions.assertEquals("Team Page 2", resolvedTeamP2.getName());
+
+            teamState.setCurrentMode(ClientWorkspaceState.WorkspaceMode.LOCAL);
+            BoardPage resolvedLocalB = ClientWorkspaceState.resolveActiveWorkspacePage("local_page_b");
+            Assertions.assertNotNull(resolvedLocalB);
+            Assertions.assertEquals("Local Page B", resolvedLocalB.getName());
+        } finally {
+            teamState.clear();
+            teamState.setCurrentMode(ClientWorkspaceState.WorkspaceMode.LOCAL);
+        }
+    }
+
+    @Test
+    @DisplayName("CrossPageSourceSearchDialog respects active workspace mode and isolates candidate junctions")
+    void testCrossPageSourceSearchDialogIsolation() throws Exception {
+        BoardManager bm = BoardManager.getInstance();
+        List<BoardPage> personalPages = bm.getPages();
+        personalPages.clear();
+        BoardPage localA = new BoardPage("local_search_a", "Local A", new FlowGraph());
+        BoardPage localB = new BoardPage("local_search_b", "Local B", new FlowGraph());
+        personalPages.add(localA);
+        personalPages.add(localB);
+        bm.openPage("local_search_a");
+
+        RecipeNode localConsumer = RecipeNode.create(ResourceLocation.tryParse("gtceu:junction"), "Local Consumer", 0, 0, GTVoltageTier.LV);
+        localConsumer.setReroute(true);
+        localA.getGraph().addNode(localConsumer);
+
+        RecipeNode localSrc = RecipeNode.create(ResourceLocation.tryParse("gtceu:junction"), "Local Source", 0, 0, GTVoltageTier.LV);
+        localSrc.setReroute(true);
+        localB.getGraph().addNode(localSrc);
+
+        ClientWorkspaceState teamState = ClientWorkspaceState.getInstance();
+        teamState.clear();
+        teamState.setCurrentTeamId(java.util.UUID.randomUUID());
+        teamState.setCurrentTeamName("Test Team");
+
+        TeamWorkspacePage teamP1 = new TeamWorkspacePage("team_search_1", "Team 1");
+        TeamWorkspacePage teamP2 = new TeamWorkspacePage("team_search_2", "Team 2");
+        teamState.updateRemotePages(List.of(teamP1, teamP2));
+        teamState.setActiveTeamPageId("team_search_1");
+
+        RecipeNode teamConsumer = RecipeNode.create(ResourceLocation.tryParse("gtceu:junction"), "Team Consumer", 0, 0, GTVoltageTier.LV);
+        teamConsumer.setReroute(true);
+        teamState.getTeamGraph("team_search_1").addNode(teamConsumer);
+
+        RecipeNode teamSrc = RecipeNode.create(ResourceLocation.tryParse("gtceu:junction"), "Team Source", 0, 0, GTVoltageTier.LV);
+        teamSrc.setReroute(true);
+        teamState.getTeamGraph("team_search_2").addNode(teamSrc);
+
+        BoardScreen screen = new BoardScreen();
+        screen.width = 800;
+        screen.height = 600;
+        CrossPageSourceSearchDialog searchDialog = new CrossPageSourceSearchDialog(screen);
+
+        Field allCandidatesField = CrossPageSourceSearchDialog.class.getDeclaredField("allCandidates");
+        allCandidatesField.setAccessible(true);
+
+        try {
+            teamState.setCurrentMode(ClientWorkspaceState.WorkspaceMode.LOCAL);
+            searchDialog.open(localConsumer, null, null, (p, n) -> {});
+            @SuppressWarnings("unchecked")
+            List<CrossPageSourceSearchDialog.SourceCandidate> localList =
+                    (List<CrossPageSourceSearchDialog.SourceCandidate>) allCandidatesField.get(searchDialog);
+            Assertions.assertEquals(1, localList.size());
+            Assertions.assertEquals("local_search_b", localList.get(0).page().getId());
+            searchDialog.close();
+
+            teamState.setCurrentMode(ClientWorkspaceState.WorkspaceMode.TEAM);
+            searchDialog.open(teamConsumer, null, null, (p, n) -> {});
+            @SuppressWarnings("unchecked")
+            List<CrossPageSourceSearchDialog.SourceCandidate> teamList =
+                    (List<CrossPageSourceSearchDialog.SourceCandidate>) allCandidatesField.get(searchDialog);
+            Assertions.assertEquals(1, teamList.size());
+            Assertions.assertEquals("team_search_2", teamList.get(0).page().getId());
+            searchDialog.close();
+        } finally {
+            teamState.clear();
+            teamState.setCurrentMode(ClientWorkspaceState.WorkspaceMode.LOCAL);
+        }
+    }
+
+    @Test
+    @DisplayName("Cross-page junction flow coordination works seamlessly in team workspace")
+    void testCrossPageFlowCoordinationInTeamWorkspace() {
+        ClientWorkspaceState teamState = ClientWorkspaceState.getInstance();
+        teamState.clear();
+        teamState.setCurrentTeamId(java.util.UUID.randomUUID());
+        teamState.setCurrentTeamName("Engineering Team");
+
+        TeamWorkspacePage producerPage = new TeamWorkspacePage("team_prod", "Producer Page");
+        TeamWorkspacePage consumerPage = new TeamWorkspacePage("team_cons", "Consumer Page");
+        teamState.updateRemotePages(List.of(producerPage, consumerPage));
+        teamState.setActiveTeamPageId("team_prod");
+
+        FlowGraph prodGraph = teamState.getTeamGraph("team_prod");
+        FlowGraph consGraph = teamState.getTeamGraph("team_cons");
+
+        RecipeNode prodJunction = RecipeNode.create(ResourceLocation.tryParse("gtceu:junction"), "Team Sulfuric Acid Producer", 0, 0, GTVoltageTier.LV);
+        prodJunction.setReroute(true);
+        IngredientStack acid = IngredientStack.fluid(ResourceLocation.tryParse("gtceu:sulfuric_acid"), "Sulfuric Acid", 1000);
+        prodJunction.bindRerouteIngredient(acid);
+        prodJunction.setSupplyMode(SupplyMode.FIXED_RATE);
+        prodJunction.setExternalSupplyRate(500.0);
+        prodGraph.addNode(prodJunction);
+
+        RecipeNode consJunction = RecipeNode.create(ResourceLocation.tryParse("gtceu:junction"), "Team Sulfuric Acid Consumer", 0, 0, GTVoltageTier.LV);
+        consJunction.setReroute(true);
+        consJunction.bindRerouteIngredient(acid);
+        consJunction.setSupplyMode(SupplyMode.LINKED_JUNCTION);
+        consJunction.asJunction().setLinkedSource("team_prod", prodJunction.getId());
+        consGraph.addNode(consJunction);
+
+        RecipeNode consumerMachine = RecipeNode.create(ResourceLocation.tryParse("gtceu:chemical_reactor"), "Reactor", 20, 0, GTVoltageTier.LV);
+        consumerMachine.getInputs().add(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:sulfuric_acid"), "Sulfuric Acid", 200));
+        consGraph.addNode(consumerMachine);
+        consGraph.addConnection(new FlowGraph.ConnectionEdge(consJunction.getId(), 0, consumerMachine.getId(), 0, 200.0));
+
+        teamState.setCurrentMode(ClientWorkspaceState.WorkspaceMode.TEAM);
+
+        try {
+            List<BoardPage> teamBoardPages = teamState.getTeamPagesAsBoardPages();
+            WorkspaceFlowCoordinator.WorkspaceFlowResult result = WorkspaceFlowCoordinator.coordinate(teamBoardPages);
+
+            Assertions.assertFalse(result.hasCycles());
+            Assertions.assertEquals(200.0, consJunction.getAllocatedInputRate(), 0.001);
+            Assertions.assertEquals(200.0, prodJunction.getAllocatedExportRate(), 0.001);
+
+            WorkspaceFlowCoordinator.SourceJunctionMetrics metrics =
+                    WorkspaceFlowCoordinator.calculateSourceJunctionMetrics(teamBoardPages.get(0), prodJunction);
+            Assertions.assertEquals(500.0, metrics.totalProduction(), 0.001);
+            Assertions.assertEquals(200.0, metrics.remoteExport(), 0.001);
+            Assertions.assertEquals(300.0, metrics.availableSurplus(), 0.001);
+        } finally {
+            teamState.clear();
+            teamState.setCurrentMode(ClientWorkspaceState.WorkspaceMode.LOCAL);
+            WorkspaceFlowCoordinator.invalidate();
         }
     }
 }

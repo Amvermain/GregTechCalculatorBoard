@@ -363,6 +363,8 @@ public final class CanvasIdleState implements CanvasInteractionState {
         ctx.setResizeStartCanvasY(canvasY);
         ctx.setOrigNodeWidth(widget.getWidth());
         ctx.setOrigNodeHeight(widget.getHeight());
+        ctx.setOrigCardWidth(widget.getNode().getCardWidth());
+        ctx.setOrigCardHeight(widget.getNode().getCardHeight());
         ctx.getStateMachine().transitionTo(new CanvasNodeResizingState());
         return true;
     }
@@ -657,9 +659,6 @@ public final class CanvasIdleState implements CanvasInteractionState {
         ctx.getSelectionHandler().startBoxSelection(canvasX, canvasY);
         if (!isShiftDown() && ctx.getScreen() != null) {
             ctx.getScreen().clearSelection();
-            if (ctx.getScreen().getNodeInspectorPanel() != null) {
-                ctx.getScreen().getNodeInspectorPanel().openPageSettings();
-            }
         }
         ctx.getStateMachine().transitionTo(new CanvasBoxSelectingState());
         return true;

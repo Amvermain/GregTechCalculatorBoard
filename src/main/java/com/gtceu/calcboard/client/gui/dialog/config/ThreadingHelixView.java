@@ -9,7 +9,29 @@ import com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 
+import net.minecraft.network.chat.Component;
+
+import java.util.ArrayList;
+import java.util.List;
+
 public class ThreadingHelixView {
+
+    private static final int LEFT_PANEL_WIDTH = 212;
+    private static final int PANEL_GAP = 6;
+    private static final int ROW_HEIGHT = 28;
+
+    private static final String[] TAB_LABEL_KEYS = {
+            "gui.gtcalcboard.threading.tab.supreme",
+            "gui.gtcalcboard.threading.tab.overdrive",
+            "gui.gtcalcboard.threading.tab.coprocessor",
+            "gui.gtcalcboard.threading.tab.weaving"
+    };
+    private static final String[] TAB_TOOLTIP_KEYS = {
+            "gui.gtcalcboard.threading.cat.supreme",
+            "gui.gtcalcboard.threading.cat.overdrive",
+            "gui.gtcalcboard.threading.cat.coprocessor",
+            "gui.gtcalcboard.threading.cat.weaving"
+    };
 
     private final MachineConfigDialog dialog;
     private int selectedHelixTab = 0;
@@ -25,22 +47,27 @@ public class ThreadingHelixView {
             cfg.setMaxHelixCapacity(maxHelix);
         }
 
-        int leftW = 184;
+        int leftW = LEFT_PANEL_WIDTH;
         graphics.fill(startX, startY, startX + leftW, startY + height, 0xFF14161E);
         graphics.renderOutline(startX, startY, leftW, height, 0xFF2D3342);
 
         int tabW = leftW / 4;
-        String[] tabShortNames = {"Sup", "Spd", "Par", "Thrd"};
         String[] tabIcons = {"⚛", "⚡", "⚙", "~"};
         for (int i = 0; i < 4; i++) {
             int tx = startX + i * tabW;
+            int currentTabW = (i == 3) ? (leftW - tx + startX) : tabW;
             boolean active = selectedHelixTab == i;
-            boolean h = mouseX >= tx && mouseX < tx + tabW && mouseY >= startY && mouseY <= startY + 14;
-            graphics.fill(tx, startY, tx + tabW, startY + 14, active ? 0xFF2A344A : (h ? 0xFF202636 : 0xFF181C26));
+            boolean h = mouseX >= tx && mouseX < tx + currentTabW && mouseY >= startY && mouseY <= startY + 14;
+            graphics.fill(tx, startY, tx + currentTabW, startY + 14, active ? 0xFF2A344A : (h ? 0xFF202636 : 0xFF181C26));
             if (active) {
-                graphics.fill(tx, startY + 13, tx + tabW, startY + 14, 0xFF5890FF);
+                graphics.fill(tx, startY + 13, tx + currentTabW, startY + 14, 0xFF5890FF);
             }
-            graphics.drawCenteredString(font, tabIcons[i] + " " + tabShortNames[i], tx + tabW / 2, startY + 3, active ? 0xFFFFFFFF : 0xFF888888);
+            String tabLabel = tabIcons[i] + " " + Component.translatable(TAB_LABEL_KEYS[i]).getString();
+            graphics.drawCenteredString(font, tabLabel, tx + currentTabW / 2, startY + 3, active ? 0xFFFFFFFF : 0xFF888888);
+
+            if (h && dialog != null) {
+                dialog.setDeferredTooltip(List.of(Component.translatable(TAB_TOOLTIP_KEYS[i])));
+            }
         }
 
         GTThreadingHelix[] currentTiers;
@@ -58,75 +85,121 @@ public class ThreadingHelixView {
         boolean atMax = maxHelix > 0 && totalInstalled >= maxHelix;
 
         int rowY = startY + 18;
+        int btnAreaWidth = 68;
+        int maxTextW = leftW - btnAreaWidth - 8;
+
         for (GTThreadingHelix helix : currentTiers) {
             int count = cfg.getHelixCount(helix);
-            String hLabel = "§e" + helix.getTier().name() + " §f" + helix.getEnglishName();
-            graphics.drawString(font, font.plainSubstrByWidth(hLabel, leftW - 75), startX + 4, rowY + 3, 0xFFFFFFFF, false);
+            String hLabel = helix.getTier().getFormatCode() + helix.getDisplayName().getString();
+            graphics.drawString(font, font.plainSubstrByWidth(hLabel, maxTextW), startX + 4, rowY + 3, 0xFFFFFFFF, false);
 
-            StringBuilder sb = new StringBuilder("§7");
-            if (helix.getGeneral() > 0) sb.append("+").append(helix.getGeneral()).append("Gen ");
-            if (helix.getSpeed() > 0) sb.append("+").append(helix.getSpeed()).append("Spd ");
-            if (helix.getEfficiency() > 0) sb.append("+").append(helix.getEfficiency()).append("Eff ");
-            if (helix.getParallels() > 0) sb.append("+").append(helix.getParallels()).append("Par ");
-            if (helix.getThreading() > 0) sb.append("+").append(helix.getThreading()).append("Thrd ");
-            graphics.drawString(font, sb.toString().trim(), startX + 4, rowY + 14, 0xFFAAAAAA, false);
+            StringBuilder sb = new StringBuilder();
+            if (helix.getGeneral() > 0) sb.append("§b⚛+").append(helix.getGeneral()).append(" ");
+            if (helix.getSpeed() > 0) sb.append("§a⚡+").append(helix.getSpeed()).append(" ");
+            if (helix.getEfficiency() > 0) sb.append("§e★+").append(helix.getEfficiency()).append(" ");
+            if (helix.getParallels() > 0) sb.append("§c⚙+").append(helix.getParallels()).append(" ");
+            if (helix.getThreading() > 0) sb.append("§9~+").append(helix.getThreading()).append(" ");
+            String statStr = sb.toString().trim();
+            graphics.drawString(font, font.plainSubstrByWidth(statStr, maxTextW), startX + 4, rowY + 15, 0xFFAAAAAA, false);
 
-            int btnX = startX + leftW - 68;
-            renderMiniBtn(graphics, font, "-", btnX, rowY + 5, 14, mouseX, mouseY);
-            graphics.drawCenteredString(font, String.valueOf(count), btnX + 22, rowY + 8, count > 0 ? 0xFF55FF55 : 0xFF888888);
-            renderMiniBtn(graphics, font, "+", btnX + 30, rowY + 5, 14, atMax ? 0xFF333333 : mouseX, mouseY);
-            renderMiniBtn(graphics, font, "+10", btnX + 46, rowY + 5, 20, atMax ? 0xFF333333 : mouseX, mouseY);
+            int btnX = startX + leftW - btnAreaWidth;
+            int btnY = rowY + 6;
+            renderMiniBtn(graphics, font, "-", btnX, btnY, 14, mouseX, mouseY);
+            graphics.drawCenteredString(font, String.valueOf(count), btnX + 22, btnY + 3, count > 0 ? 0xFF55FF55 : 0xFF888888);
+            renderMiniBtn(graphics, font, "+", btnX + 30, btnY, 14, atMax ? 0xFF333333 : mouseX, mouseY);
+            renderMiniBtn(graphics, font, "+10", btnX + 46, btnY, 20, atMax ? 0xFF333333 : mouseX, mouseY);
 
-            rowY += 26;
+            boolean rowHover = mouseX >= startX && mouseX < btnX && mouseY >= rowY && mouseY < rowY + ROW_HEIGHT;
+            if (rowHover && dialog != null) {
+                List<Component> tt = new ArrayList<>();
+                tt.add(helix.getDisplayName().copy().withStyle(net.minecraft.ChatFormatting.GOLD));
+                if (helix.getGeneral() > 0) {
+                    tt.add(Component.literal("§b⚛ ").append(Component.translatable("gui.gtcalcboard.threading.stat.gen")).append(": +" + helix.getGeneral()));
+                }
+                if (helix.getSpeed() > 0) {
+                    tt.add(Component.literal("§a⚡ ").append(Component.translatable("gui.gtcalcboard.threading.stat.spd")).append(": +" + helix.getSpeed()));
+                }
+                if (helix.getEfficiency() > 0) {
+                    tt.add(Component.literal("§e★ ").append(Component.translatable("gui.gtcalcboard.threading.stat.eff")).append(": +" + helix.getEfficiency()));
+                }
+                if (helix.getParallels() > 0) {
+                    tt.add(Component.literal("§c⚙ ").append(Component.translatable("gui.gtcalcboard.threading.stat.par")).append(": +" + helix.getParallels()));
+                }
+                if (helix.getThreading() > 0) {
+                    tt.add(Component.literal("§9~ ").append(Component.translatable("gui.gtcalcboard.threading.stat.thrd")).append(": +" + helix.getThreading()));
+                }
+                dialog.setDeferredTooltip(tt);
+            }
+
+            rowY += ROW_HEIGHT;
         }
 
         String helixCapStr = maxHelix > 0
-                ? String.format("§e✦ Helixes: §a%d §7/ §e%d", totalInstalled, maxHelix)
-                : String.format("§e✦ Helixes: §a%d", totalInstalled);
-        graphics.drawString(font, helixCapStr, startX + 4, startY + height - 22, 0xFFFFFFFF, false);
+                ? Component.translatable("gui.gtcalcboard.threading.helixes_cap", totalInstalled, maxHelix).getString()
+                : Component.translatable("gui.gtcalcboard.threading.helixes_count", totalInstalled).getString();
+        graphics.drawString(font, font.plainSubstrByWidth(helixCapStr, leftW - 8), startX + 4, startY + height - 22, 0xFFFFFFFF, false);
 
-        String baseStatsStr = String.format("§8Base: +%d Spd | +%d Eff | +%d Par | +%d Thrd",
-                cfg.getBaseSpeed(), cfg.getBaseEfficiency(), cfg.getBaseParallels(), cfg.getBaseThreading());
-        graphics.drawString(font, font.plainSubstrByWidth(baseStatsStr, leftW - 6), startX + 4, startY + height - 11, 0xFF888888, false);
+        String baseStatsStr = Component.translatable("gui.gtcalcboard.threading.base_stats",
+                cfg.getBaseSpeed(), cfg.getBaseEfficiency(), cfg.getBaseParallels(), cfg.getBaseThreading()).getString();
+        graphics.drawString(font, font.plainSubstrByWidth(baseStatsStr, leftW - 8), startX + 4, startY + height - 11, 0xFF888888, false);
 
-        int rightX = startX + 190;
-        int rightW = width - 190;
+        int rightX = startX + leftW + PANEL_GAP;
+        int rightW = width - leftW - PANEL_GAP;
         graphics.fill(rightX, startY, rightX + rightW, startY + height, 0xFF14161E);
         graphics.renderOutline(rightX, startY, rightW, height, 0xFF2D3342);
 
         int remGen = cfg.getRemainingGeneral();
         int baseGen = cfg.getBaseGeneral();
-        String genBadge = String.format("§b⚛ Generalis: §a%d §7/ §e%d pt §7(Avail/Total)", remGen, baseGen);
-        graphics.drawString(font, genBadge, rightX + 4, startY + 4, 0xFFFFFFFF, false);
+        String genBadge = Component.translatable("gui.gtcalcboard.threading.stat.generalis", remGen, baseGen).getString();
+        graphics.drawString(font, font.plainSubstrByWidth(genBadge, rightW - 8), rightX + 4, startY + 4, 0xFFFFFFFF, false);
 
         int statRowY = startY + 16;
-        renderStatAllocationRow(graphics, font, rightX, statRowY, rightW, "⚡ Velocitas", cfg.getAssignedSpeed(), cfg.getTotalSpeed(),
-                String.format("§a⏱ %.2fx Dur (%.1fx Spd)", cfg.calculateDurationMultiplier(), 1.0 / Math.max(0.001, cfg.calculateDurationMultiplier())),
-                mouseX, mouseY);
+        String vLabel = Component.translatable("gui.gtcalcboard.threading.stat.velocitas").getString();
+        String vEffect = Component.translatable("gui.gtcalcboard.threading.effect.speed",
+                cfg.calculateDurationMultiplier(), 1.0 / Math.max(0.001, cfg.calculateDurationMultiplier())).getString();
+        renderStatAllocationRow(graphics, font, rightX, statRowY, rightW, vLabel, cfg.getAssignedSpeed(), cfg.getTotalSpeed(),
+                vEffect, mouseX, mouseY);
 
         statRowY += 22;
-        renderStatAllocationRow(graphics, font, rightX, statRowY, rightW, "★ Efficienta", cfg.getAssignedEfficiency(), cfg.getTotalEfficiency(),
-                String.format("§e⚡ %.2fx Power (%.0f%% Cost)", cfg.calculateEnergyMultiplier(), cfg.calculateEnergyMultiplier() * 100.0),
-                mouseX, mouseY);
+        String eLabel = Component.translatable("gui.gtcalcboard.threading.stat.efficienta").getString();
+        String eEffect = Component.translatable("gui.gtcalcboard.threading.effect.efficiency",
+                cfg.calculateEnergyMultiplier(), cfg.calculateEnergyMultiplier() * 100.0).getString();
+        renderStatAllocationRow(graphics, font, rightX, statRowY, rightW, eLabel, cfg.getAssignedEfficiency(), cfg.getTotalEfficiency(),
+                eEffect, mouseX, mouseY);
 
         statRowY += 22;
         int effPar = cfg.getEffectiveParallels();
         double parPen = Math.sqrt(effPar);
-        renderStatAllocationRow(graphics, font, rightX, statRowY, rightW, "⚙ Parallelismus", cfg.getAssignedParallels(), cfg.getTotalParallels(),
-                String.format("§c⚡ %dx Par (⏱ +%.0f%% Time)", effPar, (parPen - 1.0) * 100.0),
-                mouseX, mouseY);
+        String pLabel = Component.translatable("gui.gtcalcboard.threading.stat.parallelismus").getString();
+        String pEffect = Component.translatable("gui.gtcalcboard.threading.effect.parallels",
+                effPar, (parPen - 1.0) * 100.0).getString();
+        renderStatAllocationRow(graphics, font, rightX, statRowY, rightW, pLabel, cfg.getAssignedParallels(), cfg.getTotalParallels(),
+                pEffect, mouseX, mouseY);
 
         statRowY += 22;
         int effThrd = cfg.getEffectiveThreads();
-        renderStatAllocationRow(graphics, font, rightX, statRowY, rightW, "~ Filum", cfg.getAssignedThreading(), cfg.getTotalThreading(),
-                String.format("§9~ %d Threads", effThrd),
-                mouseX, mouseY);
+        String fLabel = Component.translatable("gui.gtcalcboard.threading.stat.filum").getString();
+        String fEffect = Component.translatable("gui.gtcalcboard.threading.effect.threads", effThrd).getString();
+        renderStatAllocationRow(graphics, font, rightX, statRowY, rightW, fLabel, cfg.getAssignedThreading(), cfg.getTotalThreading(),
+                fEffect, mouseX, mouseY);
 
         int actY = startY + height - 15;
-        renderMiniBtn(graphics, font, "↺ Reset", rightX + 4, actY, 40, mouseX, mouseY);
-        renderMiniBtn(graphics, font, "⚡ Max Spd", rightX + 48, actY, 46, mouseX, mouseY);
-        renderMiniBtn(graphics, font, "★ Max Eff", rightX + 98, actY, 46, mouseX, mouseY);
-        renderMiniBtn(graphics, font, "⚙ Max Par", rightX + 148, actY, 42, mouseX, mouseY);
+        String rText = Component.translatable("gui.gtcalcboard.threading.btn.reset").getString();
+        String sText = Component.translatable("gui.gtcalcboard.threading.btn.max_spd").getString();
+        String eText = Component.translatable("gui.gtcalcboard.threading.btn.max_eff").getString();
+        String pText = Component.translatable("gui.gtcalcboard.threading.btn.max_par").getString();
+        int btnW1 = font.width(rText) + 8;
+        int btnW2 = font.width(sText) + 8;
+        int btnW3 = font.width(eText) + 8;
+        int btnW4 = font.width(pText) + 8;
+        int curBtnX = rightX + 4;
+        renderMiniBtn(graphics, font, rText, curBtnX, actY, btnW1, mouseX, mouseY);
+        curBtnX += btnW1 + 4;
+        renderMiniBtn(graphics, font, sText, curBtnX, actY, btnW2, mouseX, mouseY);
+        curBtnX += btnW2 + 4;
+        renderMiniBtn(graphics, font, eText, curBtnX, actY, btnW3, mouseX, mouseY);
+        curBtnX += btnW3 + 4;
+        renderMiniBtn(graphics, font, pText, curBtnX, actY, btnW4, mouseX, mouseY);
     }
 
     private void renderStatAllocationRow(GuiGraphics graphics, Font font, int rx, int ry, int rw, String label, int assigned, int total, String statEffect, int mouseX, int mouseY) {
@@ -150,7 +223,7 @@ public class ThreadingHelixView {
     public boolean mouseClicked(int startX, int startY, int width, int height, double mouseX, double mouseY, RecipeNode node) {
         NodeThreadingConfig cfg = RecipeNodeThreadingHelper.getThreadingConfig(node);
 
-        int leftW = 184;
+        int leftW = LEFT_PANEL_WIDTH;
         if (mouseX >= startX && mouseX <= startX + leftW && mouseY >= startY && mouseY <= startY + height) {
             int tabW = leftW / 4;
             if (mouseY >= startY && mouseY <= startY + 14) {
@@ -175,24 +248,25 @@ public class ThreadingHelixView {
             int rowY = startY + 18;
             for (GTThreadingHelix helix : currentTiers) {
                 int btnX = startX + leftW - 68;
-                if (mouseX >= btnX && mouseX <= btnX + 14 && mouseY >= rowY + 5 && mouseY <= rowY + 19) {
+                int btnY = rowY + 6;
+                if (mouseX >= btnX && mouseX <= btnX + 14 && mouseY >= btnY && mouseY <= btnY + 14) {
                     cfg.addHelixCount(helix, -1);
                     return true;
                 }
-                if (mouseX >= btnX + 30 && mouseX <= btnX + 44 && mouseY >= rowY + 5 && mouseY <= rowY + 19) {
+                if (mouseX >= btnX + 30 && mouseX <= btnX + 44 && mouseY >= btnY && mouseY <= btnY + 14) {
                     cfg.addHelixCount(helix, 1);
                     return true;
                 }
-                if (mouseX >= btnX + 46 && mouseX <= btnX + 66 && mouseY >= rowY + 5 && mouseY <= rowY + 19) {
+                if (mouseX >= btnX + 46 && mouseX <= btnX + 66 && mouseY >= btnY && mouseY <= btnY + 14) {
                     cfg.addHelixCount(helix, 10);
                     return true;
                 }
-                rowY += 26;
+                rowY += ROW_HEIGHT;
             }
         }
 
-        int rightX = startX + 190;
-        int rightW = width - 190;
+        int rightX = startX + leftW + PANEL_GAP;
+        int rightW = width - leftW - PANEL_GAP;
         if (mouseX >= rightX && mouseX <= rightX + rightW && mouseY >= startY && mouseY <= startY + height) {
             int btnX = rightX + rightW - 72;
 
@@ -286,19 +360,34 @@ public class ThreadingHelixView {
 
             int actY = startY + height - 15;
             if (mouseY >= actY && mouseY <= actY + 14) {
-                if (mouseX >= rightX + 4 && mouseX <= rightX + 44) {
+                net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+                Font font = mc != null ? mc.font : null;
+                String rText = Component.translatable("gui.gtcalcboard.threading.btn.reset").getString();
+                String sText = Component.translatable("gui.gtcalcboard.threading.btn.max_spd").getString();
+                String eText = Component.translatable("gui.gtcalcboard.threading.btn.max_eff").getString();
+                String pText = Component.translatable("gui.gtcalcboard.threading.btn.max_par").getString();
+                int btnW1 = (font != null ? font.width(rText) : 32) + 8;
+                int btnW2 = (font != null ? font.width(sText) : 38) + 8;
+                int btnW3 = (font != null ? font.width(eText) : 38) + 8;
+                int btnW4 = (font != null ? font.width(pText) : 34) + 8;
+
+                int curBtnX = rightX + 4;
+                if (mouseX >= curBtnX && mouseX <= curBtnX + btnW1) {
                     cfg.reset();
                     return true;
                 }
-                if (mouseX >= rightX + 48 && mouseX <= rightX + 94) {
+                curBtnX += btnW1 + 4;
+                if (mouseX >= curBtnX && mouseX <= curBtnX + btnW2) {
                     cfg.setAssignedSpeed(cfg.getAssignedSpeed() + cfg.getRemainingGeneral());
                     return true;
                 }
-                if (mouseX >= rightX + 98 && mouseX <= rightX + 144) {
+                curBtnX += btnW2 + 4;
+                if (mouseX >= curBtnX && mouseX <= curBtnX + btnW3) {
                     cfg.setAssignedEfficiency(cfg.getAssignedEfficiency() + cfg.getRemainingGeneral());
                     return true;
                 }
-                if (mouseX >= rightX + 148 && mouseX <= rightX + 190) {
+                curBtnX += btnW3 + 4;
+                if (mouseX >= curBtnX && mouseX <= curBtnX + btnW4) {
                     cfg.setAssignedParallels(cfg.getAssignedParallels() + cfg.getRemainingGeneral());
                     return true;
                 }

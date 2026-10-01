@@ -15,6 +15,7 @@ import com.gtceu.calcboard.api.solver.FlowBalanceMatrixSolver;
 import com.gtceu.calcboard.api.solver.WorkspaceFlowCoordinator;
 import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.api.storage.BoardPage;
+import com.gtceu.calcboard.client.team.ClientWorkspaceState;
 
 import java.util.List;
 
@@ -43,11 +44,31 @@ public final class BoardJsonSerializer {
         root.addProperty("pageTitle", pageTitle != null ? pageTitle : "Untitled Page");
         root.addProperty("timestamp", System.currentTimeMillis());
 
+        ClientWorkspaceState teamState = ClientWorkspaceState.getInstance();
+        boolean isTeamPage = teamState.getRemotePage(pageId) != null
+                || (teamState.isTeamMode() && pageId != null && pageId.equals(teamState.getActiveTeamPageId()));
+        root.addProperty("workspace", isTeamPage ? "TEAM" : "LOCAL");
+        root.addProperty("hasTeam", teamState.isCollaborationEnabled());
+        root.addProperty("teamName", teamState.getCurrentTeamName());
+        if (isTeamPage) {
+            var rp = teamState.getRemotePage(pageId);
+            root.addProperty("isLocked", rp != null && rp.isLocked());
+            root.addProperty("lockHolder", rp != null && rp.getLockHolderName() != null ? rp.getLockHolderName() : "");
+        }
+
         JsonObject viewport = new JsonObject();
         viewport.addProperty("panX", panX);
         viewport.addProperty("panY", panY);
         viewport.addProperty("zoom", zoom);
         root.add("viewport", viewport);
+
+        if (graph != null) {
+            for (CanvasGroupFrame frame : graph.getFrames()) {
+                if (frame != null && frame.isSharedMachineFrame() && frame.getViewMode() == com.gtceu.calcboard.api.model.PoolViewMode.EMBEDDED_PANEL) {
+                    frame.relayoutEmbeddedCards(graph);
+                }
+            }
+        }
 
         root.add("nodes", serializeNodes(graph));
         root.add("connections", serializeConnections(graph));
@@ -70,9 +91,20 @@ public final class BoardJsonSerializer {
             nodeObj.addProperty("tier", node.getTargetTier() != null ? node.getTargetTier().name() : "LV");
             nodeObj.addProperty("posX", node.getPosX());
             nodeObj.addProperty("posY", node.getPosY());
-            nodeObj.addProperty("width", resolveCardWidth(node));
-            nodeObj.addProperty("height", resolveCardHeight(node));
+            nodeObj.addProperty("width", resolveCardWidth(node, graph));
+            nodeObj.addProperty("height", resolveCardHeight(node, graph));
             nodeObj.addProperty("isFlipped", node.isFlipped());
+
+            CanvasGroupFrame emb = graph.getEmbeddedFrameForNode(node.getId());
+            nodeObj.addProperty("isEmbedded", emb != null);
+            if (emb != null) {
+                nodeObj.addProperty("embeddedFrameId", emb.getId());
+            }
+            CanvasGroupFrame folded = graph.getFoldedFrameForNode(node.getId());
+            nodeObj.addProperty("isFoldedInFrame", folded != null);
+            if (folded != null) {
+                nodeObj.addProperty("foldedFrameId", folded.getId());
+            }
 
             nodeObj.add("metrics", serializeNodeMetrics(node));
             nodeObj.add("inputs", serializeInputPorts(node));
@@ -108,7 +140,7 @@ public final class BoardJsonSerializer {
         linkObj.addProperty("nodeId", srcNodeId);
 
         BoardPage srcPage = (srcPageId != null && !srcPageId.isEmpty())
-                ? BoardManager.getInstance().getPage(srcPageId).orElse(null)
+                ? ClientWorkspaceState.resolveActiveWorkspacePage(srcPageId)
                 : null;
         RecipeNode srcNode = (srcPage != null && srcNodeId != null)
                 ? srcPage.getGraph().findNodeById(srcNodeId)
@@ -162,7 +194,7 @@ public final class BoardJsonSerializer {
         for (CrossPageExportTarget t : node.getExportTargets()) {
             JsonObject tObj = new JsonObject();
             tObj.addProperty("targetPageId", t.targetPageId());
-            BoardPage targetPage = BoardManager.getInstance().getPage(t.targetPageId()).orElse(null);
+            BoardPage targetPage = ClientWorkspaceState.resolveActiveWorkspacePage(t.targetPageId());
             tObj.addProperty("targetPageName", resolvePageName(targetPage, t.targetPageId()));
             tObj.addProperty("priority", t.priority());
             tObj.addProperty("fixedLimit", roundThreeDecimals(t.fixedLimit()));
@@ -171,16 +203,24 @@ public final class BoardJsonSerializer {
         nodeObj.add("exportTargets", expArr);
     }
 
-    private static double resolveCardHeight(RecipeNode node) {
+    private static double resolveCardHeight(RecipeNode node, FlowGraph graph) {
         if (node.isReroute() || node.isBoundaryPin()) return 32.0;
+        if (graph != null && graph.isNodeInEmbeddedPanel(node.getId())) {
+            int portRows = Math.max(node.getInputs().size(), node.getOutputs().size());
+            double portRowsH = portRows > 0 ? portRows * 16.0 + 4.0 : 16.0;
+            return Math.max(40.0, 16.0 + portRowsH + 4.0);
+        }
         int maxRows = Math.max(node.getInputs().size(), node.getOutputs().size());
         int contentStartY = node.isModule() ? 62 : 80;
         int autoHeight = contentStartY + Math.max(1, maxRows) * 18 + 8;
         return Math.max(autoHeight, (double) node.getCardHeight());
     }
 
-    private static double resolveCardWidth(RecipeNode node) {
+    private static double resolveCardWidth(RecipeNode node, FlowGraph graph) {
         if (node.isReroute() || node.isBoundaryPin()) return 32.0;
+        if (graph != null && graph.isNodeInEmbeddedPanel(node.getId())) {
+            return node.getCardWidth() > 0 ? (double) node.getCardWidth() : 245.0;
+        }
         return (double) node.getCardWidth();
     }
 
@@ -257,6 +297,24 @@ public final class BoardJsonSerializer {
             edgeObj.addProperty("toNode", edge.toNodeId());
             edgeObj.addProperty("toPort", "in_" + edge.inputIndex());
 
+            CanvasGroupFrame fromFolded = graph.getFoldedFrameForNode(edge.fromNodeId());
+            CanvasGroupFrame toFolded = graph.getFoldedFrameForNode(edge.toNodeId());
+            if (fromFolded != null && toFolded != null && fromFolded.getId().equals(toFolded.getId())) {
+                edgeObj.addProperty("isInternalFolded", true);
+            }
+            if (fromFolded != null) {
+                var summary = com.gtceu.calcboard.api.solver.FlowGraphTopologyAnalyzer.aggregateFoldedPorts(graph, fromFolded);
+                int foldedOutIdx = summary.findOutputIndexForOrigin(edge.fromNodeId(), edge.outputIndex());
+                edgeObj.addProperty("fromFoldedFrame", fromFolded.getId());
+                edgeObj.addProperty("fromFoldedPortIndex", foldedOutIdx >= 0 ? foldedOutIdx : 0);
+            }
+            if (toFolded != null) {
+                var summary = com.gtceu.calcboard.api.solver.FlowGraphTopologyAnalyzer.aggregateFoldedPorts(graph, toFolded);
+                int foldedInIdx = summary.findInputIndexForOrigin(edge.toNodeId(), edge.inputIndex());
+                edgeObj.addProperty("toFoldedFrame", toFolded.getId());
+                edgeObj.addProperty("toFoldedPortIndex", foldedInIdx >= 0 ? foldedInIdx : 0);
+            }
+
             double flowRate = calculateEdgeFlowRate(graph, edge);
             edgeObj.addProperty("flowRate", roundThreeDecimals(flowRate));
             edgeObj.addProperty("unit", resolveEdgeUnit(graph, edge));
@@ -331,9 +389,62 @@ public final class BoardJsonSerializer {
             frameObj.addProperty("height", frame.getHeight());
             frameObj.addProperty("isFolded", frame.isFolded());
             frameObj.addProperty("isSharedMachine", frame.isSharedMachineFrame());
+            frameObj.addProperty("viewMode", frame.getViewMode().name());
+
+            if (frame.isSharedMachineFrame()) {
+                net.minecraft.resources.ResourceLocation icon = frame.getSharedMachineIcon(graph);
+                frameObj.addProperty("sharedMachineId", icon != null ? icon.toString() : "");
+                frameObj.addProperty("sharedMachineName", frame.getSharedMachineName(graph));
+                var tier = frame.getSharedVoltageTier(graph);
+                frameObj.addProperty("sharedTier", tier != null ? tier.name() : "");
+                frameObj.addProperty("targetCapacity", frame.getTargetPoolCapacity());
+                frameObj.addProperty("totalDuty", roundThreeDecimals(frame.computeTotalMachineDuty(graph)));
+                frameObj.addProperty("requiredMachines", frame.computeRequiredMachines(graph));
+                frameObj.addProperty("totalEUt", roundThreeDecimals(frame.computeSharedTotalEUt(graph)));
+                frameObj.addProperty("isCompatible", frame.isMachineCompatible(graph));
+
+                JsonArray nodeIds = new JsonArray();
+                for (String nid : frame.getContainedNodeIds()) {
+                    nodeIds.add(nid);
+                }
+                frameObj.add("containedNodeIds", nodeIds);
+
+                if (frame.getViewMode() == com.gtceu.calcboard.api.model.PoolViewMode.FOLDED_CARD) {
+                    frameObj.add("foldedPorts", serializeFoldedPorts(graph, frame));
+                }
+            }
+
             array.add(frameObj);
         }
         return array;
+    }
+
+    private static JsonObject serializeFoldedPorts(FlowGraph graph, CanvasGroupFrame frame) {
+        var summary = com.gtceu.calcboard.api.solver.FlowGraphTopologyAnalyzer.aggregateFoldedPorts(graph, frame);
+        JsonObject fpObj = new JsonObject();
+        JsonArray fpIn = new JsonArray();
+        for (var port : summary.inputs()) {
+            fpIn.add(serializeFoldedPort(port));
+        }
+        fpObj.add("inputs", fpIn);
+
+        JsonArray fpOut = new JsonArray();
+        for (var port : summary.outputs()) {
+            fpOut.add(serializeFoldedPort(port));
+        }
+        fpObj.add("outputs", fpOut);
+        return fpObj;
+    }
+
+    private static JsonObject serializeFoldedPort(com.gtceu.calcboard.api.solver.FlowGraphTopologyAnalyzer.AggregatedFoldedPort port) {
+        JsonObject p = new JsonObject();
+        IngredientStack is = port.ingredient();
+        p.addProperty("type", is.isFluid() ? "FLUID" : (is.isStressUnit() ? "STRESS" : "ITEM"));
+        p.addProperty("id", is.getId() != null ? is.getId().toString() : "");
+        p.addProperty("displayName", is.getDisplayName() != null ? is.getDisplayName() : "");
+        p.addProperty("amount", is.getAmount());
+        p.addProperty("ratePerSec", roundThreeDecimals(port.actualRate()));
+        return p;
     }
 
     private static JsonArray serializeStickyNotes(FlowGraph graph) {

@@ -52,6 +52,7 @@ public class BoardDialogManager {
     private AutoConnectFilterDialog autoConnectDialog;
     private PatternBindingDialog patternBindingDialog;
     private JunctionSupplyDialog junctionSupplyDialog;
+    private CrossPageSourceSearchDialog crossPageSourceSearchDialog;
     private TargetOutputRateDialog targetOutputRateDialog;
     private PageSettingsDialog pageSettingsDialog;
     private BatchRunCalculatorDialog batchRunDialog;
@@ -84,6 +85,7 @@ public class BoardDialogManager {
         if (this.autoConnectDialog == null) this.autoConnectDialog = new AutoConnectFilterDialog(screen);
         if (this.patternBindingDialog == null) this.patternBindingDialog = new PatternBindingDialog(screen);
         if (this.junctionSupplyDialog == null) this.junctionSupplyDialog = new JunctionSupplyDialog(screen);
+        if (this.crossPageSourceSearchDialog == null) this.crossPageSourceSearchDialog = new CrossPageSourceSearchDialog(screen);
         if (this.targetOutputRateDialog == null) this.targetOutputRateDialog = new TargetOutputRateDialog(screen);
         if (this.pageSettingsDialog == null) this.pageSettingsDialog = new PageSettingsDialog(screen);
         if (this.batchRunDialog == null) this.batchRunDialog = new BatchRunCalculatorDialog(screen);
@@ -121,6 +123,7 @@ public class BoardDialogManager {
         trackModal(autoConnectDialog);
         trackModal(patternBindingDialog);
         trackModal(junctionSupplyDialog);
+        trackModal(crossPageSourceSearchDialog);
         trackModal(targetOutputRateDialog);
         trackModal(pageSettingsDialog);
         trackModal(batchRunDialog);
@@ -361,6 +364,14 @@ public class BoardDialogManager {
         }
     }
 
+    public void openRecipeSearchForSharedFrameWithWireContext(CanvasGroupFrame frame, RecipeNode sourceNode, int sourcePortIdx, boolean sourceIsInput, com.gtceu.calcboard.api.model.IngredientStack sourceStack, boolean shiftAutoRatio) {
+        if (!screen.ensureEditPermission() || frame == null) return;
+        if (searchDialog != null) {
+            searchDialog.openForSharedFrame(frame, sourceNode, sourcePortIdx, sourceIsInput, sourceStack, shiftAutoRatio);
+            modalStack.push(searchDialog);
+        }
+    }
+
     public void openMachineConfigDialog(RecipeNode node) {
         openMachineConfigDialog(node, null, null);
     }
@@ -491,5 +502,19 @@ public class BoardDialogManager {
         }
         batchRunDialog.open(preselected, isInput);
         modalStack.push(batchRunDialog);
+    }
+
+    public CrossPageSourceSearchDialog getCrossPageSourceSearchDialog() {
+        return crossPageSourceSearchDialog;
+    }
+
+    public void openCrossPageSourceSearchDialog(RecipeNode consumerNode, String initialPageId, String initialNodeId, java.util.function.BiConsumer<String, String> onSelect) {
+        if (!screen.ensureEditPermission()) return;
+        if (crossPageSourceSearchDialog == null) {
+            crossPageSourceSearchDialog = new CrossPageSourceSearchDialog(screen);
+            trackModal(crossPageSourceSearchDialog);
+        }
+        crossPageSourceSearchDialog.open(consumerNode, initialPageId, initialNodeId, onSelect);
+        modalStack.push(crossPageSourceSearchDialog);
     }
 }

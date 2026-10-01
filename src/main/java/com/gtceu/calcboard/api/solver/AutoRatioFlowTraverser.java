@@ -33,10 +33,20 @@ public final class AutoRatioFlowTraverser {
     }
 
     public static double calculateTotalConnectedPortDemand(FlowGraph graph, RecipeNode producer, int outputIndex) {
-        return calculateTotalConnectedPortDemand(graph, producer, outputIndex, null);
+        return calculateTotalConnectedPortDemand(graph, producer, outputIndex, null, false);
     }
 
     public static double calculateTotalConnectedPortDemand(FlowGraph graph, RecipeNode producer, int outputIndex, Map<String, Double> countsMap) {
+        return calculateTotalConnectedPortDemand(graph, producer, outputIndex, countsMap, false);
+    }
+
+    public static double calculateTotalConnectedPortDemand(
+            FlowGraph graph,
+            RecipeNode producer,
+            int outputIndex,
+            Map<String, Double> countsMap,
+            boolean effective
+    ) {
         if (producer == null || producer.isVoidSink() || outputIndex < 0) return 0.0;
 
         Queue<DemandHop> queue = new ArrayDeque<>();
@@ -58,9 +68,9 @@ public final class AutoRatioFlowTraverser {
 
                 if (cNode.isReroute()) {
                     totalPortDemand += computeRerouteDrainDemand(cNode, hop);
-                    processRerouteDemandHop(graph, cNode, hop, countsMap, queue, visited);
+                    processRerouteDemandHop(graph, cNode, hop, countsMap, effective, queue, visited);
                 } else if (outEdge.inputIndex() >= 0 && outEdge.inputIndex() < cNode.getInputs().size()) {
-                    totalPortDemand += computeDirectPortDemand(graph, cNode, outEdge, hop, countsMap);
+                    totalPortDemand += computeDirectPortDemand(graph, cNode, outEdge, hop, countsMap, effective);
                 }
             }
         }
@@ -83,6 +93,7 @@ public final class AutoRatioFlowTraverser {
             RecipeNode cNode,
             DemandHop hop,
             Map<String, Double> countsMap,
+            boolean effective,
             Queue<DemandHop> queue,
             Set<String> visited
     ) {
@@ -95,7 +106,7 @@ public final class AutoRatioFlowTraverser {
         int inDegree = countPortInDegree(graph, cNode.getId(), 0);
         double nextWeight = hop.weight / Math.max(1, inDegree);
         if (cNode.isExternalSupply() && cNode.getExternalSupplyRate() > 0.0) {
-            double downstreamDemand = calculateTotalConnectedPortDemand(graph, cNode, 0, countsMap);
+            double downstreamDemand = calculateTotalConnectedPortDemand(graph, cNode, 0, countsMap, effective);
             double netDemand = Math.max(0.0, downstreamDemand - cNode.getExternalSupplyRate());
             double factor = downstreamDemand > 0.0001 ? Math.min(1.0, netDemand / downstreamDemand) : 0.0;
             nextWeight *= factor;
@@ -110,12 +121,18 @@ public final class AutoRatioFlowTraverser {
             RecipeNode cNode,
             FlowGraph.ConnectionEdge outEdge,
             DemandHop hop,
-            Map<String, Double> countsMap
+            Map<String, Double> countsMap,
+            boolean effective
     ) {
-        double cCount = countsMap != null ? countsMap.getOrDefault(cNode.getId(), cNode.getMachineCount()) : cNode.getMachineCount();
-        IngredientStack inStack = cNode.getInputs().get(outEdge.inputIndex());
-        double singleInRate = cNode.calculateSingleMachineInputRate(inStack);
-        double cReq = singleInRate * cCount;
+        double cReq;
+        if (effective) {
+            cReq = cNode.getInputSlotRate(outEdge.inputIndex(), true);
+        } else {
+            double cCount = countsMap != null ? countsMap.getOrDefault(cNode.getId(), cNode.getMachineCount()) : cNode.getMachineCount();
+            IngredientStack inStack = cNode.getInputs().get(outEdge.inputIndex());
+            double singleInRate = cNode.calculateSingleMachineInputRate(inStack);
+            cReq = singleInRate * cCount;
+        }
         if (outEdge.hasFixedLimit()) {
             cReq = Math.min(cReq, outEdge.fixedFlowLimit());
         }

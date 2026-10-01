@@ -24,12 +24,20 @@ public class NetworkHandler {
     private static final String PROTOCOL_VERSION = "2.1.0";
     private static int packetId = 0;
 
-    public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
-            ResourceLocation.tryParse(GregTechCalcBoard.MOD_ID + ":main"),
-            () -> PROTOCOL_VERSION,
-            NetworkRegistry.acceptMissingOr(PROTOCOL_VERSION::equals),
-            NetworkRegistry.acceptMissingOr(PROTOCOL_VERSION::equals)
-    );
+    public static final SimpleChannel CHANNEL = initChannel();
+
+    private static SimpleChannel initChannel() {
+        try {
+            return NetworkRegistry.newSimpleChannel(
+                    ResourceLocation.tryParse(GregTechCalcBoard.MOD_ID + ":main"),
+                    () -> PROTOCOL_VERSION,
+                    NetworkRegistry.acceptMissingOr(PROTOCOL_VERSION::equals),
+                    NetworkRegistry.acceptMissingOr(PROTOCOL_VERSION::equals)
+            );
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
 
     public static void init() {
         // C2S Packets
@@ -61,10 +69,13 @@ public class NetworkHandler {
                                               java.util.function.Function<net.minecraft.network.FriendlyByteBuf, MSG> decoder,
                                               java.util.function.BiConsumer<MSG, java.util.function.Supplier<net.minecraftforge.network.NetworkEvent.Context>> handler,
                                               Optional<NetworkDirection> direction) {
-        CHANNEL.registerMessage(packetId++, msgClass, encoder, decoder, handler, direction);
+        if (CHANNEL != null) {
+            CHANNEL.registerMessage(packetId++, msgClass, encoder, decoder, handler, direction);
+        }
     }
 
     public static void sendToServer(Object msg) {
+        if (CHANNEL == null) return;
         try {
             CHANNEL.sendToServer(msg);
         } catch (Throwable ignored) {
@@ -72,7 +83,7 @@ public class NetworkHandler {
     }
 
     public static void sendToPlayer(ServerPlayer player, Object msg) {
-        if (player != null) {
+        if (CHANNEL != null && player != null) {
             CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), msg);
         }
     }

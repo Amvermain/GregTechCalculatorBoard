@@ -32,9 +32,9 @@ graph TD
         RENDER["Two-Pass Z-Order 렌더링 & 포화도 기반 와이어 펄스 셰이더"]
         WSI["WireSpatialIndex (128x128 AABB 균일 그리드 O(log E) 공간 분할)"]
         NCTC["NodeCardTextCache (dirty 기반 텍스트 절삭 및 단위 포맷팅 캐시)"]
-        Widgets["widget.* (NodeWidget, ToolbarWidget, PageTabBarWidget, HotkeyHudWidget, SummaryOverlay, FavoritesDockWidget)"]
-        Dialogs["dialog.* (BoardSettingsDialog, MachineConfigDialog & RecipeOverrideView, BatchRunCalculatorDialog, BOMDialog, SearchDialog, GlobalBalanceDialog, JunctionSupplyDialog, FrameEditDialog)"]
-        Web["web.* (LocalWebServerDaemon, WebSyncEventBus, MicroIconRenderer, IconDiskCache, BoardJsonSerializer)"]
+        Widgets["widget.* (NodeWidget, ToolbarWidget, PageTabBarWidget, PageBrowserDrawer & TreeModel, HotkeyHudWidget, SummaryOverlay, FavoritesDockWidget)"]
+        Dialogs["dialog.* (BoardSettingsDialog, MachineConfigDialog & RecipeOverrideView, BatchRunCalculatorDialog, BOMDialog, SearchDialog, GlobalBalanceDialog, JunctionSupplyDialog, CrossPageSourceSearchDialog, FrameEditDialog)"]
+        Web["web.* (LocalWebServerDaemon with ?workspace=team|local, WebSyncEventBus, MicroIconRenderer, IconDiskCache, BoardJsonSerializer)"]
         Search["search.* (RecipeSearchCacheManager, RecipeSearchQueryEngine & 합성 가능 명세 패턴)"]
     end
 
@@ -262,6 +262,9 @@ graph TD
 ### 2.37 페이지 간 정션 유량 분배 및 가상 연동 시스템 (ADR-064)
 * **페이지 간 가상 연동**: 정션 노드를 원격 공급원 페이지의 정션과 직접 연결하여 우선순위 기반 자원 분배, 실시간 공급량 동기화 및 1클릭 페이지 전환을 제공합니다.
 * **다중 워크스페이스 코디네이터 (`WorkspaceFlowCoordinator`)**: 여러 페이지 간의 정션 참조 관계를 유향 비순환 그래프(DAG)로 정렬하고, 순환 참조를 감지하여 유량 수지를 결정론적으로 수렴시킵니다.
+* **정션 커스텀 명명 및 소스 검색 모달**: 정션에 목적에 맞는 이름을 부여하고, `CrossPageSourceSearchDialog`를 통해 페이지명, 라벨, 자원명으로 실시간 잉여 유량을 확인하며 손쉽게 소스 정션을 검색·연결합니다.
+* **작업 공간 간 상호 격리**: 개인 보드와 공유 팀 워크스페이스 간 상호 격리를 엄격히 적용하여 페이지 간 가상 연동이 올바른 작업 공간 내에서만 동작하도록 보장합니다.
+* **하류 기계 감속 시 실제 소비량 기반 유효 수요 반영**: 하류 병목 기계의 실제 유효 소비량($R_{\text{effective}} = R_{\text{nominal}} \cdot \eta$)을 반영하여 상류 정션 및 연결선의 허위 결손 경고를 방지합니다.
 
 ---
 

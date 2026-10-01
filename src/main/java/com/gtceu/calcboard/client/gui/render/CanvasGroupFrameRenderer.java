@@ -221,30 +221,7 @@ public class CanvasGroupFrameRenderer {
 
         ResizeDirection hoverDir = getResizeDirection(frame, mouseX, mouseY);
         if (hoverDir != ResizeDirection.NONE) {
-            int highlightCol = (color & 0x00FFFFFF) | 0xFF000000;
-            switch (hoverDir) {
-                case NORTH -> graphics.fill(x, y - 1, x + w, y + 2, highlightCol);
-                case SOUTH -> graphics.fill(x, y + h - 2, x + w, y + h + 1, highlightCol);
-                case WEST -> graphics.fill(x - 1, y, x + 2, y + h, highlightCol);
-                case EAST -> graphics.fill(x + w - 2, y, x + w + 1, y + h, highlightCol);
-                case NORTH_WEST -> {
-                    graphics.fill(x - 1, y - 1, x + 16, y + 2, highlightCol);
-                    graphics.fill(x - 1, y - 1, x + 2, y + 16, highlightCol);
-                }
-                case NORTH_EAST -> {
-                    graphics.fill(x + w - 16, y - 1, x + w + 1, y + 2, highlightCol);
-                    graphics.fill(x + w - 2, y - 1, x + w + 1, y + 16, highlightCol);
-                }
-                case SOUTH_WEST -> {
-                    graphics.fill(x - 1, y + h - 2, x + 16, y + h + 1, highlightCol);
-                    graphics.fill(x - 1, y + h - 16, x + 2, y + h + 1, highlightCol);
-                }
-                case SOUTH_EAST -> {
-                    graphics.fill(x + w - 16, y + h - 2, x + w + 1, y + h + 1, highlightCol);
-                    graphics.fill(x + w - 2, y + h - 16, x + w + 1, y + h + 1, highlightCol);
-                }
-                default -> {}
-            }
+            renderResizeHighlight(graphics, x, y, w, h, color, hoverDir);
         }
     }
 
@@ -334,8 +311,7 @@ public class CanvasGroupFrameRenderer {
             curBtnX -= (BTN_SIZE + BTN_SPACING);
 
             if (isMouseOver(canvasMouseX, canvasMouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
-                String capacityStr = String.format(Locale.ROOT, "%.1f", frame.getTargetPoolCapacity());
-                BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal("§b⚖ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_auto_ratio", capacityStr)), mouseX, mouseY);
+                renderFrameAutoRatioTooltip(graphics, font, frame, mouseX, mouseY);
                 return true;
             }
 
@@ -402,7 +378,7 @@ public class CanvasGroupFrameRenderer {
 
         int ratioBtnX = curBtnX - (BTN_SIZE + BTN_SPACING);
         if (isMouseOver(canvasMouseX, canvasMouseY, ratioBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
-            BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal("§b⚖ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_group_auto_ratio")), mouseX, mouseY);
+            renderGroupAutoRatioTooltip(graphics, font, mouseX, mouseY);
             return true;
         }
         return false;
@@ -417,8 +393,7 @@ public class CanvasGroupFrameRenderer {
 
         int ratioBtnX = cfgBtnX - (BTN_SIZE + BTN_SPACING);
         if (isMouseOver(canvasMouseX, canvasMouseY, ratioBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
-            String capacityStr = String.format(Locale.ROOT, "%.1f", frame.getTargetPoolCapacity());
-            BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal("§b⚖ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_auto_ratio", capacityStr)), mouseX, mouseY);
+            renderFrameAutoRatioTooltip(graphics, font, frame, mouseX, mouseY);
             return true;
         }
         return false;
@@ -475,13 +450,13 @@ public class CanvasGroupFrameRenderer {
         graphics.renderOutline(bx, by, bw, bh, border);
     }
 
-    private static void drawResizeGrip(GuiGraphics graphics, int gx, int gy, int col) {
+    static void drawResizeGrip(GuiGraphics graphics, int gx, int gy, int col) {
         graphics.fill(gx + 8, gy + 8, gx + 10, gy + 10, col);
         graphics.fill(gx + 4, gy + 8, gx + 6, gy + 10, col);
         graphics.fill(gx + 8, gy + 4, gx + 10, gy + 6, col);
     }
 
-    private static void drawCornerGrip(GuiGraphics graphics, int cx, int cy, int col, boolean right, boolean bottom) {
+    static void drawCornerGrip(GuiGraphics graphics, int cx, int cy, int col, boolean right, boolean bottom) {
         int sx = right ? cx - 8 : cx + 2;
         int sy = bottom ? cy - 8 : cy + 2;
         int ex = right ? cx - 2 : cx + 8;
@@ -489,13 +464,39 @@ public class CanvasGroupFrameRenderer {
         graphics.fill(sx, sy, ex, ey, (col & 0x00FFFFFF) | 0x44000000);
     }
 
+    static void renderResizeHighlight(GuiGraphics graphics, int x, int y, int w, int h, int color, ResizeDirection hoverDir) {
+        int highlightCol = (color & 0x00FFFFFF) | 0xFF000000;
+        switch (hoverDir) {
+            case NORTH -> graphics.fill(x, y - 1, x + w, y + 2, highlightCol);
+            case SOUTH -> graphics.fill(x, y + h - 2, x + w, y + h + 1, highlightCol);
+            case WEST -> graphics.fill(x - 1, y, x + 2, y + h, highlightCol);
+            case EAST -> graphics.fill(x + w - 2, y, x + w + 1, y + h, highlightCol);
+            case NORTH_WEST -> {
+                graphics.fill(x - 1, y - 1, x + 16, y + 2, highlightCol);
+                graphics.fill(x - 1, y - 1, x + 2, y + 16, highlightCol);
+            }
+            case NORTH_EAST -> {
+                graphics.fill(x + w - 16, y - 1, x + w + 1, y + 2, highlightCol);
+                graphics.fill(x + w - 2, y - 1, x + w + 1, y + 16, highlightCol);
+            }
+            case SOUTH_WEST -> {
+                graphics.fill(x - 1, y + h - 2, x + 16, y + h + 1, highlightCol);
+                graphics.fill(x - 1, y + h - 16, x + 2, y + h + 1, highlightCol);
+            }
+            case SOUTH_EAST -> {
+                graphics.fill(x + w - 16, y + h - 2, x + w + 1, y + h + 1, highlightCol);
+                graphics.fill(x + w - 2, y + h - 16, x + w + 1, y + h + 1, highlightCol);
+            }
+            default -> {}
+        }
+    }
+
     private static boolean isMouseOver(double mx, double my, int x, int y, int w, int h) {
         return mx >= x && mx <= x + w && my >= y && my <= y + h;
     }
 
     public static ResizeDirection getResizeDirection(CanvasGroupFrame frame, double mouseX, double mouseY) {
-        if (frame == null) return ResizeDirection.NONE;
-        if (frame.getViewMode() == PoolViewMode.EMBEDDED_PANEL) return ResizeDirection.NONE;
+        if (frame == null || frame.isFolded()) return ResizeDirection.NONE;
 
         double x = frame.getPosX();
         double y = frame.getPosY();
@@ -630,7 +631,7 @@ public class CanvasGroupFrameRenderer {
         }
 
         // 2. Multi-direction Resizing Grip & Edge Hit Test
-        if (!frame.isFolded() && frame.getViewMode() != PoolViewMode.EMBEDDED_PANEL) {
+        if (!frame.isFolded()) {
             ResizeDirection dir = getResizeDirection(frame, mouseX, mouseY);
             if (dir != ResizeDirection.NONE) {
                 return FrameAction.RESIZE;
@@ -886,8 +887,7 @@ public class CanvasGroupFrameRenderer {
         }
         curBtnX -= (BTN_SIZE + BTN_SPACING);
         if (isMouseOver(canvasMouseX, canvasMouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
-            String capacityStr = String.format(Locale.ROOT, "%.1f", frame.getTargetPoolCapacity());
-            BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal("§b⚖ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_auto_ratio", capacityStr)), mouseX, mouseY);
+            renderFrameAutoRatioTooltip(graphics, font, frame, mouseX, mouseY);
             return true;
         }
         curBtnX -= (BTN_SIZE + BTN_SPACING);
@@ -951,6 +951,25 @@ public class CanvasGroupFrameRenderer {
                 graphics.drawString(font, "\u26A0", warnX, badgeY + 1, 0xFFEF4444, false);
             }
         }
+    }
+
+    private static void renderFrameAutoRatioTooltip(GuiGraphics graphics, Font font, CanvasGroupFrame frame, int mouseX, int mouseY) {
+        String capacityStr = String.format(Locale.ROOT, "%.1f", frame.getTargetPoolCapacity());
+        List<Component> lines = List.of(
+                Component.literal("§b⚖ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_auto_ratio_1", capacityStr)),
+                Component.literal("   ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_auto_ratio_2")),
+                Component.literal("   ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_auto_ratio_3"))
+        );
+        BoardTooltipRenderer.renderComponentTooltip(graphics, font, lines, mouseX, mouseY);
+    }
+
+    private static void renderGroupAutoRatioTooltip(GuiGraphics graphics, Font font, int mouseX, int mouseY) {
+        List<Component> lines = List.of(
+                Component.literal("§b⚖ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_group_auto_ratio_1")),
+                Component.literal("   ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_group_auto_ratio_2")),
+                Component.literal("   ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_group_auto_ratio_3"))
+        );
+        BoardTooltipRenderer.renderComponentTooltip(graphics, font, lines, mouseX, mouseY);
     }
 }
 

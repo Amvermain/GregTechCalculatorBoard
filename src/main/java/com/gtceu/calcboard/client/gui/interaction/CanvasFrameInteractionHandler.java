@@ -526,7 +526,7 @@ public class CanvasFrameInteractionHandler {
             Map<String, double[]> dragStartPositions
     ) {
         if (resizingFrame != null) {
-            applyFrameResize(canvasMouseX, canvasMouseY);
+            applyFrameResize(canvasMouseX, canvasMouseY, screen);
             return true;
         }
 
@@ -537,15 +537,18 @@ public class CanvasFrameInteractionHandler {
         return false;
     }
 
-    private void applyFrameResize(double canvasMouseX, double canvasMouseY) {
+    private void applyFrameResize(double canvasMouseX, double canvasMouseY, BoardScreen screen) {
         double rawDeltaX = canvasMouseX - resizeFrameStartX;
         double rawDeltaY = canvasMouseY - resizeFrameStartY;
         boolean isSnap = net.minecraft.client.gui.screens.Screen.hasControlDown() || com.gtceu.calcboard.api.storage.BoardManager.getInstance().isGridSnapEnabled();
         int gridSize = com.gtceu.calcboard.api.storage.BoardManager.getInstance().getGridSnapSize();
         if (gridSize <= 0) gridSize = 16;
 
-        double minWidth = CanvasGroupFrame.MIN_WIDTH;
-        double minHeight = CanvasGroupFrame.MIN_HEIGHT;
+        FlowGraph graph = screen != null ? screen.getGraph() : null;
+        double minWidth = resizingFrame.isSharedMachineFrame() ? CanvasGroupFrame.MIN_SHARED_FRAME_WIDTH : CanvasGroupFrame.MIN_WIDTH;
+        double minHeight = (resizingFrame.getViewMode() == PoolViewMode.EMBEDDED_PANEL)
+                ? resizingFrame.computeMinEmbeddedHeight(graph)
+                : CanvasGroupFrame.MIN_HEIGHT;
 
         double targetRightX = origFrameX + origFrameWidth + rawDeltaX;
         double targetLeftX = origFrameX + rawDeltaX;
@@ -577,6 +580,10 @@ public class CanvasFrameInteractionHandler {
                 resizingFrame.setHeight(origFrameY + origFrameHeight - newTopY);
             }
             default -> {}
+        }
+
+        if (resizingFrame.getViewMode() == PoolViewMode.EMBEDDED_PANEL) {
+            resizingFrame.relayoutEmbeddedCards(graph);
         }
     }
 

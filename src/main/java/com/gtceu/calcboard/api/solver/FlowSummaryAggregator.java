@@ -31,7 +31,7 @@ public final class FlowSummaryAggregator {
                 ? (FlowBalanceMatrixSolver.calculateTotalConnectedPortDemand(graph, node, 0, null) + (node.isFixedDrain() ? node.getExternalDrainRate() : 0.0))
                 : node.getInputSlotRate(inputIndex, false);
         double effectiveReq = node.isReroute()
-                ? nominalReq
+                ? (FlowBalanceMatrixSolver.calculateTotalConnectedPortEffectiveDemand(graph, node, 0) + (node.isFixedDrain() ? node.getExternalDrainRate() : 0.0))
                 : node.getInputSlotRate(inputIndex, true);
 
         double totalSupplied = 0.0;
@@ -43,6 +43,19 @@ public final class FlowSummaryAggregator {
                     totalSupplied += FlowBalanceMatrixSolver.getEdgeAllocatedFlow(graph, edge, null);
                     count++;
                 }
+            }
+        }
+
+        if (node.isReroute() && inputIndex == 0) {
+            if (node.isInfiniteSupply()) {
+                totalSupplied = Double.POSITIVE_INFINITY;
+                count = Math.max(1, count);
+            } else if (node.isExternalSupply() && node.getExternalSupplyRate() > 0.0) {
+                totalSupplied += node.getExternalSupplyRate();
+                count = Math.max(1, count);
+            } else if (node.isLinkedJunction() && node.getAllocatedInputRate() > 0.0) {
+                totalSupplied += node.getAllocatedInputRate();
+                count = Math.max(1, count);
             }
         }
 
@@ -165,7 +178,7 @@ public final class FlowSummaryAggregator {
         }
         if (consumer.isReroute()) {
             double drain = consumer.isFixedDrain() ? consumer.getExternalDrainRate() : 0.0;
-            double totalDemand = drain + FlowBalanceMatrixSolver.calculateTotalConnectedPortDemand(graph, consumer, 0, null);
+            double totalDemand = drain + FlowBalanceMatrixSolver.calculateTotalConnectedPortEffectiveDemand(graph, consumer, 0);
             double totalProducerSupply = calculateTotalSupplyToInputSlot(graph, consumer.getId(), edge.inputIndex());
             if (totalProducerSupply > 0.0001) {
                 return totalDemand * (producedRate / totalProducerSupply);

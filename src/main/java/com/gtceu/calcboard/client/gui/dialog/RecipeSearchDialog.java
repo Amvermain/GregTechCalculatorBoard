@@ -271,9 +271,17 @@ public class RecipeSearchDialog implements IBoardModal {
     }
 
     public void openForSharedFrame(CanvasGroupFrame frame) {
+        openForSharedFrame(frame, null, -1, false, null, false);
+    }
+
+    public void openForSharedFrame(CanvasGroupFrame frame, RecipeNode sourceNode, int sourcePortIdx, boolean sourceIsInput, IngredientStack sourceStack, boolean shiftAutoRatio) {
         if (frame == null) return;
         this.targetSharedFrame = frame;
-        this.contextualWireTarget = null;
+        if (sourceNode != null && sourcePortIdx >= 0) {
+            this.contextualWireTarget = new ContextualWireTarget(sourceNode, sourcePortIdx, sourceIsInput, sourceStack, 0, 0, shiftAutoRatio);
+        } else {
+            this.contextualWireTarget = null;
+        }
         this.switchTargetNode = null;
         this.hasTargetSpawnPos = false;
         this.visible = true;
@@ -700,6 +708,10 @@ public class RecipeSearchDialog implements IBoardModal {
             targetSharedFrame.addRecipeInline(template, graph);
             double assignedCount = template.getMachineCount();
             parent.recordCommand(new BoardCommand.AddRecipeToSharedFrameCommand(targetSharedFrame.getId(), template, assignedCount, "Add Recipe to Shared Frame"));
+            if (contextualWireTarget != null) {
+                RecipeSearchNodeSpawner.linkContextualWire(parent, contextualWireTarget, template);
+                clearContextualWireTarget();
+            }
             parent.rebuildWidgets();
             parent.markSummaryDirty();
             if (parent.getWireRenderer() != null) {

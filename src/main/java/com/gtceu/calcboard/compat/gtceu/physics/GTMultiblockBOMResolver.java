@@ -50,8 +50,12 @@ public final class GTMultiblockBOMResolver {
     }
 
     public static List<MultiblockStructurePart> resolveStructureParts(RecipeNode node, boolean dualLowerTierEnergyHatches) {
+        return resolveStructureParts(node, dualLowerTierEnergyHatches, com.gtceu.calcboard.api.bom.BOMHatchTierMode.MATCH_MACHINE);
+    }
+
+    public static List<MultiblockStructurePart> resolveStructureParts(RecipeNode node, boolean dualLowerTierEnergyHatches, com.gtceu.calcboard.api.bom.BOMHatchTierMode hatchTierMode) {
         if (node == null) return Collections.emptyList();
-        return GTCEuBOMHelper.resolveGTMultiblockParts(node, dualLowerTierEnergyHatches);
+        return GTCEuBOMHelper.resolveGTMultiblockParts(node, dualLowerTierEnergyHatches, hatchTierMode);
     }
 
     public static void accumulateStructureSlots(

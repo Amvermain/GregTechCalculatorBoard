@@ -195,6 +195,7 @@ public class JeiRecipeConverter {
                 node.getAvailableWorkstations().addAll(cap.availableWorkstations());
                 if (cap.hasMultiblockOption() && !cap.hasSingleblockOption()) {
                     node.setMultiblock(true);
+                    node.getAvailableWorkstations().removeIf(ws -> !MultiblockDetector.isMultiblock(ws));
                 }
             }
         }
@@ -224,7 +225,7 @@ public class JeiRecipeConverter {
             if (adapter != null) {
                 initialTier = adapter.sanitizeTargetTier(node, initialTier);
             }
-            ResourceLocation tieredWs = node.getWorkstationForTier(initialTier);
+            ResourceLocation tieredWs = !node.isMultiblock() ? node.getWorkstationForTier(initialTier) : null;
             if (tieredWs != null && (node.getAvailableWorkstations().contains(tieredWs) || ForgeRegistries.ITEMS.containsKey(tieredWs))) {
                 icon = tieredWs;
             } else {
@@ -242,6 +243,26 @@ public class JeiRecipeConverter {
             node.setMachineIcon(icon);
             if (!node.getAvailableWorkstations().contains(icon)) {
                 node.getAvailableWorkstations().add(0, icon);
+            }
+        }
+
+        boolean hasAnySingle = false;
+        boolean hasAnyMulti = false;
+        for (ResourceLocation ws : node.getAvailableWorkstations()) {
+            if (MultiblockDetector.isMultiblock(ws) || RecipeNode.isMultiblockWorkstation(ws)) {
+                hasAnyMulti = true;
+            } else {
+                hasAnySingle = true;
+            }
+        }
+        if (hasAnyMulti && !hasAnySingle) {
+            node.setMultiblock(true);
+            var adapter = ModAdapterRegistry.getAdapterForNode(node);
+            if (adapter != null) {
+                var preferredWs = adapter.getPreferredMultiblockWorkstation(node, node.getAvailableWorkstations());
+                if (preferredWs != null) {
+                    node.setMachineIcon(preferredWs);
+                }
             }
         }
 

@@ -126,12 +126,14 @@ public class MachineSelectorDialog implements IBoardModal {
         List<ResourceLocation> mbList = NodeWorkstationResolver.getMultiblockWorkstations(node);
         wsSet.addAll(mbList);
 
+        boolean multiblockOnly = NodeWorkstationResolver.isMultiblockOnly(node);
+
         for (ResourceLocation ws : node.getAvailableWorkstations()) {
-            if (ws != null) {
+            if (ws != null && (!multiblockOnly || MultiblockDetector.isMultiblock(ws))) {
                 wsSet.add(ws);
             }
         }
-        if (node.getMachineIcon() != null) {
+        if (node.getMachineIcon() != null && (!multiblockOnly || MultiblockDetector.isMultiblock(node.getMachineIcon()))) {
             wsSet.add(node.getMachineIcon());
         }
 
@@ -139,7 +141,7 @@ public class MachineSelectorDialog implements IBoardModal {
         boolean isLiveRegistry = !ForgeRegistries.ITEMS.isEmpty();
 
         for (ResourceLocation ws : wsSet) {
-            if (ws == null) continue;
+            if (ws == null || (multiblockOnly && !MultiblockDetector.isMultiblock(ws))) continue;
             var item = ForgeRegistries.ITEMS.getValue(ws);
             ItemStack stack = (item != null && item != Items.AIR) ? new ItemStack(item) : ItemStack.EMPTY;
             if (stack.isEmpty()) {

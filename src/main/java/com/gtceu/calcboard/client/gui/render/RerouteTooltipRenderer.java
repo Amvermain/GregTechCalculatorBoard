@@ -12,6 +12,7 @@ import com.gtceu.calcboard.api.model.CrossPageExportTarget;
 import com.gtceu.calcboard.api.solver.WorkspaceFlowCoordinator;
 import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.api.storage.BoardPage;
+import com.gtceu.calcboard.client.team.ClientWorkspaceState;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
@@ -33,7 +34,8 @@ public final class RerouteTooltipRenderer {
         IngredientStack rStack = !rNode.getInputs().isEmpty() ? rNode.getInputs().get(0) : null;
 
         if (rStack == null) {
-            tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.reroute_junction").getString()));
+            String name = rNode.hasCustomName() ? rNode.getName() : Component.translatable("gui.gtcalcboard.tooltip.reroute_junction").getString();
+            tooltipLines.add(Component.literal("§6↔ §f" + name));
             BoardTooltipRenderer.renderComponentTooltip(graphics, font, tooltipLines, mouseX, mouseY, screen.width, screen.height);
             return true;
         }
@@ -41,18 +43,21 @@ public final class RerouteTooltipRenderer {
         boolean hasIncoming = graph != null && graph.getConnections().stream().anyMatch(e -> e.toNodeId().equals(rNode.getId()) && e.inputIndex() == 0);
         double upstreamSupply = calculateRerouteSupply(rNode, graph, hasIncoming);
         double downstreamDemand = graph != null ? FlowBalanceMatrixSolver.calculateTotalConnectedPortDemand(graph, rNode, 0, null) : 0.0;
+        double downstreamEffDemand = graph != null ? FlowBalanceMatrixSolver.calculateTotalConnectedPortEffectiveDemand(graph, rNode, 0) : downstreamDemand;
         if (rNode.isFixedDrain()) {
             downstreamDemand += rNode.getExternalDrainRate();
+            downstreamEffDemand += rNode.getExternalDrainRate();
         }
         if (rNode.getAllocatedExportRate() > 0.0) {
             downstreamDemand += rNode.getAllocatedExportRate();
+            downstreamEffDemand += rNode.getAllocatedExportRate();
         }
         boolean hasSupply = hasIncoming || rNode.isExternalSupply() || rNode.isInfiniteSupply();
         boolean isInputSource = !hasSupply && !rNode.isVoidSink() && !rNode.isFixedDrain() && downstreamDemand > 0.0001;
 
         appendRerouteHeader(rNode, rStack, isInputSource, tooltipLines);
         appendRerouteBatchBuffer(rNode, rStack, graph, tooltipLines);
-        appendRerouteFlowRates(rNode, rStack, graph, upstreamSupply, downstreamDemand, hasSupply, isInputSource, tooltipLines);
+        appendRerouteFlowRates(rNode, rStack, graph, upstreamSupply, downstreamDemand, downstreamEffDemand, hasSupply, isInputSource, tooltipLines);
         appendRerouteTargetBatch(rNode, rStack, graph, upstreamSupply, downstreamDemand, isInputSource, tooltipLines);
         appendCrossPageDetails(rNode, graph, tooltipLines);
 
@@ -65,13 +70,15 @@ public final class RerouteTooltipRenderer {
     }
 
     private static void appendRerouteHeader(RecipeNode rNode, IngredientStack rStack, boolean isInputSource, List<Component> tooltipLines) {
+        String mainName = rNode.hasCustomName() ? rNode.getName() : rStack.getDisplayName();
+        String subLabel = rNode.hasCustomName() ? rStack.getDisplayName() : Component.translatable("gui.gtcalcboard.tooltip.reroute_junction").getString();
         if (!rNode.hasTargetBatch()) {
-            tooltipLines.add(Component.literal("§6↔ §f" + rStack.getDisplayName() + " §7(" + Component.translatable("gui.gtcalcboard.tooltip.reroute_junction").getString() + ")"));
+            tooltipLines.add(Component.literal("§6↔ §f" + mainName + " §7(" + subLabel + ")"));
             return;
         }
         String titleKey = isInputSource ? "gui.gtcalcboard.dt.tooltip.title" : "gui.gtcalcboard.eta.tooltip.title";
         String icon = isInputSource ? "§b«" : "§6⌖";
-        tooltipLines.add(Component.literal(icon + " §f" + Component.translatable(titleKey).getString() + " §7(" + rStack.getDisplayName() + "§7)"));
+        tooltipLines.add(Component.literal(icon + " §f" + Component.translatable(titleKey).getString() + " §7(" + mainName + "§7)"));
     }
 
     private static void appendRerouteBatchBuffer(RecipeNode rNode, IngredientStack rStack, FlowGraph graph, List<Component> tooltipLines) {
@@ -86,7 +93,17 @@ public final class RerouteTooltipRenderer {
         }
     }
 
-    private static void appendRerouteFlowRates(RecipeNode rNode, IngredientStack rStack, FlowGraph graph, double upstreamSupply, double downstreamDemand, boolean hasSupply, boolean isInputSource, List<Component> tooltipLines) {
+    private static void appendRerouteFlowRates(
+            RecipeNode rNode,
+            IngredientStack rStack,
+            FlowGraph graph,
+            double upstreamSupply,
+            double downstreamDemand,
+            double downstreamEffDemand,
+            boolean hasSupply,
+            boolean isInputSource,
+            List<Component> tooltipLines
+    ) {
         if (rNode.isFixedDrain()) {
             tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.junction.supply_mode.fixed_drain").getString() + ": §c-" + FormatUtil.formatRate(rNode.getExternalDrainRate(), rStack)));
         }
@@ -100,8 +117,11 @@ public final class RerouteTooltipRenderer {
         if (downstreamDemand > 0.0001 && !rNode.isFixedDrain()) {
             tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.demand").getString() + ": §c-" + FormatUtil.formatRate(downstreamDemand, rStack)));
         }
+        if (downstreamEffDemand < downstreamDemand - 0.001 && !rNode.isFixedDrain()) {
+            tooltipLines.add(Component.literal("§3↓ " + Component.translatable("gui.gtcalcboard.tooltip.upstream_throttled", FormatUtil.formatRate(downstreamEffDemand, rStack)).getString()));
+        }
 
-        double netSurplus = upstreamSupply - downstreamDemand;
+        double netSurplus = upstreamSupply - downstreamEffDemand;
         if (hasSupply && downstreamDemand > 0.0001) {
             appendBalancedRateLine(upstreamSupply, netSurplus, rStack, tooltipLines);
             return;
@@ -189,7 +209,7 @@ public final class RerouteTooltipRenderer {
     private static void appendLinkedSourceDetails(RecipeNode rNode, FlowGraph graph, List<Component> tooltipLines) {
         String srcPageId = rNode.getLinkedSourcePageId();
         String srcNodeId = rNode.getLinkedSourceNodeId();
-        BoardPage srcPage = (srcPageId != null && !srcPageId.isEmpty()) ? BoardManager.getInstance().getPage(srcPageId).orElse(null) : null;
+        BoardPage srcPage = (srcPageId != null && !srcPageId.isEmpty()) ? ClientWorkspaceState.resolveActiveWorkspacePage(srcPageId) : null;
         RecipeNode srcNode = (srcPage != null && srcNodeId != null) ? srcPage.getGraph().findNodeById(srcNodeId) : null;
 
         if (srcPage == null || srcNode == null) {
@@ -239,7 +259,7 @@ public final class RerouteTooltipRenderer {
     private static void appendExportTargetsDetails(RecipeNode rNode, List<Component> tooltipLines) {
         tooltipLines.add(Component.literal("§6── " + Component.translatable("gui.gtcalcboard.junction.export_targets_header").getString() + " ──"));
         for (CrossPageExportTarget target : rNode.getExportTargets()) {
-            BoardPage targetPage = BoardManager.getInstance().getPage(target.targetPageId()).orElse(null);
+            BoardPage targetPage = ClientWorkspaceState.resolveActiveWorkspacePage(target.targetPageId());
             String pName = targetPage != null && targetPage.getName() != null ? targetPage.getName() : target.targetPageId();
             String capStr = target.fixedLimit() > 0 ? String.format(java.util.Locale.ROOT, " (Cap: %.1f)", target.fixedLimit()) : "";
             tooltipLines.add(Component.literal("§7→ §f" + pName + " §e[P" + target.priority() + "]" + capStr));
