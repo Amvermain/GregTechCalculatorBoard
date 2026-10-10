@@ -107,10 +107,10 @@ class StarTModAdapterTest {
         IngredientStack ws2Stack = spt.getInputs().get(1);
         assertEquals("gtceu:tungsten_disulfide", ws2Stack.getId().toString());
 
-        // Verify continuous flow rate: 1000 mB/hr = 0.277778 mB/s per machine
+        // Verify continuous flow rate: 1000 B/hr = 277.7778 mB/s per machine (1000 mB / 3.6s)
         Map<IngredientStack, Double> rates = NodeRateCalculator.calculateInputRates(spt);
         double ws2Rate = rates.get(ws2Stack);
-        assertEquals(1000.0 / 3600.0, ws2Rate, 1e-4, "WS2 consumption rate should match 1000 mB/hr");
+        assertEquals(1000.0 / 3.6, ws2Rate, 1e-4, "WS2 consumption rate should match 1000 B/hr");
 
         // 3. Cycle to Full Boost (WS2 + SS-He3: 2.0x)
         adapter.cycleBooster(spt, 1);
@@ -122,8 +122,8 @@ class StarTModAdapterTest {
         Map<IngredientStack, Double> fullRates = NodeRateCalculator.calculateInputRates(spt);
         double fullWs2Rate = fullRates.get(ws2Stack);
         double he3Rate = fullRates.get(he3Stack);
-        assertEquals(1000.0 / 3600.0, fullWs2Rate, 1e-4, "WS2 consumption rate should match 1000 mB/hr");
-        assertEquals(2500.0 / 3600.0, he3Rate, 1e-4, "SS-He3 consumption rate should match 2500 mB/hr");
+        assertEquals(1000.0 / 3.6, fullWs2Rate, 1e-4, "WS2 consumption rate should match 1000 B/hr");
+        assertEquals(2500.0 / 3.6, he3Rate, 1e-4, "SS-He3 consumption rate should match 2500 B/hr");
 
         // 4. Cycle back to Unboosted (0.9x)
         adapter.cycleBooster(spt, 1);
@@ -143,7 +143,7 @@ class StarTModAdapterTest {
         assertEquals(1, npt.getInputs().size());
         assertEquals(0.8, GTTurbineHelper.getTurbineBoostMultiplier(npt), 1e-6);
 
-        // 2. Cycle to Passive Boost (WS2: 1.50x, 2,500 mB/hr)
+        // 2. Cycle to Passive Boost (WS2: 1.50x, 2,500 B/hr)
         adapter.cycleBooster(npt, 1);
         assertEquals(1.50, GTTurbineHelper.getTurbineBoostMultiplier(npt), 1e-6);
         assertEquals(2, npt.getInputs().size());
@@ -152,9 +152,9 @@ class StarTModAdapterTest {
 
         Map<IngredientStack, Double> rates = NodeRateCalculator.calculateInputRates(npt);
         double ws2Rate = rates.get(ws2Stack);
-        assertEquals(2500.0 / 3600.0, ws2Rate, 1e-4, "NPT WS2 consumption rate should match 2500 mB/hr");
+        assertEquals(2500.0 / 3.6, ws2Rate, 1e-4, "NPT WS2 consumption rate should match 2500 B/hr");
 
-        // 3. Cycle to Full Boost (WS2 + BEC-Og: 3.0x, 800 mB/hr)
+        // 3. Cycle to Full Boost (WS2 + BEC-Og: 3.0x, 800 B/hr)
         adapter.cycleBooster(npt, 1);
         assertEquals(3.0, GTTurbineHelper.getTurbineBoostMultiplier(npt), 1e-6);
         assertEquals(3, npt.getInputs().size());
@@ -163,7 +163,7 @@ class StarTModAdapterTest {
 
         Map<IngredientStack, Double> fullRates = NodeRateCalculator.calculateInputRates(npt);
         double ogRate = fullRates.get(ogStack);
-        assertEquals(800.0 / 3600.0, ogRate, 1e-4, "BEC-Og consumption rate should match 800 mB/hr");
+        assertEquals(800.0 / 3.6, ogRate, 1e-4, "BEC-Og consumption rate should match 800 B/hr");
     }
 
     @Test
@@ -221,5 +221,50 @@ class StarTModAdapterTest {
 
         assertEquals(1, spt.getInputs().size());
         assertEquals("gtceu:argon_plasma", spt.getInputs().get(0).getId().toString());
+    }
+
+    @Test
+    @DisplayName("StarTModAdapter: Booster fluid rate invariance across parallel, duration, and machine count")
+    void testSPTBoosterRateInvarianceAcrossParallelAndMachineCount() {
+        RecipeNode spt = createSPTNode();
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(spt);
+        assertNotNull(adapter);
+
+        adapter.cycleBooster(spt, 1);
+        adapter.cycleBooster(spt, 1);
+        assertEquals(3, spt.getInputs().size());
+
+        IngredientStack ws2Stack = spt.getInputs().get(1);
+        IngredientStack he3Stack = spt.getInputs().get(2);
+
+        double baseWs2Expected = 1000.0 / 3.6;
+        double baseHe3Expected = 2500.0 / 3.6;
+
+        Map<IngredientStack, Double> initialRates = NodeRateCalculator.calculateInputRates(spt);
+        assertEquals(baseWs2Expected, initialRates.get(ws2Stack), 1e-4);
+        assertEquals(baseHe3Expected, initialRates.get(he3Stack), 1e-4);
+        assertEquals(baseWs2Expected, NodeRateCalculator.calculateSingleMachineInputRate(spt, ws2Stack), 1e-4);
+        assertEquals(baseHe3Expected, NodeRateCalculator.calculateSingleMachineInputRate(spt, he3Stack), 1e-4);
+
+        spt.setParallel(24);
+        spt.setRotorEfficiency(150);
+
+        Map<IngredientStack, Double> modifiedParallelRates = NodeRateCalculator.calculateInputRates(spt);
+        assertEquals(baseWs2Expected, modifiedParallelRates.get(ws2Stack), 1e-4);
+        assertEquals(baseHe3Expected, modifiedParallelRates.get(he3Stack), 1e-4);
+        assertEquals(baseWs2Expected, NodeRateCalculator.calculateSingleMachineInputRate(spt, ws2Stack), 1e-4);
+
+        spt.setMachineCount(3);
+        Map<IngredientStack, Double> multiMachineRates = NodeRateCalculator.calculateInputRates(spt);
+        assertEquals(baseWs2Expected * 3.0, multiMachineRates.get(ws2Stack), 1e-4);
+        assertEquals(baseHe3Expected * 3.0, multiMachineRates.get(he3Stack), 1e-4);
+        assertEquals(baseWs2Expected, NodeRateCalculator.calculateSingleMachineInputRate(spt, ws2Stack), 1e-4);
+
+        spt.setRequiredReflectorTier(2);
+        assertFalse(spt.isOperational());
+        Map<IngredientStack, Double> offlineRates = NodeRateCalculator.calculateInputRates(spt);
+        assertEquals(0.0, offlineRates.get(ws2Stack), 1e-4);
+        assertEquals(0.0, offlineRates.get(he3Stack), 1e-4);
+        assertEquals(0.0, NodeRateCalculator.calculateSingleMachineInputRate(spt, ws2Stack), 1e-4);
     }
 }

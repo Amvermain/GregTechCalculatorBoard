@@ -108,11 +108,13 @@ public class PageBrowserDrawer {
     }
 
     private void initSearchBox() {
-        Font font = Minecraft.getInstance().font;
-        int topY = screen.getHeaderBottomY() + 4;
-        this.searchBox = new EditBox(font, DRAWER_X + 8, topY + 22, DRAWER_WIDTH - 16, 16, Component.translatable("gui.gtcalcboard.browser.search_hint"));
+        Font font = Minecraft.getInstance() != null ? Minecraft.getInstance().font : null;
+        int topY = screen.getHeaderBottomY() + 2;
+        this.searchBox = new EditBox(font, DRAWER_X + 8, topY + 24, DRAWER_WIDTH - 16, 16, Component.translatable("gui.gtcalcboard.browser.search_hint"));
+        this.searchBox.setHint(Component.translatable("gui.gtcalcboard.browser.search_hint"));
         this.searchBox.setMaxLength(64);
         this.searchBox.setValue("");
+        this.searchBox.setResponder(query -> scrollY = 0);
     }
 
     private BoardPage hoveredBadgePage = null;
@@ -239,7 +241,7 @@ public class PageBrowserDrawer {
             items.add(new ContextMenuItem("§f✎ " + Component.translatable("gui.gtcalcboard.browser.rename_page").getString(), () -> {
                 promptMode = PromptMode.RENAME_PAGE;
                 promptTargetPage = contextPage;
-                Font font = Minecraft.getInstance().font;
+                Font font = Minecraft.getInstance() != null ? Minecraft.getInstance().font : null;
                 promptBox = new EditBox(font, 0, 0, 160, 16, Component.literal(""));
                 promptBox.setValue(contextPage.getName());
                 promptBox.setFocused(true);
@@ -268,7 +270,7 @@ public class PageBrowserDrawer {
             items.add(new ContextMenuItem("§e≡ " + Component.translatable("gui.gtcalcboard.browser.new_subfolder").getString(), () -> {
                 promptMode = PromptMode.NEW_SUBFOLDER;
                 promptTargetFolder = contextFolder;
-                Font font = Minecraft.getInstance().font;
+                Font font = Minecraft.getInstance() != null ? Minecraft.getInstance().font : null;
                 promptBox = new EditBox(font, 0, 0, 160, 16, Component.literal(""));
                 promptBox.setValue("New Subfolder");
                 promptBox.setFocused(true);
@@ -284,7 +286,7 @@ public class PageBrowserDrawer {
             items.add(new ContextMenuItem("§f✎ " + Component.translatable("gui.gtcalcboard.browser.rename_folder").getString(), () -> {
                 promptMode = PromptMode.RENAME_FOLDER;
                 promptTargetFolder = contextFolder;
-                Font font = Minecraft.getInstance().font;
+                Font font = Minecraft.getInstance() != null ? Minecraft.getInstance().font : null;
                 promptBox = new EditBox(font, 0, 0, 160, 16, Component.literal(""));
                 promptBox.setValue(contextFolder);
                 promptBox.setFocused(true);
@@ -405,10 +407,36 @@ public class PageBrowserDrawer {
             return true;
         }
         if (handleHeaderButtonClicks(mouseX, mouseY, button)) {
+            if (searchBox != null) {
+                searchBox.setFocused(false);
+            }
             return true;
         }
-        if (searchBox != null && searchBox.mouseClicked(mouseX, mouseY, button)) {
-            return true;
+        if (searchBox != null) {
+            int topY = screen.getHeaderBottomY() + 2;
+            int searchBoxX = DRAWER_X + 8;
+            int searchBoxY = topY + 24;
+            int searchBoxW = DRAWER_WIDTH - 16;
+            int searchBoxH = 16;
+            searchBox.setX(searchBoxX);
+            searchBox.setY(searchBoxY);
+            searchBox.setWidth(searchBoxW);
+            searchBox.setHeight(searchBoxH);
+
+            boolean clickedInside = mouseX >= searchBoxX && mouseX <= searchBoxX + searchBoxW
+                    && mouseY >= searchBoxY && mouseY <= searchBoxY + searchBoxH;
+
+            if (clickedInside) {
+                searchBox.setFocused(true);
+                if (button == 1) {
+                    searchBox.setValue("");
+                } else if (Minecraft.getInstance() != null) {
+                    searchBox.mouseClicked(mouseX, mouseY, button);
+                }
+                return true;
+            } else {
+                searchBox.setFocused(false);
+            }
         }
 
         handleTreeClicks(mouseX, mouseY, button);
@@ -487,7 +515,7 @@ public class PageBrowserDrawer {
         }
         if (mouseX >= addFolderX && mouseX <= addFolderX + 20 && mouseY >= btnY && mouseY <= btnY + 14) {
             promptMode = PromptMode.NEW_FOLDER;
-            Font font = Minecraft.getInstance().font;
+            Font font = Minecraft.getInstance() != null ? Minecraft.getInstance().font : null;
             promptBox = new EditBox(font, 0, 0, 160, 16, Component.literal(""));
             promptBox.setValue("New Folder");
             promptBox.setFocused(true);
@@ -634,8 +662,8 @@ public class PageBrowserDrawer {
         }
 
         BoardPage page = ip.page();
-        if (!ClientWorkspaceState.getInstance().isTeamMode()) {
-            Font font = Minecraft.getInstance().font;
+        Font font = Minecraft.getInstance() != null ? Minecraft.getInstance().font : null;
+        if (!ClientWorkspaceState.getInstance().isTeamMode() && font != null) {
             GTVoltageTier vTier = page.getDefaultVoltageTier();
             String badgeText = (vTier != null) ? (vTier.getFormatCode() + "⚡" + vTier.getName()) : "⚡Auto";
             int badgeW = font.width(badgeText) + 4;
@@ -936,6 +964,10 @@ public class PageBrowserDrawer {
                 contextMenuOpen = false;
                 return true;
             }
+            if (searchBox != null && searchBox.isFocused()) {
+                searchBox.setFocused(false);
+                return true;
+            }
             setOpen(false);
             return true;
         }
@@ -950,6 +982,10 @@ public class PageBrowserDrawer {
         }
 
         if (searchBox != null && searchBox.isFocused()) {
+            if (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER) {
+                searchBox.setFocused(false);
+                return true;
+            }
             searchBox.keyPressed(keyCode, scanCode, modifiers);
             return true;
         }
@@ -963,9 +999,20 @@ public class PageBrowserDrawer {
             return promptBox.charTyped(codePoint, modifiers);
         }
         if (searchBox != null && searchBox.isFocused()) {
-            return searchBox.charTyped(codePoint, modifiers);
+            searchBox.charTyped(codePoint, modifiers);
+            return true;
         }
         return false;
+    }
+
+    public void tick() {
+        if (!open) return;
+        if (searchBox != null) {
+            searchBox.tick();
+        }
+        if (promptBox != null) {
+            promptBox.tick();
+        }
     }
 
     private void confirmPrompt() {
@@ -1036,9 +1083,11 @@ public class PageBrowserDrawer {
     }
 
     private void playClickSound() {
-        Minecraft.getInstance().getSoundManager().play(
-                net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F)
-        );
+        if (Minecraft.getInstance() != null && Minecraft.getInstance().getSoundManager() != null) {
+            Minecraft.getInstance().getSoundManager().play(
+                    net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F)
+            );
+        }
     }
 
     public static class FolderTreeNode extends PageBrowserTreeModel.FolderTreeNode {

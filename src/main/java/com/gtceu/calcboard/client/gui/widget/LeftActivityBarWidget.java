@@ -1,8 +1,10 @@
 package com.gtceu.calcboard.client.gui.widget;
 
+import com.gtceu.calcboard.GregTechCalcBoard;
 import com.gtceu.calcboard.api.solver.WorkspaceFlowCoordinator;
 import com.gtceu.calcboard.client.gui.api.IBoardScreenContext;
 import com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer;
+import com.gtceu.calcboard.client.gui.util.ConfirmLinkHelper;
 import com.gtceu.calcboard.client.team.ClientWorkspaceState;
 import com.gtceu.calcboard.client.update.ClientUpdateNotifier;
 import com.gtceu.calcboard.network.NetworkHandler;
@@ -11,6 +13,7 @@ import com.gtceu.calcboard.network.packet.c2s.C2SRequestWorkspacePacket;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
@@ -23,6 +26,11 @@ public class LeftActivityBarWidget {
     private static final int BTN_SIZE = 18;
     private static final int BTN_SPACING = 3;
 
+    private static final int POPUP_W = 160;
+    private static final int POPUP_ITEM_H = 18;
+    private static final int POPUP_PADDING = 3;
+    private static final int POPUP_H = POPUP_PADDING * 2 + POPUP_ITEM_H * 2;
+
     private final IBoardScreenContext screen;
 
     private int pagesBtnY;
@@ -31,8 +39,11 @@ public class LeftActivityBarWidget {
     private int bomBtnY;
     private int balanceBtnY;
     private int teamBtnY;
+    private int communityBtnY = -100;
     private int helpBtnY;
     private int settingsBtnY;
+
+    private boolean communityPopupOpen = false;
 
     public LeftActivityBarWidget(IBoardScreenContext screen) {
         this.screen = screen;
@@ -51,6 +62,10 @@ public class LeftActivityBarWidget {
 
         Font font = Minecraft.getInstance().font;
         renderIconButtons(graphics, font, topY, bottomY, mouseX, mouseY);
+
+        if (communityPopupOpen && communityBtnY > 0) {
+            renderCommunityPopup(graphics, font, bottomY, mouseX, mouseY);
+        }
 
         graphics.pose().popPose();
     }
@@ -110,6 +125,51 @@ public class LeftActivityBarWidget {
         this.helpBtnY = settingsBtnY - BTN_SIZE - BTN_SPACING;
         boolean helpActive = screen.getHotkeyHudWidget() != null && screen.getHotkeyHudWidget().isExpanded();
         renderButton(graphics, font, 2, helpBtnY, "?", helpActive, mouseX, mouseY, 0xFF38BDF8);
+
+        int candCommunityY = helpBtnY - BTN_SIZE - BTN_SPACING;
+        if (candCommunityY > curY + 4) {
+            this.communityBtnY = candCommunityY;
+            renderButton(graphics, font, 2, communityBtnY, "💬", communityPopupOpen, mouseX, mouseY, 0xFF818CF8);
+        } else {
+            this.communityBtnY = -100;
+        }
+    }
+
+    private void renderCommunityPopup(GuiGraphics graphics, Font font, int bottomY, int mouseX, int mouseY) {
+        int px = BAR_WIDTH + 3;
+        int py = getCommunityPopupY(bottomY);
+
+        graphics.pose().pushPose();
+        graphics.pose().translate(0, 0, 100.0f);
+
+        graphics.fill(px, py, px + POPUP_W, py + POPUP_H, 0xF80F172A);
+        graphics.renderOutline(px, py, POPUP_W, POPUP_H, 0xFF334155);
+
+        int row1Y = py + POPUP_PADDING;
+        int row2Y = row1Y + POPUP_ITEM_H;
+
+        renderPopupRow(graphics, font, px, row1Y, "🐛", "gui.gtcalcboard.community.github_issues", mouseX, mouseY);
+        renderPopupRow(graphics, font, px, row2Y, "💬", "gui.gtcalcboard.community.discord", mouseX, mouseY);
+
+        graphics.pose().popPose();
+    }
+
+    private void renderPopupRow(GuiGraphics graphics, Font font, int px, int rowY, String icon, String textKey, int mouseX, int mouseY) {
+        boolean hovered = isHovered(mouseX, mouseY, px + 2, rowY, POPUP_W - 4, POPUP_ITEM_H);
+        if (hovered) {
+            graphics.fill(px + 2, rowY, px + POPUP_W - 2, rowY + POPUP_ITEM_H, 0xFF1E293B);
+        }
+
+        String label = icon + " " + Component.translatable(textKey).getString();
+        int textColor = hovered ? 0xFFFFFFFF : 0xFFCBD5E1;
+        graphics.drawString(font, label, px + 6, rowY + 5, textColor, false);
+    }
+
+    private int getCommunityPopupY(int bottomY) {
+        int maxBottom = bottomY - 4;
+        int desiredY = communityBtnY - 6;
+        int clampedY = Math.min(desiredY, maxBottom - POPUP_H);
+        return Math.max(screen.getHeaderBottomY() + 4, clampedY);
     }
 
     private void renderUpdateBadge(GuiGraphics graphics, int btnX, int btnY) {
@@ -136,7 +196,24 @@ public class LeftActivityBarWidget {
 
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (button != 0) return false;
-        if (mouseX < 0 || mouseX > BAR_WIDTH) return false;
+
+        if (communityPopupOpen && handleCommunityPopupClick(mouseX, mouseY)) {
+            return true;
+        }
+
+        if (mouseX < 0 || mouseX > BAR_WIDTH) {
+            communityPopupOpen = false;
+            return false;
+        }
+
+        if (isHovered(mouseX, mouseY, 2, communityBtnY)) {
+            playClickSound();
+            communityPopupOpen = !communityPopupOpen;
+            closePageBrowserIfOpen();
+            return true;
+        }
+
+        communityPopupOpen = false;
 
         if (isHovered(mouseX, mouseY, 2, pagesBtnY)) {
             playClickSound();
@@ -249,7 +326,49 @@ public class LeftActivityBarWidget {
         screen.switchToWorkspaceMode(target);
     }
 
+    private boolean handleCommunityPopupClick(double mouseX, double mouseY) {
+        int bottomY = screen.getScreenHeight() - AdaptiveStatusBar.BAR_HEIGHT;
+        int px = BAR_WIDTH + 3;
+        int py = getCommunityPopupY(bottomY);
+        int row1Y = py + POPUP_PADDING;
+        int row2Y = row1Y + POPUP_ITEM_H;
+
+        if (isHovered(mouseX, mouseY, px + 2, row1Y, POPUP_W - 4, POPUP_ITEM_H)) {
+            playClickSound();
+            communityPopupOpen = false;
+            Screen parentScreen = screen instanceof Screen s ? s : null;
+            ConfirmLinkHelper.openExternalLink(parentScreen, GregTechCalcBoard.GITHUB_ISSUES_URL);
+            return true;
+        }
+
+        if (isHovered(mouseX, mouseY, px + 2, row2Y, POPUP_W - 4, POPUP_ITEM_H)) {
+            playClickSound();
+            communityPopupOpen = false;
+            Screen parentScreen = screen instanceof Screen s ? s : null;
+            ConfirmLinkHelper.openExternalLink(parentScreen, GregTechCalcBoard.DISCORD_INVITE_URL);
+            return true;
+        }
+
+        if (isHovered(mouseX, mouseY, px, py, POPUP_W, POPUP_H)) {
+            return true;
+        }
+
+        if (!isHovered(mouseX, mouseY, 2, communityBtnY)) {
+            communityPopupOpen = false;
+        }
+        return false;
+    }
+
+    public boolean isCommunityPopupOpen() {
+        return communityPopupOpen;
+    }
+
+    public void closeCommunityPopup() {
+        this.communityPopupOpen = false;
+    }
+
     public void renderTooltips(GuiGraphics graphics, Font font, int mouseX, int mouseY) {
+        if (communityPopupOpen) return;
         if (mouseX < 0 || mouseX > BAR_WIDTH) return;
 
         if (isHovered(mouseX, mouseY, 2, pagesBtnY)) {
@@ -276,6 +395,10 @@ public class LeftActivityBarWidget {
             BoardTooltipRenderer.renderTooltip(graphics, font, Component.translatable("gui.gtcalcboard.activity_bar.team"), mouseX, mouseY, screen.getScreenWidth(), screen.getScreenHeight());
             return;
         }
+        if (communityBtnY > 0 && isHovered(mouseX, mouseY, 2, communityBtnY)) {
+            BoardTooltipRenderer.renderTooltip(graphics, font, Component.translatable("gui.gtcalcboard.activity_bar.community"), mouseX, mouseY, screen.getScreenWidth(), screen.getScreenHeight());
+            return;
+        }
         if (isHovered(mouseX, mouseY, 2, helpBtnY)) {
             BoardTooltipRenderer.renderTooltip(graphics, font, Component.translatable("gui.gtcalcboard.activity_bar.help"), mouseX, mouseY, screen.getScreenWidth(), screen.getScreenHeight());
             return;
@@ -289,8 +412,12 @@ public class LeftActivityBarWidget {
         }
     }
 
+    private boolean isHovered(double mouseX, double mouseY, int x, int y, int w, int h) {
+        return mouseX >= x && mouseX <= x + w && mouseY >= y && mouseY <= y + h;
+    }
+
     private boolean isHovered(double mouseX, double mouseY, int x, int y) {
-        return mouseX >= x && mouseX <= x + BTN_SIZE && mouseY >= y && mouseY <= y + BTN_SIZE;
+        return isHovered(mouseX, mouseY, x, y, BTN_SIZE, BTN_SIZE);
     }
 
     private boolean isInsideBar(double mouseY) {

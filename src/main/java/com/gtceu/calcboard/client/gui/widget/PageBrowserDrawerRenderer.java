@@ -84,6 +84,7 @@ public final class PageBrowserDrawerRenderer {
         drawer.getSearchBox().setX(PageBrowserDrawer.DRAWER_X + 8);
         drawer.getSearchBox().setY(topY + 24);
         drawer.getSearchBox().setWidth(PageBrowserDrawer.DRAWER_WIDTH - 16);
+        drawer.getSearchBox().setHeight(16);
         drawer.getSearchBox().render(graphics, mouseX, mouseY, partialTicks);
     }
 

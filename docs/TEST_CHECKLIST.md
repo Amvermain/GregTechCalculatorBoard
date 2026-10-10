@@ -43,11 +43,12 @@ Perform these 12 critical manual checks in a test world before publishing a new 
 ### 3. Dialogs, Modals, & Hotkey Isolation
 - [ ] **LIFO Modal Dismissal**: Open machine config $\rightarrow$ open recipe switcher. Press `ESC` or click backdrop; confirm only the topmost modal dialog closes first.
 - [ ] **Input Leak Protection**: While typing in any inline text field (`EditBox`, machine count, rename), confirm global hotkeys (`E`, `Space`, `W/A/S/D`) do not close the GUI or leak to background canvas.
+- [ ] **Community & Support Dialog**: Clicking the Community button on the left activity bar or Guide menu opens the GitHub Issues & Discord popup, and clicking links safely prompts confirmation before opening the external web browser.
 
 ### 4. History Stack & Persistence
 - [ ] **Undo / Redo Fidelity**: Perform node moves, wire cuts, and recipe switches; confirm `Ctrl + Z` and `Ctrl + Y` restore exact positions and wire states without orphan nodes.
 - [ ] **Save & Reload Integrity**: Place machines and wires $\rightarrow$ save world $\rightarrow$ exit to main menu $\rightarrow$ reload world; confirm board layout and calculations restore with 100% fidelity.
-- [ ] **Folder Browser State Persistence**: In folder browser, collapse/expand folders and delete a page; confirm browser stays open without closing, and reopening the board screen retains the collapsed/expanded folder states.
+- [ ] **Folder Browser State & Search**: In folder browser, click the search box to filter pages and folders, verify hint text and right-click to clear, collapse/expand folders and delete a page; confirm browser stays open without closing, and reopening the board screen retains the collapsed/expanded folder states.
 - [ ] **Shared Machine Pool Warning Badges**: Form a Shared Machine Pool with multiblock machines lacking energy hatches; confirm the pool header and sub-cards display `[⚠ LV]` red warning tints, `⚡ ⚠ No Power Hatch` badges, and energy hatch configuration hints in the tooltip.
 - [ ] **Blueprint Clipboard**: Click `Share` (Base64 copied to clipboard) $\rightarrow$ click `Import` in another page; confirm factory pastes with identical parameters.
 

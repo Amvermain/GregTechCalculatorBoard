@@ -3,6 +3,7 @@ package com.gtceu.calcboard.compat.start;
 import com.gtceu.calcboard.api.catalog.AddonCategory;
 import com.gtceu.calcboard.api.catalog.MachineAddon;
 import com.gtceu.calcboard.api.catalog.MultiblockDetector;
+import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTThreadingHelix;
@@ -297,10 +298,10 @@ public class StarTModAdapter extends GTCEuModAdapter {
 
         if (lub && cool) {
             tt.add(net.minecraft.network.chat.Component.literal("§b" + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.tooltip.turbine_boost_full_desc", activeFluid, fullMult).getString()));
-            tt.add(net.minecraft.network.chat.Component.literal("§7• " + (curModel == com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel.NPT ? "BEC-Og (800 mB/hr)" : "SS-He3 (2,500 mB/hr)") + " + WS₂ (" + (curModel == com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel.NPT ? "2,500" : "1,000") + " mB/hr)"));
+            tt.add(net.minecraft.network.chat.Component.literal("§7• " + (curModel == com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel.NPT ? "BEC-Og (800 B/hr)" : "SS-He3 (2,500 B/hr)") + " + WS₂ (" + (curModel == com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel.NPT ? "2,500" : "1,000") + " B/hr)"));
         } else if (lub) {
             tt.add(net.minecraft.network.chat.Component.literal("§e" + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.tooltip.turbine_boost_passive_desc", passMult).getString()));
-            tt.add(net.minecraft.network.chat.Component.literal("§7• WS₂ (" + (curModel == com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel.NPT ? "2,500" : "1,000") + " mB/hr)"));
+            tt.add(net.minecraft.network.chat.Component.literal("§7• WS₂ (" + (curModel == com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel.NPT ? "2,500" : "1,000") + " B/hr)"));
             tt.add(net.minecraft.network.chat.Component.literal("§a★ " + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.tooltip.turbine_boost_hint_full", activeFluid, fullMult).getString()));
         } else {
             tt.add(net.minecraft.network.chat.Component.literal("§c" + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.tooltip.turbine_boost_none_desc", noneMult).getString()));
@@ -335,6 +336,28 @@ public class StarTModAdapter extends GTCEuModAdapter {
     @Override
     public void setThreadingActive(RecipeNode node, boolean active) {
         RecipeNodeThreadingHelper.setThreadingActive(node, active);
+    }
+
+    @Override
+    public double computeEffectiveIngredientRate(RecipeNode node, IngredientStack stack, boolean isInput, double defaultRate) {
+        if (isInput && stack != null && stack.isFluid() && stack.getId() != null && StarTTurbineHelper.supportsBoost(node) && StarTTurbineHelper.isBoosterFluid(stack)) {
+            if (!node.isOperational()) {
+                return 0.0;
+            }
+            return StarTTurbineHelper.getBoosterRatePerSec(node, stack.getId()) * node.getMachineCount();
+        }
+        return super.computeEffectiveIngredientRate(node, stack, isInput, defaultRate);
+    }
+
+    @Override
+    public double computeSingleMachineIngredientRate(RecipeNode node, IngredientStack stack, boolean isInput, double defaultRate) {
+        if (isInput && stack != null && stack.isFluid() && stack.getId() != null && StarTTurbineHelper.supportsBoost(node) && StarTTurbineHelper.isBoosterFluid(stack)) {
+            if (!node.isOperational()) {
+                return 0.0;
+            }
+            return StarTTurbineHelper.getBoosterRatePerSec(node, stack.getId());
+        }
+        return super.computeSingleMachineIngredientRate(node, stack, isInput, defaultRate);
     }
 }
 

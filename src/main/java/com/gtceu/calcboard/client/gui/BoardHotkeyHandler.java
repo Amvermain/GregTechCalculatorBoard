@@ -45,6 +45,10 @@ public final class BoardHotkeyHandler {
                 screen.getToolbarWidget().closeDropdown();
                 return true;
             }
+            if (screen.getLeftActivityBar() != null && screen.getLeftActivityBar().isCommunityPopupOpen()) {
+                screen.getLeftActivityBar().closeCommunityPopup();
+                return true;
+            }
             if (screen.getCanvasHandler() != null && screen.getCanvasHandler().isDraggingWire()) {
                 screen.getCanvasHandler().cancelWireDrag();
                 return true;

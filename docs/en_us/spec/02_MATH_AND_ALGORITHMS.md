@@ -120,6 +120,17 @@ $$\text{Loss}_{\text{sec}} = \text{BaseLossRate} \times \left(\frac{\text{Actual
 $$T_{\text{lifespan}} = \frac{D_{\text{rotor}}}{\text{Loss}_{\text{sec}}} \quad (\text{seconds})$$
 $$\text{Rotor Replacement Rate (Items/hour)} = \frac{3600.0}{T_{\text{lifespan}}} \times \text{MachineCount}$$
 
+##### 4. Star Technology Boosted Plasma Turbine (SPT / NPT) Continuous Booster Rates
+- **SPT (Supreme Plasma Turbine)**:
+  - Passive Boost (Tungsten Disulfide, $\text{WS}_2$): $1,000\text{ B/hr} = 277.78\text{ mB/s}$ (1.25x power multiplier)
+  - Active Boost ($\text{WS}_2$ + Superstate Helium-3, $\text{SS-He3}$): $\text{WS}_2$ $1,000\text{ B/hr}$, $\text{SS-He3}$ $2,500\text{ B/hr} = 694.44\text{ mB/s}$ (2.0x power multiplier)
+  - Unboosted: 0.9x penalty multiplier
+- **NPT (Nyinsane Plasma Turbine)**:
+  - Passive Boost ($\text{WS}_2$): $2,500\text{ B/hr} = 694.44\text{ mB/s}$ (1.50x power multiplier)
+  - Active Boost ($\text{WS}_2$ + Bose-Einstein Condensate Oganesson, $\text{BEC-Og}$): $\text{WS}_2$ $2,500\text{ B/hr}$, $\text{BEC-Og}$ $800\text{ B/hr} = 222.22\text{ mB/s}$ (3.0x power multiplier)
+  - Unboosted: 0.8x penalty multiplier
+- **Invariance Rule**: Booster fluid is injected continuously per machine time unit, scaling strictly with machine count ($N$) regardless of parallel factor ($P$) or rotor efficiency.
+
 #### Power Supply Based Maximum Available Machine Parallel ($P_{\max}$) & Overclocking Capacity
 Given equipped Energy Hatch voltage $V_{\text{hatch}}$, amperage $A_{\text{hatch}}$, and single recipe power $E_{\text{recipe}}$:
 $$P_{\max} = \min\left(\text{ConfiguredParallel}, \, \left\lfloor \frac{V_{\text{hatch}} \times A_{\text{hatch}}}{E_{\text{recipe}}} \right\rfloor\right)$$

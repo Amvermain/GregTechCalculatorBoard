@@ -1,5 +1,6 @@
 package com.gtceu.calcboard.client.gui.widget;
 
+import com.gtceu.calcboard.GregTechCalcBoard;
 import com.gtceu.calcboard.api.storage.BoardPage;
 import com.gtceu.calcboard.api.type.FluidUnitMode;
 import com.gtceu.calcboard.api.type.RateTimeUnit;
@@ -8,6 +9,7 @@ import com.gtceu.calcboard.client.gui.action.ToolbarActionHandler;
 import com.gtceu.calcboard.client.gui.api.IBoardScreenContext;
 import com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer;
 import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
+import com.gtceu.calcboard.client.gui.util.ConfirmLinkHelper;
 import com.gtceu.calcboard.client.gui.util.FormatUtil;
 import com.gtceu.calcboard.client.team.ClientWorkspaceState;
 
@@ -17,6 +19,7 @@ import com.gtceu.calcboard.api.type.ToolbarDisplayMode;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -389,6 +392,14 @@ public class ToolbarWidget {
             if (screen.getHotkeyHudWidget() != null) {
                 screen.getHotkeyHudWidget().toggle();
             }
+        }));
+        currentDropdownItems.add(new DropdownItem("🐛 " + Component.translatable("gui.gtcalcboard.community.github_issues").getString(), null, () -> {
+            Screen parentScreen = screen instanceof Screen s ? s : null;
+            ConfirmLinkHelper.openExternalLink(parentScreen, GregTechCalcBoard.GITHUB_ISSUES_URL);
+        }));
+        currentDropdownItems.add(new DropdownItem("💬 " + Component.translatable("gui.gtcalcboard.community.discord").getString(), null, () -> {
+            Screen parentScreen = screen instanceof Screen s ? s : null;
+            ConfirmLinkHelper.openExternalLink(parentScreen, GregTechCalcBoard.DISCORD_INVITE_URL);
         }));
     }
 

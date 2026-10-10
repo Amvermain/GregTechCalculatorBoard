@@ -120,6 +120,17 @@ $$\text{Loss}_{\text{sec}} = \text{BaseLossRate} \times \left(\frac{\text{Actual
 $$T_{\text{lifespan}} = \frac{D_{\text{rotor}}}{\text{Loss}_{\text{sec}}} \quad (\text{단위: 초})$$
 $$\text{Rotor Replacement Rate (Items/hour)} = \frac{3600.0}{T_{\text{lifespan}}} \times \text{MachineCount}$$
 
+##### 4. Star Technology 부스트 플라즈마 터빈(SPT / NPT) 연속 부스팅 유체 소모율
+- **SPT (Supreme Plasma Turbine)**:
+  - 수동 부스트 (이황화텅스텐, $\text{WS}_2$): $1,000\text{ B/hr} = 277.78\text{ mB/s}$ (발전 배율 1.25x)
+  - 능동 부스트 ($\text{WS}_2$ + 초유체 헬륨-3, $\text{SS-He3}$): $\text{WS}_2$ $1,000\text{ B/hr}$, $\text{SS-He3}$ $2,500\text{ B/hr} = 694.44\text{ mB/s}$ (발전 배율 2.0x)
+  - 미부스트: 배율 0.9x 페널티
+- **NPT (Nyinsane Plasma Turbine)**:
+  - 수동 부스트 ($\text{WS}_2$): $2,500\text{ B/hr} = 694.44\text{ mB/s}$ (발전 배율 1.50x)
+  - 능동 부스트 ($\text{WS}_2$ + 보스-아인슈타인 응축 오가네손, $\text{BEC-Og}$): $\text{WS}_2$ $2,500\text{ B/hr}$, $\text{BEC-Og}$ $800\text{ B/hr} = 222.22\text{ mB/s}$ (발전 배율 3.0x)
+  - 미부스트: 배율 0.8x 페널티
+- **불변식**: 부스팅 유체는 기계 단위 시간당 연속 주입되므로 병렬 계수($P$) 및 로터 효율과 무관하게 기계 대수($N$)에만 선형 비례합니다.
+
 #### 공급 전력 기반 기계 가용 최대 병렬 ($P_{\max}$) 및 오버클록 수용 한계
 장착된 에너지 해치 티어 전압 $V_{\text{hatch}}$, 암페어 $A_{\text{hatch}}$, 단일 레시피 소비 전력 $E_{\text{recipe}}$일 때:
 $$P_{\max} = \min\left(\text{ConfiguredParallel}, \, \left\lfloor \frac{V_{\text{hatch}} \times A_{\text{hatch}}}{E_{\text{recipe}}} \right\rfloor\right)$$

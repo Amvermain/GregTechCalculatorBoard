@@ -13,6 +13,15 @@
 
 ## [Unreleased]
 
+## [2.4.2] - 2026-10-10
+
+### Added
+- Added a Community & Support button to the left activity bar and Guide menu, offering direct links to report bugs on GitHub Issues and join the Discord community.
+
+### Fixed
+- Fixed an issue where clicking the search box in the Page Browser drawer failed to gain focus or accept text input, and restored search placeholder hint text and right-click to clear.
+- Fixed an issue where Star Technology Boosted Plasma Turbines (Supreme and Nyinsane) calculated booster fluid consumption rates 1,000 times too low, and ensured booster fluid rates remain constant regardless of parallel factor or rotor efficiency.
+
 ## [2.4.1] - 2026-10-08
 
 ### Added

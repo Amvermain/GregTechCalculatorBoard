@@ -110,6 +110,32 @@ public class StarTTurbineHelper {
         return STAR_T_BOOSTER_FLUIDS.contains(in.getId());
     }
 
+    public static double getBoosterRatePerSec(RecipeNode node, ResourceLocation fluidId) {
+        if (node == null || fluidId == null || !supportsBoost(node)) {
+            return 0.0;
+        }
+        GTPlasmaTurbineModel model = GTPlasmaTurbineModel.getModel(node);
+        boolean lub = Boolean.TRUE.equals(node.getProperties().get(GTCEuProperties.LUBRICANT_BOOST));
+        boolean cool = Boolean.TRUE.equals(node.getProperties().get(GTCEuProperties.COOLANT_BOOST));
+
+        if (model == GTPlasmaTurbineModel.SPT) {
+            if (lub && TUNGSTEN_DISULFIDE.equals(fluidId)) {
+                return 1000.0 / 3.6;
+            }
+            if (lub && cool && SUPERSTATE_HELIUM_3.equals(fluidId)) {
+                return 2500.0 / 3.6;
+            }
+        } else if (model == GTPlasmaTurbineModel.NPT) {
+            if (lub && TUNGSTEN_DISULFIDE.equals(fluidId)) {
+                return 2500.0 / 3.6;
+            }
+            if (lub && cool && BEC_OG.equals(fluidId)) {
+                return 800.0 / 3.6;
+            }
+        }
+        return 0.0;
+    }
+
     public static void removeBoosterInputs(RecipeNode node) {
         if (node == null) return;
         node.getInputs().removeIf(StarTTurbineHelper::isBoosterFluid);
@@ -128,24 +154,20 @@ public class StarTTurbineHelper {
 
         if (model == GTPlasmaTurbineModel.SPT) {
             if (lub) {
-                // WS2: 1000 mB / hr
-                double perRecipeAmount = (1000.0 / 3600.0) * durationSec / parallel;
+                double perRecipeAmount = (1000.0 / 3.6) * durationSec / parallel;
                 node.getInputs().add(com.gtceu.calcboard.api.model.IngredientStack.fluid(ResourceLocation.tryParse("gtceu:tungsten_disulfide"), "Tungsten Disulfide", perRecipeAmount, 1.0));
             }
             if (lub && cool) {
-                // SS-He3: 2500 mB / hr
-                double perRecipeAmount = (2500.0 / 3600.0) * durationSec / parallel;
+                double perRecipeAmount = (2500.0 / 3.6) * durationSec / parallel;
                 node.getInputs().add(com.gtceu.calcboard.api.model.IngredientStack.fluid(ResourceLocation.tryParse("gtceu:superstate_helium_3"), "Superstate Helium 3", perRecipeAmount, 1.0));
             }
         } else if (model == GTPlasmaTurbineModel.NPT) {
             if (lub) {
-                // WS2: 2500 mB / hr
-                double perRecipeAmount = (2500.0 / 3600.0) * durationSec / parallel;
+                double perRecipeAmount = (2500.0 / 3.6) * durationSec / parallel;
                 node.getInputs().add(com.gtceu.calcboard.api.model.IngredientStack.fluid(ResourceLocation.tryParse("gtceu:tungsten_disulfide"), "Tungsten Disulfide", perRecipeAmount, 1.0));
             }
             if (lub && cool) {
-                // BEC-Og: 800 mB / hr
-                double perRecipeAmount = (800.0 / 3600.0) * durationSec / parallel;
+                double perRecipeAmount = (800.0 / 3.6) * durationSec / parallel;
                 node.getInputs().add(com.gtceu.calcboard.api.model.IngredientStack.fluid(ResourceLocation.tryParse("gtceu:bec_og"), "Oganesson Stabilized BEC", perRecipeAmount, 1.0));
             }
         }

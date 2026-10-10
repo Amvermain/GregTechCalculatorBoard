@@ -311,6 +311,9 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> implements I
         super.containerTick();
         teamSyncCoordinator.tick();
         dialogManager.tick();
+        if (pageBrowserDrawer != null) {
+            pageBrowserDrawer.tick();
+        }
         if (++nudgeScanTicks % 20 == 0) {
             com.gtceu.calcboard.client.gui.tutorial.ContextualNudgeManager.getInstance().checkTriggers(com.gtceu.calcboard.api.storage.BoardManager.getInstance().getActivePage());
         }

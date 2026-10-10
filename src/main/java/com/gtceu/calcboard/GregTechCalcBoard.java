@@ -13,6 +13,8 @@ import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 @Mod(GregTechCalcBoard.MOD_ID)
 public class GregTechCalcBoard {
     public static final String MOD_ID = "gtcalcboard";
+    public static final String GITHUB_ISSUES_URL = "https://github.com/Amvermain/GregTechCalculatorBoard/issues";
+    public static final String DISCORD_INVITE_URL = "https://discord.gg/NaJWk3UjJN";
     public static final org.slf4j.Logger LOGGER = com.mojang.logging.LogUtils.getLogger();
 
     public GregTechCalcBoard(FMLJavaModLoadingContext context) {
