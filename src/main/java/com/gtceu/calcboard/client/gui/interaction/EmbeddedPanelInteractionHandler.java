@@ -6,6 +6,8 @@ import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.client.gui.BoardScreen;
 import com.gtceu.calcboard.client.gui.dialog.RecipeSearchDialog;
+import com.gtceu.calcboard.client.gui.layout.SubCardLayoutBounds;
+import com.gtceu.calcboard.client.gui.layout.SubCardLayoutCalculator;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.sounds.SoundEvents;
@@ -70,27 +72,22 @@ public final class EmbeddedPanelInteractionHandler {
     }
 
     private static boolean handleSingleSubCardClick(BoardScreen screen, FlowGraph graph, CanvasGroupFrame frame, RecipeNode subNode, double mouseX, double mouseY) {
-        int sx = (int) subNode.getPosX();
-        int sy = (int) subNode.getPosY();
-        int sw = subNode.getCardWidth();
+        SubCardLayoutBounds bounds = SubCardLayoutCalculator.compute(frame, subNode);
+        if (!bounds.headerBounds().contains(mouseX, mouseY)) {
+            return false;
+        }
 
-        if (mouseY < sy || mouseY > sy + 18) return false;
-
-        int delX = sx + sw - 16;
-        if (mouseX >= delX && mouseX <= delX + 12) {
+        if (bounds.deleteBtnBounds().contains(mouseX, mouseY)) {
             deleteSubCard(screen, graph, frame, subNode);
             return true;
         }
 
-        int plusX = delX - 14;
-        if (mouseX >= plusX && mouseX <= plusX + 12) {
+        if (bounds.plusBtnBounds().contains(mouseX, mouseY)) {
             adjustSubNodeCount(screen, subNode, 0.1);
             return true;
         }
 
-        int dutyW = Minecraft.getInstance().font.width(String.format(java.util.Locale.ROOT, "%.2fx", subNode.getMachineCount()));
-        int minusX = plusX - dutyW - 18;
-        if (mouseX >= minusX && mouseX <= minusX + 12) {
+        if (bounds.minusBtnBounds().contains(mouseX, mouseY)) {
             adjustSubNodeCount(screen, subNode, -0.1);
             return true;
         }
@@ -134,6 +131,20 @@ public final class EmbeddedPanelInteractionHandler {
         if (canvasMouseX >= mul2X && canvasMouseX <= mul2X + 16) {
             double newCap = Math.round((oldCap * 2.0) * 100.0) / 100.0;
             scaleEmbeddedFrame(screen, graph, frame, oldCap, newCap);
+            return true;
+        }
+
+        double duty = frame.computeTotalMachineDuty(graph);
+        int req = frame.computeRequiredMachines(graph);
+        String dutyStr = String.format(java.util.Locale.ROOT, "%.1f%% (%dx)", duty * 100.0, req);
+        int dutyX = countPlusX + 54;
+        int syncBtnX = dutyX + Minecraft.getInstance().font.width(dutyStr) + 6;
+        int syncBtnW = 16;
+
+        if (canvasMouseX >= syncBtnX && canvasMouseX <= syncBtnX + syncBtnW) {
+            if (screen.getFrameInteractionHandler() != null) {
+                return screen.getFrameInteractionHandler().syncSharedPoolDemand(frame, screen);
+            }
             return true;
         }
 

@@ -121,6 +121,7 @@ public class RecipeSearchDialog implements IBoardModal {
     ) {}
 
     public static final List<PrefixGuideItem> PREFIX_ITEMS = List.of(
+            new PrefixGuideItem("m:", "gui.gtcalcboard.search.prefix.machine", "gui.gtcalcboard.search.prefix.machine.desc", 0xFF6EE7B7, 0xFF163E32),
             new PrefixGuideItem("@", "gui.gtcalcboard.search.prefix.mod", "gui.gtcalcboard.search.prefix.mod.desc", 0xFF38BDF8, 0xFF1C2C44),
             new PrefixGuideItem("#", "gui.gtcalcboard.search.prefix.tag", "gui.gtcalcboard.search.prefix.tag.desc", 0xFFFBBF24, 0xFF3D351C),
             new PrefixGuideItem("[", "gui.gtcalcboard.search.prefix.category", "gui.gtcalcboard.search.prefix.category.desc", 0xFF4ADE80, 0xFF1B3D26),
@@ -249,10 +250,10 @@ public class RecipeSearchDialog implements IBoardModal {
         this.lastObservedGlobalVersion = RecipeSearchCacheManager.getGlobalVersion();
 
         String prefill = "";
-        if (targetNode.getRecipeCategoryId() != null) {
+        if (targetNode.getMachineIcon() != null) {
+            prefill = "m:" + targetNode.getMachineIcon().getPath() + " ";
+        } else if (targetNode.getRecipeCategoryId() != null) {
             prefill = "[" + targetNode.getRecipeCategoryId().getPath() + "] ";
-        } else if (targetNode.getMachineIcon() != null) {
-            prefill = "[" + targetNode.getMachineIcon().getPath() + "] ";
         }
         if (searchBox != null) {
             searchBox.setValue(prefill);
@@ -291,13 +292,13 @@ public class RecipeSearchDialog implements IBoardModal {
 
         String prefill = "";
         FlowGraph graph = parent != null ? parent.getGraph() : null;
-        ResourceLocation catId = frame.getSharedRecipeCategoryId(graph);
-        if (catId != null) {
-            prefill = "[" + catId.getPath() + "] ";
+        ResourceLocation icon = frame.getSharedMachineIcon(graph);
+        if (icon != null) {
+            prefill = "m:" + icon.getPath() + " ";
         } else {
-            ResourceLocation icon = frame.getSharedMachineIcon(graph);
-            if (icon != null) {
-                prefill = "[" + icon.getPath() + "] ";
+            ResourceLocation catId = frame.getSharedRecipeCategoryId(graph);
+            if (catId != null) {
+                prefill = "[" + catId.getPath() + "] ";
             } else if (frame.getTitle() != null && !frame.getTitle().isEmpty()) {
                 prefill = "[" + frame.getTitle() + "] ";
             }
@@ -472,10 +473,11 @@ public class RecipeSearchDialog implements IBoardModal {
         }
 
         int itemW = sideW - 12;
-        int itemSpacing = 28;
+        int itemSpacing = Math.min(28, (dialogH - 32) / Math.max(1, PREFIX_ITEMS.size()));
+        int itemH = Math.min(24, itemSpacing - 2);
         for (int i = 0; i < PREFIX_ITEMS.size(); i++) {
             int itemY = y + 28 + i * itemSpacing;
-            if (mouseX >= sideX + 6 && mouseX <= sideX + 6 + itemW && mouseY >= itemY && mouseY <= itemY + 24) {
+            if (mouseX >= sideX + 6 && mouseX <= sideX + 6 + itemW && mouseY >= itemY && mouseY <= itemY + itemH) {
                 appendSearchPrefix(PREFIX_ITEMS.get(i).prefix());
                 return true;
             }

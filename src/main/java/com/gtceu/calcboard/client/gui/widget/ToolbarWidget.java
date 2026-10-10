@@ -9,6 +9,7 @@ import com.gtceu.calcboard.client.gui.api.IBoardScreenContext;
 import com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer;
 import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
 import com.gtceu.calcboard.client.gui.util.FormatUtil;
+import com.gtceu.calcboard.client.team.ClientWorkspaceState;
 
 import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.api.model.FlowGraph;
@@ -123,8 +124,12 @@ public class ToolbarWidget {
         return settingsBtnX + settingsBtnW + 4;
     }
 
+    private BoardPage getActivePage() {
+        return screen != null ? screen.getActiveBoardPage() : (ClientWorkspaceState.getInstance().isTeamMode() ? ClientWorkspaceState.getInstance().getTeamPageAsBoardPage(ClientWorkspaceState.getInstance().getActiveTeamPageId()) : BoardManager.getInstance().getActivePage());
+    }
+
     private int renderPageTitleButton(GuiGraphics graphics, Font font, int x, int mouseX, int mouseY) {
-        BoardPage activePage = BoardManager.getInstance().getActivePage();
+        BoardPage activePage = getActivePage();
         String title = (activePage != null && activePage.getName() != null && !activePage.getName().isEmpty())
                 ? activePage.getName() : "Untitled Page";
         String pageTxt = font.plainSubstrByWidth(title, 120) + " ▼";
@@ -351,7 +356,7 @@ public class ToolbarWidget {
         currentDropdownItems.add(new DropdownItem("🌐 " + Component.translatable("gui.gtcalcboard.web.open").getString(), null, screen::openWebDashboard));
 
         if (ModCompatHelper.isAe2Loaded()) {
-            BoardPage activePage = BoardManager.getInstance().getActivePage();
+            BoardPage activePage = getActivePage();
             String ae2Label = "⚡ " + Component.translatable("gui.gtcalcboard.ae2.btn_bind").getString();
             currentDropdownItems.add(new DropdownItem(ae2Label, null, () -> {
                 if (screen.getPatternBindingDialog() != null) {

@@ -389,8 +389,15 @@ Given target physical capacity $M_{\text{target}}$ (default $1.0$):
 $$S = \frac{M_{\text{target}}}{D_{\text{current}}}$$
 
 ##### 3. Machine Count Updates
-- **Continuous Mode (Default Click)**: Preserves decimal precision via $n_i.\text{setMachineCount}(n_i.\text{getMachineCount}() \times S)$.
-- **Integer Ceiling Mode (Alt+Click)**: Quantizes to full physical machine units via $\lceil n_i.\text{getMachineCount}() \times S \rceil$.
+- **Capacity Proportional Mode (Default Click)**: Scales machine counts so total operational duty converges to pool capacity.
+- **Precision Decimal Mode (Alt+Click)**: Preserves 4-decimal floating point precision via $n_i.\text{setMachineCount}(n_i.\text{getMachineCount}() \times S)$.
+- **Harmonized Integer Mode (Shift+Click)**: Quantizes to full physical machine units via $\lceil n_i.\text{getMachineCount}() \times S \rceil$.
+
+##### 4. Recipe Demand Synchronization (`syncSharedPoolToDemand`)
+Automatically synchronizes operating machine counts of all recipes inside a shared pool to connected external supply and demand flows in a single click (`⚡` button):
+- **Output Ports (Downstream Consumer Demand)**: Aggregates unfulfilled downstream consumer demand $\text{Demand}_{\text{rem}} = \max(0, \text{Demand} - \text{ExternalSupply})$ across output ports, calculating required machines $M_{\text{target}} = \text{Demand}_{\text{rem}} / R_{\text{out}}$ based on single-machine output rate $R_{\text{out}}$.
+- **Input Ports (Upstream Supply Flow)**: Divides incoming supply flow $\text{Supply}_{\text{in}}$ by single-machine consumption rate $R_{\text{in}}$ to determine required machines.
+- Selects the maximum required machine count across ports, applies $n_i.\text{setMachineCount}(M_{\text{target}})$, and triggers graph post-solve updates.
 
 ---
 

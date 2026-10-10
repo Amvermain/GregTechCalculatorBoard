@@ -177,7 +177,8 @@ public final class FlowSummaryAggregator {
             return edge.fixedFlowLimit();
         }
         if (consumer.isReroute()) {
-            double drain = consumer.isFixedDrain() ? consumer.getExternalDrainRate() : 0.0;
+            double drain = (consumer.isFixedDrain() ? consumer.getExternalDrainRate() : 0.0)
+                    + (consumer.getAllocatedExportRate() > 0.0 ? consumer.getAllocatedExportRate() : 0.0);
             double totalDemand = drain + FlowBalanceMatrixSolver.calculateTotalConnectedPortEffectiveDemand(graph, consumer, 0);
             double totalProducerSupply = calculateTotalSupplyToInputSlot(graph, consumer.getId(), edge.inputIndex());
             if (totalProducerSupply > 0.0001) {

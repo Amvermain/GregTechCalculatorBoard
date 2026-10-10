@@ -91,8 +91,9 @@ public final class EmiRecipeSearchIndexer {
             indexGeneratorDetails(er, inSb, outSb, inputIds, outputIds, inputNames, outputNames);
         }
 
-        if (cat != null) {
-            inSb.append(getCategoryWorkstationText(cat));
+        String wsText = (cat != null) ? getCategoryWorkstationText(cat) : "";
+        if (!wsText.isEmpty()) {
+            inSb.append(wsText);
         }
 
         ResourceLocation[] inArr = inputIds.isEmpty() ? null : inputIds.toArray(new ResourceLocation[0]);
@@ -119,7 +120,8 @@ public final class EmiRecipeSearchIndexer {
                 outArr,
                 inNamesArr,
                 outNamesArr,
-                isSupported
+                isSupported,
+                wsText.trim()
         );
     }
 

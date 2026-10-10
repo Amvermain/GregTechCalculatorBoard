@@ -317,6 +317,10 @@ public final class FlowBalanceMatrixSolver {
         return HarmonizedRatioOptimizer.autoRatioFromSharedPool(graph, poolFrame, targetMachines, mode);
     }
 
+    public static int syncSharedPoolToDemand(FlowGraph graph, CanvasGroupFrame poolFrame) {
+        return HarmonizedRatioOptimizer.syncSharedPoolToDemand(graph, poolFrame);
+    }
+
     public static FixedPointEfficiencySolver.PrecomputedDampedLoopMeta findDampedLoopMeta(FlowGraph graph, RecipeNode node, int inputIndex) {
         return FixedPointEfficiencySolver.findDampedLoopMeta(graph, node, inputIndex);
     }

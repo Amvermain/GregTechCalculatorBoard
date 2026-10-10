@@ -130,7 +130,7 @@ public class ClientAe2PatternTermHook {
         BoardScreen.openScreen(screen);
     }
 
-    private static boolean isPatternEncodingScreen(Screen screen) {
+    public static boolean isPatternEncodingScreen(Screen screen) {
         if (screen == null || patternTermScreenClass == null) return false;
         return patternTermScreenClass.isInstance(screen);
     }

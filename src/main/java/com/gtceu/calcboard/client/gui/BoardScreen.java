@@ -21,6 +21,7 @@ import com.gtceu.calcboard.client.gui.canvas.CanvasWireRenderer;
 import com.gtceu.calcboard.client.gui.dialog.*;
 import com.gtceu.calcboard.client.gui.compat.InventoryProfilesNextCompat;
 import com.gtceu.calcboard.client.gui.interaction.CanvasContextMenuManager;
+import com.gtceu.calcboard.client.gui.interaction.CanvasFrameInteractionHandler;
 import com.gtceu.calcboard.client.gui.model.PortRef;
 import com.gtceu.calcboard.client.gui.render.BoardCanvasRenderer;
 import com.gtceu.calcboard.client.gui.render.WireSpatialIndex;
@@ -562,6 +563,7 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> implements I
     public Set<String> getSelectedNodeIds() { return selectionModel.getSelectedNodeIds(); }
     public Set<String> getSelectedNoteIds() { return selectionModel.getSelectedNoteIds(); }
     public Set<String> getSelectedFrameIds() { return selectionModel.getSelectedFrameIds(); }
+    public Set<String> getEffectiveSelectedNodeIds() { return getEffectiveSelectedNodeIds(getGraph()); }
     public boolean isNodeSelected(String id) { return selectionModel.isSelected(id); }
     public boolean isNoteSelected(String id) { return selectionModel.isNoteSelected(id); }
     public boolean isFrameSelected(String id) { return selectionModel.isFrameSelected(id); }
@@ -700,6 +702,9 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> implements I
     public BoardWidgetLayerRenderer getWidgetLayerRenderer() { return widgetLayerRenderer; }
     public BoardTeamSyncCoordinator getTeamSyncCoordinator() { return teamSyncCoordinator; }
     public CanvasInteractionHandler getCanvasHandler() { return canvasHandler; }
+    public CanvasFrameInteractionHandler getFrameInteractionHandler() {
+        return canvasHandler != null ? canvasHandler.getFrameHandler() : null;
+    }
     public WorkspaceTabBarWidget getWorkspaceTabBar() { return workspaceTabBar; }
     public PageTabBarWidget getPageTabBar() { return pageTabBar; }
     public ToolbarWidget getToolbarWidget() { return toolbarWidget; }
@@ -726,11 +731,12 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> implements I
 
     public void performAutoRatio() { toolbarWidget.performAutoRatio(); }
     public void performAutoConnectForSelection() {
-        if (getSelectedNodeIds().size() >= 2) {
+        Set<String> targetNodeIds = getEffectiveSelectedNodeIds();
+        if (targetNodeIds.size() >= 2) {
             if (this.toolbarWidget != null) {
-                this.toolbarWidget.performAutoConnectForSelection(getSelectedNodeIds());
+                this.toolbarWidget.performAutoConnectForSelection(targetNodeIds);
             } else {
-                ToolbarWidget.performAutoConnectForSelection(this, getSelectedNodeIds());
+                ToolbarWidget.performAutoConnectForSelection(this, targetNodeIds);
             }
         }
     }
@@ -799,7 +805,16 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> implements I
     public void openNoteEditDialog(CanvasStickyNote note) { dialogManager.openNoteEditDialog(note); }
     public void openTargetOutputRateDialog(RecipeNode node, int outputIndex) { dialogManager.openTargetOutputRateDialog(node, outputIndex); }
     public void openPageSettingsDialog(BoardPage page) { dialogManager.openPageSettingsDialog(page); }
-    public void openPageSettingsDialog() { dialogManager.openPageSettingsDialog(com.gtceu.calcboard.api.storage.BoardManager.getInstance().getActivePage()); }
+    @Override
+    public void openPageSettingsDialog() { dialogManager.openPageSettingsDialog(getActiveBoardPage()); }
+    @Override
+    public void refreshPageSettings(String pageId) {
+        if (dialogManager != null && dialogManager.getPageSettingsDialog() != null) {
+            dialogManager.getPageSettingsDialog().refreshPageSettings(pageId);
+        }
+        rebuildWidgets();
+        markSummaryDirty();
+    }
     public PageSettingsDialog getPageSettingsDialog() { return dialogManager.getPageSettingsDialog(); }
     @Override
     public void openTutorialLauncher() { dialogManager.openTutorialLauncher(); }

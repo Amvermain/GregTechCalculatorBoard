@@ -4,7 +4,7 @@
 
 본 디렉터리는 **GregTech Calculator Board (GTCalcBoard)** 프로젝트의 핵심 기술적 의사결정 맥락(Context), 채택 이유(Why), 시스템 구조(Architecture), 그리고 결과 및 파급 효과(Consequences)를 영구히 기록하고 보존하는 **공식 아키텍처 결정 기록(ADR) 레지스트리**입니다.
 
-모든 핵심 아키텍처 결정은 구현 완료 후 공식 시스템 사양서([`docs/ko_kr/spec/`](../ko_kr/spec/))로 체계화되어 반영되며, 본 문서는 64개 ADR 전체의 생명주기 및 공식 사양서 연계 맵을 제공합니다.
+모든 핵심 아키텍처 결정은 구현 완료 후 공식 시스템 사양서([`docs/ko_kr/spec/`](../ko_kr/spec/))로 체계화되어 반영되며, 본 문서는 65개 ADR 전체의 생명주기 및 공식 사양서 연계 맵을 제공합니다.
 
 ---
 
@@ -22,11 +22,11 @@ stateDiagram-v2
 
 | 상태 (Status) | 건수 | 설명 |
 | :--- | :---: | :--- |
-| 🟢 **`Active`** | **27건** | 현재 시스템의 구조, 인터페이스 및 동작을 직접 규정하는 활성 아키텍처 결정 |
+| 🟢 **`Active`** | **28건** | 현재 시스템의 구조, 인터페이스 및 동작을 직접 규정하는 활성 아키텍처 결정 |
 | 🔄 **`Superseded`** | **5건** | 후속 ADR에 의해 설계, 모델 또는 알고리즘이 대체된 결정 |
 | 📦 **`Retired / Consolidated`** | **31건** | 구현 완료 후 공식 시스템 사양서([`docs/ko_kr/spec/`](../ko_kr/spec/))에 완전히 통합·체계화된 결정 |
 | ❌ **`Rejected`** | **1건** | 기술 검토 단계에서 기각되어 결번으로 영구 보존된 제안 (`RFC-046`) |
-| **합계** | **64건** | 전체 등록 아키텍처 결정 및 결번 레코드 총합 |
+| **합계** | **65건** | 전체 등록 아키텍처 결정 및 결번 레코드 총합 |
 
 ---
 
@@ -99,11 +99,12 @@ flowchart TD
     ADR042 --> ADR060["ADR-060<br/>공유 기계 풀 임베디드 레시피 패널 리워크"]
     ADR003["ADR-003<br/>512KB C2S/S2C 분할 스트리밍"] --> ADR051["ADR-051<br/>api.team 모델 분리 & 계층 역전 해소"]
     ADR003 --> ADR052["ADR-052<br/>128청크/64MB DoS 방어 가드"]
+    ADR003 --> ADR066["ADR-066<br/>페이지 설정 네트워크 보안 & 팀 격리"]
 ```
 
 ---
 
-## 🟢 활성 아키텍처 결정 레지스트리 (Active ADRs - 27건)
+## 🟢 활성 아키텍처 결정 레지스트리 (Active ADRs - 28건)
 
 현재 시스템의 핵심 불변식, 데이터 구조, 연산 알고리즘 및 인터랙션을 직접 규정하는 활성 결정 목록입니다.
 
@@ -136,6 +137,7 @@ flowchart TD
 | **[ADR-062](ADR_062_HEADLESS_CANVAS_INTERACTION_TEST_HARNESS_AND_FUZZER.md)** | 헤드리스 캔버스 인터랙션 및 노드 하드웨어 전이 가역성 테스트 하네스·퍼징 시스템 명세 | `v2.4.1` | Client GUI & Core Domain (`client.gui.interaction`, `api.model`) | [03. UI & 렌더링](../ko_kr/spec/03_UI_AND_RENDERING_PIPELINE.md) | 헤드리스 이벤트 시뮬레이션 하네스(`CanvasTestHarness`), 하드웨어 전이 가역성 검증기(`NodeHardwareSnapshot`), UI 및 하드웨어 2대 퍼징 엔진 |
 | **[ADR-063](ADR_063_SELECTION_CONTEXTUAL_AUTO_CONNECT.md)** | 선택 노드 한정 컨텍스트 자동 연결 명세 | `v2.4.0` | Client GUI & Action (`client.gui`, `client.gui.action`) | [03. UI & 렌더링](../ko_kr/spec/03_UI_AND_RENDERING_PIPELINE.md) | 다중 선택 노드 간 국소 자동 배선, 플로팅 바 Connect 버튼, Shift+C 스마트 분기 및 단일 복합 명령 Undo 롤백 |
 | **[ADR-064](ADR_064_CROSS_PAGE_JUNCTION_FLOW_ALLOCATION.md)** | 페이지 간 정션 유량 분배 및 가상 연동 시스템 명세 | `v2.4.1` | Domain, Solver & GUI (`api.model`, `api.solver`, `client.gui`) | [02. 수학 & 알고리즘](../ko_kr/spec/02_MATH_AND_ALGORITHMS.md) | 정션 1:N 유량 분할 엔진(`FlowEdgeAllocator`) 기반 페이지 간 자원 연동, 우선순위 티어링, 의존성 DAG 위상 정렬 및 순환 참조 방어 |
+| **[ADR-066](ADR_066_PAGE_SETTINGS_NETWORK_SECURITY_AND_TEAM_ISOLATION.md)** | 페이지 설정 네트워크 보안 검증 및 팀 워크스페이스 격리 명세 | `v2.4.1` | Network & Storage (`network.packet.c2s`, `server.storage`) | [04. 멀티플레이어](../ko_kr/spec/04_MULTIPLAYER_AND_NETWORK_PROTOCOL.md) | UpdatePageSettingsPacket 송신자 팀 권한·락 소유권 검증, TeamBoardSavedData 격리 영속화 및 동일 팀 한정 타겟 브로드캐스트 라우팅 |
 
 ---
 
@@ -205,8 +207,7 @@ flowchart TD
 
 ## 💡 활성 RFC 제안 목록 (Active RFC Proposals in `docs/rfc/`)
 
-*현재 검토 대기 중인 활성 RFC 제안이 없습니다. (모든 제안이 ADR로 승격 또는 채택 완료됨)*
+현재 검토 및 설계 승인 대기 중인 공식 기능 제안(RFC) 목록입니다. 구현 및 검증 완료 후 ADR로 승격됩니다.
 
-
-
+*(현재 검토 대기 중인 활성 RFC 제안이 없습니다.)*
 

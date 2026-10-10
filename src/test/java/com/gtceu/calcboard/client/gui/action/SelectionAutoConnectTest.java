@@ -273,4 +273,113 @@ public class SelectionAutoConnectTest {
         };
         Assertions.assertDoesNotThrow(() -> ToolbarActionHandler.performAutoConnectForSelection(nullGraphScreen, Set.of("n1", "n2")));
     }
+
+    @Test
+    public void testSharedMachinePoolEmbeddedNodesAutoConnectWithExternalNode() {
+        BoardScreen screen = new BoardScreen();
+        FlowGraph graph = screen.getGraph();
+        ResourceLocation ironId = ResourceLocation.tryParse("minecraft:iron_ingot");
+
+        RecipeNode externalProducer = new RecipeNode("ext_p", "Iron Producer", 100, 100, GTVoltageTier.LV);
+        externalProducer.getOutputs().add(IngredientStack.item(ironId, "Iron Ingot", 1.0));
+        graph.addNode(externalProducer);
+
+        com.gtceu.calcboard.api.model.CanvasGroupFrame poolFrame = new com.gtceu.calcboard.api.model.CanvasGroupFrame(
+                "pool_1", "Shared Pool", 0, 0, 300, 200, 0xFF3B82F6
+        );
+        poolFrame.setSharedMachineFrame(true);
+        poolFrame.setViewMode(com.gtceu.calcboard.api.model.PoolViewMode.EMBEDDED_PANEL);
+
+        RecipeNode embeddedConsumer = new RecipeNode("embed_c", "Iron Consumer", 10, 10, GTVoltageTier.LV);
+        embeddedConsumer.getInputs().add(IngredientStack.item(ironId, "Iron Ingot", 1.0));
+        graph.addNode(embeddedConsumer);
+
+        poolFrame.addNode("embed_c");
+        graph.addFrame(poolFrame);
+
+        screen.getSelectedNodeIds().add("ext_p");
+        screen.getSelectedFrameIds().add("pool_1");
+
+        Assertions.assertEquals(Set.of("ext_p", "embed_c"), screen.getEffectiveSelectedNodeIds());
+
+        screen.performAutoConnectForSelection();
+
+        Assertions.assertEquals(1, graph.getConnections().size());
+        FlowGraph.ConnectionEdge edge = graph.getConnections().get(0);
+        Assertions.assertEquals("ext_p", edge.fromNodeId());
+        Assertions.assertEquals("embed_c", edge.toNodeId());
+
+        screen.undo();
+        Assertions.assertEquals(0, graph.getConnections().size());
+
+        screen.redo();
+        Assertions.assertEquals(1, graph.getConnections().size());
+    }
+
+    @Test
+    public void testSharedMachinePoolInternalAutoConnectWhenOnlyFrameSelected() {
+        BoardScreen screen = new BoardScreen();
+        FlowGraph graph = screen.getGraph();
+        ResourceLocation copperId = ResourceLocation.tryParse("gtceu:copper_ingot");
+
+        com.gtceu.calcboard.api.model.CanvasGroupFrame poolFrame = new com.gtceu.calcboard.api.model.CanvasGroupFrame(
+                "pool_1", "Shared Pool", 0, 0, 300, 200, 0xFF3B82F6
+        );
+        poolFrame.setSharedMachineFrame(true);
+        poolFrame.setViewMode(com.gtceu.calcboard.api.model.PoolViewMode.EMBEDDED_PANEL);
+
+        RecipeNode embeddedProducer = new RecipeNode("embed_p", "Copper Producer", 10, 10, GTVoltageTier.LV);
+        embeddedProducer.getOutputs().add(IngredientStack.item(copperId, "Copper Ingot", 1.0));
+        graph.addNode(embeddedProducer);
+
+        RecipeNode embeddedConsumer = new RecipeNode("embed_c", "Copper Consumer", 20, 20, GTVoltageTier.LV);
+        embeddedConsumer.getInputs().add(IngredientStack.item(copperId, "Copper Ingot", 1.0));
+        graph.addNode(embeddedConsumer);
+
+        poolFrame.addNode("embed_p");
+        poolFrame.addNode("embed_c");
+        graph.addFrame(poolFrame);
+
+        screen.getSelectedFrameIds().add("pool_1");
+
+        Assertions.assertEquals(Set.of("embed_p", "embed_c"), screen.getEffectiveSelectedNodeIds());
+
+        screen.performAutoConnectForSelection();
+
+        Assertions.assertEquals(1, graph.getConnections().size());
+        FlowGraph.ConnectionEdge edge = graph.getConnections().get(0);
+        Assertions.assertEquals("embed_p", edge.fromNodeId());
+        Assertions.assertEquals("embed_c", edge.toNodeId());
+
+        screen.undo();
+        Assertions.assertEquals(0, graph.getConnections().size());
+
+        screen.redo();
+        Assertions.assertEquals(1, graph.getConnections().size());
+    }
+
+    @Test
+    public void testSharedMachinePoolWithEmptyContainedNodesDoesNotConnect() {
+        BoardScreen screen = new BoardScreen();
+        FlowGraph graph = screen.getGraph();
+        ResourceLocation ironId = ResourceLocation.tryParse("minecraft:iron_ingot");
+
+        RecipeNode singleNode = new RecipeNode("single_p", "Iron Producer", 100, 100, GTVoltageTier.LV);
+        singleNode.getOutputs().add(IngredientStack.item(ironId, "Iron Ingot", 1.0));
+        graph.addNode(singleNode);
+
+        com.gtceu.calcboard.api.model.CanvasGroupFrame emptyFrame = new com.gtceu.calcboard.api.model.CanvasGroupFrame(
+                "empty_frame", "Empty Pool", 0, 0, 300, 200, 0xFF3B82F6
+        );
+        graph.addFrame(emptyFrame);
+
+        screen.getSelectedNodeIds().add("single_p");
+        screen.getSelectedFrameIds().add("empty_frame");
+
+        Assertions.assertEquals(Set.of("single_p"), screen.getEffectiveSelectedNodeIds());
+
+        screen.performAutoConnectForSelection();
+
+        Assertions.assertEquals(0, graph.getConnections().size());
+    }
 }

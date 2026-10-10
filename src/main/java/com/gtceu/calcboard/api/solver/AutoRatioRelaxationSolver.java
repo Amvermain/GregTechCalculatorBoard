@@ -187,6 +187,17 @@ public final class AutoRatioRelaxationSolver {
     }
 
     public static void normalizeNodeCounts(FlowGraph graph, RecipeNode anchor, double targetAnchorCount, boolean integerCounts) {
+        normalizeNodeCounts(graph, anchor, targetAnchorCount, null, null, integerCounts);
+    }
+
+    public static void normalizeNodeCounts(
+            FlowGraph graph,
+            RecipeNode anchor,
+            double targetAnchorCount,
+            Set<String> downstreamNodes,
+            Set<String> cyclicNodes,
+            boolean integerCounts
+    ) {
         for (RecipeNode n : graph.getNodes()) {
             if (n.getId().equals(anchor.getId())) {
                 n.setMachineCount(targetAnchorCount);
@@ -196,7 +207,15 @@ public final class AutoRatioRelaxationSolver {
                 n.setMachineCount(1.0);
                 continue;
             }
-            n.setMachineCount(AutoRatioEngine.quantizeMachineCount(graph, n, n.getMachineCount(), FlowBalanceMatrixSolver.CountRoundingMode.CEIL, integerCounts));
+            boolean isPureDownstream = downstreamNodes != null
+                    && downstreamNodes.contains(n.getId())
+                    && (cyclicNodes == null || !cyclicNodes.contains(n.getId()));
+
+            FlowBalanceMatrixSolver.CountRoundingMode mode = isPureDownstream
+                    ? FlowBalanceMatrixSolver.CountRoundingMode.FLOOR
+                    : FlowBalanceMatrixSolver.CountRoundingMode.CEIL;
+
+            n.setMachineCount(AutoRatioEngine.quantizeMachineCount(graph, n, n.getMachineCount(), mode, integerCounts));
         }
         anchor.setMachineCount(targetAnchorCount);
     }

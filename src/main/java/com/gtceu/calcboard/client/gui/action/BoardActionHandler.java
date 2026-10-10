@@ -251,7 +251,14 @@ public class BoardActionHandler {
         if (nodeIds.isEmpty()) {
             nodeIds = findHoveredNodeIdList(lastMouseX, lastMouseY);
         }
-        if (nodeIds.isEmpty()) return;
+        if (nodeIds.isEmpty()) {
+            CanvasGroupFrame hoveredFrame = findHoveredSharedFrame(lastMouseX, lastMouseY);
+            if (hoveredFrame != null && screen.getFrameInteractionHandler() != null) {
+                screen.getFrameInteractionHandler().flipFrame(hoveredFrame, screen);
+                return;
+            }
+            return;
+        }
 
         Map<String, Boolean> prevStates = new HashMap<>();
         Map<String, Boolean> newStates = new HashMap<>();
@@ -285,6 +292,20 @@ public class BoardActionHandler {
             }
         }
         return Collections.emptyList();
+    }
+
+    private CanvasGroupFrame findHoveredSharedFrame(double mouseX, double mouseY) {
+        if (screen.getGraph() == null) return null;
+        double canvasX = screen.toCanvasX(mouseX);
+        double canvasY = screen.toCanvasY(mouseY);
+        List<CanvasGroupFrame> frames = screen.getGraph().getFrames();
+        for (int i = frames.size() - 1; i >= 0; i--) {
+            CanvasGroupFrame frame = frames.get(i);
+            if (frame != null && frame.isSharedMachineFrame() && frame.isPointInside(canvasX, canvasY)) {
+                return frame;
+            }
+        }
+        return null;
     }
 
     private void invalidateFlippedWidgets(Set<String> affectedIds) {

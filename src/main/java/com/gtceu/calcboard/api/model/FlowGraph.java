@@ -660,6 +660,10 @@ public class FlowGraph {
         return FlowGraphSolver.autoRatioFromSharedPool(this, poolFrame, targetMachines, mode);
     }
 
+    public int syncSharedPoolToDemand(CanvasGroupFrame poolFrame) {
+        return FlowGraphSolver.syncSharedPoolToDemand(this, poolFrame);
+    }
+
     public int autoRatioFromGroupFrame(CanvasGroupFrame frame, com.gtceu.calcboard.api.solver.AutoRatioMode mode) {
         return FlowGraphSolver.autoRatioFromGroupFrame(this, frame, mode);
     }

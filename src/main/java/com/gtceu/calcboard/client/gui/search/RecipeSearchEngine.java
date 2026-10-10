@@ -19,7 +19,8 @@ import java.util.regex.Pattern;
  * - NOT ('!'): 'pyrolyse !charcoal'
  * - Mod ID prefix ('@'): '@gtceu', '@thermal'
  * - Tag prefix ('#'): '#logs', '#forge:dusts'
- * - Category / Machine prefix ('[' or '%'): '[pyrolyse_oven]'
+ * - Category prefix ('[' or '%'): '[pyrolyse_oven]'
+ * - Machine / Workstation prefix ('m:', 'ws:', 'machine:', 'workstation:'): 'm:large_macerator', 'ws:macerator'
  * - Input prefix ('in:', 'input:', '>'): 'in:iron', 'input:steam', '>polyethylene'
  * - Output prefix ('out:', 'output:', '<', '^'): 'out:steel', 'output:oxygen', '<phenol'
  * - Quoted phrases ("..."): '"heavy fuel"', 'in:"heavy fuel"'
@@ -72,7 +73,8 @@ public class RecipeSearchEngine {
         GENERAL,
         MOD_ID,      // @mod
         TAG,         // #tag
-        CATEGORY     // [category] or %category
+        CATEGORY,    // [category] or %category
+        MACHINE      // m:machine, ws:machine, machine:machine, workstation:machine
     }
 
     public record QueryTerm(String text, MatchType type, Scope scope, boolean negated) {
@@ -85,7 +87,7 @@ public class RecipeSearchEngine {
 
     public record ParsedQuery(List<AndGroup> orGroups, boolean isEmpty) {}
 
-    private static final Pattern TOKEN_PATTERN = Pattern.compile("(!?(?:in:|input:|out:|output:|>|<|\\^))?\"([^\"]*)\"|\\[([^\\]]*)\\]|(\\S+)");
+    private static final Pattern TOKEN_PATTERN = Pattern.compile("(!?(?:in:|input:|out:|output:|>|<|\\^|m:|ws:|machine:|workstation:))?\"([^\"]*)\"|\\[([^\\]]*)\\]|(\\S+)");
 
     public static SearchableRecipe buildIndex(Object recipe) {
         if (recipe == null) return null;
@@ -204,23 +206,26 @@ public class RecipeSearchEngine {
         return score;
     }
 
-    private record ParsedPrefix(Scope scope, boolean negated) {}
+    private record ParsedPrefix(Scope scope, MatchType type, boolean negated) {}
 
     private static ParsedPrefix parsePrefix(String prefix) {
         if (prefix == null || prefix.isEmpty()) {
-            return new ParsedPrefix(Scope.ALL, false);
+            return new ParsedPrefix(Scope.ALL, MatchType.GENERAL, false);
         }
         String p = prefix.toLowerCase(Locale.ROOT);
         boolean neg = p.startsWith("!");
         if (neg) p = p.substring(1);
 
         if (p.equals("in:") || p.equals("input:") || p.equals(">")) {
-            return new ParsedPrefix(Scope.INPUT, neg);
+            return new ParsedPrefix(Scope.INPUT, MatchType.GENERAL, neg);
         }
         if (p.equals("out:") || p.equals("output:") || p.equals("<") || p.equals("^")) {
-            return new ParsedPrefix(Scope.OUTPUT, neg);
+            return new ParsedPrefix(Scope.OUTPUT, MatchType.GENERAL, neg);
         }
-        return new ParsedPrefix(Scope.ALL, neg);
+        if (p.equals("m:") || p.equals("ws:") || p.equals("machine:") || p.equals("workstation:")) {
+            return new ParsedPrefix(Scope.ALL, MatchType.MACHINE, neg);
+        }
+        return new ParsedPrefix(Scope.ALL, MatchType.GENERAL, neg);
     }
 
     public record StackSearchData(String name, String searchText) {}
@@ -276,8 +281,8 @@ public class RecipeSearchEngine {
 
                 if (quoted != null) {
                     token = quoted.trim();
-                    type = MatchType.GENERAL;
                     ParsedPrefix pp = parsePrefix(prefix);
+                    type = pp.type();
                     scope = pp.scope();
                     negated = pp.negated();
                 } else if (bracketed != null) {
@@ -290,7 +295,9 @@ public class RecipeSearchEngine {
                             || token.equals("!") || token.equals("@") || token.equals("#") || token.equals("%")
                             || token.equals("[") || token.equals("]") || token.equalsIgnoreCase("in:")
                             || token.equalsIgnoreCase("input:") || token.equalsIgnoreCase("out:")
-                            || token.equalsIgnoreCase("output:") || token.equals(">") || token.equals("<") || token.equals("^")) {
+                            || token.equalsIgnoreCase("output:") || token.equals(">") || token.equals("<") || token.equals("^")
+                            || token.equalsIgnoreCase("m:") || token.equalsIgnoreCase("ws:")
+                            || token.equalsIgnoreCase("machine:") || token.equalsIgnoreCase("workstation:")) {
                         continue;
                     }
 
@@ -321,7 +328,6 @@ public class RecipeSearchEngine {
                         token = token.substring(1);
                     }
 
-                    // Check Type prefixes (@, #, [, %)
                     if (token.startsWith("@") && token.length() > 1) {
                         type = MatchType.MOD_ID;
                         token = token.substring(1);
@@ -334,6 +340,18 @@ public class RecipeSearchEngine {
                     } else if (token.startsWith("%") && token.length() > 1) {
                         type = MatchType.CATEGORY;
                         token = token.substring(1);
+                    } else if (lower.startsWith("m:") && token.length() > 2) {
+                        type = MatchType.MACHINE;
+                        token = token.substring(2);
+                    } else if (lower.startsWith("ws:") && token.length() > 3) {
+                        type = MatchType.MACHINE;
+                        token = token.substring(3);
+                    } else if (lower.startsWith("machine:") && token.length() > 8) {
+                        type = MatchType.MACHINE;
+                        token = token.substring(8);
+                    } else if (lower.startsWith("workstation:") && token.length() > 12) {
+                        type = MatchType.MACHINE;
+                        token = token.substring(12);
                     }
 
                     if (token.endsWith("]")) {
@@ -408,7 +426,7 @@ public class RecipeSearchEngine {
         return switch (type) {
             case MOD_ID -> recipe.inputSearchIndex().startsWith(text + ":") || recipe.inputSearchIndex().contains(" " + text + ":") || recipe.inputSearchIndex().contains(text);
             case TAG -> recipe.inputSearchIndex().contains(text) || recipe.inputSearchIndex().contains(textUnder);
-            case CATEGORY -> false;
+            case CATEGORY, MACHINE -> false;
             case GENERAL -> recipe.inputSearchIndex().contains(text)
                     || (!textSpaced.isEmpty() && recipe.inputSearchIndex().contains(textSpaced))
                     || (!textUnder.isEmpty() && recipe.inputSearchIndex().contains(textUnder))
@@ -420,7 +438,7 @@ public class RecipeSearchEngine {
         return switch (type) {
             case MOD_ID -> recipe.outputSearchIndex().startsWith(text + ":") || recipe.outputSearchIndex().contains(" " + text + ":") || recipe.outputSearchIndex().contains(text);
             case TAG -> recipe.outputSearchIndex().contains(text) || recipe.outputSearchIndex().contains(textUnder);
-            case CATEGORY -> false;
+            case CATEGORY, MACHINE -> false;
             case GENERAL -> recipe.outputSearchIndex().contains(text)
                     || recipe.displayName().toLowerCase(Locale.ROOT).contains(text)
                     || (!textSpaced.isEmpty() && (recipe.outputSearchIndex().contains(textSpaced) || recipe.displayName().toLowerCase(Locale.ROOT).contains(textSpaced)))
@@ -437,6 +455,7 @@ public class RecipeSearchEngine {
                     || recipe.categoryId().contains(textUnder)
                     || recipe.categoryName().contains(text)
                     || recipe.categoryName().contains(textSpaced);
+            case MACHINE -> matchesWorkstation(recipe, text, textSpaced, textUnder, textClean);
             case GENERAL -> {
                 String dNameLower = recipe.displayName().toLowerCase(Locale.ROOT);
                 yield dNameLower.contains(text)
@@ -450,6 +469,42 @@ public class RecipeSearchEngine {
                         || (!textClean.isEmpty() && (dNameLower.contains(textClean) || recipe.outputSearchIndex().contains(textClean) || recipe.inputSearchIndex().contains(textClean) || recipe.categoryName().contains(textClean)));
             }
         };
+    }
+
+    private static boolean matchesWorkstation(SearchableRecipe recipe, String text, String textSpaced, String textUnder, String textClean) {
+        String ws = recipe.workstationSearchIndex();
+        if (!ws.isEmpty()) {
+            return matchesWorkstationText(ws, text, textSpaced, textUnder, textClean);
+        }
+        ResourceLocation catId = ResourceLocation.tryParse(recipe.modId() + ":" + recipe.categoryId());
+        if (catId == null) return false;
+        return matchesCapabilityWorkstations(catId, text, textSpaced, textUnder);
+    }
+
+    private static boolean matchesWorkstationText(String ws, String text, String textSpaced, String textUnder, String textClean) {
+        return ws.contains(text)
+                || (!textSpaced.isEmpty() && ws.contains(textSpaced))
+                || (!textUnder.isEmpty() && ws.contains(textUnder))
+                || (!textClean.isEmpty() && ws.contains(textClean));
+    }
+
+    private static boolean matchesCapabilityWorkstations(ResourceLocation catId, String text, String textSpaced, String textUnder) {
+        var cap = com.gtceu.calcboard.api.catalog.CategoryCapabilityMatrix.getInstance().getCapability(catId);
+        if (cap == null) return false;
+        for (ResourceLocation wsId : cap.availableWorkstations()) {
+            if (wsId != null && matchesWorkstationId(wsId, text, textSpaced, textUnder)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean matchesWorkstationId(ResourceLocation wsId, String text, String textSpaced, String textUnder) {
+        String p = wsId.getPath().toLowerCase(Locale.ROOT);
+        return p.contains(text)
+                || (!textSpaced.isEmpty() && p.contains(textSpaced))
+                || (!textUnder.isEmpty() && p.contains(textUnder))
+                || wsId.toString().toLowerCase(Locale.ROOT).contains(text);
     }
 
     /**
@@ -511,7 +566,7 @@ public class RecipeSearchEngine {
 
     private static MatchedOutputResult findMatchedOutputForTerm(SearchableRecipe recipe, QueryTerm term) {
         if (term.negated()) return null;
-        if (term.scope() == Scope.INPUT || term.type() == MatchType.CATEGORY) return null;
+        if (term.scope() == Scope.INPUT || term.type() == MatchType.CATEGORY || term.type() == MatchType.MACHINE) return null;
 
         String t = term.text().toLowerCase(Locale.ROOT).trim();
         if (t.isEmpty()) return null;
@@ -758,6 +813,9 @@ public class RecipeSearchEngine {
         if (term.type() == MatchType.CATEGORY) {
             return scoreCategoryTerm(t, tUnder, cat, catId);
         }
+        if (term.type() == MatchType.MACHINE) {
+            return scoreMachineTerm(recipe, t, tUnder);
+        }
         if (term.type() == MatchType.MOD_ID) {
             return scoreModIdTerm(term, recipe, t);
         }
@@ -765,6 +823,12 @@ public class RecipeSearchEngine {
             return scoreTagTerm(recipe, t, tUnder);
         }
         return scoreGeneralTerm(term, recipe, t, tUnder, cat, catId, dn);
+    }
+
+    private static int scoreMachineTerm(SearchableRecipe recipe, String t, String tUnder) {
+        String ws = recipe.workstationSearchIndex();
+        if (ws.contains(t) || ws.contains(tUnder)) return 15000;
+        return 0;
     }
 
     private static int scoreCategoryTerm(String t, String tUnder, String cat, String catId) {

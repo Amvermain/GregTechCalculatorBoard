@@ -1,6 +1,7 @@
 package com.gtceu.calcboard.client.gui;
 
 import com.gtceu.calcboard.api.model.FlowGraph;
+import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.api.storage.BoardPage;
@@ -190,5 +191,69 @@ public class BoardHotkeyHandlerTest {
         Assertions.assertTrue(handled);
 
         Assertions.assertFalse(TutorialManager.getInstance().isActive());
+    }
+
+    @Test
+    public void testSummaryOverlayRecipeAndUsesHotkeys() {
+        BoardScreen screen = new BoardScreen();
+        com.gtceu.calcboard.client.gui.widget.SummaryOverlay overlay = screen.getSummaryOverlay();
+        overlay.setCollapsed(false);
+
+        IngredientStack gravel = IngredientStack.item(net.minecraft.resources.ResourceLocation.tryParse("minecraft:gravel"), "Gravel", 1.0);
+        overlay.setHoveredStack(gravel);
+
+        java.util.concurrent.atomic.AtomicReference<IngredientStack> recipeRequested = new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.concurrent.atomic.AtomicReference<IngredientStack> usesRequested = new java.util.concurrent.atomic.AtomicReference<>();
+
+        com.gtceu.calcboard.integration.spi.IRecipeViewerAdapter mockAdapter = new com.gtceu.calcboard.integration.vanilla.VanillaRecipeViewerAdapter() {
+            @Override
+            public String getViewerId() {
+                return "mock_summary_viewer";
+            }
+
+            @Override
+            public int getPriority() {
+                return 10000;
+            }
+
+            @Override
+            public boolean displayRecipes(IngredientStack ingredient) {
+                recipeRequested.set(ingredient);
+                return true;
+            }
+
+            @Override
+            public boolean displayUses(IngredientStack ingredient) {
+                usesRequested.set(ingredient);
+                return true;
+            }
+        };
+
+        try {
+            com.gtceu.calcboard.integration.spi.RecipeViewerRegistry.register(mockAdapter);
+
+            boolean handledR = BoardHotkeyHandler.handleKeyPressed(screen, GLFW.GLFW_KEY_R, 0, 0, 0, 0);
+            Assertions.assertTrue(handledR);
+            Assertions.assertEquals(gravel, recipeRequested.get());
+
+            boolean handledU = BoardHotkeyHandler.handleKeyPressed(screen, GLFW.GLFW_KEY_U, 0, 0, 0, 0);
+            Assertions.assertTrue(handledU);
+            Assertions.assertEquals(gravel, usesRequested.get());
+
+            overlay.setCollapsed(true);
+            recipeRequested.set(null);
+            boolean handledCollapsed = BoardHotkeyHandler.handleKeyPressed(screen, GLFW.GLFW_KEY_R, 0, 0, 0, 0);
+            Assertions.assertFalse(handledCollapsed);
+            Assertions.assertNull(recipeRequested.get());
+
+            overlay.setCollapsed(false);
+            overlay.setHoveredStack(null);
+            boolean handledNullHover = BoardHotkeyHandler.handleKeyPressed(screen, GLFW.GLFW_KEY_R, 0, 0, 0, 0);
+            Assertions.assertFalse(handledNullHover);
+            Assertions.assertNull(recipeRequested.get());
+        } finally {
+            com.gtceu.calcboard.integration.spi.RecipeViewerRegistry.unregister("mock_summary_viewer");
+            com.gtceu.calcboard.integration.spi.RecipeViewerRegistry.reset();
+        }
     }
 }

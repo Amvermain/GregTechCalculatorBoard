@@ -13,6 +13,26 @@
 
 ## [Unreleased]
 
+## [2.4.1] - 2026-10-08
+
+### Added
+- Added an 'Export to AE2' button to the Multiblock Bill of Materials (BOM) dialog when opened directly from an AE2 Pattern Encoding Terminal, transferring required construction materials directly into processing pattern slots.
+- Added a 'Sync Recipe Demand' button to Shared Machine Pools, allowing players to automatically match each internal recipe's operating count to connected external demand in a single click.
+- Added a machine/workstation search prefix (`m:`, `ws:`) to the recipe search dialog, allowing players to find all recipes compatible with a specific machine across different categories (such as Macerator, Ore Grinding, and Part Grinding).
+
+### Fixed
+- Fixed an issue where pressing the 'R' (Recipes) and 'U' (Uses) hotkeys while hovering over ingredients in the Process Summary panel did not open recipe lookups.
+- Fixed an issue where the multi-selection Auto-Connect action (floating toolbar button, 'Shift+C' hotkey, and right-click menu) was unavailable or did not connect when selecting Shared Machine Pools alongside other nodes.
+- Fixed an issue where clicking the search bar in the Switch Machine dialog did not focus or receive text input, and added a search placeholder hint.
+- Fixed an issue where switching recipes on a machine node (such as a Macerator) restricted search results to only the current recipe's category, preventing recipes in other categories for the same machine from appearing.
+- Fixed an issue where standard Auto-Ratio caused downstream machine counts to artificially explode when an upstream machine had low utilization, by calculating continuous material flow before quantizing into integers.
+- Fixed an issue where hovering over input and output slots in the Shared Machine Pool recipe list displayed rates in per-second (/s) format instead of matching the board's active time unit (/min, /t, etc.).
+- Fixed an issue where the horizontal flip direction (input/output reversal) feature was unavailable on Shared Machine Pools, adding full support for flipping via the header button, the 'F' hotkey, and the context menu across all pool view modes.
+- Fixed an issue where Shared Machine Pools failed to display missing energy hatch and tier deficit warning badges when multiblock machines were inactive.
+- Fixed an issue in Shared Machine Pools where clicking the bottom border or empty space of a recipe card mistakenly triggered the first output item port.
+- Fixed an issue in multiplayer team workspaces where modifying page voltage tier or auto-hatch settings could fail to synchronize or be overwritten across different teams.
+- Fixed an issue where multiblock machines with higher-amperage energy hatches (such as 2A) incorrectly accessed full amperage for parallel and overclocking calculations instead of adhering to the 1A tier limit, resulting in inflated overclocking and output rates.
+
 ## [2.4.0] - 2026-10-05
 
 ### Fixed

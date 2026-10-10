@@ -118,14 +118,14 @@ public final class AutoRatioEngine {
                 upstreamNodes,
                 downstreamNodes,
                 cyclicNodes,
-                integerCounts,
+                false,
                 divergenceContext
         );
 
-        resolveBottlenecksPass(graph, anchor, upstreamNodes, downstreamNodes, integerCounts, divergenceContext);
+        resolveBottlenecksPass(graph, anchor, upstreamNodes, downstreamNodes, false, divergenceContext);
         ProcessStabilityAnalyzer.detectConflictingAnchors(graph, initialBaseNodeCounts, divergenceContext);
         anchor.setMachineCount(targetAnchorCount);
-        AutoRatioRelaxationSolver.normalizeNodeCounts(graph, anchor, targetAnchorCount, integerCounts);
+        AutoRatioRelaxationSolver.normalizeNodeCounts(graph, anchor, targetAnchorCount, downstreamNodes, cyclicNodes, integerCounts);
 
         ProcessStabilityAnalyzer.reconcileLoopDivergences(graph, anchor, divergenceContext, integerCounts);
         optimizeDampedLoopsToSteadyState(graph, integerCounts);

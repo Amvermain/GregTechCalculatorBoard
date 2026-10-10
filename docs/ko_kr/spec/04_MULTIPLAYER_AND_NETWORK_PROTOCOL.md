@@ -55,6 +55,7 @@ sequenceDiagram
 * **`TeamWorkspacePage` (`com.gtceu.calcboard.api.team`)**:
   - 팀 워크스페이스 내 개별 페이지 메타데이터(페이지 ID, 제목, 수정자, Revision, 생성/수정 타임스탬프, 폴더 경로)를 캡슐화한 공통 도메인 엔티티.
   - 서브페이지 메타데이터 지원: `PageType`(`STANDARD`, `MODULE`), `parentPageId`, `parentModuleNodeId`를 보관 및 NBT/패킷 동기화하여 복합 모듈 서브페이지의 계층 구조를 보존.
+  - 페이지 환경설정 지원: `defaultVoltageTierOrdinal`(목표 전압 티어 번호) 및 `autoEquipEnergyHatches`(자동 전력 해치 장착 플래그)를 NBT/패킷으로 동기화하여 팀원 간 일관된 프로비저닝 환경 보장 (ADR-066).
   - 클라이언트(`ClientWorkspaceState`, `BoardTeamSyncCoordinator`, `PageTabBarWidget`)와 서버(`TeamWorkspaceData`, `TeamBoardSavedData`)가 동일한 DTO 계약을 공유.
 * **`CommitLogEntry` (`com.gtceu.calcboard.api.team`)**:
   - 팀 페이지의 커밋 이력(작성자 UUID, 작성자명, 커밋 메시지, 타임스탬프, 리비전 번호)을 보관하는 불변 레코드.
@@ -96,7 +97,7 @@ flowchart TD
 
 ---
 
-## 3. C2S (Client to Server) 패킷 명세 (9종)
+## 3. C2S (Client to Server) 패킷 명세 (10종)
 
 | 패킷 클래스 | 페이로드 구조 | 설명 및 서버 처리 동작 |
 | :--- | :--- | :--- |
@@ -109,6 +110,7 @@ flowchart TD
 | `C2SDeleteTeamPagePacket` | `UUID teamId, String pageId` | 팀 워크스페이스에서 특정 페이지 삭제 요청 (오피서/관리자 권한 필요) |
 | `C2SPingPresencePacket` | `UUID teamId, String pageId` | 락 소유권 유지를 위한 주기적 하트비트 핑 (Lease 연장) |
 | `C2SRequestCommitHistoryPacket` | `int offset, int limit` | 최근 세이브 다이얼로그에서 페이징된 커밋 이력 온디맨드 조회 요청 (ADR-051) |
+| `UpdatePageSettingsPacket` | `UUID teamId, String pageId, int expectedRevision, int defaultVoltageTierOrdinal, boolean autoEquipEnergyHatches` | 팀 워크스페이스 페이지의 목표 전압 및 자동 해치 장착 설정 변경 요청 (송신자 팀 편집 권한 및 락 검증, ADR-066) |
 
 ---
 
@@ -160,6 +162,8 @@ flowchart TD
           "PageId": "page_benzene_cracking",
           "Title": "벤젠 크래킹 라인",
           "Revision": 12,
+          "DefaultVoltageTier": 4,
+          "AutoEquipEnergyHatches": 1,
           "LastModifiedBy": "PlayerName",
           "LastModifiedTime": 1724123456789,
           "GraphNBT": {

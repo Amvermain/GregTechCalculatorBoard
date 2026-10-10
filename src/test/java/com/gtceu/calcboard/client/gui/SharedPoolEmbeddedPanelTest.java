@@ -8,6 +8,7 @@ import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.PoolViewMode;
 import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.solver.FlowGraphSolver;
 import com.gtceu.calcboard.api.solver.FlowGraphTopologyAnalyzer;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.client.gui.api.IBoardScreenContext;
@@ -23,6 +24,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.client.gui.interaction.CanvasBundleWiringHandler;
 import com.gtceu.calcboard.client.gui.model.PortRef;
+import com.gtceu.calcboard.client.gui.util.FormatUtil;
 import java.lang.reflect.Proxy;
 import java.util.List;
 import java.util.Set;
@@ -577,5 +579,233 @@ public class SharedPoolEmbeddedPanelTest {
                 e.toNodeId().equals(lcrSub.getId()) && e.inputIndex() == 0
         );
         Assertions.assertTrue(connected);
+    }
+
+    @Test
+    public void testEmbeddedPortTooltipRateRespectsTimeUnit() {
+        BoardManager.getInstance().resetToDefault();
+        RecipeNode node = RecipeNode.create("Centrifuge", 20, 100, GTVoltageTier.LV);
+        node.setMachineCount(1.0);
+        IngredientStack out = IngredientStack.item(ResourceLocation.tryParse("gtceu:crushed_blue_topaz_ore"), "Crushed Blue Topaz Ore", 1.0);
+        node.getOutputs().add(out);
+
+        double rate = node.getOutputSlotRate(0, true);
+        Assertions.assertEquals(1.0, rate, 0.001);
+
+        BoardManager.getInstance().setTimeUnit(com.gtceu.calcboard.api.type.RateTimeUnit.PER_SECOND);
+        Assertions.assertEquals("1/s", FormatUtil.formatRate(rate, out));
+
+        BoardManager.getInstance().setTimeUnit(com.gtceu.calcboard.api.type.RateTimeUnit.PER_MINUTE);
+        Assertions.assertEquals("60/min", FormatUtil.formatRate(rate, out));
+
+        BoardManager.getInstance().setTimeUnit(com.gtceu.calcboard.api.type.RateTimeUnit.PER_TICK);
+        Assertions.assertEquals("0.05/t", FormatUtil.formatRate(rate, out));
+
+        BoardManager.getInstance().resetToDefault();
+    }
+
+    @Test
+    public void testSharedPoolFlipLayoutAndAnchors() {
+        BoardManager.getInstance().resetToDefault();
+        FlowGraph graph = BoardManager.getInstance().getActiveGraph();
+
+        CanvasGroupFrame frame = new CanvasGroupFrame("sp_flip_test", "Centrifuge Pool", CanvasGroupFrame.COLOR_CYAN, 100, 100, 360, 240);
+        frame.setSharedMachineFrame(true);
+        graph.addFrame(frame);
+
+        RecipeNode subNode = RecipeNode.create("Centrifuge Sub", 20, 100, GTVoltageTier.LV);
+        subNode.getInputs().add(IngredientStack.item(ResourceLocation.tryParse("minecraft:iron_ore"), "Iron Ore", 1.0));
+        subNode.getOutputs().add(IngredientStack.item(ResourceLocation.tryParse("minecraft:iron_ingot"), "Iron Ingot", 1.0));
+        graph.addNode(subNode);
+        frame.addRecipeInline(subNode, graph);
+
+        Assertions.assertFalse(frame.isFlipped());
+
+        double[] normalInAnchor = EmbeddedPanelRenderer.getEmbeddedPortAnchor(frame, subNode, 0, true);
+        double[] normalOutAnchor = EmbeddedPanelRenderer.getEmbeddedPortAnchor(frame, subNode, 0, false);
+        Assertions.assertTrue(normalInAnchor[0] < normalOutAnchor[0]);
+
+        frame.setFlipped(true);
+        Assertions.assertTrue(frame.isFlipped());
+
+        double[] flippedInAnchor = EmbeddedPanelRenderer.getEmbeddedPortAnchor(frame, subNode, 0, true);
+        double[] flippedOutAnchor = EmbeddedPanelRenderer.getEmbeddedPortAnchor(frame, subNode, 0, false);
+        Assertions.assertTrue(flippedInAnchor[0] > flippedOutAnchor[0]);
+
+        var inAnchor = CanvasWireRenderer.resolvePortAnchor(graph, null, subNode, 0, true);
+        var outAnchor = CanvasWireRenderer.resolvePortAnchor(graph, null, subNode, 0, false);
+        Assertions.assertEquals(1.0f, inAnchor.dirX(), 0.001f);
+        Assertions.assertEquals(-1.0f, outAnchor.dirX(), 0.001f);
+
+        CompoundTag tag = frame.serializeNBT();
+        Assertions.assertTrue(tag.getBoolean("isFlipped"));
+
+        CanvasGroupFrame restored = CanvasGroupFrame.deserializeNBT(tag);
+        Assertions.assertTrue(restored.isFlipped());
+    }
+
+    @Test
+    public void testFlipFrameCommandUndoRedo() {
+        FlowGraph graph = new FlowGraph();
+        CanvasGroupFrame frame = new CanvasGroupFrame("sp_cmd_flip", "Centrifuge Pool", CanvasGroupFrame.COLOR_CYAN, 100, 100, 360, 240);
+        frame.setSharedMachineFrame(true);
+        graph.addFrame(frame);
+
+        RecipeNode subNode = RecipeNode.create("Sub 1", 20, 100, GTVoltageTier.LV);
+        graph.addNode(subNode);
+        frame.addRecipeInline(subNode, graph);
+
+        Assertions.assertFalse(frame.isFlipped());
+        Assertions.assertFalse(subNode.isFlipped());
+
+        com.gtceu.calcboard.api.history.command.FlipFrameCommand cmd =
+                new com.gtceu.calcboard.api.history.command.FlipFrameCommand(frame.getId(), false, true);
+
+        cmd.redo(graph);
+        Assertions.assertTrue(frame.isFlipped());
+        Assertions.assertTrue(subNode.isFlipped());
+
+        cmd.undo(graph);
+        Assertions.assertFalse(frame.isFlipped());
+        Assertions.assertFalse(subNode.isFlipped());
+    }
+
+    @Test
+    public void testSharedPoolDemandSyncWithExternalConsumers() {
+        FlowGraph graph = new FlowGraph();
+        CanvasGroupFrame frame = new CanvasGroupFrame("sp_demand", "Large Cutter Pool", CanvasGroupFrame.COLOR_CYAN, 100, 100, 360, 240);
+        frame.setSharedMachineFrame(true);
+        graph.addFrame(frame);
+
+        RecipeNode sub1 = RecipeNode.create("Cutting Titanium", 20.0, 10.0, GTVoltageTier.HV);
+        IngredientStack titOre = IngredientStack.item(ResourceLocation.tryParse("gtceu:titanium_rod"), "Titanium Rod", 1);
+        sub1.getOutputs().add(titOre);
+        sub1.setMachineCount(1.0);
+        graph.addNode(sub1);
+        frame.addRecipeInline(sub1, graph);
+
+        RecipeNode sub2 = RecipeNode.create("Cutting Tungstensteel", 20.0, 10.0, GTVoltageTier.HV);
+        IngredientStack tsOre = IngredientStack.item(ResourceLocation.tryParse("gtceu:tungstensteel_rod"), "Tungstensteel Rod", 1);
+        sub2.getOutputs().add(tsOre);
+        sub2.setMachineCount(1.0);
+        graph.addNode(sub2);
+        frame.addRecipeInline(sub2, graph);
+
+        RecipeNode c1 = RecipeNode.create("Assembler 1", 20.0, 10.0, GTVoltageTier.HV);
+        c1.getInputs().add(titOre);
+        c1.setMachineCount(0.1);
+        graph.addNode(c1);
+
+        RecipeNode c2 = RecipeNode.create("Assembler 2", 20.0, 10.0, GTVoltageTier.HV);
+        c2.getInputs().add(tsOre);
+        c2.setMachineCount(0.2);
+        graph.addNode(c2);
+
+        graph.addConnection(sub1.getId(), 0, c1.getId(), 0);
+        graph.addConnection(sub2.getId(), 0, c2.getId(), 0);
+
+        int changed = FlowGraphSolver.syncSharedPoolToDemand(graph, frame);
+        Assertions.assertEquals(2, changed);
+        Assertions.assertEquals(0.1, sub1.getMachineCount(), 0.001);
+        Assertions.assertEquals(0.2, sub2.getMachineCount(), 0.001);
+        Assertions.assertEquals(0.3, frame.computeTotalMachineDuty(graph), 0.001);
+    }
+
+    @Test
+    public void testSharedPoolDemandSyncWithMultipleConsumersOnSamePort() {
+        FlowGraph graph = new FlowGraph();
+        CanvasGroupFrame frame = new CanvasGroupFrame("sp_multi_c", "Cutter Pool", CanvasGroupFrame.COLOR_CYAN, 100, 100, 360, 240);
+        frame.setSharedMachineFrame(true);
+        graph.addFrame(frame);
+
+        RecipeNode sub1 = RecipeNode.create("Cutting Titanium", 20.0, 10.0, GTVoltageTier.HV);
+        IngredientStack titOre = IngredientStack.item(ResourceLocation.tryParse("gtceu:titanium_rod"), "Titanium Rod", 1);
+        sub1.getOutputs().add(titOre);
+        sub1.setMachineCount(1.0);
+        graph.addNode(sub1);
+        frame.addRecipeInline(sub1, graph);
+
+        RecipeNode c1 = RecipeNode.create("Consumer 1", 20.0, 10.0, GTVoltageTier.HV);
+        c1.getInputs().add(titOre);
+        c1.setMachineCount(0.1);
+        graph.addNode(c1);
+
+        RecipeNode c2 = RecipeNode.create("Consumer 2", 20.0, 10.0, GTVoltageTier.HV);
+        c2.getInputs().add(titOre);
+        c2.setMachineCount(0.2);
+        graph.addNode(c2);
+
+        graph.addConnection(sub1.getId(), 0, c1.getId(), 0);
+        graph.addConnection(sub1.getId(), 0, c2.getId(), 0);
+
+        int changed = FlowGraphSolver.syncSharedPoolToDemand(graph, frame);
+        Assertions.assertEquals(1, changed);
+        Assertions.assertEquals(0.3, sub1.getMachineCount(), 0.001);
+    }
+
+    @Test
+    public void testSharedPoolDemandSyncWithExternalProducer() {
+        FlowGraph graph = new FlowGraph();
+        CanvasGroupFrame frame = new CanvasGroupFrame("sp_producer", "Waste Pool", CanvasGroupFrame.COLOR_CYAN, 100, 100, 360, 240);
+        frame.setSharedMachineFrame(true);
+        graph.addFrame(frame);
+
+        RecipeNode sub1 = RecipeNode.create("Waste Burner", 20.0, 10.0, GTVoltageTier.HV);
+        IngredientStack waste = IngredientStack.item(ResourceLocation.tryParse("gtceu:waste"), "Waste", 1);
+        sub1.getInputs().add(waste);
+        sub1.setMachineCount(1.0);
+        graph.addNode(sub1);
+        frame.addRecipeInline(sub1, graph);
+
+        RecipeNode prod = RecipeNode.create("Producer", 20.0, 10.0, GTVoltageTier.HV);
+        prod.getOutputs().add(waste);
+        prod.setMachineCount(0.25);
+        graph.addNode(prod);
+
+        graph.addConnection(prod.getId(), 0, sub1.getId(), 0);
+
+        int changed = FlowGraphSolver.syncSharedPoolToDemand(graph, frame);
+        Assertions.assertEquals(1, changed);
+        Assertions.assertEquals(0.25, sub1.getMachineCount(), 0.001);
+    }
+
+    @Test
+    public void testSharedPoolDemandSyncNoConnections() {
+        FlowGraph graph = new FlowGraph();
+        CanvasGroupFrame frame = new CanvasGroupFrame("sp_isolated", "Isolated Pool", CanvasGroupFrame.COLOR_CYAN, 100, 100, 360, 240);
+        frame.setSharedMachineFrame(true);
+        graph.addFrame(frame);
+
+        RecipeNode sub1 = RecipeNode.create("Sub 1", 20.0, 10.0, GTVoltageTier.HV);
+        sub1.setMachineCount(1.0);
+        graph.addNode(sub1);
+        frame.addRecipeInline(sub1, graph);
+
+        int changed = FlowGraphSolver.syncSharedPoolToDemand(graph, frame);
+        Assertions.assertEquals(0, changed);
+        Assertions.assertEquals(1.0, sub1.getMachineCount(), 0.001);
+    }
+
+    @Test
+    public void testEmbeddedPanelSyncButtonHitDetection() {
+        FlowGraph graph = new FlowGraph();
+        CanvasGroupFrame frame = new CanvasGroupFrame("sp_hit", "Hit Pool", CanvasGroupFrame.COLOR_CYAN, 100, 100, 360, 240);
+        frame.setSharedMachineFrame(true);
+        graph.addFrame(frame);
+
+        double sumY = frame.getPosY() + CanvasGroupFrame.HEADER_HEIGHT;
+        Assertions.assertFalse(EmbeddedPanelRenderer.isMouseOverSyncButton(frame, graph, null, 100, sumY - 10));
+
+        double countMinusX = frame.getPosX() + 40;
+        double countBoxX = countMinusX + 16;
+        String countText = String.format(java.util.Locale.ROOT, "%.2f", frame.getTargetPoolCapacity());
+        double countBoxW = Math.max(30, countText.length() * 6 + 6);
+        double countPlusX = countBoxX + countBoxW + 2;
+        double dutyX = countPlusX + 54;
+        String dutyStr = String.format(java.util.Locale.ROOT, "%.1f%% (%dx)", frame.computeTotalMachineDuty(graph) * 100.0, frame.computeRequiredMachines(graph));
+        double syncBtnX = dutyX + dutyStr.length() * 6 + 6;
+
+        Assertions.assertTrue(EmbeddedPanelRenderer.isMouseOverSyncButton(frame, graph, null, syncBtnX + 2, sumY + 5));
+        Assertions.assertFalse(EmbeddedPanelRenderer.isMouseOverSyncButton(frame, graph, null, syncBtnX - 10, sumY + 5));
     }
 }

@@ -18,6 +18,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
@@ -302,17 +303,30 @@ public class MultiblockBOMDialog implements IBoardModal {
         graphics.renderOutline(copyBtnX, copyBtnY, copyBtnW, 16, copyHover ? 0xFF55AAFF : 0xFF355580);
         graphics.drawCenteredString(font, "§b» " + Component.translatable("gui.gtcalcboard.bom.copy_clipboard").getString(), copyBtnX + copyBtnW / 2, copyBtnY + 4, 0xFFFFFFFF);
 
+        int nextBtnRight = copyBtnX - 6;
         var activeViewer = com.gtceu.calcboard.integration.spi.RecipeViewerRegistry.getActiveAdapter();
         if (activeViewer.isBoMGoalRegistrationSupported()) {
             boolean isEmi = "emi".equals(activeViewer.getViewerId());
             String regKey = isEmi ? "gui.gtcalcboard.bom.register_emi" : "gui.gtcalcboard.bom.register_jei";
             String regTxt = (isEmi ? "§a⭐ " : "§e⭐ ") + Component.translatable(regKey).getString();
             int regBtnW = font.width(Component.translatable(regKey).getString()) + 14;
-            int regBtnX = copyBtnX - regBtnW - 6;
+            int regBtnX = nextBtnRight - regBtnW;
             boolean regHover = mouseX >= regBtnX && mouseX <= regBtnX + regBtnW && mouseY >= copyBtnY && mouseY <= copyBtnY + 16;
             graphics.fill(regBtnX, copyBtnY, regBtnX + regBtnW, copyBtnY + 16, regHover ? (isEmi ? 0xFF2B5533 : 0xFF4A3B18) : (isEmi ? 0xFF1C3A24 : 0xFF2D240E));
             graphics.renderOutline(regBtnX, copyBtnY, regBtnW, 16, regHover ? (isEmi ? 0xFF55FF77 : 0xFFFDE047) : (isEmi ? 0xFF358045 : 0xFF786221));
             graphics.drawCenteredString(font, regTxt, regBtnX + regBtnW / 2, copyBtnY + 4, 0xFFFFFFFF);
+            nextBtnRight = regBtnX - 6;
+        }
+
+        if (isAe2PatternTerminalActive()) {
+            String ae2Key = "gui.gtcalcboard.bom.export_ae2";
+            String ae2Txt = "§b⚡ " + Component.translatable(ae2Key).getString();
+            int ae2BtnW = font.width(Component.translatable(ae2Key).getString()) + 16;
+            int ae2BtnX = nextBtnRight - ae2BtnW;
+            boolean ae2Hover = mouseX >= ae2BtnX && mouseX <= ae2BtnX + ae2BtnW && mouseY >= copyBtnY && mouseY <= copyBtnY + 16;
+            graphics.fill(ae2BtnX, copyBtnY, ae2BtnX + ae2BtnW, copyBtnY + 16, ae2Hover ? 0xFF1B3D54 : 0xFF122838);
+            graphics.renderOutline(ae2BtnX, copyBtnY, ae2BtnW, 16, ae2Hover ? 0xFF38BDF8 : 0xFF1D5A7A);
+            graphics.drawCenteredString(font, ae2Txt, ae2BtnX + ae2BtnW / 2, copyBtnY + 4, 0xFFFFFFFF);
         }
 
         // 5. Left Sidebar (Included Pages)
@@ -618,6 +632,29 @@ public class MultiblockBOMDialog implements IBoardModal {
             hatchTip.add(Component.translatable("gui.gtcalcboard.bom.hatch_tier.cycle_hint"));
             BoardTooltipRenderer.renderComponentTooltip(graphics, font, hatchTip, mouseX, mouseY, screenW, screenH);
         }
+
+        if (isAe2PatternTerminalActive()) {
+            int copyBtnW = font.width(Component.translatable("gui.gtcalcboard.bom.copy_clipboard").getString()) + 14;
+            int copyBtnX = dialogX + dialogW - 10 - copyBtnW;
+            int copyBtnY = bannerY + 3;
+            int nextBtnRight = copyBtnX - 6;
+            var activeViewer = com.gtceu.calcboard.integration.spi.RecipeViewerRegistry.getActiveAdapter();
+            if (activeViewer.isBoMGoalRegistrationSupported()) {
+                String regKey = "emi".equals(activeViewer.getViewerId()) ? "gui.gtcalcboard.bom.register_emi" : "gui.gtcalcboard.bom.register_jei";
+                int regBtnW = font.width(Component.translatable(regKey).getString()) + 14;
+                nextBtnRight = nextBtnRight - regBtnW - 6;
+            }
+            String ae2Key = "gui.gtcalcboard.bom.export_ae2";
+            int ae2BtnW = font.width(Component.translatable(ae2Key).getString()) + 16;
+            int ae2BtnX = nextBtnRight - ae2BtnW;
+            if (mouseX >= ae2BtnX && mouseX <= ae2BtnX + ae2BtnW && mouseY >= copyBtnY && mouseY <= copyBtnY + 16) {
+                List<Component> tip = List.of(
+                    Component.translatable("gui.gtcalcboard.bom.export_ae2"),
+                    Component.translatable("gui.gtcalcboard.bom.export_ae2.desc")
+                );
+                BoardTooltipRenderer.renderComponentTooltip(graphics, font, tip, mouseX, mouseY, screenW, screenH);
+            }
+        }
     }
 
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
@@ -657,15 +694,28 @@ public class MultiblockBOMDialog implements IBoardModal {
             return true;
         }
 
+        int nextBtnRight = copyBtnX - 6;
         var activeViewer = com.gtceu.calcboard.integration.spi.RecipeViewerRegistry.getActiveAdapter();
         if (activeViewer.isBoMGoalRegistrationSupported()) {
             boolean isEmi = "emi".equals(activeViewer.getViewerId());
             String regKey = isEmi ? "gui.gtcalcboard.bom.register_emi" : "gui.gtcalcboard.bom.register_jei";
             int regBtnW = font.width(Component.translatable(regKey).getString()) + 14;
-            int regBtnX = copyBtnX - regBtnW - 6;
+            int regBtnX = nextBtnRight - regBtnW;
             if (mouseX >= regBtnX && mouseX <= regBtnX + regBtnW && mouseY >= copyBtnY && mouseY <= copyBtnY + 16) {
                 playClickSound();
                 registerToBoMGoal();
+                return true;
+            }
+            nextBtnRight = regBtnX - 6;
+        }
+
+        if (isAe2PatternTerminalActive()) {
+            String ae2Key = "gui.gtcalcboard.bom.export_ae2";
+            int ae2BtnW = font.width(Component.translatable(ae2Key).getString()) + 16;
+            int ae2BtnX = nextBtnRight - ae2BtnW;
+            if (mouseX >= ae2BtnX && mouseX <= ae2BtnX + ae2BtnW && mouseY >= copyBtnY && mouseY <= copyBtnY + 16) {
+                playClickSound();
+                exportToAe2PatternTerminal();
                 return true;
             }
         }
@@ -969,6 +1019,41 @@ public class MultiblockBOMDialog implements IBoardModal {
             return;
         }
         com.gtceu.calcboard.integration.spi.RecipeViewerRegistry.getActiveAdapter().registerBoMGoal(targetSummary);
+    }
+
+    public boolean isAe2PatternTerminalActive() {
+        if (!ModCompatHelper.isAe2Loaded() || parent == null) return false;
+        Screen prev = parent.getPreviousScreen();
+        return com.gtceu.calcboard.client.gui.compat.ae2.ClientAe2PatternTermHook.isPatternEncodingScreen(prev);
+    }
+
+    private void exportToAe2PatternTerminal() {
+        if (parent == null || cachedSummary == null) return;
+        Screen prevScreen = parent.getPreviousScreen();
+        if (prevScreen == null) return;
+
+        boolean success = com.gtceu.calcboard.client.gui.compat.ae2.Ae2PatternTransferHelper.transferBoMToPatternTerminal(
+                prevScreen, cachedSummary, preparedItemIds
+        );
+
+        Minecraft mc = Minecraft.getInstance();
+        if (success) {
+            if (mc.player != null) {
+                mc.player.displayClientMessage(
+                    Component.translatable("gui.gtcalcboard.bom.export_ae2_success"),
+                    true
+                );
+            }
+            close();
+            parent.onClose();
+        } else {
+            if (mc.player != null) {
+                mc.player.displayClientMessage(
+                    Component.translatable("gui.gtcalcboard.bom.export_ae2_empty"),
+                    true
+                );
+            }
+        }
     }
 
     private void playClickSound() {

@@ -7,6 +7,7 @@ import com.gtceu.calcboard.client.gui.action.BoardActionHandler;
 import com.gtceu.calcboard.client.gui.api.IBoardScreenContext;
 import com.gtceu.calcboard.client.gui.widget.NodeInspectorPanel;
 import com.gtceu.calcboard.client.gui.widget.NodeWidget;
+import com.gtceu.calcboard.client.team.ClientWorkspaceState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -41,10 +42,14 @@ public class PageSettingsInspector implements INodeSubInspector {
         return pendingTooltip;
     }
 
+    private BoardPage getActivePage() {
+        return screen != null ? screen.getActiveBoardPage() : (ClientWorkspaceState.getInstance().isTeamMode() ? ClientWorkspaceState.getInstance().getTeamPageAsBoardPage(ClientWorkspaceState.getInstance().getActiveTeamPageId()) : BoardManager.getInstance().getActivePage());
+    }
+
     @Override
     public void render(GuiGraphics graphics, Font font, int px, int py, int ph, int mouseX, int mouseY) {
         this.pendingTooltip = null;
-        BoardPage page = BoardManager.getInstance().getActivePage();
+        BoardPage page = getActivePage();
         if (page == null) return;
 
         String title = "📄 " + Component.translatable("gui.gtcalcboard.page_settings.title").getString();
@@ -155,7 +160,7 @@ public class PageSettingsInspector implements INodeSubInspector {
     @Override
     public boolean mouseClicked(int px, int py, double mouseX, double mouseY, int button) {
         if (button != 0) return false;
-        BoardPage page = BoardManager.getInstance().getActivePage();
+        BoardPage page = getActivePage();
         if (page == null) return false;
 
         int popoutX = px + NodeInspectorPanel.PANEL_WIDTH - 30;
@@ -193,10 +198,13 @@ public class PageSettingsInspector implements INodeSubInspector {
                 } else {
                     page.setDefaultVoltageTier(GTVoltageTier.getByIndex(i - 1));
                 }
-                BoardManager.getInstance().saveForCurrentContext();
+                if (!ClientWorkspaceState.getInstance().isTeamMode()) {
+                    BoardManager.getInstance().saveForCurrentContext();
+                }
                 if (screen != null) {
                     screen.rebuildBoardWidgets();
                 }
+                ClientWorkspaceState.getInstance().syncPageSettingsIfTeamMode(page);
                 Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
                 return true;
             }
@@ -205,7 +213,10 @@ public class PageSettingsInspector implements INodeSubInspector {
 
         if (mouseX >= x && mouseX <= x + contentW && mouseY >= curY && mouseY <= curY + 16) {
             page.setAutoEquipEnergyHatches(!page.isAutoEquipEnergyHatches());
-            BoardManager.getInstance().saveForCurrentContext();
+            if (!ClientWorkspaceState.getInstance().isTeamMode()) {
+                BoardManager.getInstance().saveForCurrentContext();
+            }
+            ClientWorkspaceState.getInstance().syncPageSettingsIfTeamMode(page);
             Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
             return true;
         }

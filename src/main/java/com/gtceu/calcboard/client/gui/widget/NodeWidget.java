@@ -281,7 +281,18 @@ public class NodeWidget {
         return getLayoutBounds().isResizeHandleHovered(canvasMouseX, canvasMouseY);
     }
 
+    private com.gtceu.calcboard.api.model.FlowGraph resolveGraph() {
+        if (parent != null && parent.getGraph() != null) {
+            return parent.getGraph();
+        }
+        return node.getParentGraph();
+    }
+
     public boolean isPointInside(double canvasMouseX, double canvasMouseY) {
+        var graph = resolveGraph();
+        if (graph != null && graph.isNodeInFoldedOrEmbeddedFrame(node.getId())) {
+            return false;
+        }
         if (nameEditor != null && nameEditor.isEditing() && node.isBoundaryPin()) {
             var mc = Minecraft.getInstance();
             var font = mc != null ? mc.font : null;
@@ -296,10 +307,18 @@ public class NodeWidget {
     }
 
     public int getHoveredInputPortIndex(double canvasMouseX, double canvasMouseY) {
+        var graph = resolveGraph();
+        if (graph != null && graph.isNodeInFoldedOrEmbeddedFrame(node.getId())) {
+            return -1;
+        }
         return getLayoutBounds().getHoveredInputPortIndex(canvasMouseX, canvasMouseY);
     }
 
     public int getHoveredOutputPortIndex(double canvasMouseX, double canvasMouseY) {
+        var graph = resolveGraph();
+        if (graph != null && graph.isNodeInFoldedOrEmbeddedFrame(node.getId())) {
+            return -1;
+        }
         return getLayoutBounds().getHoveredOutputPortIndex(canvasMouseX, canvasMouseY);
     }
 

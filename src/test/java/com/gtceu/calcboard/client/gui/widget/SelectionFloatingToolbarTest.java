@@ -45,21 +45,32 @@ public class SelectionFloatingToolbarTest {
         com.gtceu.calcboard.client.gui.BoardScreen screen = new com.gtceu.calcboard.client.gui.BoardScreen();
         SelectionFloatingToolbarWidget widget = new SelectionFloatingToolbarWidget(screen);
 
+        SelectionFloatingToolbarWidget.ToolbarAction connectAction = widget.getActions().stream()
+                .filter(a -> "↔".equals(a.icon()))
+                .findFirst()
+                .orElseThrow();
+
         screen.getSelectedNodeIds().clear();
+        screen.getSelectedFrameIds().clear();
         screen.getSelectedNodeIds().add("n1");
-        // Only 1 node selected
-        SelectionFloatingToolbarWidget.ToolbarAction connectAction = new SelectionFloatingToolbarWidget.ToolbarAction(
-                "↔",
-                net.minecraft.network.chat.Component.literal("Connect"),
-                net.minecraft.network.chat.Component.literal("Tooltip"),
-                screen::performAutoConnectForSelection,
-                false,
-                () -> screen.getSelectedNodeIds().size() >= 2
-        );
         Assertions.assertFalse(connectAction.available().getAsBoolean());
 
-        // 2 nodes selected
         screen.getSelectedNodeIds().add("n2");
+        Assertions.assertTrue(connectAction.available().getAsBoolean());
+
+        screen.getSelectedNodeIds().clear();
+        screen.getSelectedNodeIds().add("n1");
+        com.gtceu.calcboard.api.model.CanvasGroupFrame frame = new com.gtceu.calcboard.api.model.CanvasGroupFrame(
+                "frame_1", "Shared Pool", 0, 0, 200, 200, 0xFF222222
+        );
+        com.gtceu.calcboard.api.model.RecipeNode frameNode = new com.gtceu.calcboard.api.model.RecipeNode(
+                "fn1", "Frame Machine", 10, 10, com.gtceu.calcboard.api.type.GTVoltageTier.LV
+        );
+        screen.getGraph().addNode(frameNode);
+        frame.getContainedNodeIds().add("fn1");
+        screen.getGraph().addFrame(frame);
+        screen.getSelectedFrameIds().add("frame_1");
+
         Assertions.assertTrue(connectAction.available().getAsBoolean());
     }
 

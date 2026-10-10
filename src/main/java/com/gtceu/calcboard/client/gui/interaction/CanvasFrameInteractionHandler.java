@@ -1,6 +1,7 @@
 package com.gtceu.calcboard.client.gui.interaction;
 
 import com.gtceu.calcboard.api.history.BoardCommand;
+import com.gtceu.calcboard.api.history.command.FlipFrameCommand;
 import com.gtceu.calcboard.api.history.command.SetFrameViewModeCommand;
 import com.gtceu.calcboard.api.model.CanvasGroupFrame;
 import com.gtceu.calcboard.api.model.CanvasStickyNote;
@@ -137,6 +138,9 @@ public class CanvasFrameInteractionHandler {
         if (action == CanvasGroupFrameRenderer.FrameAction.EXPAND && button == 0) {
             return handleFrameExpand(frame, screen);
         }
+        if (action == CanvasGroupFrameRenderer.FrameAction.FLIP && button == 0) {
+            return flipFrame(frame, screen);
+        }
         if (action == CanvasGroupFrameRenderer.FrameAction.AUTOFIT && button == 0) {
             return autoFitFrame(frame, screen);
         }
@@ -151,6 +155,33 @@ public class CanvasFrameInteractionHandler {
             return executeGroupFrameAutoRatio(frame, screen);
         }
         return false;
+    }
+
+    public boolean flipFrame(CanvasGroupFrame frame, BoardScreen screen) {
+        if (frame == null) return false;
+        FlowGraph graph = screen.getGraph();
+        if (graph == null) return false;
+
+        boolean wasFlipped = frame.isFlipped();
+        boolean newFlipped = !wasFlipped;
+        frame.setFlipped(newFlipped);
+        for (RecipeNode sub : frame.getSubNodes(graph)) {
+            if (sub != null) {
+                sub.setFlipped(newFlipped);
+            }
+        }
+
+        screen.recordCommand(new FlipFrameCommand(frame.getId(), wasFlipped, newFlipped));
+        Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.1F));
+
+        if (screen.getWireRenderer() != null) {
+            screen.getWireRenderer().markDirty();
+        }
+        screen.markSummaryDirty();
+
+        String msgKey = newFlipped ? "gui.gtcalcboard.flip_direction.right_to_left" : "gui.gtcalcboard.flip_direction.left_to_right";
+        BoardToast.show(Component.literal("§b⇄ ").append(Component.translatable(msgKey)));
+        return true;
     }
 
     private boolean executeSharedPoolAutoRatio(CanvasGroupFrame frame, BoardScreen screen) {
@@ -170,6 +201,44 @@ public class CanvasFrameInteractionHandler {
         notifySuccessPool(frame, changed, mode);
         screen.markSummaryDirty();
         screen.rebuildWidgets();
+        return true;
+    }
+
+    public boolean syncSharedPoolDemand(CanvasGroupFrame frame, BoardScreen screen) {
+        FlowGraph graph = screen.getGraph();
+        if (graph == null || frame == null || !frame.isSharedMachineFrame()) return false;
+        if (!screen.ensureEditPermission()) return true;
+
+        List<RecipeNode> enclosed = frame.getEnclosedNodes(graph);
+        Map<String, Double> oldCounts = new HashMap<>();
+        for (RecipeNode n : enclosed) {
+            oldCounts.put(n.getId(), n.getMachineCount());
+        }
+
+        int changed = FlowGraphSolver.syncSharedPoolToDemand(graph, frame);
+        if (changed <= 0) {
+            BoardToast.show(Component.literal("§7ℹ ").append(Component.translatable("message.gtcalcboard.sync_demand_no_change", frame.getTitle())));
+            Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 0.8F));
+            return true;
+        }
+
+        List<BoardCommand> subCmds = new ArrayList<>();
+        for (RecipeNode n : enclosed) {
+            double oldC = oldCounts.getOrDefault(n.getId(), 1.0);
+            double newC = n.getMachineCount();
+            if (Math.abs(oldC - newC) > 0.0001) {
+                subCmds.add(BoardCommand.ModifyPropertyCommand.machineCount(n.getId(), oldC, newC));
+            }
+        }
+        screen.recordCommand(new BoardCommand.CompoundCommand(subCmds, "Sync Demand: " + frame.getTitle()));
+        screen.markSummaryDirty();
+        screen.rebuildWidgets();
+        if (screen.getWireRenderer() != null) {
+            screen.getWireRenderer().markDirty();
+        }
+
+        BoardToast.show(Component.literal("§a⚡ ").append(Component.translatable("message.gtcalcboard.sync_demand_success", changed, frame.getTitle())));
+        Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.2F));
         return true;
     }
 

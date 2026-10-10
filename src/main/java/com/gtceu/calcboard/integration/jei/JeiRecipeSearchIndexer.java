@@ -116,8 +116,9 @@ public final class JeiRecipeSearchIndexer {
             indexIngredientStack(in, inSb, inputIds, inputNames);
         }
 
-        if (catResId != null) {
-            inSb.append(getCategoryCatalystText(category, jeiRuntime));
+        String wsText = (catResId != null) ? getCategoryCatalystText(category, jeiRuntime) : "";
+        if (!wsText.isEmpty()) {
+            inSb.append(wsText);
         }
 
         if (catResId != null && com.gtceu.calcboard.api.util.ModCompatHelper.isCreateFamilyNamespace(catResId.getNamespace())) {
@@ -154,7 +155,8 @@ public final class JeiRecipeSearchIndexer {
                 outArr,
                 inNamesArr,
                 outNamesArr,
-                isSupported
+                isSupported,
+                wsText.trim()
         );
     }
 

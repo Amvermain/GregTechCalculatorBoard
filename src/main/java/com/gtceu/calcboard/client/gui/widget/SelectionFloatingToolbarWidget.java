@@ -14,6 +14,7 @@ import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.function.BooleanSupplier;
@@ -76,7 +77,7 @@ public class SelectionFloatingToolbarWidget {
 
         actions.add(new ToolbarAction("↔", Component.translatable("gui.gtcalcboard.floating_bar.auto_connect"),
                 Component.translatable("gui.gtcalcboard.floating_bar.tooltip.auto_connect"), onConnect, false,
-                () -> screen != null && screen.getSelectedNodeIds().size() >= 2));
+                () -> screen != null && screen.getEffectiveSelectedNodeIds().size() >= 2));
         actions.add(new ToolbarAction("▤", Component.translatable("gui.gtcalcboard.floating_bar.frame"),
                 Component.translatable("gui.gtcalcboard.floating_bar.tooltip.frame"), onFrame, false));
         actions.add(new ToolbarAction("📦", Component.translatable("gui.gtcalcboard.floating_bar.module"),
@@ -89,6 +90,10 @@ public class SelectionFloatingToolbarWidget {
                 Component.translatable("gui.gtcalcboard.floating_bar.tooltip.copy"), onCopy, false));
         actions.add(new ToolbarAction("✕", Component.translatable("gui.gtcalcboard.floating_bar.delete"),
                 Component.translatable("gui.gtcalcboard.floating_bar.tooltip.delete"), onDelete, true));
+    }
+
+    List<ToolbarAction> getActions() {
+        return Collections.unmodifiableList(actions);
     }
 
     public boolean isVisible() {

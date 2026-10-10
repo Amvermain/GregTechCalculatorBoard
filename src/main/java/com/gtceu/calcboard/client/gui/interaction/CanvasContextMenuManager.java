@@ -293,7 +293,7 @@ public class CanvasContextMenuManager {
 
     public void openForSelection(double screenX, double screenY) {
         this.items.clear();
-        if (screen != null && screen.getSelectedNodeIds().size() >= 2) {
+        if (screen != null && screen.getEffectiveSelectedNodeIds().size() >= 2) {
             this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.auto_connect", "↔", "Shift+C", screen::performAutoConnectForSelection));
         }
         this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.create_frame", "▤", "Ctrl+G", screen::createFrameFromSelection));
@@ -361,6 +361,18 @@ public class CanvasContextMenuManager {
                 }));
                 this.items.add(ContextMenuItem.separator());
             }
+        }
+        if (frame != null && frame.isSharedMachineFrame()) {
+            this.items.add(ContextMenuItem.item("gui.gtcalcboard.frame.btn_sync_demand", "⚡", null, () -> {
+                if (screen != null && screen.getFrameInteractionHandler() != null) {
+                    screen.getFrameInteractionHandler().syncSharedPoolDemand(frame, screen);
+                }
+            }));
+            this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.flip_node", "➔", "F", () -> {
+                if (screen != null && screen.getFrameInteractionHandler() != null) {
+                    screen.getFrameInteractionHandler().flipFrame(frame, screen);
+                }
+            }));
         }
         this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.configure_frame", "⚙", null, () -> {
             if (screen != null) screen.openFrameEditDialog(frame);

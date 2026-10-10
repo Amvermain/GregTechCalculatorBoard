@@ -266,4 +266,47 @@ public class NetworkPacketSerializationTest {
         Assertions.assertEquals(errorCode, decoded.getErrorCode());
         Assertions.assertEquals(key, decoded.getMessageKey());
     }
+
+    @Test
+    @DisplayName("UpdatePageSettingsPacket serialization roundtrip")
+    void testUpdatePageSettingsPacketRoundtrip() {
+        String pageId = "page_settings_test";
+        int defaultVoltageTierOrdinal = 3;
+        boolean autoEquipEnergyHatches = false;
+        UpdatePageSettingsPacket original = new UpdatePageSettingsPacket(pageId, defaultVoltageTierOrdinal, autoEquipEnergyHatches);
+
+        FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.buffer());
+        original.encode(buf);
+
+        UpdatePageSettingsPacket decoded = new UpdatePageSettingsPacket(buf);
+        Assertions.assertEquals(pageId, decoded.getPageId());
+        Assertions.assertEquals(defaultVoltageTierOrdinal, decoded.getDefaultVoltageTierOrdinal());
+        Assertions.assertNull(decoded.getTeamId());
+        Assertions.assertEquals(0, decoded.getExpectedRevision());
+        Assertions.assertEquals(autoEquipEnergyHatches, decoded.isAutoEquipEnergyHatches());
+    }
+
+    @Test
+    @DisplayName("UpdatePageSettingsPacket full payload with team and revision serialization roundtrip")
+    void testUpdatePageSettingsPacketFullPayloadRoundtrip() {
+        UUID teamId = UUID.randomUUID();
+        String pageId = "page_multiblock_line";
+        int expectedRevision = 42;
+        int defaultVoltageTierOrdinal = 5;
+        boolean autoEquipEnergyHatches = false;
+
+        UpdatePageSettingsPacket original = new UpdatePageSettingsPacket(
+                teamId, pageId, expectedRevision, defaultVoltageTierOrdinal, autoEquipEnergyHatches
+        );
+
+        FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.buffer());
+        original.encode(buf);
+
+        UpdatePageSettingsPacket decoded = new UpdatePageSettingsPacket(buf);
+        Assertions.assertEquals(teamId, decoded.getTeamId());
+        Assertions.assertEquals(pageId, decoded.getPageId());
+        Assertions.assertEquals(expectedRevision, decoded.getExpectedRevision());
+        Assertions.assertEquals(defaultVoltageTierOrdinal, decoded.getDefaultVoltageTierOrdinal());
+        Assertions.assertEquals(autoEquipEnergyHatches, decoded.isAutoEquipEnergyHatches());
+    }
 }

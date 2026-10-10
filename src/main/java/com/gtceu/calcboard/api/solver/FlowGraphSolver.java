@@ -122,6 +122,10 @@ public final class FlowGraphSolver {
         return FlowBalanceMatrixSolver.autoRatioFromSharedPool(graph, poolFrame, targetMachines, mode);
     }
 
+    public static int syncSharedPoolToDemand(FlowGraph graph, CanvasGroupFrame poolFrame) {
+        return FlowBalanceMatrixSolver.syncSharedPoolToDemand(graph, poolFrame);
+    }
+
     public static int autoRatioFromGroupFrame(FlowGraph graph, CanvasGroupFrame frame, AutoRatioMode mode) {
         return GroupAutoRatioEngine.executeGroupAutoRatio(graph, frame, mode);
     }

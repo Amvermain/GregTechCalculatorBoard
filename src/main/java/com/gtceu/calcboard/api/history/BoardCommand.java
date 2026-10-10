@@ -259,6 +259,12 @@ public interface BoardCommand {
         }
     }
 
+    class FlipFrameCommand extends com.gtceu.calcboard.api.history.command.FlipFrameCommand {
+        public FlipFrameCommand(String frameId, boolean previousFlipped, boolean newFlipped) {
+            super(frameId, previousFlipped, newFlipped);
+        }
+    }
+
     class AddRecipeToSharedFrameCommand extends com.gtceu.calcboard.api.history.command.AddRecipeToSharedFrameCommand {
         public AddRecipeToSharedFrameCommand(String frameId, RecipeNode node, double assignedMachineCount, String description) {
             super(frameId, node, assignedMachineCount, description);

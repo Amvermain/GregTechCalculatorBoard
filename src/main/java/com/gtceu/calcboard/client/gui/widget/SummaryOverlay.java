@@ -13,11 +13,15 @@ import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.solver.BalanceSummary;
 import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.client.gui.api.IBoardScreenContext;
+import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
+import com.gtceu.calcboard.integration.spi.RecipeViewerRegistry;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
+import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -523,6 +527,49 @@ public class SummaryOverlay {
             }
         }
         return false;
+    }
+
+    public IngredientStack getHoveredStack() {
+        return hoveredStack;
+    }
+
+    public void setHoveredStack(IngredientStack hoveredStack) {
+        this.hoveredStack = hoveredStack;
+    }
+
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (collapsed || hoveredStack == null || hoveredActionStack != null) {
+            return false;
+        }
+        if (isControlDown(modifiers) || isAltDown(modifiers)) {
+            return false;
+        }
+        if (keyCode == GLFW.GLFW_KEY_R || keyCode == GLFW.GLFW_KEY_U) {
+            var adapter = RecipeViewerRegistry.getActiveAdapter();
+            if (adapter == null) {
+                return false;
+            }
+            boolean success = (keyCode == GLFW.GLFW_KEY_R)
+                    ? adapter.displayRecipes(hoveredStack)
+                    : adapter.displayUses(hoveredStack);
+            if (success) {
+                TutorialManager.getInstance().onRecipeLookup();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isControlDown(int modifiers) {
+        if ((modifiers & GLFW.GLFW_MOD_CONTROL) != 0) return true;
+        Minecraft mc = Minecraft.getInstance();
+        return mc != null && mc.getWindow() != null && Screen.hasControlDown();
+    }
+
+    private static boolean isAltDown(int modifiers) {
+        if ((modifiers & GLFW.GLFW_MOD_ALT) != 0) return true;
+        Minecraft mc = Minecraft.getInstance();
+        return mc != null && mc.getWindow() != null && Screen.hasAltDown();
     }
 
     private void executeVoidAction(IngredientStack stack, boolean restore) {

@@ -441,8 +441,15 @@ $$D_{\text{current}} = \sum_{i=1}^{k} n_i.\text{getMachineCount}()$$
 $$S = \frac{M_{\text{target}}}{D_{\text{current}}}$$
 
 ##### 3. 기계 대수 갱신 모드
-- **연속 모드 (기본 클릭)**: 정밀 소수점을 보존하여 $n_i.\text{setMachineCount}(n_i.\text{getMachineCount}() \times S)$ 적용.
-- **정수 올림 모드 (Alt+클릭)**: 물리적 기계 1대 단위 완결을 위해 $\lceil n_i.\text{getMachineCount}() \times S \rceil$ 올림 적용.
+- **풀 용량 비례 모드 (기본 클릭)**: 목표 기계 용량($M_{\text{target}}$)에 맞춰 전체 서브노드의 가동률 합이 용량에 수렴하도록 비례 스케일링 적용.
+- **정밀 소수점 모드 (Alt+클릭)**: 소수점 4자리 정밀 연속 수치를 보존하여 $n_i.\text{setMachineCount}(n_i.\text{getMachineCount}() \times S)$ 적용.
+- **완벽 조화 정수 모드 (Shift+클릭)**: 물리적 기계 1대 단위 완결을 위해 $\lceil n_i.\text{getMachineCount}() \times S \rceil$ 올림 적용.
+
+##### 4. 레시피별 외부 수요 동기화 (`syncSharedPoolToDemand`)
+공유 풀에 연결된 외부 공정의 유량 수지를 분석하여 풀 내부 레시피별 기계 대수를 1클릭으로 자동 동기화(`⚡` 버튼)합니다:
+- **출력 포트 (하류 소비자 수요 매칭)**: 각 출력 포트와 연결된 외부 소비자들의 잔여 수요량 $\text{Demand}_{\text{rem}} = \max(0, \text{Demand} - \text{ExternalSupply})$를 집계하고, 해당 산출물의 단일 기계 기준 생산 속도 $R_{\text{out}}$를 기반으로 필요 대수 $M_{\text{target}} = \text{Demand}_{\text{rem}} / R_{\text{out}}$ 산출.
+- **입력 포트 (상류 공급원 유입 매칭)**: 외부 공급원으로부터 유입되는 유효 공급량 $\text{Supply}_{\text{in}}$을 단일 기계 기준 소비 속도 $R_{\text{in}}$으로 나누어 필요 대수 산출.
+- 다중 포트 연결 시 최대 필요 대수를 채택하고, 변경된 노드에 대해 $n_i.\text{setMachineCount}(M_{\text{target}})$를 적용한 후 그래프 솔버 이벤트를 트리거합니다.
 
 ---
 

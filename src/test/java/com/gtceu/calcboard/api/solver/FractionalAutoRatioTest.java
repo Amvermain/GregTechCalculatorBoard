@@ -114,4 +114,44 @@ public class FractionalAutoRatioTest {
             bm.setPreserveFractionalAnchor(origPreserve);
         }
     }
+
+    @Test
+    public void testDownstreamContinuousFlowPreservationInIntegerAutoRatio() {
+        FlowGraph graph = new FlowGraph();
+        ResourceLocation slurry = ResourceLocation.tryParse("gtceu:apatite_slurry");
+        ResourceLocation distilled = ResourceLocation.tryParse("gtceu:apatite_distilled");
+        ResourceLocation diamond = ResourceLocation.tryParse("minecraft:diamond");
+
+        RecipeNode brewery = RecipeNode.create(ResourceLocation.tryParse("gtceu:brewery"), "Brewery", 200, 30, GTVoltageTier.HV);
+        brewery.setBaseNode(true);
+        brewery.setMachineCount(1.0);
+        brewery.getOutputs().add(IngredientStack.fluid(slurry, "Slurry", 1000));
+        graph.addNode(brewery);
+
+        RecipeNode dt = RecipeNode.create(ResourceLocation.tryParse("gtceu:distillation_tower"), "DT", 12, 120, GTVoltageTier.ZPM);
+        dt.getInputs().add(IngredientStack.fluid(slurry, "Slurry", 1000));
+        dt.getOutputs().add(IngredientStack.fluid(distilled, "Distilled", 750));
+        graph.addNode(dt);
+
+        RecipeNode solidifier = RecipeNode.create(ResourceLocation.tryParse("gtceu:fluid_solidifier"), "Solidifier", 200, 30, GTVoltageTier.HV);
+        solidifier.getInputs().add(IngredientStack.fluid(distilled, "Distilled", 250));
+        solidifier.getOutputs().add(IngredientStack.item(diamond, "Diamond", 1.0));
+        graph.addNode(solidifier);
+
+        graph.addConnection(brewery.getId(), 0, dt.getId(), 0);
+        graph.addConnection(dt.getId(), 0, solidifier.getId(), 0);
+
+        RecipeNode independentMacerator = RecipeNode.create(ResourceLocation.tryParse("gtceu:macerator"), "Macerator", 20, 30, GTVoltageTier.LV);
+        graph.addNode(independentMacerator);
+
+        graph.autoRatioFractional(brewery);
+        Assertions.assertEquals(1.0, brewery.getMachineCount(), 0.001);
+        Assertions.assertEquals(0.06, dt.getMachineCount(), 0.005);
+        Assertions.assertEquals(3.0, solidifier.getMachineCount(), 0.001);
+
+        graph.autoRatioFromAnchor(brewery);
+        Assertions.assertEquals(1.0, brewery.getMachineCount(), 0.001);
+        Assertions.assertEquals(1.0, dt.getMachineCount(), 0.001);
+        Assertions.assertEquals(3.0, solidifier.getMachineCount(), 0.001);
+    }
 }

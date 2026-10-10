@@ -27,18 +27,21 @@ public final class LinearEquationSystem {
         if (graph == null) return;
 
         Set<String> orderedNodeIds = new LinkedHashSet<>();
-        if (anchor != null && (anchor.isMachine() || anchor.isModule())) {
-            orderedNodeIds.add(anchor.getId());
+        if (anchor != null) {
+            if (anchor.isMachine() || anchor.isModule()) {
+                orderedNodeIds.add(anchor.getId());
+            }
             Set<String> directSuppliers = com.gtceu.calcboard.api.solver.FlowGraphTopologyAnalyzer.getDirectSuppliers(graph, anchor.getId());
             Set<String> down = com.gtceu.calcboard.api.solver.FlowGraphTopologyAnalyzer.findDownstreamNodes(graph, anchor.getId(), directSuppliers);
             if (down != null) orderedNodeIds.addAll(down);
             Set<String> up = com.gtceu.calcboard.api.solver.FlowGraphTopologyAnalyzer.findUpstreamNodes(graph, anchor.getId(), down);
             if (up != null) orderedNodeIds.addAll(up);
-        }
-
-        for (RecipeNode node : graph.getNodes()) {
-            if (node == null || (!node.isMachine() && !node.isModule())) continue;
-            orderedNodeIds.add(node.getId());
+            includeIntersectingSharedPools(graph, orderedNodeIds);
+        } else {
+            for (RecipeNode node : graph.getNodes()) {
+                if (node == null || (!node.isMachine() && !node.isModule())) continue;
+                orderedNodeIds.add(node.getId());
+            }
         }
 
         for (String id : orderedNodeIds) {
@@ -46,6 +49,31 @@ public final class LinearEquationSystem {
             if (n != null && (n.isMachine() || n.isModule())) {
                 nodeIndexMap.put(id, variableNodeIds.size());
                 variableNodeIds.add(id);
+            }
+        }
+    }
+
+    private void includeIntersectingSharedPools(FlowGraph graph, Set<String> orderedNodeIds) {
+        if (graph.getFrames() == null) return;
+        for (CanvasGroupFrame frame : graph.getFrames()) {
+            if (!frame.isSharedMachineFrame()) continue;
+            if (frameIntersectsNodes(frame, orderedNodeIds)) {
+                addFrameMachines(graph, frame, orderedNodeIds);
+            }
+        }
+    }
+
+    private boolean frameIntersectsNodes(CanvasGroupFrame frame, Set<String> nodeIds) {
+        for (String id : nodeIds) {
+            if (frame.containsNode(id)) return true;
+        }
+        return false;
+    }
+
+    private void addFrameMachines(FlowGraph graph, CanvasGroupFrame frame, Set<String> orderedNodeIds) {
+        for (RecipeNode n : graph.getNodes()) {
+            if (frame.containsNode(n.getId()) && (n.isMachine() || n.isModule())) {
+                orderedNodeIds.add(n.getId());
             }
         }
     }

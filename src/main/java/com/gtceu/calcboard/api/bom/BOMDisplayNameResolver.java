@@ -13,12 +13,21 @@ public final class BOMDisplayNameResolver {
 
     private BOMDisplayNameResolver() {}
 
+    @SuppressWarnings("deprecation")
     public static ItemStack resolveItemStack(ResourceLocation itemId) {
         if (itemId == null) return ItemStack.EMPTY;
         try {
             if (ForgeRegistries.ITEMS != null) {
                 var item = ForgeRegistries.ITEMS.getValue(itemId);
                 if (item != null) {
+                    return new ItemStack(item);
+                }
+            }
+        } catch (Throwable ignored) {}
+        try {
+            if (net.minecraft.core.registries.BuiltInRegistries.ITEM != null) {
+                var item = net.minecraft.core.registries.BuiltInRegistries.ITEM.get(itemId);
+                if (item != null && item != net.minecraft.world.item.Items.AIR) {
                     return new ItemStack(item);
                 }
             }

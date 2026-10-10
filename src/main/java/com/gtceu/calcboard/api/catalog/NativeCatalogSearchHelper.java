@@ -40,6 +40,19 @@ public final class NativeCatalogSearchHelper {
         String inIndex = buildSearchIndex(inputNames, inputIds, displayName, templateNode);
         String outIndex = buildSearchIndex(outputNames, outputIds, displayName, templateNode);
 
+        StringBuilder wsSb = new StringBuilder();
+        if (templateNode.getMachineIcon() != null) {
+            wsSb.append(templateNode.getMachineIcon().toString().toLowerCase(Locale.ROOT)).append(' ');
+            wsSb.append(templateNode.getMachineIcon().getPath().toLowerCase(Locale.ROOT)).append(' ');
+        }
+        for (ResourceLocation ws : templateNode.getAvailableWorkstations()) {
+            if (ws != null) {
+                wsSb.append(ws.toString().toLowerCase(Locale.ROOT)).append(' ');
+                wsSb.append(ws.getPath().toLowerCase(Locale.ROOT)).append(' ');
+            }
+        }
+        String wsIndex = wsSb.toString().trim();
+
         ResourceLocation recipeId = ResourceLocation.tryParse(
                 "gtcalcboard:native/" + (itemId != null ? itemId.getNamespace() + "/" + itemId.getPath() : "node")
         );
@@ -57,7 +70,8 @@ public final class NativeCatalogSearchHelper {
                 outputIds.toArray(new ResourceLocation[0]),
                 inputNames.toArray(new String[0]),
                 outputNames.toArray(new String[0]),
-                true
+                true,
+                wsIndex
         );
     }
 

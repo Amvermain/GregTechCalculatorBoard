@@ -86,7 +86,9 @@ public class CanvasWireRenderer {
             CanvasGroupFrame emb = graph.getEmbeddedFrameForNode(node.getId());
             if (emb != null) {
                 double[] pt = EmbeddedPanelRenderer.getEmbeddedPortAnchor(emb, node, portIndex, isInput);
-                return new PortAnchor((float) pt[0], (float) pt[1], isInput ? -1.0f : 1.0f);
+                boolean flipped = emb.isFlipped();
+                float dirX = isInput ? (flipped ? 1.0f : -1.0f) : (flipped ? -1.0f : 1.0f);
+                return new PortAnchor((float) pt[0], (float) pt[1], dirX);
             }
         }
 
@@ -102,18 +104,19 @@ public class CanvasWireRenderer {
             boolean isInput
     ) {
         FlowGraphTopologyAnalyzer.FoldedPortSummary summary = FlowGraphTopologyAnalyzer.aggregateFoldedPorts(graph, folded);
+        boolean flipped = folded.isFlipped();
         if (isInput) {
             int inIdx = summary.findInputIndexForOrigin(node.getId(), portIndex);
             if (inIdx < 0) inIdx = 0;
-            float x = (float) (folded.getPosX() + 5.0);
+            float x = (float) (flipped ? (folded.getPosX() + folded.getWidth() - 5.0) : (folded.getPosX() + 5.0));
             float y = (float) (folded.getPosY() + 64.0 + inIdx * 18.0 + 8.0);
-            return new PortAnchor(x, y, -1.0f);
+            return new PortAnchor(x, y, flipped ? 1.0f : -1.0f);
         }
         int outIdx = summary.findOutputIndexForOrigin(node.getId(), portIndex);
         if (outIdx < 0) outIdx = 0;
-        float x = (float) (folded.getPosX() + folded.getWidth() - 5.0);
+        float x = (float) (flipped ? (folded.getPosX() + 5.0) : (folded.getPosX() + folded.getWidth() - 5.0));
         float y = (float) (folded.getPosY() + 64.0 + outIdx * 18.0 + 8.0);
-        return new PortAnchor(x, y, 1.0f);
+        return new PortAnchor(x, y, flipped ? -1.0f : 1.0f);
     }
 
     private static PortAnchor resolveWidgetPortAnchor(
@@ -332,6 +335,7 @@ public class CanvasWireRenderer {
     }
 
     private static float resolveBadgeCode(RecipeNode fromNode) {
+        if (fromNode == null) return 1.0f;
         if (fromNode.isJunctionBuffer()) {
             return -1.0f;
         }

@@ -379,8 +379,9 @@ public final class RecipeSearchDialogRenderer {
         graphics.drawString(font, font.plainSubstrByWidth(headerTitle, sideW - 10), sideX + 6, y + 8, 0xFFFFFFFF, false);
 
         int itemW = sideW - 12;
-        int itemH = 24;
-        int itemSpacing = 28;
+        int itemSpacing = Math.min(28, (dialogH - 32) / Math.max(1, RecipeSearchDialog.PREFIX_ITEMS.size()));
+        int itemH = Math.min(24, itemSpacing - 2);
+        int textYOffset = (itemH - 8) / 2;
         RecipeSearchDialog.PrefixGuideItem hoveredItem = null;
 
         for (int i = 0; i < RecipeSearchDialog.PREFIX_ITEMS.size(); i++) {
@@ -395,13 +396,13 @@ public final class RecipeSearchDialogRenderer {
             graphics.renderOutline(itemX, itemY, itemW, itemH, hover ? item.color() : 0xFF334155);
 
             graphics.fill(itemX + 2, itemY + 2, itemX + 18, itemY + itemH - 2, 0xFF0F172A);
-            graphics.drawCenteredString(font, item.prefix(), itemX + 10, itemY + 8, item.color());
+            graphics.drawCenteredString(font, item.prefix(), itemX + 10, itemY + textYOffset, item.color());
 
             String label = Component.translatable(item.labelKey()).getString();
             if (label.startsWith(item.prefix())) {
                 label = label.substring(item.prefix().length()).trim();
             }
-            graphics.drawString(font, font.plainSubstrByWidth(label, itemW - 22), itemX + 22, itemY + 8, hover ? 0xFFFFFFFF : 0xFFCCCCCC, false);
+            graphics.drawString(font, font.plainSubstrByWidth(label, itemW - 22), itemX + 22, itemY + textYOffset, hover ? 0xFFFFFFFF : 0xFFCCCCCC, false);
         }
 
         if (hoveredItem != null && !dialog.getFilterDialog().isVisible()) {

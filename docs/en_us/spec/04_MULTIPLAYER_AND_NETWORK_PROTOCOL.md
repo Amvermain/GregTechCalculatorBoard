@@ -62,7 +62,7 @@ sequenceDiagram
 
 ---
 
-## 3. C2S (Client to Server) Packet Specifications (8 Packets)
+## 3. C2S (Client to Server) Packet Specifications (9 Packets)
 
 | Packet Class | Payload Structure | Description & Server Action |
 | :--- | :--- | :--- |
@@ -74,6 +74,7 @@ sequenceDiagram
 | `C2SDeleteTeamPagePacket` | `UUID teamId, String pageId` | Requests deletion of a team page (requires officer/admin permissions) |
 | `C2SPingPresencePacket` | `UUID teamId, String pageId` | Heartbeat ping to extend lock lease ownership |
 | `C2SCreatePagePacket` | `UUID teamId, String pageTitle` | Requests creation of a new team page |
+| `UpdatePageSettingsPacket` | `UUID teamId, String pageId, int expectedRevision, int defaultVoltageTierOrdinal, boolean autoEquipEnergyHatches` | Requests updating page target voltage and auto-hatch provisioning settings (ADR-066) |
 
 ---
 
@@ -122,6 +123,8 @@ sequenceDiagram
           "PageId": "page_benzene_cracking",
           "Title": "Benzene Cracking Line",
           "Revision": 12,
+          "DefaultVoltageTier": 4,
+          "AutoEquipEnergyHatches": 1,
           "LastModifiedBy": "PlayerName",
           "LastModifiedTime": 1724123456789,
           "GraphNBT": {

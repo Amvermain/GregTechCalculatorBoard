@@ -19,6 +19,8 @@ public class TeamWorkspacePage {
     private String lockHolderName = "";
     private long lockExpiresTimestamp;
     private byte[] compressedGraphData;
+    private byte defaultVoltageTierOrdinal = -1;
+    private boolean autoEquipEnergyHatches = true;
 
     public TeamWorkspacePage(String pageId, String title) {
         this.pageId = pageId;
@@ -180,6 +182,27 @@ public class TeamWorkspacePage {
         this.parentModuleNodeId = parentModuleNodeId != null ? parentModuleNodeId : "";
     }
 
+    public byte getDefaultVoltageTierOrdinal() {
+        return defaultVoltageTierOrdinal;
+    }
+
+    public void setDefaultVoltageTierOrdinal(byte defaultVoltageTierOrdinal) {
+        this.defaultVoltageTierOrdinal = defaultVoltageTierOrdinal;
+    }
+
+    public boolean isAutoEquipEnergyHatches() {
+        return autoEquipEnergyHatches;
+    }
+
+    public void setAutoEquipEnergyHatches(boolean autoEquipEnergyHatches) {
+        this.autoEquipEnergyHatches = autoEquipEnergyHatches;
+    }
+
+    public void applySettings(byte defaultVoltageTierOrdinal, boolean autoEquipEnergyHatches) {
+        this.defaultVoltageTierOrdinal = defaultVoltageTierOrdinal;
+        this.autoEquipEnergyHatches = autoEquipEnergyHatches;
+    }
+
     public CompoundTag toNBT() {
         CompoundTag tag = new CompoundTag();
         tag.putString("PageId", pageId);
@@ -201,6 +224,8 @@ public class TeamWorkspacePage {
             tag.putLong("LockExpires", lockExpiresTimestamp);
         }
         tag.putByteArray("CompressedGraphData", compressedGraphData != null ? compressedGraphData : new byte[0]);
+        tag.putByte("DefaultVoltageTier", defaultVoltageTierOrdinal);
+        tag.putBoolean("AutoEquipEnergyHatches", autoEquipEnergyHatches);
         return tag;
     }
 
@@ -229,6 +254,16 @@ public class TeamWorkspacePage {
             page.setLockExpiresTimestamp(tag.getLong("LockExpires"));
         }
         page.setCompressedGraphData(tag.getByteArray("CompressedGraphData"));
+        if (tag.contains("DefaultVoltageTier")) {
+            page.setDefaultVoltageTierOrdinal(tag.getByte("DefaultVoltageTier"));
+        } else {
+            page.setDefaultVoltageTierOrdinal((byte) -1);
+        }
+        if (tag.contains("AutoEquipEnergyHatches")) {
+            page.setAutoEquipEnergyHatches(tag.getBoolean("AutoEquipEnergyHatches"));
+        } else {
+            page.setAutoEquipEnergyHatches(true);
+        }
         return page;
     }
 }

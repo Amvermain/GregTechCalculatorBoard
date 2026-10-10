@@ -165,7 +165,6 @@ public final class GTPowerCalculator {
         int effectivePar = computePowerEffectiveParallel(node);
         double combinedEutMult = node.getCombinedEutMultiplier();
         double threadingPowerMult = node.hasThreading() ? RecipeNodeThreadingHelper.getThreadingConfig(node).getFinalPowerMultiplier() : 1.0;
-        long maxCapacity = GTAddonCompatibilityHandler.getMaxEUtCapacity(node);
         long maxVoltage = GTAddonCompatibilityHandler.getOverclockVoltage(node);
 
         double baseDuration = node.getBaseDurationTicks();
@@ -191,7 +190,7 @@ public final class GTPowerCalculator {
                 break;
             }
             double nextTotalEUt = nextEUt * effectivePar * subtickParallel * combinedEutMult * threadingPowerMult;
-            if (nextTotalEUt > maxCapacity) {
+            if (nextTotalEUt > maxVoltage) {
                 break;
             }
 

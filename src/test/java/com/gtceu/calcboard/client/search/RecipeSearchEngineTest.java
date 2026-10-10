@@ -573,4 +573,78 @@ public class RecipeSearchEngineTest {
         assertEquals("nitrobenzene", terms2.get(1).text());
         assertEquals(RecipeSearchEngine.MatchType.GENERAL, terms2.get(1).type());
     }
+
+    @Test
+    public void testMachinePrefixQueryParsing() {
+        var q1 = RecipeSearchEngine.parseQuery("m:large_macerator");
+        assertFalse(q1.isEmpty());
+        var t1 = q1.orGroups().get(0).terms().get(0);
+        assertEquals("large_macerator", t1.text());
+        assertEquals(RecipeSearchEngine.MatchType.MACHINE, t1.type());
+        assertFalse(t1.negated());
+
+        var q2 = RecipeSearchEngine.parseQuery("ws:macerator");
+        assertFalse(q2.isEmpty());
+        var t2 = q2.orGroups().get(0).terms().get(0);
+        assertEquals("macerator", t2.text());
+        assertEquals(RecipeSearchEngine.MatchType.MACHINE, t2.type());
+
+        var q3 = RecipeSearchEngine.parseQuery("m:\"large macerator\"");
+        assertFalse(q3.isEmpty());
+        var t3 = q3.orGroups().get(0).terms().get(0);
+        assertEquals("large macerator", t3.text());
+        assertEquals(RecipeSearchEngine.MatchType.MACHINE, t3.type());
+
+        var q4 = RecipeSearchEngine.parseQuery("!m:macerator");
+        assertFalse(q4.isEmpty());
+        var t4 = q4.orGroups().get(0).terms().get(0);
+        assertEquals("macerator", t4.text());
+        assertEquals(RecipeSearchEngine.MatchType.MACHINE, t4.type());
+        assertTrue(t4.negated());
+    }
+
+    @Test
+    public void testMachineWorkstationCrossCategorySearch() {
+        String maceratorWs = "gtceu:large_macerator large_macerator large macerator gtceu:lv_macerator lv_macerator";
+        String arcFurnaceWs = "gtceu:arc_furnace arc_furnace";
+
+        SearchableRecipe oreGrinding = new SearchableRecipe(
+                null, null, "Crushed Iron Ore", "gtceu", "ore_crushing", "Ore Grinding",
+                "iron ore", "crushed iron ore", null, null, null, null, true, maceratorWs
+        );
+        SearchableRecipe partGrinding = new SearchableRecipe(
+                null, null, "Iron Dust from Rod", "gtceu", "macerator_recycling", "Part Grinding",
+                "iron rod", "iron dust", null, null, null, null, true, maceratorWs
+        );
+        SearchableRecipe generalMacerator = new SearchableRecipe(
+                null, null, "Iron Dust from Ingot", "gtceu", "macerator", "Macerator",
+                "iron ingot", "iron dust", null, null, null, null, true, maceratorWs
+        );
+        SearchableRecipe arcFurnace = new SearchableRecipe(
+                null, null, "Annealed Copper Ingot", "gtceu", "arc_furnace", "Arc Furnace",
+                "copper ingot", "annealed copper ingot", null, null, null, null, true, arcFurnaceWs
+        );
+
+        ParsedQuery qMachine = RecipeSearchEngine.parseQuery("m:large_macerator");
+        assertTrue(RecipeSearchEngine.matches(oreGrinding, qMachine));
+        assertTrue(RecipeSearchEngine.matches(partGrinding, qMachine));
+        assertTrue(RecipeSearchEngine.matches(generalMacerator, qMachine));
+        assertFalse(RecipeSearchEngine.matches(arcFurnace, qMachine));
+
+        ParsedQuery qWs = RecipeSearchEngine.parseQuery("ws:macerator");
+        assertTrue(RecipeSearchEngine.matches(oreGrinding, qWs));
+        assertTrue(RecipeSearchEngine.matches(partGrinding, qWs));
+        assertTrue(RecipeSearchEngine.matches(generalMacerator, qWs));
+        assertFalse(RecipeSearchEngine.matches(arcFurnace, qWs));
+
+        ParsedQuery qCombined = RecipeSearchEngine.parseQuery("m:large_macerator rod");
+        assertFalse(RecipeSearchEngine.matches(oreGrinding, qCombined));
+        assertTrue(RecipeSearchEngine.matches(partGrinding, qCombined));
+        assertFalse(RecipeSearchEngine.matches(generalMacerator, qCombined));
+
+        ParsedQuery qCategoryOnly = RecipeSearchEngine.parseQuery("[ore_crushing]");
+        assertTrue(RecipeSearchEngine.matches(oreGrinding, qCategoryOnly));
+        assertFalse(RecipeSearchEngine.matches(partGrinding, qCategoryOnly));
+        assertFalse(RecipeSearchEngine.matches(generalMacerator, qCategoryOnly));
+    }
 }

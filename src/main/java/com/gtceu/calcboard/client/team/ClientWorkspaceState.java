@@ -8,6 +8,7 @@ import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.network.packet.s2c.S2CBroadcastPresencePacket;
 import com.gtceu.calcboard.api.team.CommitLogEntry;
 import com.gtceu.calcboard.api.team.TeamWorkspacePage;
+import com.gtceu.calcboard.api.type.GTVoltageTier;
 import net.minecraft.nbt.CompoundTag;
 
 import java.util.*;
@@ -37,10 +38,12 @@ public class ClientWorkspaceState implements com.gtceu.calcboard.api.storage.IWo
     private final List<S2CBroadcastPresencePacket.MemberPresence> activePresence = new ArrayList<>();
     private final Map<String, Boolean> myHeldLocks = new ConcurrentHashMap<>();
     private final Map<String, TeamPageViewport> pageViewports = new ConcurrentHashMap<>();
+    private final Map<String, PageSettingsSnapshot> pendingSettingsSnapshots = new ConcurrentHashMap<>();
 
     private boolean serverSupported = false;
 
     public record TeamPageViewport(double panX, double panY, double zoom) {}
+    public record PageSettingsSnapshot(byte voltageTierOrdinal, boolean autoEquipEnergyHatches) {}
 
     private ClientWorkspaceState() {}
 
@@ -222,6 +225,12 @@ public class ClientWorkspaceState implements com.gtceu.calcboard.api.storage.IWo
         bp.setPageType(tp.getPageType());
         bp.setParentPageId(tp.getParentPageId());
         bp.setParentModuleNodeId(tp.getParentModuleNodeId());
+        if (tp.getDefaultVoltageTierOrdinal() >= 0 && tp.getDefaultVoltageTierOrdinal() < GTVoltageTier.values().length) {
+            bp.setDefaultVoltageTier(GTVoltageTier.values()[tp.getDefaultVoltageTierOrdinal()]);
+        } else {
+            bp.setDefaultVoltageTier(null);
+        }
+        bp.setAutoEquipEnergyHatches(tp.isAutoEquipEnergyHatches());
         String folder = tp.getFolderPath();
         String title = tp.getTitle();
         if ((folder == null || folder.isEmpty()) && title != null && title.contains("/")) {
@@ -235,6 +244,51 @@ public class ClientWorkspaceState implements com.gtceu.calcboard.api.storage.IWo
             bp.setFolderPath(folder != null ? folder : "");
         }
         return bp;
+    }
+
+    public void syncPageSettingsIfTeamMode(BoardPage page) {
+        if (!isTeamMode() || currentTeamId == null || page == null) {
+            return;
+        }
+        TeamWorkspacePage remotePage = getRemotePage(page.getId());
+        int rev = remotePage != null ? remotePage.getPageRevision() : 1;
+        int tierOrdinal = page.getDefaultVoltageTier() != null ? page.getDefaultVoltageTier().ordinal() : -1;
+        if (remotePage != null) {
+            pendingSettingsSnapshots.putIfAbsent(page.getId(), new PageSettingsSnapshot(
+                    remotePage.getDefaultVoltageTierOrdinal(),
+                    remotePage.isAutoEquipEnergyHatches()
+            ));
+            remotePage.applySettings((byte) tierOrdinal, page.isAutoEquipEnergyHatches());
+        }
+        com.gtceu.calcboard.network.NetworkHandler.sendToServer(
+                new com.gtceu.calcboard.network.packet.c2s.UpdatePageSettingsPacket(
+                        currentTeamId,
+                        page.getId(),
+                        rev,
+                        tierOrdinal,
+                        page.isAutoEquipEnergyHatches()
+                )
+        );
+    }
+
+    public PageSettingsSnapshot consumePendingSnapshot(String pageId) {
+        return pageId != null ? pendingSettingsSnapshots.remove(pageId) : null;
+    }
+
+    public void clearPendingSnapshot(String pageId) {
+        if (pageId != null) {
+            pendingSettingsSnapshots.remove(pageId);
+        }
+    }
+
+    public Set<String> getPendingSnapshotPageIds() {
+        return new HashSet<>(pendingSettingsSnapshots.keySet());
+    }
+
+    public BoardPage getActiveBoardPage() {
+        return isTeamMode()
+                ? getTeamPageAsBoardPage(getActiveTeamPageId())
+                : com.gtceu.calcboard.api.storage.BoardManager.getInstance().getActivePage();
     }
 
     public static BoardPage resolveActiveWorkspacePage(String pageId) {
@@ -649,6 +703,7 @@ public class ClientWorkspaceState implements com.gtceu.calcboard.api.storage.IWo
         loadingPages.clear();
         cachedRevisions.clear();
         pageViewports.clear();
+        pendingSettingsSnapshots.clear();
         ChunkedPayloadAssembler.clear();
         com.gtceu.calcboard.api.storage.WorkspacePageRegistry.registerCollaborativeHandler(this);
     }

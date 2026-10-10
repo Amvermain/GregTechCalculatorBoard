@@ -1,8 +1,11 @@
 package com.gtceu.calcboard.client.gui.api;
 
+import com.gtceu.calcboard.api.model.CanvasGroupFrame;
+import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.client.gui.BoardSelectionModel;
 import com.gtceu.calcboard.client.gui.model.PortRef;
 
+import java.util.LinkedHashSet;
 import java.util.Set;
 
 /**
@@ -69,4 +72,23 @@ public interface IBoardSelectionHandler {
     void duplicateSelection();
 
     boolean isBoxSelecting();
+ 
+    default Set<String> getEffectiveSelectedNodeIds(FlowGraph graph) {
+        Set<String> result = new LinkedHashSet<>(getSelectedNodeIds());
+        Set<String> frameIds = getSelectedFrameIds();
+        if (graph == null || frameIds == null || frameIds.isEmpty()) {
+            return result;
+        }
+        for (CanvasGroupFrame frame : graph.getFrames()) {
+            if (!frameIds.contains(frame.getId())) {
+                continue;
+            }
+            for (String nid : frame.getContainedNodeIds()) {
+                if (graph.getNode(nid) != null) {
+                    result.add(nid);
+                }
+            }
+        }
+        return result;
+    }
 }

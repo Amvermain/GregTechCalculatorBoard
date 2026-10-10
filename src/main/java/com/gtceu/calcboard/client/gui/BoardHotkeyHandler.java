@@ -107,7 +107,7 @@ public final class BoardHotkeyHandler {
 
         if (keyCode == GLFW.GLFW_KEY_C && isShift && !isControl && !isAlt) {
             closePopups(screen);
-            if (screen.getSelectedNodeIds().size() >= 2) {
+            if (screen.getEffectiveSelectedNodeIds().size() >= 2) {
                 screen.performAutoConnectForSelection();
             } else if (screen.getToolbarWidget() != null) {
                 screen.getToolbarWidget().performAutoConnect();
@@ -154,6 +154,10 @@ public final class BoardHotkeyHandler {
 
         // 6. Recipe lookup under cursor [R] / [U] (EMI, JEI, etc.)
         if (!isControl && !isAlt && (keyCode == GLFW.GLFW_KEY_R || keyCode == GLFW.GLFW_KEY_U)) {
+            if (screen.getSummaryOverlay() != null && screen.getSummaryOverlay().keyPressed(keyCode, scanCode, modifiers)) {
+                return true;
+            }
+
             double canvasMouseX = screen.toCanvasX(lastMouseX);
             double canvasMouseY = screen.toCanvasY(lastMouseY);
             List<NodeWidget> nodeWidgets = screen.getNodeWidgets();

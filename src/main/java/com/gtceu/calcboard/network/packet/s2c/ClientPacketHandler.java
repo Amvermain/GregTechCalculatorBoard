@@ -6,6 +6,13 @@ import com.gtceu.calcboard.client.team.ClientWorkspaceState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 
+import com.gtceu.calcboard.api.storage.BoardManager;
+import com.gtceu.calcboard.api.storage.BoardPage;
+import com.gtceu.calcboard.api.team.TeamWorkspacePage;
+import com.gtceu.calcboard.api.type.GTVoltageTier;
+import com.gtceu.calcboard.network.packet.c2s.UpdatePageSettingsPacket;
+
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -80,8 +87,8 @@ public class ClientPacketHandler {
 
     public static void handleError(S2CWorkspaceErrorPacket packet) {
         BoardToast.show("gui.gtcalcboard.toast.error", Component.translatable(packet.getMessageKey()).getString());
+        ClientWorkspaceState state = ClientWorkspaceState.getInstance();
         if (packet.getErrorCode() == 409) {
-            ClientWorkspaceState state = ClientWorkspaceState.getInstance();
             String activePageId = state.getActiveTeamPageId();
             state.clearPageDirty(activePageId);
             UUID teamId = state.getCurrentTeamId();
@@ -89,6 +96,89 @@ public class ClientPacketHandler {
                 com.gtceu.calcboard.network.NetworkHandler.sendToServer(new com.gtceu.calcboard.network.packet.c2s.C2SRequestWorkspacePacket(teamId, activePageId));
                 com.gtceu.calcboard.network.NetworkHandler.sendToServer(new com.gtceu.calcboard.network.packet.c2s.C2SRequestPageDataPacket(activePageId, 0));
             }
+        }
+        if (shouldRollbackSettings(packet.getErrorCode(), state)) {
+            rollbackPendingSettings(state);
+        }
+    }
+
+    private static boolean shouldRollbackSettings(int errorCode, ClientWorkspaceState state) {
+        return (errorCode == 403 || errorCode == 423 || errorCode == 409) && state.isTeamMode();
+    }
+
+    private static void rollbackPendingSettings(ClientWorkspaceState state) {
+        Set<String> pendingPages = state.getPendingSnapshotPageIds();
+        if (pendingPages.isEmpty()) {
+            rollbackPageSettings(state, state.getActiveTeamPageId());
+            return;
+        }
+        for (String pageId : pendingPages) {
+            rollbackPageSettings(state, pageId);
+        }
+    }
+
+    private static void rollbackPageSettings(ClientWorkspaceState state, String pageId) {
+        if (pageId == null) return;
+        ClientWorkspaceState.PageSettingsSnapshot snapshot = state.consumePendingSnapshot(pageId);
+        TeamWorkspacePage remote = state.getRemotePage(pageId);
+
+        byte targetTierOrdinal = snapshot != null ? snapshot.voltageTierOrdinal() : (remote != null ? remote.getDefaultVoltageTierOrdinal() : -1);
+        boolean targetAutoHatch = snapshot != null ? snapshot.autoEquipEnergyHatches() : (remote == null || remote.isAutoEquipEnergyHatches());
+
+        if (remote != null) {
+            remote.applySettings(targetTierOrdinal, targetAutoHatch);
+        }
+
+        for (BoardPage bp : BoardManager.getInstance().getPageManager().getPages()) {
+            if (bp.getId().equals(pageId)) {
+                applyVoltageTierToPage(bp, targetTierOrdinal);
+                bp.setAutoEquipEnergyHatches(targetAutoHatch);
+                break;
+            }
+        }
+
+        refreshScreenIfActive(pageId);
+    }
+
+    public static void handleUpdatePageSettings(UpdatePageSettingsPacket packet) {
+        ClientWorkspaceState state = ClientWorkspaceState.getInstance();
+        state.clearPendingSnapshot(packet.getPageId());
+        if (state.isTeamMode()) {
+            TeamWorkspacePage remotePage = state.getRemotePage(packet.getPageId());
+            if (remotePage != null) {
+                remotePage.applySettings(
+                        (byte) packet.getDefaultVoltageTierOrdinal(),
+                        packet.isAutoEquipEnergyHatches()
+                );
+                if (packet.getExpectedRevision() > 0) {
+                    remotePage.setPageRevision(packet.getExpectedRevision());
+                }
+            }
+        }
+
+        for (BoardPage page : BoardManager.getInstance().getPageManager().getPages()) {
+            if (page.getId().equals(packet.getPageId())) {
+                page.setAutoEquipEnergyHatches(packet.isAutoEquipEnergyHatches());
+                applyVoltageTierToPage(page, packet.getDefaultVoltageTierOrdinal());
+                break;
+            }
+        }
+
+        refreshScreenIfActive(packet.getPageId());
+    }
+
+    private static void applyVoltageTierToPage(BoardPage page, int tierOrdinal) {
+        if (tierOrdinal >= 0 && tierOrdinal < GTVoltageTier.values().length) {
+            page.setDefaultVoltageTier(GTVoltageTier.values()[tierOrdinal]);
+        } else if (tierOrdinal < 0) {
+            page.setDefaultVoltageTier(null);
+        }
+    }
+
+    private static void refreshScreenIfActive(String pageId) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc != null && mc.screen instanceof BoardScreen bs) {
+            bs.refreshPageSettings(pageId);
         }
     }
 

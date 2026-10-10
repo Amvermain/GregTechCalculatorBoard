@@ -10,6 +10,8 @@ import com.gtceu.calcboard.client.gui.dialog.modal.IBoardModal;
 import com.gtceu.calcboard.client.gui.dialog.modal.ModalRenderContext;
 import com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer;
 import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
+import com.gtceu.calcboard.api.team.TeamWorkspacePage;
+import com.gtceu.calcboard.client.team.ClientWorkspaceState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -40,9 +42,27 @@ public class PageSettingsDialog implements IBoardModal {
     }
 
     public void open(BoardPage page) {
-        this.targetPage = (page != null) ? page : BoardManager.getInstance().getActivePage();
+        this.targetPage = (page != null) ? page : (parent != null ? parent.getActiveBoardPage() : BoardManager.getInstance().getActivePage());
         this.visible = true;
         this.pendingTooltip = null;
+    }
+
+    public void refreshPageSettings(String pageId) {
+        if (!visible || targetPage == null || (pageId != null && !targetPage.getId().equals(pageId))) {
+            return;
+        }
+        ClientWorkspaceState state = ClientWorkspaceState.getInstance();
+        if (state.isTeamMode()) {
+            TeamWorkspacePage remote = state.getRemotePage(targetPage.getId());
+            if (remote != null) {
+                if (remote.getDefaultVoltageTierOrdinal() >= 0 && remote.getDefaultVoltageTierOrdinal() < GTVoltageTier.values().length) {
+                    targetPage.setDefaultVoltageTier(GTVoltageTier.values()[remote.getDefaultVoltageTierOrdinal()]);
+                } else {
+                    targetPage.setDefaultVoltageTier(null);
+                }
+                targetPage.setAutoEquipEnergyHatches(remote.isAutoEquipEnergyHatches());
+            }
+        }
     }
 
     @Override
@@ -233,8 +253,11 @@ public class PageSettingsDialog implements IBoardModal {
                 } else {
                     targetPage.setDefaultVoltageTier(GTVoltageTier.getByIndex(i - 1));
                 }
-                BoardManager.getInstance().saveForCurrentContext();
+                if (!ClientWorkspaceState.getInstance().isTeamMode()) {
+                    BoardManager.getInstance().saveForCurrentContext();
+                }
                 parent.rebuildBoardWidgets();
+                ClientWorkspaceState.getInstance().syncPageSettingsIfTeamMode(targetPage);
                 TutorialManager.getInstance().onPageSettingsConfigured();
                 playClickSound();
                 return true;
@@ -246,7 +269,10 @@ public class PageSettingsDialog implements IBoardModal {
     private boolean handleAutoHatchClick(int x, int y, int w, double mouseX, double mouseY) {
         if (mouseX >= x && mouseX <= x + w && mouseY >= y && mouseY <= y + 16) {
             targetPage.setAutoEquipEnergyHatches(!targetPage.isAutoEquipEnergyHatches());
-            BoardManager.getInstance().saveForCurrentContext();
+            if (!ClientWorkspaceState.getInstance().isTeamMode()) {
+                BoardManager.getInstance().saveForCurrentContext();
+            }
+            ClientWorkspaceState.getInstance().syncPageSettingsIfTeamMode(targetPage);
             TutorialManager.getInstance().onPageSettingsConfigured();
             playClickSound();
             return true;

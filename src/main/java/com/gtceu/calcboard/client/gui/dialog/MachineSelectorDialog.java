@@ -66,10 +66,88 @@ public class MachineSelectorDialog implements IBoardModal {
     private static final int DIALOG_HEIGHT = 280;
     private static final int ROW_HEIGHT = 24;
 
+    private static final int PADDING_HORIZONTAL = 12;
+    private static final int PADDING_TOP = 8;
+    private static final int PADDING_BOTTOM = 10;
+    private static final int ELEMENT_SPACING = 6;
+
+    private static final int CLOSE_BUTTON_SIZE = 12;
+
+    private static final int TITLE_PADDING_TOP = 2;
+    private static final int TITLE_FONT_HEIGHT = 9;
+    private static final int HEADER_ROW_GAP = 5;
+
+    private static final int SEARCH_BOX_WIDTH = 140;
+    private static final int SEARCH_BOX_HEIGHT = 14;
+
+    private static final int LIST_PADDING_HORIZONTAL = 10;
+    private static final int LIST_PADDING_BOTTOM = 10;
+
     private record MachineBadge(String text, int fgColor, int bgColor, int borderColor) {}
 
     public MachineSelectorDialog(BoardScreen parent) {
         this.parent = parent;
+    }
+
+    public int getDialogX(int screenWidth) {
+        return (screenWidth - DIALOG_WIDTH) / 2;
+    }
+
+    public int getDialogY(int screenHeight) {
+        return (screenHeight - DIALOG_HEIGHT) / 2;
+    }
+
+    public int getCloseButtonX(int dialogX) {
+        return dialogX + DIALOG_WIDTH - PADDING_HORIZONTAL - CLOSE_BUTTON_SIZE;
+    }
+
+    public int getCloseButtonY(int dialogY) {
+        return dialogY + PADDING_TOP;
+    }
+
+    public int getSearchBoxX(int dialogX) {
+        return getCloseButtonX(dialogX) - ELEMENT_SPACING - SEARCH_BOX_WIDTH;
+    }
+
+    public int getSearchBoxY(int dialogY) {
+        return dialogY + PADDING_TOP + TITLE_PADDING_TOP + TITLE_FONT_HEIGHT + HEADER_ROW_GAP;
+    }
+
+    public int getListX(int dialogX) {
+        return dialogX + LIST_PADDING_HORIZONTAL;
+    }
+
+    public int getListY(int dialogY) {
+        return getSearchBoxY(dialogY) + SEARCH_BOX_HEIGHT + ELEMENT_SPACING;
+    }
+
+    public int getListWidth() {
+        return DIALOG_WIDTH - (LIST_PADDING_HORIZONTAL * 2);
+    }
+
+    public int getListHeight(int dialogY) {
+        return DIALOG_HEIGHT - (getListY(dialogY) - dialogY) - LIST_PADDING_BOTTOM;
+    }
+
+    public void updateSearchBoxBounds(int dialogX, int dialogY) {
+        if (searchBox == null) return;
+        searchBox.setX(getSearchBoxX(dialogX));
+        searchBox.setY(getSearchBoxY(dialogY));
+        searchBox.setWidth(SEARCH_BOX_WIDTH);
+    }
+
+    public EditBox getSearchBox() {
+        return searchBox;
+    }
+
+    @org.jetbrains.annotations.VisibleForTesting
+    public void setSearchBoxForTesting(EditBox searchBox) {
+        this.searchBox = searchBox;
+    }
+
+    @org.jetbrains.annotations.VisibleForTesting
+    public void setVisibleForTesting(boolean visible) {
+        this.visible = visible;
     }
 
     public boolean isVisible() {
@@ -83,19 +161,22 @@ public class MachineSelectorDialog implements IBoardModal {
         this.searchQuery = "";
         this.scrollY = 0.0;
 
-        int x = (parent.width - DIALOG_WIDTH) / 2;
-        int y = (parent.height - DIALOG_HEIGHT) / 2;
+        int screenWidth = parent != null ? parent.width : 800;
+        int screenHeight = parent != null ? parent.height : 600;
+        int dialogX = getDialogX(screenWidth);
+        int dialogY = getDialogY(screenHeight);
 
         Minecraft mc = Minecraft.getInstance();
         if (mc != null && mc.font != null) {
             this.searchBox = new EditBox(
                     mc.font,
-                    x + DIALOG_WIDTH - 170,
-                    y + 8,
-                    140,
-                    14,
-                    Component.literal("Search...")
+                    getSearchBoxX(dialogX),
+                    getSearchBoxY(dialogY),
+                    SEARCH_BOX_WIDTH,
+                    SEARCH_BOX_HEIGHT,
+                    Component.translatable("gui.gtcalcboard.search.placeholder")
             );
+            this.searchBox.setHint(Component.translatable("gui.gtcalcboard.search.placeholder"));
             this.searchBox.setMaxLength(30);
             this.searchBox.setValue("");
             this.searchBox.setResponder(text -> {
@@ -273,45 +354,45 @@ public class MachineSelectorDialog implements IBoardModal {
         Minecraft mc = Minecraft.getInstance();
         if (mc == null || mc.font == null) return;
         Font font = mc.font;
-        int x = (screenWidth - DIALOG_WIDTH) / 2;
-        int y = (screenHeight - DIALOG_HEIGHT) / 2;
+        int dialogX = getDialogX(screenWidth);
+        int dialogY = getDialogY(screenHeight);
 
         // Dim background
         graphics.fill(0, 0, screenWidth, screenHeight, 0x77000000);
 
         // Dialog base frame
-        graphics.fill(x, y, x + DIALOG_WIDTH, y + DIALOG_HEIGHT, 0xF0121722);
-        graphics.renderOutline(x, y, DIALOG_WIDTH, DIALOG_HEIGHT, 0xFF35425E);
-        graphics.renderOutline(x + 1, y + 1, DIALOG_WIDTH - 2, DIALOG_HEIGHT - 2, 0xFF1B2332);
+        graphics.fill(dialogX, dialogY, dialogX + DIALOG_WIDTH, dialogY + DIALOG_HEIGHT, 0xF0121722);
+        graphics.renderOutline(dialogX, dialogY, DIALOG_WIDTH, DIALOG_HEIGHT, 0xFF35425E);
+        graphics.renderOutline(dialogX + 1, dialogY + 1, DIALOG_WIDTH - 2, DIALOG_HEIGHT - 2, 0xFF1B2332);
 
         // Title Header
         String title = "§b🏛 " + Component.translatable("gui.gtcalcboard.machine_selector.title").getString();
-        graphics.drawString(font, title, x + 12, y + 10, 0xFFFFFFFF, false);
+        graphics.drawString(font, title, dialogX + PADDING_HORIZONTAL, dialogY + PADDING_TOP + TITLE_PADDING_TOP, 0xFFFFFFFF, false);
 
         // Subtitle (Current Node)
         String nodeSub = "§7" + Component.translatable("gui.gtcalcboard.machine_selector.for_node", node.getName()).getString();
-        graphics.drawString(font, nodeSub, x + 12, y + 22, 0xFF8FA0BA, false);
+        int subTitleY = dialogY + PADDING_TOP + TITLE_PADDING_TOP + font.lineHeight + 3;
+        graphics.drawString(font, nodeSub, dialogX + PADDING_HORIZONTAL, subTitleY, 0xFF8FA0BA, false);
 
         // Close Button [X]
-        int closeBtnX = x + DIALOG_WIDTH - 20;
-        int closeBtnY = y + 8;
-        boolean closeHover = mouseX >= closeBtnX && mouseX <= closeBtnX + 12 && mouseY >= closeBtnY && mouseY <= closeBtnY + 12;
-        graphics.fill(closeBtnX, closeBtnY, closeBtnX + 12, closeBtnY + 12, closeHover ? 0xFF9E2A2B : 0xFF2A344A);
-        graphics.renderOutline(closeBtnX, closeBtnY, 12, 12, closeHover ? 0xFFFF5555 : 0xFF425170);
-        graphics.drawCenteredString(font, "✕", closeBtnX + 6, closeBtnY + 2, closeHover ? 0xFFFFFFFF : 0xFF8FA0BA);
+        int closeBtnX = getCloseButtonX(dialogX);
+        int closeBtnY = getCloseButtonY(dialogY);
+        boolean closeHover = mouseX >= closeBtnX && mouseX <= closeBtnX + CLOSE_BUTTON_SIZE && mouseY >= closeBtnY && mouseY <= closeBtnY + CLOSE_BUTTON_SIZE;
+        graphics.fill(closeBtnX, closeBtnY, closeBtnX + CLOSE_BUTTON_SIZE, closeBtnY + CLOSE_BUTTON_SIZE, closeHover ? 0xFF9E2A2B : 0xFF2A344A);
+        graphics.renderOutline(closeBtnX, closeBtnY, CLOSE_BUTTON_SIZE, CLOSE_BUTTON_SIZE, closeHover ? 0xFFFF5555 : 0xFF425170);
+        graphics.drawCenteredString(font, "✕", closeBtnX + CLOSE_BUTTON_SIZE / 2, closeBtnY + 2, closeHover ? 0xFFFFFFFF : 0xFF8FA0BA);
 
         // Search Box
-        int searchX = x + DIALOG_WIDTH - 170;
-        int searchY = y + 24;
-        searchBox.setX(searchX);
-        searchBox.setY(searchY);
-        searchBox.render(graphics, mouseX, mouseY, 0);
+        if (searchBox != null) {
+            updateSearchBoxBounds(dialogX, dialogY);
+            searchBox.render(graphics, mouseX, mouseY, 0);
+        }
 
         // List Area
-        int listX = x + 10;
-        int listY = y + 44;
-        int listW = DIALOG_WIDTH - 20;
-        int listH = DIALOG_HEIGHT - 54;
+        int listX = getListX(dialogX);
+        int listY = getListY(dialogY);
+        int listW = getListWidth();
+        int listH = getListHeight(dialogY);
 
         graphics.fill(listX, listY, listX + listW, listY + listH, 0xFF0D121B);
         graphics.renderOutline(listX, listY, listW, listH, 0xFF263044);
@@ -494,20 +575,39 @@ public class MachineSelectorDialog implements IBoardModal {
         }
     }
 
+    @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        int screenWidth = parent != null ? parent.width : 800;
+        int screenHeight = parent != null ? parent.height : 600;
+        return mouseClicked(mouseX, mouseY, button, screenWidth, screenHeight);
+    }
+
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button, int screenWidth, int screenHeight) {
         if (!visible) return false;
 
-        int x = (parent.width - DIALOG_WIDTH) / 2;
-        int y = (parent.height - DIALOG_HEIGHT) / 2;
+        int dialogX = getDialogX(screenWidth);
+        int dialogY = getDialogY(screenHeight);
 
-        if (searchBox != null && searchBox.mouseClicked(mouseX, mouseY, button)) {
-            return true;
+        if (searchBox != null) {
+            updateSearchBoxBounds(dialogX, dialogY);
+            int sbX = getSearchBoxX(dialogX);
+            int sbY = getSearchBoxY(dialogY);
+            boolean inSearchBox = mouseX >= sbX && mouseX <= sbX + SEARCH_BOX_WIDTH
+                    && mouseY >= sbY && mouseY <= sbY + SEARCH_BOX_HEIGHT;
+            if (inSearchBox) {
+                searchBox.setFocused(true);
+                searchBox.mouseClicked(mouseX, mouseY, button);
+                return true;
+            } else if (button == 0) {
+                searchBox.setFocused(false);
+            }
         }
 
-        // Close Button
-        int closeBtnX = x + DIALOG_WIDTH - 20;
-        int closeBtnY = y + 8;
-        if (mouseX >= closeBtnX && mouseX <= closeBtnX + 12 && mouseY >= closeBtnY && mouseY <= closeBtnY + 12) {
+        int closeBtnX = getCloseButtonX(dialogX);
+        int closeBtnY = getCloseButtonY(dialogY);
+        if (mouseX >= closeBtnX && mouseX <= closeBtnX + CLOSE_BUTTON_SIZE
+                && mouseY >= closeBtnY && mouseY <= closeBtnY + CLOSE_BUTTON_SIZE) {
             close();
             Minecraft mc = Minecraft.getInstance();
             if (mc != null && mc.getSoundManager() != null) {
@@ -518,11 +618,10 @@ public class MachineSelectorDialog implements IBoardModal {
             return true;
         }
 
-        // Item row click
-        int listX = x + 10;
-        int listY = y + 44;
-        int listW = DIALOG_WIDTH - 20;
-        int listH = DIALOG_HEIGHT - 54;
+        int listX = getListX(dialogX);
+        int listY = getListY(dialogY);
+        int listW = getListWidth();
+        int listH = getListHeight(dialogY);
 
         if (mouseX >= listX && mouseX <= listX + listW && mouseY >= listY && mouseY <= listY + listH) {
             double vMouseY = mouseY - listY - 2 + scrollY;
@@ -538,15 +637,19 @@ public class MachineSelectorDialog implements IBoardModal {
             }
         }
 
-        // Consume click inside dialog
-        return mouseX >= x && mouseX <= x + DIALOG_WIDTH && mouseY >= y && mouseY <= y + DIALOG_HEIGHT;
+        return mouseX >= dialogX && mouseX <= dialogX + DIALOG_WIDTH
+                && mouseY >= dialogY && mouseY <= dialogY + DIALOG_HEIGHT;
     }
 
+    @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
         if (!visible) return false;
-        int x = (parent.width - DIALOG_WIDTH) / 2;
-        int y = (parent.height - DIALOG_HEIGHT) / 2;
-        if (mouseX >= x && mouseX <= x + DIALOG_WIDTH && mouseY >= y && mouseY <= y + DIALOG_HEIGHT) {
+        int screenWidth = parent != null ? parent.width : 800;
+        int screenHeight = parent != null ? parent.height : 600;
+        int dialogX = getDialogX(screenWidth);
+        int dialogY = getDialogY(screenHeight);
+        if (mouseX >= dialogX && mouseX <= dialogX + DIALOG_WIDTH
+                && mouseY >= dialogY && mouseY <= dialogY + DIALOG_HEIGHT) {
             scrollY -= delta * ROW_HEIGHT;
             scrollY = Math.max(0, Math.min(scrollY, maxScrollY));
             return true;
@@ -554,6 +657,7 @@ public class MachineSelectorDialog implements IBoardModal {
         return false;
     }
 
+    @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         if (!visible) return false;
 
@@ -582,11 +686,24 @@ public class MachineSelectorDialog implements IBoardModal {
         return false;
     }
 
+    @Override
     public boolean charTyped(char codePoint, int modifiers) {
         if (!visible) return false;
         if (searchBox != null && searchBox.isFocused()) {
             return searchBox.charTyped(codePoint, modifiers);
         }
         return false;
+    }
+
+    @Override
+    public net.minecraft.client.gui.components.events.GuiEventListener getFocusedWidget() {
+        return searchBox != null && searchBox.isFocused() ? searchBox : null;
+    }
+
+    @Override
+    public void tick() {
+        if (searchBox != null) {
+            searchBox.tick();
+        }
     }
 }

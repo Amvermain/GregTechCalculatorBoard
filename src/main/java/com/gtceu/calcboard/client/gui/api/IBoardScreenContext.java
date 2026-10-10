@@ -10,6 +10,7 @@ import com.gtceu.calcboard.client.gui.dialog.*;
 import com.gtceu.calcboard.client.gui.widget.*;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * Composite context interface aggregating viewport access, selection handling,
@@ -83,9 +84,18 @@ public interface IBoardScreenContext extends IBoardViewportAccessor, IBoardSelec
 
     PageSettingsDialog getPageSettingsDialog();
 
+    default BoardPage getActiveBoardPage() {
+        com.gtceu.calcboard.client.team.ClientWorkspaceState state = com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance();
+        return state.isTeamMode()
+                ? state.getTeamPageAsBoardPage(state.getActiveTeamPageId())
+                : com.gtceu.calcboard.api.storage.BoardManager.getInstance().getActivePage();
+    }
+
     void openPageSettingsDialog(BoardPage page);
 
     void openPageSettingsDialog();
+
+    default void refreshPageSettings(String pageId) {}
 
     default BatchRunCalculatorDialog getBatchRunDialog() { return null; }
 
@@ -110,4 +120,8 @@ public interface IBoardScreenContext extends IBoardViewportAccessor, IBoardSelec
     void onNodeInspectorClosed();
 
     void onSummaryOverlayToggled();
+ 
+    default Set<String> getEffectiveSelectedNodeIds() {
+        return getEffectiveSelectedNodeIds(getGraph());
+    }
 }

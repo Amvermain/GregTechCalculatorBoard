@@ -20,8 +20,27 @@ public record SearchableRecipe(
         ResourceLocation[] outputIds,
         String[] inputNames,
         String[] outputNames,
-        boolean isSupported
+        boolean isSupported,
+        String workstationIndex
 ) {
+    public SearchableRecipe(
+            Object recipe,
+            ResourceLocation recipeId,
+            String displayName,
+            String modId,
+            String categoryId,
+            String categoryName,
+            String inputIndex,
+            String outputIndex,
+            ResourceLocation[] inputIds,
+            ResourceLocation[] outputIds,
+            String[] inputNames,
+            String[] outputNames,
+            boolean isSupported
+    ) {
+        this(recipe, recipeId, displayName, modId, categoryId, categoryName, inputIndex, outputIndex, inputIds, outputIds, inputNames, outputNames, isSupported, "");
+    }
+
     public SearchableRecipe(
             Object recipe,
             String displayName,
@@ -36,7 +55,7 @@ public record SearchableRecipe(
             String[] outputNames,
             boolean isSupported
     ) {
-        this(recipe, null, displayName, modId, categoryId, categoryName, inputIndex, outputIndex, inputIds, outputIds, inputNames, outputNames, isSupported);
+        this(recipe, null, displayName, modId, categoryId, categoryName, inputIndex, outputIndex, inputIds, outputIds, inputNames, outputNames, isSupported, "");
     }
 
     public SearchableRecipe(
@@ -52,7 +71,7 @@ public record SearchableRecipe(
             String[] inputNames,
             String[] outputNames
     ) {
-        this(recipe, null, displayName, modId, categoryId, categoryName, inputIndex, outputIndex, inputIds, outputIds, inputNames, outputNames, true);
+        this(recipe, null, displayName, modId, categoryId, categoryName, inputIndex, outputIndex, inputIds, outputIds, inputNames, outputNames, true, "");
     }
 
     public SearchableRecipe(
@@ -64,7 +83,7 @@ public record SearchableRecipe(
             String inputIndex,
             String outputIndex
     ) {
-        this(recipe, null, displayName, modId, categoryId, categoryName, inputIndex, outputIndex, null, null, null, null, true);
+        this(recipe, null, displayName, modId, categoryId, categoryName, inputIndex, outputIndex, null, null, null, null, true, "");
     }
 
     public boolean hasExactInput(ResourceLocation id) {
@@ -131,5 +150,14 @@ public record SearchableRecipe(
 
     public String outputSearchIndex() {
         return outputIndex != null ? outputIndex : "";
+    }
+
+    public boolean hasWorkstation(String token) {
+        if (token == null || token.isEmpty()) return false;
+        return workstationIndex != null && workstationIndex.contains(token.toLowerCase(Locale.ROOT));
+    }
+
+    public String workstationSearchIndex() {
+        return workstationIndex != null ? workstationIndex : "";
     }
 }

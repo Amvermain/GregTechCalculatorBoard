@@ -6,8 +6,11 @@ import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceLocation;
 
+import com.gtceu.calcboard.api.property.NodeBadge;
+import com.gtceu.calcboard.api.property.NodeBadgeRegistry;
 import com.gtceu.calcboard.api.solver.FlowGraphTopologyAnalyzer;
 import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
+import net.minecraft.network.chat.Component;
 
 import java.util.*;
 
@@ -51,6 +54,7 @@ public class CanvasGroupFrame {
     private boolean isSharedMachineFrame = false;
     private double targetPoolCapacity = 1.0;
     private boolean isFolded = false;
+    private boolean isFlipped = false;
     private PoolViewMode poolViewMode = PoolViewMode.EXPANDED_FRAME;
     private ResourceLocation sharedMachineId = null;
     private ResourceLocation sharedRecipeCategoryId = null;
@@ -322,6 +326,9 @@ public class CanvasGroupFrame {
             tag.putDouble("savedUnfoldedWidth", savedUnfoldedWidth);
             tag.putDouble("savedUnfoldedHeight", savedUnfoldedHeight);
         }
+        if (isFlipped) {
+            tag.putBoolean("isFlipped", true);
+        }
         if (poolViewMode != null) {
             tag.putString("poolViewMode", poolViewMode.name());
         }
@@ -364,6 +371,9 @@ public class CanvasGroupFrame {
             if (tag.contains("targetPoolCapacity")) {
                 frame.setTargetPoolCapacity(tag.getDouble("targetPoolCapacity"));
             }
+        }
+        if (tag.getBoolean("isFlipped")) {
+            frame.setFlipped(true);
         }
         if (tag.getBoolean("isFolded")) {
             frame.setFolded(true);
@@ -724,6 +734,11 @@ public class CanvasGroupFrame {
         if (this.savedUnfoldedHeight > 0) {
             this.height = Math.max(MIN_HEIGHT, this.savedUnfoldedHeight);
         }
+        if (graph != null) {
+            for (RecipeNode n : getEnclosedNodes(graph.getNodes())) {
+                containedNodeIds.add(n.getId());
+            }
+        }
         relayoutEmbeddedCards(graph);
     }
 
@@ -892,6 +907,14 @@ public class CanvasGroupFrame {
         }
     }
 
+    public boolean isFlipped() {
+        return isFlipped;
+    }
+
+    public void setFlipped(boolean flipped) {
+        this.isFlipped = flipped;
+    }
+
     public boolean isFolded() {
         return getViewMode() == PoolViewMode.FOLDED_CARD;
     }
@@ -986,6 +1009,39 @@ public class CanvasGroupFrame {
             total += node.getBaseEUt() * node.getMachineCount();
         }
         return total;
+    }
+
+    public boolean hasOperationalWarnings(FlowGraph graph) {
+        if (graph == null) return false;
+        for (RecipeNode n : getEnclosedNodes(graph)) {
+            if (n == null || n.isReroute()) continue;
+            if (!n.isOperational(graph) || !n.getOperationalWarnings(graph).isEmpty()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public List<Component> getOperationalWarnings(FlowGraph graph) {
+        if (graph == null) return Collections.emptyList();
+        List<Component> allWarnings = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        for (RecipeNode n : getEnclosedNodes(graph)) {
+            if (n == null || n.isReroute()) continue;
+            for (Component w : n.getOperationalWarnings(graph)) {
+                if (w != null && seen.add(w.getString())) {
+                    allWarnings.add(w);
+                }
+            }
+        }
+        return allWarnings;
+    }
+
+    public List<NodeBadge> getSharedBadges(FlowGraph graph) {
+        if (graph == null) return Collections.emptyList();
+        RecipeNode master = getFirstOperationalNode(graph);
+        if (master == null) return Collections.emptyList();
+        return NodeBadgeRegistry.getBadgesForNode(master, graph);
     }
 }
 

@@ -291,4 +291,42 @@ public class MultiblockEnergyParallelOverclockTest {
         double rateWithBatch = node.calculateSingleMachineOutputRate(node.getOutputs().get(0));
         Assertions.assertEquals(6990506.67, rateWithBatch, 1.0, "Rate with batching must stay identical: 6,990,506.67 items/s");
     }
+
+    @Test
+    public void testLargeCentrifuge16xParallelWith2AHVEnergyHatchDoesNotOverclockIntoSecondAmp() {
+        ResourceLocation centrifugeId = ResourceLocation.tryParse("gtceu:large_centrifuge");
+        MultiblockDetector.registerMultiblock(centrifugeId);
+        MultiblockDetector.registerParallelHatchController(centrifugeId);
+
+        RecipeNode node = RecipeNode.create(centrifugeId, "Sea Water Centrifuging", 50.0, 15.0, GTVoltageTier.LV);
+        node.setMultiblock(true);
+        node.setTargetTier(GTVoltageTier.HV);
+
+        ResourceLocation parHatchId = ResourceLocation.tryParse("gtceu:advanced_parallel_hatch");
+        GTParallelHatchAddon parHatch = new GTParallelHatchAddon(
+                parHatchId.toString(), "Advanced Parallel Hatch", "16x Parallel", parHatchId, 16, false
+        );
+        node.getAddons().add(parHatch);
+
+        ResourceLocation energyHatchId = ResourceLocation.tryParse("gtceu:hv_energy_input_hatch_2a");
+        GTEnergyHatchAddon energyHatch = new GTEnergyHatchAddon(
+                energyHatchId.toString(), "2A HV Energy Hatch", "2A HV", energyHatchId,
+                GTVoltageTier.HV, 2, false, false, false
+        );
+        node.getAddons().add(energyHatch);
+
+        node.getOutputs().add(com.gtceu.calcboard.api.model.IngredientStack.item(
+                ResourceLocation.tryParse("minecraft:sand"), "Mineral Sand", 1.0, 1.0));
+
+        node.markOverclockDirty();
+
+        Assertions.assertEquals(16, node.getTotalParallel(), "Should run 16 parallels");
+        Assertions.assertEquals(0, node.getOverclockResult().overclocks(), "Overclocks must be 0 because 960 EU/t exceeds 1A HV limit (512 EU/t)");
+        Assertions.assertEquals(2.50, node.getEffectiveDurationSeconds(), 1e-4, "Duration must remain 2.50s");
+        Assertions.assertEquals(240.0, node.getSingleMachineEUt(), 1e-4, "Total consumption must be 240.0 EU/t (0.47A HV), not 960.0 EU/t (1.9A HV)");
+
+        double rate = node.calculateSingleMachineOutputRate(node.getOutputs().get(0));
+        Assertions.assertEquals(6.4, rate, 1e-4, "Output rate must be 6.4/s (matching 16x 1A LV centrifuges), not 12.8/s");
+    }
 }
+
