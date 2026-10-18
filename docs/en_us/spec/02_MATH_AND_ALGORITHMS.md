@@ -70,9 +70,10 @@ $$\text{Cycles Per Second (CPS)} = 20.0 \times \text{BatchesPerTick} \times \tex
 
 ### 1.4 Hardware Addon Compounding
 
-For all installed addons $a \in \text{InstalledAddons}$, duration and power multipliers compound multiplicatively:
+For all installed addons $a \in \text{InstalledAddons}$, duration and power multipliers compound multiplicatively. Heating coil (`MachineAddon.Category.COIL`) speed multipliers are applied before overclocking with floor rounding ($\lfloor \text{BaseDurationTicks} \times \text{CoilDurationMult} \rfloor$), whereas non-coil duration multipliers compound after overclocking:
 
-$$\text{Total Duration} = \text{Effective Duration} \times \prod_{a \in \text{Addons}} a.\text{getDurationMultiplier}()$$
+$$\text{Pre-OC Base Duration} = \max\left(1.0, \, \left\lfloor \text{BaseDurationTicks} \times \prod_{c \in \text{Coils}} c.\text{getDurationMultiplier}() \right\rfloor\right)$$
+$$\text{Total Duration} = \text{Effective Duration} \times \prod_{a \in \text{Addons} \setminus \text{Coils}} a.\text{getDurationMultiplier}()$$
 $$\text{Total EU/t} = \text{Effective EU/t} \times \prod_{a \in \text{Addons}} a.\text{getEutMultiplier}()$$
 
 #### Heating Coil Machine-Specific Bonus Deduction
@@ -130,6 +131,13 @@ $$\text{Rotor Replacement Rate (Items/hour)} = \frac{3600.0}{T_{\text{lifespan}}
   - Active Boost ($\text{WS}_2$ + Bose-Einstein Condensate Oganesson, $\text{BEC-Og}$): $\text{WS}_2$ $2,500\text{ B/hr}$, $\text{BEC-Og}$ $800\text{ B/hr} = 222.22\text{ mB/s}$ (3.0x power multiplier)
   - Unboosted: 0.8x penalty multiplier
 - **Invariance Rule**: Booster fluid is injected continuously per machine time unit, scaling strictly with machine count ($N$) regardless of parallel factor ($P$) or rotor efficiency.
+
+##### 5. Star Technology Bacterial Hydrocarbon Harvester (BHH) Colony Stat Scaling Formulas (ADR-067)
+Given colony Production $P \in [1, 5]$ and Metabolism $M \in [1, 5]$ (JEI/EMI representative recipe defaults: $P = 5, M = 5$), per-cycle input and output ports are projected dynamically:
+- **Sugar Consumption (`minecraft:sugar`)**: $Q_{\text{sugar}} = 2^M \text{ items}$ (`1 << M`)
+- **Biomass Consumption (`gtceu:biomass`)**: $Q_{\text{biomass}} = 100 \times 2^M \text{ mB}$ (`100 << M`)
+- **Fluid Output Yields (5 fluids)**: $Q_{\text{out}} = \left(\frac{Q_{\text{rep}}}{5.0}\right) \times P \text{ mB}$
+- **Constant Inputs**: Distilled Water ($1,000\text{ mB}$) and the bacteria colony item ($1\text{x}$) remain constant across all stat tiers.
 
 #### Power Supply Based Maximum Available Machine Parallel ($P_{\max}$) & Overclocking Capacity
 Given equipped Energy Hatch voltage $V_{\text{hatch}}$, amperage $A_{\text{hatch}}$, and single recipe power $E_{\text{recipe}}$:

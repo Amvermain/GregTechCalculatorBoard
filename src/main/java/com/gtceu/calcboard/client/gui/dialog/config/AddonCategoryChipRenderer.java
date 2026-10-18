@@ -54,6 +54,7 @@ public final class AddonCategoryChipRenderer {
             if (cat != null && !cat.equals(AddonCategory.CUSTOM) && !cat.equals(AddonCategory.MANUAL_OVERRIDE) && !list.contains(cat)) {
                 if (cat.equals(AddonCategory.THREADING)
                         || cat.equals(AddonCategory.MCF_MODULE)
+                        || cat.equals(AddonCategory.BACTERIA_STATS)
                         || (cat.equals(AddonCategory.HEATER) && com.gtceu.calcboard.compat.create.CreateProperties.isCreateBoiler(node))
                         || activeCategories.contains(cat)) {
                     list.add(cat);

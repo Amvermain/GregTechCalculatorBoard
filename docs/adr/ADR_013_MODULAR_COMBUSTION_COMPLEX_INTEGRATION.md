@@ -72,9 +72,9 @@ flowchart TD
 ```
 
 ### 2.2 슬롯 구성 및 결정론적 직렬화 모델 (`MCFSlotConfiguration`)
-- `MCFModuleType`: 4대 모듈 타입(`UCM`, `SCM`, `SRM`, `NRM`)의 기본 전압, 베이스/부스트 Amps, 윤활유 및 산화제 규격을 상수로 캡슐화.
-- `MCFFuel`: 모듈별 지원 연료 레시피(Cetane Diesel, Gasoline, High Octane Gasoline, Rocket Fuels 등) 및 EU/t, 소모량 정의.
-- `MCFModuleSlot`: 슬롯 활성화 여부, 모듈 타입, 선택 연료, 산화제 부스트 토글 상태 관리.
+- `MCFModuleType`: 4대 모듈 타입(`UCM`, `SCM`, `SRM`, `NRM`)의 기본 전압, 베이스/부스트 Amps, 윤활유 및 산화제 규격을 상수로 캡슐화하고, 아키타입별 사용 가능 연료 목록(`getAvailableFuels()`) 및 기본 연료(`getDefaultFuel()`) 제공.
+- `MCFFuel`: 모듈 타입별 전용 연료 레시피(연소기: Cetane Diesel, Gasoline, High Octane Gas, Diesel, Bio Diesel / 로켓: Rocket Fuel, RP-1, Monomethylhydrazine, Sorbitol Hypergolic Fuel) 및 EU/t, 소모량 정의.
+- `MCFModuleSlot`: 슬롯 활성화 여부, 모듈 타입, 선택 연료(모듈 변경 시 유효 연료로 자동 보정), 산화제 부스트 토글 상태 관리.
 - `MCFSlotConfiguration`: 8개 슬롯 고정 배열, 빠른 프리셋 생성(`create8xUCM`, `create8xSCM`), 불변 복사(`copy`), JSON 직렬화/역직렬화 지원.
 - `NodePropertyStore` 연동: `GTCEuProperties.MCF_COOLANT_TYPE` ("none", "distilled_water", "deionized_water") 및 `GTCEuProperties.MCF_SLOTS_DATA` (JSON 배열).
 

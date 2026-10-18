@@ -154,4 +154,79 @@ public class FractionalAutoRatioTest {
         Assertions.assertEquals(1.0, dt.getMachineCount(), 0.001);
         Assertions.assertEquals(3.0, solidifier.getMachineCount(), 0.001);
     }
+
+    @Test
+    public void testDownstreamMachineCountGreaterThanOneCeilsInIntegerAutoRatio() {
+        FlowGraph graph = new FlowGraph();
+        ResourceLocation dustA = ResourceLocation.tryParse("gtceu:dust_a");
+        ResourceLocation dustB = ResourceLocation.tryParse("gtceu:dust_b");
+        ResourceLocation dustC = ResourceLocation.tryParse("gtceu:dust_c");
+        ResourceLocation dustD = ResourceLocation.tryParse("gtceu:dust_d");
+        ResourceLocation dustE = ResourceLocation.tryParse("gtceu:dust_e");
+        ResourceLocation dustF = ResourceLocation.tryParse("gtceu:dust_f");
+        ResourceLocation ingotFinal = ResourceLocation.tryParse("gtceu:ingot_final");
+
+        RecipeNode electromagnet = RecipeNode.create(ResourceLocation.tryParse("gtceu:electromagnet"), "Large Electromagnet", 20, 30, GTVoltageTier.LuV);
+        electromagnet.setBaseNode(true);
+        electromagnet.setMachineCount(1.0);
+        electromagnet.getOutputs().add(IngredientStack.item(dustA, "Dust A", 2.4));
+        electromagnet.getOutputs().add(IngredientStack.item(dustB, "Dust B", 1.2));
+        graph.addNode(electromagnet);
+
+        RecipeNode centrifugal = RecipeNode.create(ResourceLocation.tryParse("gtceu:centrifugal"), "Large Centrifugal Unit", 20, 30, GTVoltageTier.ZPM);
+        centrifugal.getInputs().add(IngredientStack.item(dustA, "Dust A", 9.6));
+        centrifugal.getOutputs().add(IngredientStack.item(dustC, "Dust C", 4.2667));
+        graph.addNode(centrifugal);
+
+        RecipeNode electrolysis = RecipeNode.create(ResourceLocation.tryParse("gtceu:electrolysis"), "Large Electrolysis Chamber", 20, 30, GTVoltageTier.ZPM);
+        electrolysis.getInputs().add(IngredientStack.item(dustC, "Dust C", 4.2667));
+        electrolysis.getOutputs().add(IngredientStack.item(dustD, "Dust D", 2.1333));
+        graph.addNode(electrolysis);
+
+        RecipeNode ecrBottom = RecipeNode.create(ResourceLocation.tryParse("gtceu:ecr_bottom"), "Extreme Chemical Reactor 1", 20, 30, GTVoltageTier.ZPM);
+        ecrBottom.getInputs().add(IngredientStack.item(dustB, "Dust B", 5.0));
+        ecrBottom.getOutputs().add(IngredientStack.item(dustD, "Dust D", 2.0));
+        graph.addNode(ecrBottom);
+
+        RecipeNode ecrMid = RecipeNode.create(ResourceLocation.tryParse("gtceu:ecr_mid"), "Extreme Chemical Reactor 2", 20, 30, GTVoltageTier.ZPM);
+        ecrMid.getInputs().add(IngredientStack.item(dustD, "Dust D", 2.9804));
+        ecrMid.getOutputs().add(IngredientStack.item(dustE, "Dust E", 4.4706));
+        graph.addNode(ecrMid);
+
+        RecipeNode ecrRight = RecipeNode.create(ResourceLocation.tryParse("gtceu:ecr_right"), "Extreme Chemical Reactor 3", 20, 30, GTVoltageTier.ZPM);
+        ecrRight.getInputs().add(IngredientStack.item(dustE, "Dust E", 4.6061));
+        ecrRight.getOutputs().add(IngredientStack.item(dustF, "Dust F", 7.6757));
+        graph.addNode(ecrRight);
+
+        RecipeNode rotaryHearth = RecipeNode.create(ResourceLocation.tryParse("gtceu:rotary_hearth"), "Rotary Hearth Furnace", 20, 30, GTVoltageTier.UV);
+        rotaryHearth.getInputs().add(IngredientStack.item(dustF, "Dust F", 1.5445));
+        rotaryHearth.getOutputs().add(IngredientStack.item(ingotFinal, "Final Ingot", 0.3089));
+        graph.addNode(rotaryHearth);
+
+        graph.addConnection(electromagnet.getId(), 0, centrifugal.getId(), 0);
+        graph.addConnection(centrifugal.getId(), 0, electrolysis.getId(), 0);
+        graph.addConnection(electromagnet.getId(), 1, ecrBottom.getId(), 0);
+        graph.addConnection(electrolysis.getId(), 0, ecrMid.getId(), 0);
+        graph.addConnection(ecrBottom.getId(), 0, ecrMid.getId(), 0);
+        graph.addConnection(ecrMid.getId(), 0, ecrRight.getId(), 0);
+        graph.addConnection(ecrRight.getId(), 0, rotaryHearth.getId(), 0);
+
+        graph.autoRatioFractional(electromagnet);
+        Assertions.assertEquals(0.25, centrifugal.getMachineCount(), 0.01);
+        Assertions.assertEquals(0.25, electrolysis.getMachineCount(), 0.01);
+        Assertions.assertEquals(0.24, ecrBottom.getMachineCount(), 0.01);
+        Assertions.assertEquals(0.34, ecrMid.getMachineCount(), 0.01);
+        Assertions.assertEquals(0.33, ecrRight.getMachineCount(), 0.01);
+        Assertions.assertEquals(1.64, rotaryHearth.getMachineCount(), 0.02);
+
+        graph.autoRatioFromAnchor(electromagnet);
+        Assertions.assertEquals(1.0, electromagnet.getMachineCount(), 0.001);
+        Assertions.assertEquals(1.0, centrifugal.getMachineCount(), 0.001);
+        Assertions.assertEquals(1.0, electrolysis.getMachineCount(), 0.001);
+        Assertions.assertEquals(1.0, ecrBottom.getMachineCount(), 0.001);
+        Assertions.assertEquals(1.0, ecrMid.getMachineCount(), 0.001);
+        Assertions.assertEquals(1.0, ecrRight.getMachineCount(), 0.001);
+        Assertions.assertEquals(2.0, rotaryHearth.getMachineCount(), 0.001,
+                "Downstream machine requiring 1.64 machines must be rounded up (CEIL) to 2.0, not floored to 1.0!");
+    }
 }

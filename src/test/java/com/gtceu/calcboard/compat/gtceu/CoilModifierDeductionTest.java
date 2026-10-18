@@ -342,5 +342,30 @@ public class CoilModifierDeductionTest {
             com.gtceu.calcboard.api.util.ModCompatHelper.clearTestOverrides();
         }
     }
+
+    @Test
+    @DisplayName("Verify Coil Boost duration multiplier is applied and floored before Overclock steps")
+    public void testCoilBoostAppliedAndFlooredBeforeOverclock() {
+        com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.clearCache();
+        com.gtceu.calcboard.api.util.ModCompatHelper.setTestOverride("start_core", true);
+
+        try {
+            ResourceLocation ecrId = ResourceLocation.tryParse("gtceu:extreme_chemical_reactor");
+            RecipeNode node = RecipeNode.create(ecrId, "Sodium Persulfate", 30.0, 960.0, GTVoltageTier.EV);
+            node.setMultiblock(true);
+            node.setTargetTier(GTVoltageTier.LuV);
+
+            CoilHelper.CoilStats tritaniumStats = CoilHelper.getCoilStats("gtceu:tritanium_coil_block");
+            GTCoilAddon tritaniumCoil = new GTCoilAddon("gtceu:tritanium_coil_block", "Tritanium Coil Block", "10800K", null, tritaniumStats);
+            CoilHelper.installCoil(node, tritaniumCoil);
+
+            Assertions.assertEquals(3.0, node.getOverclockResult().durationTicks(), 1e-6);
+            Assertions.assertEquals(0.15, node.getEffectiveDurationSeconds(), 1e-6);
+        } finally {
+            com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.clearCache();
+            com.gtceu.calcboard.api.util.ModCompatHelper.clearTestOverrides();
+        }
+    }
 }
+
 

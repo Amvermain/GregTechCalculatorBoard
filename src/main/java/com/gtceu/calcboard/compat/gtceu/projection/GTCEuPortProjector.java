@@ -77,7 +77,7 @@ public final class GTCEuPortProjector implements IPortProjectionProvider {
     private static void appendCoreInputs(RecipeNode node, RecipeSpec baseSpec, List<ProjectedPort> ports) {
         List<IngredientStack> coreInputs;
         if (baseSpec != null && baseSpec.baseInputs() != null && !baseSpec.baseInputs().isEmpty()) {
-            coreInputs = baseSpec.baseInputs();
+            coreInputs = INSTANCE.sanitizeLegacyCoreInputs(node, baseSpec.baseInputs());
         } else if (node != null && node.getInputs() != null && !node.getInputs().isEmpty()) {
             coreInputs = INSTANCE.sanitizeLegacyCoreInputs(node, node.getInputs());
         } else {
@@ -230,24 +230,9 @@ public final class GTCEuPortProjector implements IPortProjectionProvider {
             if (isSteam && in.isFluid() && STEAM_ID != null && STEAM_ID.equals(in.getId())) {
                 continue;
             }
-            if (node != null && GTCombustionHelper.isModularCombustionFrame(node) && in.isFluid()) {
+            if (node != null && (GTCombustionHelper.isCombustionEngine(node) || GTCombustionHelper.isModularCombustionFrame(node)) && in.isFluid()) {
                 ResourceLocation id = in.getId();
-                if (GTCombustionHelper.DISTILLED_WATER.equals(id)
-                        || GTCombustionHelper.DEIONIZED_WATER.equals(id)
-                        || GTCombustionHelper.LUBRICANT.equals(id)
-                        || GTCombustionHelper.TUNGSTEN_DISULFIDE.equals(id)) {
-                    continue;
-                }
-            }
-            if (node != null && GTCombustionHelper.isCombustionEngine(node) && in.isFluid()) {
-                ResourceLocation id = in.getId();
-                if (ResourceLocation.tryParse("gtceu:oxygen").equals(id)
-                        || ResourceLocation.tryParse("gtceu:liquid_oxygen").equals(id)
-                        || GTCombustionHelper.LUBRICANT.equals(id)
-                        || GTCombustionHelper.TUNGSTEN_DISULFIDE.equals(id)
-                        || GTCombustionHelper.RED_FUMING_NITRIC_ACID.equals(id)
-                        || GTCombustionHelper.DIOXYGEN_DIFLUORIDE.equals(id)
-                        || GTCombustionHelper.FERROCENIUM_SUPEROXIDE.equals(id)) {
+                if (GTCombustionHelper.COMBUSTION_AUXILIARY_FLUIDS.contains(id)) {
                     continue;
                 }
             }

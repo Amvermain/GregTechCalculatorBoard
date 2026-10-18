@@ -64,6 +64,7 @@ public class MachineConfigDialog implements IBoardModal {
     private final ThreadingHelixView threadingHelixView;
     private final com.gtceu.calcboard.client.gui.compat.create.CreateBoilerConfigView createBoilerConfigView;
     private final MCFConfigView mcfConfigView;
+    private final com.gtceu.calcboard.client.gui.dialog.config.BacteriaStatsConfigView bacteriaStatsConfigView;
     private final RecipeOverrideView recipeOverrideView;
 
     // Top Base Parallel EditBox
@@ -94,6 +95,7 @@ public class MachineConfigDialog implements IBoardModal {
         this.threadingHelixView = new ThreadingHelixView(this);
         this.createBoilerConfigView = new com.gtceu.calcboard.client.gui.compat.create.CreateBoilerConfigView(this);
         this.mcfConfigView = new MCFConfigView(this);
+        this.bacteriaStatsConfigView = new com.gtceu.calcboard.client.gui.dialog.config.BacteriaStatsConfigView(this);
         this.recipeOverrideView = new RecipeOverrideView(this);
     }
 
@@ -217,6 +219,9 @@ public class MachineConfigDialog implements IBoardModal {
         }
         if (com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isModularCombustionFrame(node)) {
             return AddonCategory.MCF_MODULE;
+        }
+        if (com.gtceu.calcboard.compat.start.projection.StarTPortProjector.isBacterialHarvester(node)) {
+            return AddonCategory.BACTERIA_STATS;
         }
         if (MachineAddon.isCombustionMachine(node) && node.isMultiblock()) {
             return AddonCategory.MULTIBLOCK_TRAIT;
@@ -568,6 +573,8 @@ public class MachineConfigDialog implements IBoardModal {
             createBoilerConfigView.render(graphics, font, node, catalogStartX + 4, catalogStartY + 4, catalogW - 8, catalogH - 8, virtualMouseX, virtualMouseY);
         } else if (selectedCategory == AddonCategory.MCF_MODULE && com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isModularCombustionFrame(node)) {
             mcfConfigView.render(graphics, font, node, catalogStartX + 4, catalogStartY + 4, catalogW - 8, catalogH - 8, virtualMouseX, virtualMouseY);
+        } else if (selectedCategory == AddonCategory.BACTERIA_STATS && com.gtceu.calcboard.compat.start.projection.StarTPortProjector.isBacterialHarvester(node)) {
+            bacteriaStatsConfigView.render(graphics, font, node, catalogStartX + 4, catalogStartY + 4, catalogW - 8, catalogH - 8, virtualMouseX, virtualMouseY);
         } else {
             addonCatalogView.renderCatalogGrid(graphics, font, node, catalogStartX + 4, catalogStartY + 4, catalogW - 8, catalogH - 8, virtualMouseX, virtualMouseY);
         }
@@ -817,6 +824,12 @@ public class MachineConfigDialog implements IBoardModal {
             return createBoilerConfigView.mouseClicked(node, catalogStartX + 4, catalogStartY + 4, catalogW - 8, catalogH - 8, mX, mY, button, parent);
         } else if (selectedCategory == AddonCategory.MCF_MODULE && com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isModularCombustionFrame(node)) {
             if (mcfConfigView.mouseClicked(catalogStartX + 4, catalogStartY + 4, catalogW - 8, catalogH - 8, mX, mY, button, node, parent)) {
+                if (parent != null) parent.markSummaryDirty();
+                return true;
+            }
+            return true;
+        } else if (selectedCategory == AddonCategory.BACTERIA_STATS && com.gtceu.calcboard.compat.start.projection.StarTPortProjector.isBacterialHarvester(node)) {
+            if (bacteriaStatsConfigView.mouseClicked(catalogStartX + 4, catalogStartY + 4, catalogW - 8, catalogH - 8, mX, mY, button, node, parent)) {
                 if (parent != null) parent.markSummaryDirty();
                 return true;
             }

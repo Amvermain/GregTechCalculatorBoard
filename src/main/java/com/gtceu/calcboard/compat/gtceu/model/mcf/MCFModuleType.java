@@ -4,6 +4,8 @@ import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper;
 import net.minecraft.resources.ResourceLocation;
 
+import java.util.List;
+
 /**
  * Enumeration of Star Technology modular combustion and rocket module multiblock archetypes.
  */
@@ -81,6 +83,54 @@ public enum MCFModuleType {
         MCFModuleType[] vals = values();
         return vals[(ordinal() + 1) % vals.length];
     }
+
+    public boolean isRocket() {
+        return this == SRM || this == NRM;
+    }
+
+    public List<MCFFuel> getAvailableFuels() {
+        if (isRocket()) {
+            return ROCKET_FUELS;
+        }
+        return COMBUSTION_FUELS;
+    }
+
+    public MCFFuel getDefaultFuel() {
+        return isRocket() ? MCFFuel.ROCKET_FUEL : MCFFuel.CETANE_DIESEL;
+    }
+
+    public boolean isValidFuel(MCFFuel fuel) {
+        return fuel != null && getAvailableFuels().contains(fuel);
+    }
+
+    public MCFFuel getNextFuel(MCFFuel current) {
+        List<MCFFuel> fuels = getAvailableFuels();
+        int idx = fuels.indexOf(current);
+        if (idx < 0) return getDefaultFuel();
+        return fuels.get((idx + 1) % fuels.size());
+    }
+
+    public MCFFuel getPreviousFuel(MCFFuel current) {
+        List<MCFFuel> fuels = getAvailableFuels();
+        int idx = fuels.indexOf(current);
+        if (idx < 0) return getDefaultFuel();
+        return fuels.get((idx - 1 + fuels.size()) % fuels.size());
+    }
+
+    private static final List<MCFFuel> COMBUSTION_FUELS = List.of(
+            MCFFuel.CETANE_DIESEL,
+            MCFFuel.HIGH_OCTANE_GASOLINE,
+            MCFFuel.GASOLINE,
+            MCFFuel.DIESEL,
+            MCFFuel.BIO_DIESEL
+    );
+
+    private static final List<MCFFuel> ROCKET_FUELS = List.of(
+            MCFFuel.ROCKET_FUEL,
+            MCFFuel.RP_1,
+            MCFFuel.MONOMETHYLHYDRAZINE,
+            MCFFuel.SORBITOL_HYPERGOLIC_FUEL
+    );
 
     public static MCFModuleType fromMachineId(ResourceLocation id) {
         if (id == null) return UCM;

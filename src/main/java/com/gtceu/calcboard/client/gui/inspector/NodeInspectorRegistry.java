@@ -28,6 +28,7 @@ public final class NodeInspectorRegistry {
         registerSection(OverclockModeSection::new);
         registerSection(SteamModeSection::new);
         registerSection(BoilerThrottleSection::new);
+        registerSection(com.gtceu.calcboard.client.gui.inspector.section.BacteriaStatsSection::new);
         registerSection(SubPageModuleSection::new);
         registerSection(HardwareConfigSection::new);
         registerSection(StatsSummarySection::new);

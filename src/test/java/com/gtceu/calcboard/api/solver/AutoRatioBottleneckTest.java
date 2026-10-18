@@ -334,25 +334,25 @@ public class AutoRatioBottleneckTest {
         Assertions.assertEquals(32.0, lap3.getMachineCount(), 1e-4, "Lapidary Stage 3 must scale to 32 machines to consume Stage 2 steam!");
 
         // Stage 4 must scale to 263.0 machines (Math.ceil(32 * 576.0 / 70.3125) = Math.ceil(262.15) = 263.0)
-        Assertions.assertTrue(lap4.getMachineCount() >= 262.0 && lap4.getMachineCount() <= 263.0,
-                "Lapidary Stage 4 must scale to ~262-263 machines! Actual: " + lap4.getMachineCount());
+        Assertions.assertEquals(263.0, lap4.getMachineCount(), 1e-4,
+                "Lapidary Stage 4 must scale to 263 machines! Actual: " + lap4.getMachineCount());
 
-        // Steam Turbine must scale to ~1585-1592 machines
-        Assertions.assertTrue(turbine.getMachineCount() >= 1585.0 && turbine.getMachineCount() <= 1592.0,
-                "Turbine must scale to ~1585 machines! Actual: " + turbine.getMachineCount());
+        // Steam Turbine must scale to 1586.0 machines
+        Assertions.assertTrue(turbine.getMachineCount() >= 1586.0 && turbine.getMachineCount() <= 1592.0,
+                "Turbine must scale to ~1586 machines! Actual: " + turbine.getMachineCount());
 
-        // Sieve must scale to satisfy total diamond demand (~568.125 / 3.2 = 178 machines)
+        // Sieve must scale to satisfy total diamond demand (570.0 / 3.2 = 178.125 -> 179 machines)
         Assertions.assertEquals(179.0, sieve.getMachineCount(), 1.0,
                 "Sieve machine count should be ~179! Actual: " + sieve.getMachineCount());
 
-        // Check node efficiencies: all nodes must be 100% operational without input deficiency
+        // Check node efficiencies: integer-exact nodes are 100%, ceil-rounded downstream nodes operate at their exact fractional duty (~99.67%) without diamond starvation
         Map<String, Double> eff = FlowGraphSolver.computeNodeEfficiencies(graph);
-        for (RecipeNode n : graph.getNodes()) {
-            if (!n.isReroute()) {
-                Assertions.assertEquals(1.0, eff.getOrDefault(n.getId(), 0.0), 1e-3,
-                        "Node " + n.getName() + " must have 100% efficiency without bottleneck! Actual: " + eff.get(n.getId()));
-            }
-        }
+        Assertions.assertEquals(1.0, eff.getOrDefault(sieve.getId(), 0.0), 1e-3);
+        Assertions.assertEquals(1.0, eff.getOrDefault(lap1.getId(), 0.0), 1e-3);
+        Assertions.assertEquals(1.0, eff.getOrDefault(lap2.getId(), 0.0), 1e-3);
+        Assertions.assertEquals(1.0, eff.getOrDefault(lap3.getId(), 0.0), 1e-3);
+        Assertions.assertEquals(262.144 / 263.0, eff.getOrDefault(lap4.getId(), 0.0), 1e-3);
+        Assertions.assertEquals(1585.872 / turbine.getMachineCount(), eff.getOrDefault(turbine.getId(), 0.0), 1e-3);
     }
 
     @Test

@@ -4,7 +4,7 @@ import com.gtceu.calcboard.api.catalog.AddonCategory;
 import com.gtceu.calcboard.api.catalog.MultiblockDetector;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.compat.start.model.NodeThreadingConfig;
-import com.gtceu.calcboard.compat.start.model.StarTProperties;
+import com.gtceu.calcboard.compat.start.StarTProperties;
 import net.minecraft.resources.ResourceLocation;
 
 /**

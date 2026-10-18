@@ -167,7 +167,8 @@ public final class GTPowerCalculator {
         double threadingPowerMult = node.hasThreading() ? RecipeNodeThreadingHelper.getThreadingConfig(node).getFinalPowerMultiplier() : 1.0;
         long maxVoltage = GTAddonCompatibilityHandler.getOverclockVoltage(node);
 
-        double baseDuration = node.getBaseDurationTicks();
+        double coilDurationMult = getCoilDurationMultiplier(node);
+        double baseDuration = Math.max(1.0, Math.floor(node.getBaseDurationTicks() * coilDurationMult + 1e-9));
         double currentEUt = node.getBaseEUt();
         double durationMultiplier = 1.0;
         int performedOcs = 0;
@@ -278,11 +279,22 @@ public final class GTPowerCalculator {
         return false;
     }
 
+    public static double getCoilDurationMultiplier(RecipeNode node) {
+        if (node == null) return 1.0;
+        double mult = 1.0;
+        for (MachineAddon a : node.getAddons()) {
+            if (a != null && a.getCategory() == MachineAddon.Category.COIL) {
+                mult *= a.getDurationMultiplier();
+            }
+        }
+        return mult;
+    }
+
     public static double getNonSequentialDurationMultiplier(RecipeNode node) {
         if (node == null) return 1.0;
         double mult = 1.0;
         for (MachineAddon a : node.getAddons()) {
-            if (!isSequentialPostOcAddon(a)) {
+            if (a != null && a.getCategory() != MachineAddon.Category.COIL && !isSequentialPostOcAddon(a)) {
                 mult *= a.getDurationMultiplier();
             }
         }

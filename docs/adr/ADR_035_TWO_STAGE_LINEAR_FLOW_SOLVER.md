@@ -34,9 +34,8 @@
    - 외부 의존성 없는 순수 Java $O(N^3)$ 가우스-조던 소거기(`GaussJordanEliminator`)로 부분 피보팅(Partial Pivoting) 및 잉여(Surplus, $0 \cdot x = -c, c > 0$) 허용 소거를 수행하여 이상적인 연속 가동 배율 도출.
 
 2. **2단계: 이산 정수 양자화 (Stage 2: Discrete Quantization)**
-   - 폐순환 루프(Cycle) 및 상류 노드는 자원 결핍 방지를 위해 정수 올림(`Math.ceil`) 적용.
-   - 순수 하류 종단 노드(Pure Downstream)는 과잉 생산 방지를 위해 정수 내림(`Math.floor`) 적용.
-   - 정수 모드(`integerCounts = false`)인 경우 1단계 연속 해를 그대로 채택.
+   - 폐순환 루프(Cycle), 상류 노드 및 하류 노드를 포함한 모든 기계 노드에 대해 자원 결핍 및 하류 처리 용량 병목 방지를 위해 정수 올림(`Math.ceil`)을 일관되게 적용.
+   - 소수점 모드(`integerCounts = false`) 또는 공유 기계 풀 프레임 내부 노드의 경우 1단계 연속 해를 그대로 채택.
 
 ### 2.2 패키지 및 모듈 구성
 

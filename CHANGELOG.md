@@ -13,6 +13,17 @@
 
 ## [Unreleased]
 
+## [2.4.3] - 2026-10-18
+
+### Added
+- Added bacteria stat configuration (Production and Metabolism tiers 1-5) to Star Technology Bacterial Hydrocarbon Harvester nodes, allowing flow calculations based on actual breed levels for accurate sugar/biomass consumption and fluid production.
+
+### Fixed
+- Fixed an issue where an invalid fuel was displayed in the Modular Combustion Frame (MCF), and ensured Rocket Modules correctly offer dedicated rocket fuels (Rocket Fuel, RP-1, Monomethylhydrazine, and Sorbitol Hypergolic Fuel) instead of standard combustion fuels.
+- Fixed an issue where auxiliary fluids (such as liquid tungsten disulfide or lubricants) in combustion generators and rocket modules could be duplicated as both core recipe inputs and hardware auxiliary inputs on the node card.
+- Fixed an issue where heating coil speed bonuses were applied after overclocking instead of before overclocking, ensuring recipe durations round down after coil speed boosts first and then at each overclock step to match in-game processing times.
+- Fixed an issue where running Auto-Ratio from an upstream anchor rounded downstream machines requiring more than 1 machine down instead of up, causing insufficient processing capacity.
+
 ## [2.4.2] - 2026-10-10
 
 ### Added

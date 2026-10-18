@@ -155,28 +155,17 @@ public final class TwoStageLinearFlowSolver {
 
     private static Map<String, Double> quantizeRates(FlowGraph graph, RecipeNode anchor, Map<String, Double> continuousRates, boolean integerCounts) {
         Map<String, Double> quantized = new LinkedHashMap<>();
-        Set<String> directAnchorSuppliers = com.gtceu.calcboard.api.solver.FlowGraphTopologyAnalyzer.getDirectSuppliers(graph, anchor.getId());
-        Set<String> downstreamNodes = com.gtceu.calcboard.api.solver.FlowGraphTopologyAnalyzer.findDownstreamNodes(graph, anchor.getId(), directAnchorSuppliers);
-        Set<String> cyclicNodes = AutoRatioEngine.findCyclicNodeIds(graph, FlowEdgeAllocator.buildEdgeIndex(graph));
 
         for (Map.Entry<String, Double> entry : continuousRates.entrySet()) {
             RecipeNode node = graph.findNodeById(entry.getKey());
             if (node == null) continue;
             double count = entry.getValue();
 
-            boolean isPureDownstream = downstreamNodes != null
-                    && downstreamNodes.contains(node.getId())
-                    && (cyclicNodes == null || !cyclicNodes.contains(node.getId()));
-
-            FlowBalanceMatrixSolver.CountRoundingMode mode = isPureDownstream
-                    ? FlowBalanceMatrixSolver.CountRoundingMode.FLOOR
-                    : FlowBalanceMatrixSolver.CountRoundingMode.CEIL;
-
             double finalCount = FlowBalanceMatrixSolver.quantizeMachineCount(
                     graph,
                     node,
                     count,
-                    mode,
+                    FlowBalanceMatrixSolver.CountRoundingMode.CEIL,
                     integerCounts
             );
             quantized.put(entry.getKey(), finalCount);

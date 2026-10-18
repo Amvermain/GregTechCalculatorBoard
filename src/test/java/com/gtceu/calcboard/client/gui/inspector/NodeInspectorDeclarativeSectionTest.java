@@ -349,6 +349,25 @@ public class NodeInspectorDeclarativeSectionTest {
         boolean outsideClicked = section.mouseClicked(x, y, w, x - 10, y - 10, 0);
         Assertions.assertFalse(outsideClicked);
     }
+
+    @Test
+    public void testBacterialHarvesterSectionComposition() {
+        CompositeNodeInspector inspector = new CompositeNodeInspector(null);
+        RecipeNode bhh = RecipeNode.create("BHH", 160.0, 65536.0, GTVoltageTier.ZPM);
+        bhh.setMachineIcon(ResourceLocation.tryParse("gtceu:bacterial_hydrocarbon_harvester"));
+        bhh.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:bacterial_hydrocarbon_harvester"));
+        bhh.setMultiblock(true);
+        bhh.setEnergyType(EnergyType.ELECTRIC_EU);
+        bhh.setOverclockMode(OverclockMode.STANDARD);
+
+        List<IInspectorSection> applicable = inspector.getApplicableSections(bhh);
+        Assertions.assertTrue(applicable.stream().anyMatch(s -> s instanceof com.gtceu.calcboard.client.gui.inspector.section.BacteriaStatsSection));
+
+        RecipeNode normal = RecipeNode.create("Macerator", 100.0, 30.0, GTVoltageTier.LV);
+        normal.setMachineIcon(ResourceLocation.tryParse("gtceu:macerator"));
+        List<IInspectorSection> normalApplicable = inspector.getApplicableSections(normal);
+        Assertions.assertFalse(normalApplicable.stream().anyMatch(s -> s instanceof com.gtceu.calcboard.client.gui.inspector.section.BacteriaStatsSection));
+    }
 }
 
 

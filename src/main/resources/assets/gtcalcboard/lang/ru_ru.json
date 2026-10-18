@@ -1641,5 +1641,19 @@
   "gui.gtcalcboard.web.disabled_hint": "Локальная веб-панель отключена в настройках. Включите её в Настройки (⚙) > Обновления.",
   "gui.gtcalcboard.web.bind_failed": "Не удалось запустить локальный веб-сервер. Порты 8080-8089 могут быть заняты другими приложениями.",
   "gui.gtcalcboard.settings.web_server_section": "Локальная веб-панель (127.0.0.1)",
-  "gui.gtcalcboard.settings.enable_web_server": "Включить локальный веб-сервер (по умолчанию выкл для экономии ресурсов)"
+  "gui.gtcalcboard.settings.enable_web_server": "Включить локальный веб-сервер (по умолчанию выкл для экономии ресурсов)",
+  "gui.gtcalcboard.addon_cat.bacteria_stats": "Характеристики бактерий",
+  "gui.gtcalcboard.bacteria_stats.title": "Характеристики колонии бактерий",
+  "gui.gtcalcboard.bacteria_stats.production": "Эффективность",
+  "gui.gtcalcboard.bacteria_stats.production_desc": "Множитель выхода жидкости: %s",
+  "gui.gtcalcboard.bacteria_stats.metabolism": "Метаболизм",
+  "gui.gtcalcboard.bacteria_stats.sugar": "Сахар",
+  "gui.gtcalcboard.bacteria_stats.biomass": "Биомасса",
+  "gui.gtcalcboard.bacteria_stats.presets": "Шаблоны колонии",
+  "gui.gtcalcboard.bacteria_stats.preset_perfect": "★ Идеальная (Э5 / М1)",
+  "gui.gtcalcboard.bacteria_stats.preset_default": "По умолчанию EMI/JEI (Э5 / М5)",
+  "gui.gtcalcboard.bacteria_stats.preset_initial": "Дикая колония (Э1 / М5)",
+  "gui.gtcalcboard.bacteria_stats.preview_title": "Обзор потоков за цикл",
+  "gui.gtcalcboard.bacteria_stats.inputs_header": "Затраты за цикл",
+  "gui.gtcalcboard.bacteria_stats.outputs_header": "Выход за цикл"
 }

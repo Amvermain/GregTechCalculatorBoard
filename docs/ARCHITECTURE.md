@@ -267,6 +267,11 @@ The Core Domain Engine (`com.gtceu.calcboard.api`) and Common Mod Adapters (`com
 * **Strict Workspace Isolation**: Isolates cross-page lookups between personal boards and shared team workspaces to preserve multi-tenant boundary integrity.
 * **Throttled Downstream Effective Demand**: Evaluates flow demands using actual effective throughput ($R_{\text{effective}} = R_{\text{nominal}} \cdot \eta$) when downstream consumers are throttled, preventing false deficit warnings on upstream junctions.
 
+### 2.38 Star Technology Bacterial Hydrocarbon Harvester Stats & Dynamic Port Projection (ADR-067)
+* **Colony Stat Properties (`StarTBacterialProperties`)**: Stores Production (1–5) and Metabolism (1–5) tiers in `NodePropertyStore` without polluting `RecipeNode`.
+* **Exponential & Linear Dynamic Port Projection (`StarTPortProjector`)**: Dynamically scales sugar ($2^M$) and biomass ($100 \times 2^M\text{ mB}$) consumption along with fluid output yields ($\text{BaseUnit} \times P$) while preserving the immutable base `RecipeSpec`.
+* **Dual Inspector & Modal Configuration (`BacteriaStatsSection`, `BacteriaStatsConfigView`)**: Provides direct stat steppers and 1-click presets (Max Breed 5/1, EMI/JEI Default 5/5, Wild Colony 1/5) in both the side inspector panel and the machine configuration dialog.
+
 ---
 
 > 📑 **Detailed Specifications**:

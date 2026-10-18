@@ -354,7 +354,7 @@ public final class AutoRatioEngine {
         double requiredConsumerCount = calculateRequiredDownstreamConsumerCount(graph, consumer, anchor, countsMap);
         if (requiredConsumerCount <= 0.0001) return;
 
-        double finalConsumerCount = quantizeMachineCount(graph, consumer, requiredConsumerCount, FlowBalanceMatrixSolver.CountRoundingMode.FLOOR, integerCounts);
+        double finalConsumerCount = quantizeMachineCount(graph, consumer, requiredConsumerCount, FlowBalanceMatrixSolver.CountRoundingMode.CEIL, integerCounts);
         countsMap.put(consumer.getId(), finalConsumerCount);
         consumer.setMachineCount(finalConsumerCount);
 

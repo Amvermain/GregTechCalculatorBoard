@@ -264,7 +264,9 @@ public class MCFConfigView {
                 return true;
             }
             if (mX >= fuelBtnX && mX <= fuelBtnX + fuelBtnW) {
-                MCFFuel next = (button == 1) ? previousFuel(slot.getFuel()) : slot.getFuel().next();
+                MCFFuel next = (button == 1)
+                        ? slot.getModuleType().getPreviousFuel(slot.getFuel())
+                        : slot.getModuleType().getNextFuel(slot.getFuel());
                 slot.setFuel(next);
                 slot.setEnabled(true);
                 saveAndNotify(cfg, node);
@@ -292,12 +294,6 @@ public class MCFConfigView {
 
     private static MCFModuleType previousModuleType(MCFModuleType current) {
         MCFModuleType[] vals = MCFModuleType.values();
-        int idx = current != null ? current.ordinal() : 0;
-        return vals[(idx - 1 + vals.length) % vals.length];
-    }
-
-    private static MCFFuel previousFuel(MCFFuel current) {
-        MCFFuel[] vals = MCFFuel.values();
         int idx = current != null ? current.ordinal() : 0;
         return vals[(idx - 1 + vals.length) % vals.length];
     }

@@ -1641,5 +1641,19 @@
   "gui.gtcalcboard.web.disabled_hint": "本地网页仪表盘已在设置中禁用。请在 设置 (⚙) > 更新 选项卡中启用。",
   "gui.gtcalcboard.web.bind_failed": "无法启动本地网页服务器。8080-8089 端口可能被其他应用程序占用。",
   "gui.gtcalcboard.settings.web_server_section": "本地网页仪表盘 (127.0.0.1)",
-  "gui.gtcalcboard.settings.enable_web_server": "启用本地网页服务器（默认关闭以节省资源）"
+  "gui.gtcalcboard.settings.enable_web_server": "启用本地网页服务器（默认关闭以节省资源）",
+  "gui.gtcalcboard.addon_cat.bacteria_stats": "细菌属性",
+  "gui.gtcalcboard.bacteria_stats.title": "细菌菌落属性设置",
+  "gui.gtcalcboard.bacteria_stats.production": "生产力",
+  "gui.gtcalcboard.bacteria_stats.production_desc": "流体产量倍率：%s",
+  "gui.gtcalcboard.bacteria_stats.metabolism": "新陈代谢",
+  "gui.gtcalcboard.bacteria_stats.sugar": "糖",
+  "gui.gtcalcboard.bacteria_stats.biomass": "生物量",
+  "gui.gtcalcboard.bacteria_stats.presets": "属性预设",
+  "gui.gtcalcboard.bacteria_stats.preset_perfect": "★ 完美细菌 (产5/代1)",
+  "gui.gtcalcboard.bacteria_stats.preset_default": "EMI / JEI 默认值 (产5/代5)",
+  "gui.gtcalcboard.bacteria_stats.preset_initial": "野生菌落 (产1/代5)",
+  "gui.gtcalcboard.bacteria_stats.preview_title": "周期流体概览",
+  "gui.gtcalcboard.bacteria_stats.inputs_header": "每周期消耗输入",
+  "gui.gtcalcboard.bacteria_stats.outputs_header": "每周期产物流体"
 }

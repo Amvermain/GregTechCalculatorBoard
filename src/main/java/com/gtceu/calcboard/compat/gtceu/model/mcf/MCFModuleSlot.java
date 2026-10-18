@@ -21,7 +21,7 @@ public class MCFModuleSlot {
         this.slotIndex = slotIndex;
         this.enabled = enabled;
         this.moduleType = moduleType != null ? moduleType : MCFModuleType.UCM;
-        this.fuel = fuel != null ? fuel : MCFFuel.CETANE_DIESEL;
+        this.fuel = (fuel != null && this.moduleType.isValidFuel(fuel)) ? fuel : this.moduleType.getDefaultFuel();
         this.oxidizerBoosted = oxidizerBoosted;
     }
 
@@ -43,6 +43,9 @@ public class MCFModuleSlot {
 
     public void setModuleType(MCFModuleType moduleType) {
         this.moduleType = moduleType != null ? moduleType : MCFModuleType.UCM;
+        if (!this.moduleType.isValidFuel(this.fuel)) {
+            this.fuel = this.moduleType.getDefaultFuel();
+        }
     }
 
     public MCFFuel getFuel() {
@@ -50,7 +53,7 @@ public class MCFModuleSlot {
     }
 
     public void setFuel(MCFFuel fuel) {
-        this.fuel = fuel != null ? fuel : MCFFuel.CETANE_DIESEL;
+        this.fuel = (fuel != null && this.moduleType.isValidFuel(fuel)) ? fuel : this.moduleType.getDefaultFuel();
     }
 
     public boolean isOxidizerBoosted() {
@@ -84,7 +87,7 @@ public class MCFModuleSlot {
         boolean oxBoost = !json.has("oxBoost") || json.get("oxBoost").getAsBoolean();
 
         MCFModuleType type = MCFModuleType.fromNameOrDefault(typeName);
-        MCFFuel fuel = MCFFuel.fromIdOrDefault(fuelName);
+        MCFFuel fuel = MCFFuel.fromIdOrDefault(fuelName, type);
         return new MCFModuleSlot(slot, enabled, type, fuel, oxBoost);
     }
 

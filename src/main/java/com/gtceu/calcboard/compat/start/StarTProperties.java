@@ -1,10 +1,14 @@
-package com.gtceu.calcboard.compat.start.model;
+package com.gtceu.calcboard.compat.start;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.gtceu.calcboard.api.property.NodeProperties;
 import com.gtceu.calcboard.api.property.NodePropertyKey;
+import com.gtceu.calcboard.compat.start.model.NodeThreadingConfig;
 
+/**
+ * Node property keys for Star Technology machine configurations such as Threading helix assignments.
+ */
 public final class StarTProperties {
     private StarTProperties() {}
 

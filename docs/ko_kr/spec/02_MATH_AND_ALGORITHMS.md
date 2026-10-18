@@ -70,9 +70,10 @@ $$\text{Cycles Per Second (CPS)} = 20.0 \times \text{BatchesPerTick} \times \tex
 
 ### 1.4 하드웨어 애드온 승수 합성 (Addon Compounding)
 
-장착된 모든 애드온 $a \in \text{InstalledAddons}$에 대해 기간 및 전력 승수를 복합 합성합니다:
+장착된 모든 애드온 $a \in \text{InstalledAddons}$에 대해 기간 및 전력 승수를 복합 합성합니다. 가열 코일(`MachineAddon.Category.COIL`)의 속도 가속 보너스는 오버클럭 연산 이전에 기본 소요 시간에 먼저 적용되어 내림($\lfloor \text{BaseDurationTicks} \times \text{CoilDurationMult} \rfloor$) 처리되며, 비코일 애드온의 소요 시간 승수는 오버클럭 이후에 합성됩니다:
 
-$$\text{Total Duration} = \text{Effective Duration} \times \prod_{a \in \text{Addons}} a.\text{getDurationMultiplier}()$$
+$$\text{Pre-OC Base Duration} = \max\left(1.0, \, \left\lfloor \text{BaseDurationTicks} \times \prod_{c \in \text{Coils}} c.\text{getDurationMultiplier}() \right\rfloor\right)$$
+$$\text{Total Duration} = \text{Effective Duration} \times \prod_{a \in \text{Addons} \setminus \text{Coils}} a.\text{getDurationMultiplier}()$$
 $$\text{Total EU/t} = \text{Effective EU/t} \times \prod_{a \in \text{Addons}} a.\text{getEutMultiplier}()$$
 
 #### 가열 코일 (Heating Coil) 기계별 보너스 연역 수식
@@ -130,6 +131,13 @@ $$\text{Rotor Replacement Rate (Items/hour)} = \frac{3600.0}{T_{\text{lifespan}}
   - 능동 부스트 ($\text{WS}_2$ + 보스-아인슈타인 응축 오가네손, $\text{BEC-Og}$): $\text{WS}_2$ $2,500\text{ B/hr}$, $\text{BEC-Og}$ $800\text{ B/hr} = 222.22\text{ mB/s}$ (발전 배율 3.0x)
   - 미부스트: 배율 0.8x 페널티
 - **불변식**: 부스팅 유체는 기계 단위 시간당 연속 주입되므로 병렬 계수($P$) 및 로터 효율과 무관하게 기계 대수($N$)에만 선형 비례합니다.
+
+##### 5. Star Technology 박테리아 탄화수소 수확기(BHH) 군집 능력치 스케일링 공식 (ADR-067)
+박테리아 군집의 생산력 $P \in [1, 5]$ 및 신진대사 $M \in [1, 5]$ (JEI/EMI 대표 레시피 기준값: $P = 5, M = 5$)에 따른 사이클당 입출력 포트 동적 투영 수식:
+- **설탕 소모량 (`minecraft:sugar`)**: $Q_{\text{sugar}} = 2^M \text{ 개}$ (`1 << M`)
+- **바이오매스 소모량 (`gtceu:biomass`)**: $Q_{\text{biomass}} = 100 \times 2^M \text{ mB}$ (`100 << M`)
+- **산출 유체 생산량 (5종)**: $Q_{\text{out}} = \left(\frac{Q_{\text{rep}}}{5.0}\right) \times P \text{ mB}$
+- **고정 입력**: 증류수($1,000\text{ mB}$) 및 박테리아 배양 아이템($1\text{개}$)은 스탯과 무관하게 일정하게 유지됩니다.
 
 #### 공급 전력 기반 기계 가용 최대 병렬 ($P_{\max}$) 및 오버클록 수용 한계
 장착된 에너지 해치 티어 전압 $V_{\text{hatch}}$, 암페어 $A_{\text{hatch}}$, 단일 레시피 소비 전력 $E_{\text{recipe}}$일 때:

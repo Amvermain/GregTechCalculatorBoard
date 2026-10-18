@@ -4,7 +4,7 @@
 
 This directory serves as the official **Architecture Decision Records (ADR) Registry** for the **GregTech Calculator Board (GTCalcBoard)** project, permanently preserving technical context, decision rationale, system architecture, and architectural consequences.
 
-All core architectural decisions, once implemented, are consolidated and structured into the official system specifications ([`docs/en_us/spec/`](../en_us/spec/)). This document provides a complete lifecycle map of all 65 ADRs and their integration with the specifications.
+All core architectural decisions, once implemented, are consolidated and structured into the official system specifications ([`docs/en_us/spec/`](../en_us/spec/)). This document provides a complete lifecycle map of all 66 ADRs and their integration with the specifications.
 
 ---
 
@@ -22,11 +22,11 @@ stateDiagram-v2
 
 | Status | Count | Description |
 | :--- | :---: | :--- |
-| 🟢 **`Active`** | **28** | Active decisions directly governing current system architecture, interfaces, and invariants |
+| 🟢 **`Active`** | **29** | Active decisions directly governing current system architecture, interfaces, and invariants |
 | 🔄 **`Superseded`** | **5** | Decisions replaced by subsequent ADRs due to architectural evolution or model upgrades |
 | 📦 **`Retired / Consolidated`** | **31** | Decisions fully integrated and codified into the official specifications ([`docs/en_us/spec/`](../en_us/spec/)) |
 | ❌ **`Rejected`** | **1** | Proposals permanently rejected during technical review and preserved as gaps (`RFC-046`) |
-| **Total** | **65** | Total registered architecture decision and gap records |
+| **Total** | **66** | Total registered architecture decision and gap records |
 
 ---
 
@@ -94,6 +94,7 @@ flowchart TD
     ADR037 --> ADR047["ADR-047<br/>Rule 5 Deterministic Exact Match Normalization"]
     ADR004 -.->|Replaced by| ADR045["ADR-045<br/>RecipeNode INodeRole Composition"]
     ADR045 --> ADR050["ADR-050<br/>Immutable RecipeSpec & Lazy Port Projection"]
+    ADR050 --> ADR067["ADR-067<br/>BHH Colony Stats Dynamic Port Projection"]
     ADR045 --> ADR055["ADR-055<br/>RecipeNode Direct Copy Constructor"]
     ADR031["ADR-031 (Superseded)<br/>Shared Machine Pool Simple Scaling"] -.->|Replaced by| ADR042["ADR-042<br/>Shared Pool In-Place Folding & Ratio Preservation"]
     ADR042 --> ADR060["ADR-060<br/>Shared Pool Embedded Recipe Panel Rework"]
@@ -104,12 +105,12 @@ flowchart TD
 
 ---
 
-## 🟢 Active ADR Registry (28 Active Decisions)
+## 🟢 Active ADR Registry (29 Active Decisions)
 
 These active decisions directly govern the core invariants, data structures, computation algorithms, and interactions of the current codebase.
 
 | ID | Title | Target Ver. | Governing Layer | Related Specification | Core Decision Summary |
-| :---: | :--- | :--- | :--- | :--- | :--- |
+| :---: | :--- | :---: | :--- | :--- | :--- |
 | **[ADR-037](ADR_037_DOMAIN_PURITY_AND_DETERMINISTIC_DEDUCTION_REFACTORING.md)** | Domain Entity Purity, Reverse Dependency Isolation, and Deterministic Deduction Specification | `v2.2.0-beta.2` | Core Domain (`api.spi`) | [01. Core Domain](../en_us/spec/01_CORE_DOMAIN_AND_MODELS.md) | Migrated `IModAdapter` to `api.spi` to eliminate API ➔ Compat reverse references; removed mod-specific fields from `RecipeNode`. |
 | **[ADR-038](ADR_038_LEGACY_CALCULATION_ALGORITHM_AND_SIMULATION_PURITY_REFACTORING.md)** | Legacy Calculation Algorithm and Physical Simulation Purity Refactoring Specification | `v2.2.0-beta.2` | Solver & Physics (`api.solver`) | [02. Math & Algorithms](../en_us/spec/02_MATH_AND_ALGORITHMS.md) | Eliminated in-place port mutations during calculation; isolated cache invalidation from UI rendering loops. |
 | **[ADR-039](ADR_039_RENDERING_LIFECYCLE_AND_PRECISION_CACHE_INVALIDATION.md)** | Rendering Lifecycle Optimization, Precision Cache Invalidation, and Graph Traversal Refactoring Specification | `v2.2.0-beta.2` | Client GUI (`client.gui.*`) | [03. UI & Rendering](../en_us/spec/03_UI_AND_RENDERING_PIPELINE.md) | Localized bounds updating on sticky note/frame movement; cached viewer focus reflection targets. |
@@ -138,6 +139,7 @@ These active decisions directly govern the core invariants, data structures, com
 | **[ADR-063](ADR_063_SELECTION_CONTEXTUAL_AUTO_CONNECT.md)** | Selection Contextual Auto-Connect Specification | `v2.4.0` | Client GUI & Action (`client.gui`, `client.gui.action`) | [03. UI & Rendering](../en_us/spec/03_UI_AND_RENDERING_PIPELINE.md) | Scoped auto-connection between multi-selected nodes, floating toolbar Connect button, Shift+C smart hotkey routing, and atomic CompoundCommand undo rollback. |
 | **[ADR-064](ADR_064_CROSS_PAGE_JUNCTION_FLOW_ALLOCATION.md)** | Cross-Page Junction Flow Allocation & Virtual Inter-Page Link System Specification | `v2.4.1` | Domain, Solver & GUI (`api.model`, `api.solver`, `client.gui`) | [02. Math & Algorithms](../en_us/spec/02_MATH_AND_ALGORITHMS.md) | Inter-page resource distribution via 1:N Junction FlowEdgeAllocator, priority tiering, dependency DAG topological sorting, and circular reference defense. |
 | **[ADR-066](ADR_066_PAGE_SETTINGS_NETWORK_SECURITY_AND_TEAM_ISOLATION.md)** | Page Settings Network Security Verification & Team Workspace Isolation Specification | `v2.4.1` | Network & Storage (`network.packet.c2s`, `server.storage`) | [04. Multiplayer](../en_us/spec/04_MULTIPLAYER_AND_NETWORK_PROTOCOL.md) | Verified UpdatePageSettingsPacket sender team authorization and lock ownership, isolated TeamBoardSavedData persistence, and targeted team routing. |
+| **[ADR-067](ADR_067_START_BACTERIA_HARVESTER_STATS_INTEGRATION.md)** | Star Technology Bacterial Hydrocarbon Harvester Variable Stats (Production & Metabolism) Modeling & Flow Balance Integration Specification | `v2.4.3` | Compat & Domain (`compat.start`, `client.gui.dialog.config`) | [05. External Integrations](../en_us/spec/05_INTEGRATION_AND_I18N.md) | Configurable Production (1-5) and Metabolism (1-5) on BHH nodes with dynamic port projection (ADR-050) and 1-click presets. |
 
 ---
 

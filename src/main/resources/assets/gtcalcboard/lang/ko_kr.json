@@ -1641,5 +1641,19 @@
   "gui.gtcalcboard.web.disabled_hint": "로컬 웹 대시보드가 비활성화되어 있습니다. 설정(⚙) > 업데이트 탭에서 활성화해주세요.",
   "gui.gtcalcboard.web.bind_failed": "로컬 웹 서버를 시작할 수 없습니다. 8080~8089 포트가 다른 프로그램에서 사용 중일 수 있습니다.",
   "gui.gtcalcboard.settings.web_server_section": "로컬 웹 대시보드 (127.0.0.1)",
-  "gui.gtcalcboard.settings.enable_web_server": "로컬 웹 서버 활성화 (사양 보호를 위해 기본 꺼짐)"
+  "gui.gtcalcboard.settings.enable_web_server": "로컬 웹 서버 활성화 (사양 보호를 위해 기본 꺼짐)",
+  "gui.gtcalcboard.addon_cat.bacteria_stats": "박테리아 능력치",
+  "gui.gtcalcboard.bacteria_stats.title": "박테리아 능력치 설정",
+  "gui.gtcalcboard.bacteria_stats.production": "생산력",
+  "gui.gtcalcboard.bacteria_stats.production_desc": "유체 생산량 배율: %s",
+  "gui.gtcalcboard.bacteria_stats.metabolism": "신진대사",
+  "gui.gtcalcboard.bacteria_stats.sugar": "설탕",
+  "gui.gtcalcboard.bacteria_stats.biomass": "바이오매스",
+  "gui.gtcalcboard.bacteria_stats.presets": "능력치 프리셋",
+  "gui.gtcalcboard.bacteria_stats.preset_perfect": "★ 종결 박테리아 (생산 5 / 대사 1)",
+  "gui.gtcalcboard.bacteria_stats.preset_default": "EMI / JEI 기본값 (생산 5 / 대사 5)",
+  "gui.gtcalcboard.bacteria_stats.preset_initial": "초기 배양체 (생산 1 / 대사 5)",
+  "gui.gtcalcboard.bacteria_stats.preview_title": "실시간 사이클 요약",
+  "gui.gtcalcboard.bacteria_stats.inputs_header": "사이클당 입력 자원",
+  "gui.gtcalcboard.bacteria_stats.outputs_header": "사이클당 출력 유체"
 }

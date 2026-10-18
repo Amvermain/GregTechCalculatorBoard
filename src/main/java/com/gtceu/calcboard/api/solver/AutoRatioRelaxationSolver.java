@@ -207,15 +207,13 @@ public final class AutoRatioRelaxationSolver {
                 n.setMachineCount(1.0);
                 continue;
             }
-            boolean isPureDownstream = downstreamNodes != null
-                    && downstreamNodes.contains(n.getId())
-                    && (cyclicNodes == null || !cyclicNodes.contains(n.getId()));
-
-            FlowBalanceMatrixSolver.CountRoundingMode mode = isPureDownstream
-                    ? FlowBalanceMatrixSolver.CountRoundingMode.FLOOR
-                    : FlowBalanceMatrixSolver.CountRoundingMode.CEIL;
-
-            n.setMachineCount(AutoRatioEngine.quantizeMachineCount(graph, n, n.getMachineCount(), mode, integerCounts));
+            n.setMachineCount(AutoRatioEngine.quantizeMachineCount(
+                    graph,
+                    n,
+                    n.getMachineCount(),
+                    FlowBalanceMatrixSolver.CountRoundingMode.CEIL,
+                    integerCounts
+            ));
         }
         anchor.setMachineCount(targetAnchorCount);
     }

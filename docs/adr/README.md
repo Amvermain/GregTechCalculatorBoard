@@ -4,7 +4,7 @@
 
 본 디렉터리는 **GregTech Calculator Board (GTCalcBoard)** 프로젝트의 핵심 기술적 의사결정 맥락(Context), 채택 이유(Why), 시스템 구조(Architecture), 그리고 결과 및 파급 효과(Consequences)를 영구히 기록하고 보존하는 **공식 아키텍처 결정 기록(ADR) 레지스트리**입니다.
 
-모든 핵심 아키텍처 결정은 구현 완료 후 공식 시스템 사양서([`docs/ko_kr/spec/`](../ko_kr/spec/))로 체계화되어 반영되며, 본 문서는 65개 ADR 전체의 생명주기 및 공식 사양서 연계 맵을 제공합니다.
+모든 핵심 아키텍처 결정은 구현 완료 후 공식 시스템 사양서([`docs/ko_kr/spec/`](../ko_kr/spec/))로 체계화되어 반영되며, 본 문서는 66개 ADR 전체의 생명주기 및 공식 사양서 연계 맵을 제공합니다.
 
 ---
 
@@ -22,11 +22,11 @@ stateDiagram-v2
 
 | 상태 (Status) | 건수 | 설명 |
 | :--- | :---: | :--- |
-| 🟢 **`Active`** | **28건** | 현재 시스템의 구조, 인터페이스 및 동작을 직접 규정하는 활성 아키텍처 결정 |
+| 🟢 **`Active`** | **29건** | 현재 시스템의 구조, 인터페이스 및 동작을 직접 규정하는 활성 아키텍처 결정 |
 | 🔄 **`Superseded`** | **5건** | 후속 ADR에 의해 설계, 모델 또는 알고리즘이 대체된 결정 |
 | 📦 **`Retired / Consolidated`** | **31건** | 구현 완료 후 공식 시스템 사양서([`docs/ko_kr/spec/`](../ko_kr/spec/))에 완전히 통합·체계화된 결정 |
 | ❌ **`Rejected`** | **1건** | 기술 검토 단계에서 기각되어 결번으로 영구 보존된 제안 (`RFC-046`) |
-| **합계** | **65건** | 전체 등록 아키텍처 결정 및 결번 레코드 총합 |
+| **합계** | **66건** | 전체 등록 아키텍처 결정 및 결번 레코드 총합 |
 
 ---
 
@@ -94,6 +94,7 @@ flowchart TD
     ADR037 --> ADR047["ADR-047<br/>Rule 5 결정론적 정규화 & 완전 일치"]
     ADR004 -.->|대체| ADR045["ADR-045<br/>RecipeNode INodeRole 컴포지션"]
     ADR045 --> ADR050["ADR-050<br/>불변 RecipeSpec & 지연 포트 투영"]
+    ADR050 --> ADR067["ADR-067<br/>BHH 박테리아 스탯 동적 포트 투영"]
     ADR045 --> ADR055["ADR-055<br/>RecipeNode 직접 복제 생성자 최적화"]
     ADR031["ADR-031 (대체됨)<br/>공유 기계 풀 단순 스케일링"] -.->|대체| ADR042["ADR-042<br/>공유 풀 인플레이스 접기 & 비율 보존"]
     ADR042 --> ADR060["ADR-060<br/>공유 기계 풀 임베디드 레시피 패널 리워크"]
@@ -104,7 +105,7 @@ flowchart TD
 
 ---
 
-## 🟢 활성 아키텍처 결정 레지스트리 (Active ADRs - 28건)
+## 🟢 활성 아키텍처 결정 레지스트리 (Active ADRs - 29건)
 
 현재 시스템의 핵심 불변식, 데이터 구조, 연산 알고리즘 및 인터랙션을 직접 규정하는 활성 결정 목록입니다.
 
@@ -138,6 +139,7 @@ flowchart TD
 | **[ADR-063](ADR_063_SELECTION_CONTEXTUAL_AUTO_CONNECT.md)** | 선택 노드 한정 컨텍스트 자동 연결 명세 | `v2.4.0` | Client GUI & Action (`client.gui`, `client.gui.action`) | [03. UI & 렌더링](../ko_kr/spec/03_UI_AND_RENDERING_PIPELINE.md) | 다중 선택 노드 간 국소 자동 배선, 플로팅 바 Connect 버튼, Shift+C 스마트 분기 및 단일 복합 명령 Undo 롤백 |
 | **[ADR-064](ADR_064_CROSS_PAGE_JUNCTION_FLOW_ALLOCATION.md)** | 페이지 간 정션 유량 분배 및 가상 연동 시스템 명세 | `v2.4.1` | Domain, Solver & GUI (`api.model`, `api.solver`, `client.gui`) | [02. 수학 & 알고리즘](../ko_kr/spec/02_MATH_AND_ALGORITHMS.md) | 정션 1:N 유량 분할 엔진(`FlowEdgeAllocator`) 기반 페이지 간 자원 연동, 우선순위 티어링, 의존성 DAG 위상 정렬 및 순환 참조 방어 |
 | **[ADR-066](ADR_066_PAGE_SETTINGS_NETWORK_SECURITY_AND_TEAM_ISOLATION.md)** | 페이지 설정 네트워크 보안 검증 및 팀 워크스페이스 격리 명세 | `v2.4.1` | Network & Storage (`network.packet.c2s`, `server.storage`) | [04. 멀티플레이어](../ko_kr/spec/04_MULTIPLAYER_AND_NETWORK_PROTOCOL.md) | UpdatePageSettingsPacket 송신자 팀 권한·락 소유권 검증, TeamBoardSavedData 격리 영속화 및 동일 팀 한정 타겟 브로드캐스트 라우팅 |
+| **[ADR-067](ADR_067_START_BACTERIA_HARVESTER_STATS_INTEGRATION.md)** | Star Technology 박테리아 추출기 능력치(생산력·신진대사) 가변 모델링 및 공정 유량 수지 연동 명세 | `v2.4.3` | Compat & Domain (`compat.start`, `client.gui.dialog.config`) | [05. 외부 모드 연동](../ko_kr/spec/05_INTEGRATION_AND_I18N.md) | BHH 노드 생산력(1~5)·신진대사(1~5) 가변 능력치 설정, 지수/선형 동적 포트 투영(ADR-050) 및 원클릭 프리셋 연동 |
 
 ---
 

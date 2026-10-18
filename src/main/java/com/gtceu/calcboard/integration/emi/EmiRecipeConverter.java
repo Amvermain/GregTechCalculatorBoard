@@ -310,12 +310,17 @@ public class EmiRecipeConverter {
             effectiveTier = adapter.sanitizeTargetTier(node, effectiveTier);
         }
         node.setTargetTier(effectiveTier);
+        List<IngredientStack> pureInputs = node.getInputs();
+        var projectionProvider = ModAdapterRegistry.findExtension(node, com.gtceu.calcboard.api.spi.extension.IPortProjectionProvider.class).orElse(null);
+        if (projectionProvider != null) {
+            pureInputs = projectionProvider.sanitizeLegacyCoreInputs(node, pureInputs);
+        }
         node.setBaseSpec(RecipeSpec.of(
                 node.getId(),
                 node.getRecipeCategoryId(),
                 node.getBaseDurationTicks(),
                 node.getBaseEUt(),
-                node.getInputs(),
+                pureInputs,
                 node.getOutputs()
         ));
         com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.ensureCombustionInputs(node);

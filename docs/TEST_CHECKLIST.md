@@ -12,7 +12,7 @@ All deterministic calculations, mathematical solvers, NBT serialization, and lay
 Run these three commands in terminal. All must exit with `0 errors`:
 
 ```bash
-# 1. 68 Headless JUnit Domain, Solver, & ArchUnit Architecture Tests
+# 1. 70 Headless JUnit Domain, Solver, & ArchUnit Architecture Tests
 ./gradlew test
 
 # 2. 4-Language i18n Parity & Font Safety (No VS16) Check

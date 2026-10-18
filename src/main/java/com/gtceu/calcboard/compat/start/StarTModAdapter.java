@@ -29,7 +29,20 @@ public class StarTModAdapter extends GTCEuModAdapter {
         if (IBoosterProvider.class.equals(extensionClass)) {
             return Optional.empty();
         }
+        if (com.gtceu.calcboard.api.spi.extension.IPortProjectionProvider.class.equals(extensionClass)) {
+            return Optional.of(extensionClass.cast(com.gtceu.calcboard.compat.start.projection.StarTPortProjector.getInstance()));
+        }
         return super.getExtension(extensionClass);
+    }
+
+    @Override
+    public List<com.gtceu.calcboard.api.model.ProjectedPort> projectInputPorts(RecipeNode node, com.gtceu.calcboard.api.model.RecipeSpec baseSpec) {
+        return com.gtceu.calcboard.compat.start.projection.StarTPortProjector.getInstance().projectInputPorts(node, baseSpec);
+    }
+
+    @Override
+    public List<com.gtceu.calcboard.api.model.ProjectedPort> projectOutputPorts(RecipeNode node, com.gtceu.calcboard.api.model.RecipeSpec baseSpec) {
+        return com.gtceu.calcboard.compat.start.projection.StarTPortProjector.getInstance().projectOutputPorts(node, baseSpec);
     }
 
     @Override
@@ -56,12 +69,7 @@ public class StarTModAdapter extends GTCEuModAdapter {
     @Override
     public boolean handlesCategory(ResourceLocation categoryId) {
         if (categoryId == null) return false;
-        String ns = categoryId.getNamespace().toLowerCase(Locale.ROOT);
-        String path = categoryId.getPath().toLowerCase(Locale.ROOT);
-        if (path.equals("large_rotor_machine") || path.equals("gate_construction") || path.equals("stargate_component_assembly")) {
-            return true;
-        }
-        return ns.equals("start_core") || ns.equals("gtceu_start") || ns.equals("start") || ns.equals("star_technology");
+        return StarTReflectionBridge.isStarTRecipeType(categoryId);
     }
 
     @Override
@@ -69,18 +77,16 @@ public class StarTModAdapter extends GTCEuModAdapter {
         if (node == null) return false;
         if (node.getEnergyTypeOverride() == com.gtceu.calcboard.api.type.EnergyType.KINETIC_SU) return false;
 
+        if (StarTReflectionBridge.isBacterialHarvester(node)) {
+            return true;
+        }
+
         if (node.getRecipeCategoryId() != null && handlesCategory(node.getRecipeCategoryId())) {
             return true;
         }
 
-        if (node.getMachineIcon() != null) {
-            String ns = node.getMachineIcon().getNamespace().toLowerCase(Locale.ROOT);
-            if (ns.equals("start_core") || ns.equals("gtceu_start")) {
-                return true;
-            }
-            if (MultiblockDetector.isThreadingMultiblock(node.getMachineIcon())) {
-                return true;
-            }
+        if (node.getMachineIcon() != null && StarTReflectionBridge.isStarTMachine(node.getMachineIcon())) {
+            return true;
         }
 
         if (StarTTurbineHelper.isStarTTurbine(node)) {
@@ -110,6 +116,11 @@ public class StarTModAdapter extends GTCEuModAdapter {
     @Override
     public List<AddonCategory> getApplicableAddonCategories(RecipeNode node) {
         List<AddonCategory> mutable = new ArrayList<>(super.getApplicableAddonCategories(node));
+        if (com.gtceu.calcboard.compat.start.projection.StarTPortProjector.isBacterialHarvester(node)) {
+            if (!mutable.contains(AddonCategory.BACTERIA_STATS)) {
+                mutable.add(0, AddonCategory.BACTERIA_STATS);
+            }
+        }
         if (node.isTurbine() && node.isMultiblock() && StarTTurbineHelper.isStarTTurbine(node)) {
             if (!mutable.contains(AddonCategory.MULTIBLOCK_TRAIT)) {
                 mutable.add(AddonCategory.MULTIBLOCK_TRAIT);

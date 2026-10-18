@@ -1641,5 +1641,19 @@
   "gui.gtcalcboard.cross_page_search.title": "Source Page & Junction Search",
   "gui.gtcalcboard.junction.name_hint": "Custom label (e.g. Main Oxygen Bus)...",
   "gui.gtcalcboard.junction.search_source": "Search",
-  "gui.gtcalcboard.menu.rename_junction": "Rename Junction"
+  "gui.gtcalcboard.menu.rename_junction": "Rename Junction",
+  "gui.gtcalcboard.addon_cat.bacteria_stats": "Bacteria Stats",
+  "gui.gtcalcboard.bacteria_stats.title": "Bacteria Colony Stats",
+  "gui.gtcalcboard.bacteria_stats.production": "Production",
+  "gui.gtcalcboard.bacteria_stats.production_desc": "Fluid yield multiplier: %s",
+  "gui.gtcalcboard.bacteria_stats.metabolism": "Metabolism",
+  "gui.gtcalcboard.bacteria_stats.sugar": "Sugar",
+  "gui.gtcalcboard.bacteria_stats.biomass": "Biomass",
+  "gui.gtcalcboard.bacteria_stats.presets": "Colony Presets",
+  "gui.gtcalcboard.bacteria_stats.preset_perfect": "★ Max Breed (P5 / M1)",
+  "gui.gtcalcboard.bacteria_stats.preset_default": "EMI / JEI Default (P5 / M5)",
+  "gui.gtcalcboard.bacteria_stats.preset_initial": "Wild Colony (P1 / M5)",
+  "gui.gtcalcboard.bacteria_stats.preview_title": "Cycle Flow Preview",
+  "gui.gtcalcboard.bacteria_stats.inputs_header": "Inputs per cycle",
+  "gui.gtcalcboard.bacteria_stats.outputs_header": "Outputs per cycle"
 }

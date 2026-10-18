@@ -94,7 +94,7 @@ graph LR
 | `compat.createdieselgenerators` | `CreateDieselGeneratorsModAdapter`<br/>`CDGRecipeHandler` | • Diesel Engine kinetic generation (SU) and fluid fuel consumption simulation<br/>• Basin processing (fermenting), distillation tower, and compression molding integration |
 | `compat.thermal` | `ThermalModAdapter`<br/>`ThermalAugmentHelper`<br/>`ThermalRecipeHandler` | • Thermal augments & custom kits (`AugmentData` NBT) extraction<br/>• Dynamo power (RF/t) & machine time scale compounding |
 | `compat.systeams` | `SysteamsModAdapter`<br/>`SysteamsRecipeHandler` | • Steam boiler (Steam mB/s) and dynamo tooltips<br/>• Multi-stage steam progression (Water ➔ Steam ➔ Warm ➔ Hot ➔ Superhot ➔ Plasma)<br/>• Systeams registered fluid IDs (`steamier`, `steamiest`, `steamiester`, `steamiestest`) and runtime boiler recipe reflection (`boil`/`getBoiledFluid`, `fluidOut`/`fluid`) flexible compatibility |
-| `compat.start` | `StarTModAdapter`<br/>`StarTReflectionBridge`<br/>`StarTTurbineHelper` | • `StarTReflectionBridge`: Star Technology Core recipe modifiers and machine capability deduction<br/>• Star Technology plasma turbines (SPT/NPT) and multi-helix structures<br/>• SPT/NPT trait compatibility and multiblock validation |
+| `compat.start` | `StarTModAdapter`<br/>`StarTReflectionBridge`<br/>`StarTTurbineHelper`<br/>`StarTBacterialProperties`<br/>`projection.StarTPortProjector` | • `StarTReflectionBridge`: Star Technology Core recipe modifiers, static recipe type caching, and machine capability deduction<br/>• Star Technology plasma turbines (SPT/NPT) and multi-helix structures<br/>• Bacterial Hydrocarbon Harvester (BHH) Production (1–5) & Metabolism (1–5) stat scaling and dynamic port projection (ADR-067)<br/>• SPT/NPT trait compatibility and multiblock validation |
 | `compat.vanilla` | `VanillaModAdapter` | • Standard singleblock and unspecialized mod fallbacks |
 
 ---
@@ -145,7 +145,7 @@ flowchart TD
 
 ## 6. Internationalization (i18n) Synchronization
 
-All user-facing strings are synchronized 1:1 across English (`en_us.json`), Korean (`ko_kr.json`), and Simplified Chinese (`zh_cn.json`).
+All user-facing strings are synchronized 1:1 across English (`en_us.json`), Korean (`ko_kr.json`), Simplified Chinese (`zh_cn.json`), and Russian (`ru_ru.json`).
 
 ```json
 {

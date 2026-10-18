@@ -288,13 +288,12 @@ public class CalculationTest {
 
         Assertions.assertEquals(1.0, nodeA.getMachineCount());
         Assertions.assertEquals(1.0, nodeB.getMachineCount());
-        Assertions.assertEquals(1.0, nodeC.getMachineCount());
+        Assertions.assertEquals(2.0, nodeC.getMachineCount());
 
         BalanceSummary summary = graph.computeSummary();
         IngredientStack woodTar = IngredientStack.fluid(ResourceLocation.tryParse("gtceu:wood_tar"), "Wood Tar", 1000, 1.0);
-        Double netWoodTar = summary.netOutputs().get(woodTar);
-        Assertions.assertNotNull(netWoodTar);
-        Assertions.assertTrue(netWoodTar >= 0);
+        Assertions.assertFalse(summary.rawInputs().containsKey(woodTar));
+        Assertions.assertTrue(summary.netOutputs().containsKey(woodTar) || summary.fullyBalanced().containsKey(woodTar));
     }
 
     @Test

@@ -18,7 +18,7 @@ import com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon;
 import com.gtceu.calcboard.compat.gtceu.handler.GTAddonCompatibilityHandler;
 import com.gtceu.calcboard.compat.start.helper.RecipeNodeThreadingHelper;
 import com.gtceu.calcboard.compat.start.model.NodeThreadingConfig;
-import com.gtceu.calcboard.compat.start.model.StarTProperties;
+import com.gtceu.calcboard.compat.start.StarTProperties;
 import net.minecraft.resources.ResourceLocation;
 
 import java.util.Locale;

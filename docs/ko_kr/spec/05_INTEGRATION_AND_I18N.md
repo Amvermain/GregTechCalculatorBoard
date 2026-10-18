@@ -94,7 +94,7 @@ graph LR
 | `compat.createdieselgenerators` | `CreateDieselGeneratorsModAdapter`<br/>`CDGRecipeHandler` | • 디젤 엔진 3종(기본/모듈러/대형) 회전력(SU) 발전 및 유체 연료 소비 시뮬레이션<br/>• 대야 가공(발효) 및 원유 분별 증류탑, 압축 성형 레시피 연동 |
 | `compat.thermal` | `ThermalModAdapter`<br/>`ThermalAugmentHelper`<br/>`ThermalRecipeHandler` | • 써멀 증강 및 커스텀 키트(`AugmentData` NBT) 연역 추출<br/>• 다이내모 발전량(RF/t) 및 기계 소요 시간 계수 합성 |
 | `compat.systeams` | `SysteamsModAdapter`<br/>`SysteamsRecipeHandler` | • 스팀 보일러(Steam mB/s) 및 스팀 다이내모 툴팁/수지 연산<br/>• 복합 연료 증기 열효율 및 다단계 증기 티어(Water ➔ Steam ➔ Warm ➔ Hot ➔ Superhot ➔ Plasma) 변환<br/>• Systeams 등록 유체 ID(`steamier`, `steamiest`, `steamiester`, `steamiestest`) 및 런타임 보일러 레시피 매니저 리플렉션(`boil`/`getBoiledFluid`, `fluidOut`/`fluid`) 유연 호환 지원 |
-| `compat.start` | `StarTModAdapter`<br/>`StarTReflectionBridge`<br/>`StarTTurbineHelper` | • `StarTReflectionBridge`: Star Technology Core 레시피 모디파이어 및 기계 능력 격리 연역<br/>• Star Technology 초고압 플라즈마 터빈(SPT/NPT) 및 다중 나선 구조 지원<br/>• SPT/NPT 전용 특성 애드온 호환성 및 멀티블록 제약 검증 |
+| `compat.start` | `StarTModAdapter`<br/>`StarTReflectionBridge`<br/>`StarTTurbineHelper`<br/>`StarTBacterialProperties`<br/>`projection.StarTPortProjector` | • `StarTReflectionBridge`: Star Technology Core 레시피 모디파이어, 레시피 타입 정적 리플렉션 캐싱 및 기계 능력 격리 연역<br/>• Star Technology 초고압 플라즈마 터빈(SPT/NPT) 및 다중 나선 구조 지원<br/>• 박테리아 탄화수소 수확기(BHH) 생산력(1~5)·신진대사(1~5) 가변 스탯 및 동적 포트 투영(ADR-067)<br/>• SPT/NPT 전용 특성 애드온 호환성 및 멀티블록 제약 검증 |
 | `compat.vanilla` | `VanillaModAdapter` | • 표준 싱글블록 및 비특화 모드 기본 폴백 처리 |
 
 ---
@@ -147,9 +147,9 @@ flowchart TD
 
 ---
 
-## 6. 다국어(i18n) 키 명명 규칙 및 3개 국어 동기화
+## 6. 다국어(i18n) 키 명명 규칙 및 4개 국어 동기화
 
-모든 UI 텍스트는 한국어(`ko_kr.json`), 영어(`en_us.json`), 간체 중국어(`zh_cn.json`) 언어 리소스 파일에 상호 1:1로 동기화되어 관리됩니다.
+모든 UI 텍스트는 영어(`en_us.json`), 한국어(`ko_kr.json`), 간체 중국어(`zh_cn.json`), 러시아어(`ru_ru.json`) 언어 리소스 파일에 상호 1:1로 동기화되어 관리됩니다.
 
 ```json
 {
