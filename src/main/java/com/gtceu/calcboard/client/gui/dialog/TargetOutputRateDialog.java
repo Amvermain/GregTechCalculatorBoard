@@ -245,6 +245,9 @@ public class TargetOutputRateDialog implements IBoardModal {
         targetNode.setBaseNode(true);
 
         if (parent != null) {
+            if (targetNode.isCompoundNode() && parent.getGraph() != null) {
+                parent.getGraph().syncCompoundParameters(targetNode);
+            }
             parent.recordCommand(BoardCommand.ModifyPropertyCommand.machineCount(targetNode.getId(), oldC, finalCount));
             parent.markSummaryDirty();
         }

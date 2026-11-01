@@ -44,6 +44,10 @@ public interface IRecipeViewerBridge {
         return null;
     }
 
+    default List<ResourceLocation> findAllWorkstations(Object recipe) {
+        return List.of();
+    }
+
     default void invalidateTextCaches() {
     }
 }

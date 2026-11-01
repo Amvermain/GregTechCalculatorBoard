@@ -21,6 +21,7 @@ class GTTurbineEnhancementTest {
     @BeforeAll
     static void init() {
         com.gtceu.calcboard.api.spi.ModAdapterRegistry.init();
+        com.gtceu.calcboard.testutil.TestMultiblockFixtures.initTestEnvironmentDefaults();
     }
 
     private RecipeNode createLargeSteamTurbineNode() {
@@ -471,7 +472,7 @@ class GTTurbineEnhancementTest {
         node.setTargetTier(GTVoltageTier.ZPM);
         GTTurbineHelper.setRotorHolderTier(node, GTVoltageTier.ZPM);
         GTTurbineHelper.setDynamoTier(node, GTVoltageTier.UV);
-        GTTurbineHelper.setDynamoAmperage(node, 64);
+        GTTurbineHelper.setDynamoAmperage(node, 256);
         node.setRotorPower(1600);
         node.setRotorEfficiency(260);
         node.setRotorName("Prismalium");
@@ -482,6 +483,7 @@ class GTTurbineEnhancementTest {
         assertEquals(6144, node.getTotalParallel());
 
         node.setMachineIcon(lptWs);
+        assertEquals(16, GTTurbineHelper.getDynamoAmperage(node), "Switching to normal turbine must clamp dynamo amperage to 16A");
         assertEquals(512, node.getParallel(), "Switching to LPT must auto-tune parallel to 512");
         assertEquals(512, node.getTotalParallel(), "Total parallel must drop from 6144 to 512");
 
@@ -493,5 +495,41 @@ class GTTurbineEnhancementTest {
         assertFalse(rates.isEmpty());
         double totalRatePerTick = rates.values().iterator().next() / 20.0;
         assertTrue(totalRatePerTick < 300.0, "Fluid rate must normalize to ~222 mB/t, got " + totalRatePerTick);
+    }
+
+    @Test
+    @DisplayName("Normal turbines cap dynamo amperage at 16A while laser-capable turbines support 256A-4096A")
+    void testNormalAndLaserTurbineDynamoAmperageLimits() {
+        RecipeNode normalTurbine = new RecipeNode("lgt", "Large Gas Turbine", 20.0, 32.0, GTVoltageTier.EV);
+        normalTurbine.setGenerator(true);
+        normalTurbine.setMultiblock(true);
+        normalTurbine.setMachineIcon(ResourceLocation.tryParse("gtceu:large_gas_turbine"));
+
+        GTTurbineHelper.setDynamoAmperage(normalTurbine, 16);
+        assertEquals(16, GTTurbineHelper.getDynamoAmperage(normalTurbine));
+
+        GTTurbineHelper.cycleDynamoAmperage(normalTurbine, 1);
+        assertEquals(1, GTTurbineHelper.getDynamoAmperage(normalTurbine), "Normal turbine must wrap 16A -> 1A and never allow 64A");
+
+        GTTurbineHelper.setDynamoAmperage(normalTurbine, 64);
+        assertEquals(16, GTTurbineHelper.getDynamoAmperage(normalTurbine), "Normal turbine must clamp 64A down to 16A");
+
+        RecipeNode laserTurbine = new RecipeNode("spt", "Supreme Plasma Turbine", 20.0, 2048.0, GTVoltageTier.UHV);
+        laserTurbine.setGenerator(true);
+        laserTurbine.setMultiblock(true);
+        laserTurbine.setMachineIcon(ResourceLocation.tryParse("gtceu:supreme_plasma_turbine"));
+
+        GTTurbineHelper.setDynamoAmperage(laserTurbine, 16);
+        GTTurbineHelper.cycleDynamoAmperage(laserTurbine, 1);
+        assertEquals(256, GTTurbineHelper.getDynamoAmperage(laserTurbine), "Laser-capable turbine must jump 16A -> 256A (skipping 64A substation hatch)");
+
+        GTTurbineHelper.cycleDynamoAmperage(laserTurbine, 1);
+        assertEquals(1024, GTTurbineHelper.getDynamoAmperage(laserTurbine));
+
+        GTTurbineHelper.cycleDynamoAmperage(laserTurbine, 1);
+        assertEquals(4096, GTTurbineHelper.getDynamoAmperage(laserTurbine));
+
+        GTTurbineHelper.cycleDynamoAmperage(laserTurbine, 1);
+        assertEquals(1, GTTurbineHelper.getDynamoAmperage(laserTurbine), "Laser-capable turbine must wrap 4096A -> 1A");
     }
 }

@@ -1655,5 +1655,14 @@
   "gui.gtcalcboard.bacteria_stats.preset_initial": "Wild Colony (P1 / M5)",
   "gui.gtcalcboard.bacteria_stats.preview_title": "Cycle Flow Preview",
   "gui.gtcalcboard.bacteria_stats.inputs_header": "Inputs per cycle",
-  "gui.gtcalcboard.bacteria_stats.outputs_header": "Outputs per cycle"
+  "gui.gtcalcboard.bacteria_stats.outputs_header": "Outputs per cycle",
+  "gui.gtcalcboard.hellforge.crucible_heat": "Crucible Heat",
+  "gui.gtcalcboard.badge.hellforge_fluid": "Heating Fluid: %s (%s MK)",
+  "gui.gtcalcboard.badge.hellforge_required_temp": "Required Heat: %s MK",
+  "gui.gtcalcboard.hellforge.infernal_parallel_tooltip": "Infernal Parallel: %dx (+%d tiers above min)",
+  "gui.gtcalcboard.hellforge.click_to_cycle_fluid": "[Click] Cycle Heating Fluid",
+  "gui.gtcalcboard.hellforge.temp_deficit_title": "Insufficient Crucible Heat",
+  "gui.gtcalcboard.node_warning.hellforge_temp_deficit": "Crucible heat (%d MK) is below required recipe heat (%d MK)",
+  "gui.gtcalcboard.hellforge.fluid_max_temp": "Max Temperature: %s MK (+%d MK/B)",
+  "gui.gtcalcboard.hellforge.active_fluid": "Active Heating Fluid"
 }

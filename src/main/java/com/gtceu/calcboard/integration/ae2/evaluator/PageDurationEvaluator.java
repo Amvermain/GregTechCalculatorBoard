@@ -52,7 +52,7 @@ public final class PageDurationEvaluator {
     }
 
     private static double resolveNodeUnitTicks(RecipeNode node) {
-        double unitTicks = node.getOverclockResult().durationTicks();
+        double unitTicks = com.gtceu.calcboard.api.model.NodePerformanceHelper.computeCompoundCycleDurationTicks(node);
         if (unitTicks <= 0.0) {
             unitTicks = Math.max(1.0, node.getBaseDurationTicks());
         }

@@ -118,6 +118,9 @@ public class ModifyPropertyCommand<T> implements BoardCommand {
                 if (val instanceof String s) node.setRotorName(s);
             }
         }
+        if (node.isCompoundNode()) {
+            graph.syncCompoundParameters(node);
+        }
     }
 
     private void updateBaseAnchor(FlowGraph graph, RecipeNode node, T val) {

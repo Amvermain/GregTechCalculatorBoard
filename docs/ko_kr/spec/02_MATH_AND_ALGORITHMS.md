@@ -70,10 +70,11 @@ $$\text{Cycles Per Second (CPS)} = 20.0 \times \text{BatchesPerTick} \times \tex
 
 ### 1.4 하드웨어 애드온 승수 합성 (Addon Compounding)
 
-장착된 모든 애드온 $a \in \text{InstalledAddons}$에 대해 기간 및 전력 승수를 복합 합성합니다. 가열 코일(`MachineAddon.Category.COIL`)의 속도 가속 보너스는 오버클럭 연산 이전에 기본 소요 시간에 먼저 적용되어 내림($\lfloor \text{BaseDurationTicks} \times \text{CoilDurationMult} \rfloor$) 처리되며, 비코일 애드온의 소요 시간 승수는 오버클럭 이후에 합성됩니다:
+장착된 모든 애드온 $a \in \text{InstalledAddons}$에 대해 기간 및 전력 승수를 복합 합성합니다. 유지보수 해치(`MachineAddon.Category.MAINTENANCE`)의 소요 시간 승수는 기본 레시피 소요 시간에 가장 먼저 적용되어 반올림($\text{round}(\text{BaseDurationTicks} \times \text{MaintDurationMult})$) 처리되고, 이어서 가열 코일(`MachineAddon.Category.COIL`)의 속도 가속 보너스가 오버클럭 연산 이전에 내림($\lfloor \text{MaintDuration} \times \text{CoilDurationMult} \rfloor$) 처리되며, 나머지 애드온의 소요 시간 승수는 오버클럭 이후에 합성됩니다:
 
-$$\text{Pre-OC Base Duration} = \max\left(1.0, \, \left\lfloor \text{BaseDurationTicks} \times \prod_{c \in \text{Coils}} c.\text{getDurationMultiplier}() \right\rfloor\right)$$
-$$\text{Total Duration} = \text{Effective Duration} \times \prod_{a \in \text{Addons} \setminus \text{Coils}} a.\text{getDurationMultiplier}()$$
+$$\text{MaintDuration} = \max\left(1.0, \, \text{round}\left(\text{BaseDurationTicks} \times \prod_{m \in \text{Maintenance}} m.\text{getDurationMultiplier}()\right)\right)$$
+$$\text{Pre-OC Base Duration} = \max\left(1.0, \, \left\lfloor \text{MaintDuration} \times \prod_{c \in \text{Coils}} c.\text{getDurationMultiplier}() \right\rfloor\right)$$
+$$\text{Total Duration} = \text{Effective Duration} \times \prod_{a \in \text{Addons} \setminus (\text{Maintenance} \cup \text{Coils})} a.\text{getDurationMultiplier}()$$
 $$\text{Total EU/t} = \text{Effective EU/t} \times \prod_{a \in \text{Addons}} a.\text{getEutMultiplier}()$$
 
 #### 가열 코일 (Heating Coil) 기계별 보너스 연역 수식
@@ -101,11 +102,13 @@ $$\text{Parallel} = \text{SmelterParallel} \quad (\text{기본 } 32\text{x}, 64\
 #### 대형 증기/가스/플라즈마 터빈 로터, 독립 티어 및 내구도 소모율 공식 (ADR-006)
 
 ##### 1. 로터 홀더 및 다이나모 해치 독립 티어 분리 (Decoupled Tiers)
-로터 홀더 티어 전압 $V_{\text{holder}}$, 다이나모 해치 티어 전압 $V_{\text{dynamo}}$, 암페어 $A_{\text{dynamo}}$일 때:
+로터 홀더 티어 전압 $V_{\text{holder}}$, 다이나모 해치 티어 전압 $V_{\text{dynamo}}$, 암페어 $A_{\text{dynamo}}$ (일반 대형 터빈은 $A_{\text{dynamo}} \in \{1, 2, 4, 16\}\text{A}$, 레이저 해치 지원 터빈은 $A_{\text{dynamo}} \in \{1, 2, 4, 16, 256, 1024, 4096\}\text{A}$)일 때:
 
 $$\text{Cap}_{\text{holder}} = V_{\text{holder}} \times 2.0 \quad (\text{단위: EU/t, 최대 유량 한계})$$
 $$\text{Cap}_{\text{dynamo}} = V_{\text{dynamo}} \times A_{\text{dynamo}} \quad (\text{단위: EU/t, 발전 출력 상한})$$
 $$P_{\text{max, turbine}} = \min(\text{Cap}_{\text{holder}}, \, \text{Cap}_{\text{dynamo}})$$
+
+일반 발전 멀티블록(핵분열 원자로 등)의 경우 장착된 다이나모/변전소/레이저 소스 해치들의 총 출력 수용 용량 $\text{Cap}_{\text{dynamo}} = \sum (V_k \times A_k)$가 단일 가동 발전량 $E_{\text{single}}$ 이상일 때($\text{Cap}_{\text{dynamo}} \ge E_{\text{single}}$) 정상 가동하며, 병렬 제어기 사용 시 최대 병렬 한계는 $P_{\text{max, gen}} = \lfloor \text{Cap}_{\text{dynamo}} / E_{\text{single}} \rfloor$로 결정됩니다.
 
 ##### 2. 터빈 로터 효율 및 발전량 계산
 로터 기본 효율 $E_{\text{rotor}}$, 로터 파워 $P_{\text{rotor}}$, 로터 홀더 보너스 $B_{\text{holder}} = \max(0, (\text{HolderTier} - \text{BaseTier}) \times 10\%)$, 윤활유 부스트 승수 $M_{\text{boost}} \in \{1.0, 1.25, 1.50\}$일 때:
@@ -138,6 +141,11 @@ $$\text{Rotor Replacement Rate (Items/hour)} = \frac{3600.0}{T_{\text{lifespan}}
 - **바이오매스 소모량 (`gtceu:biomass`)**: $Q_{\text{biomass}} = 100 \times 2^M \text{ mB}$ (`100 << M`)
 - **산출 유체 생산량 (5종)**: $Q_{\text{out}} = \left(\frac{Q_{\text{rep}}}{5.0}\right) \times P \text{ mB}$
 - **고정 입력**: 증류수($1,000\text{ mB}$) 및 박테리아 배양 아이템($1\text{개}$)은 스탯과 무관하게 일정하게 유지됩니다.
+
+##### 6. Star Technology 헬포지(Hellforge) 및 포르낙스의 인퍼널 로터리 엔진(FIRE) 인퍼널 병렬 보너스 공식
+도가니 열기(`GTCEuProperties.EBF_TEMPERATURE`, $T_{\text{recipe}} \in [0, 4050]\text{ MK}$)를 사용하는 인퍼널 기계에 가열 유체(`StarTProperties.HELLFORGE_TEMP`, $T_{\text{fluid}} \in \{900, 1350, 1800, 2250, 2700, 3150, 3600, 4050\}\text{ MK}$)를 주입할 때, $T_{\text{fluid}} < T_{\text{recipe}}$이면 미달 경고를 표시하며 $T_{\text{fluid}} \ge T_{\text{recipe}}$일 때 초과 열기 $450\text{ MK}$마다 $2$배씩 증가하는 인퍼널 병렬 승수 $P_{\text{infernal}}$가 기계 기본/해치 병렬에 곱해집니다:
+$$P_{\text{infernal}} = 2^{\lfloor \max(0, \, T_{\text{fluid}} - T_{\text{recipe}}) / 450 \rfloor}$$
+$$P_{\text{total}} = \max(1, \, P_{\text{base}} \times P_{\text{infernal}})$$
 
 #### 공급 전력 기반 기계 가용 최대 병렬 ($P_{\max}$) 및 오버클록 수용 한계
 장착된 에너지 해치 티어 전압 $V_{\text{hatch}}$, 암페어 $A_{\text{hatch}}$, 단일 레시피 소비 전력 $E_{\text{recipe}}$일 때:
@@ -507,7 +515,7 @@ $$S = \frac{M_{\text{target}}}{D_{\text{current}}}$$
 복합 재순환 루프, 정션 앵커, 및 공유 기계 풀 제약이 혼재된 다중 결합 그래프에서 단 1회의 연산으로 결정론적 질량 보존 수렴을 보장합니다:
 
 1. **1단계: 연속 유량 균형 선형 연립방정식 연산 ($A\mathbf{x} = \mathbf{b}$)**:
-   - 각 기계 노드 $i$의 가동 배율 $x_i$를 미지수로 두고, 각 중간 생산물 $j$에 대한 질량 보존 제약식 $\sum_i C_{ji} x_i = 0$ 및 앵커 제약식 $x_{\text{anchor}} = S_{\text{fixed}}$로 증강 행렬 $[A | \mathbf{b}]$를 구축합니다.
+   - 각 기계 노드 $i$의 가동 배율 $x_i$를 미지수로 두고, 각 중간 생산물 $j$에 대한 질량 보존 제약식 $\sum_i C_{ji} x_i = 0$, 앵커 제약식 $x_{\text{anchor}} = S_{\text{fixed}}$, 및 다단계(Layered) 복합 공정 그룹 형제 간 가동 대수 등치 제약식 $x_{\text{rep}} - x_{\text{sibling}} = 0$으로 증강 행렬 $[A | \mathbf{b}]$를 구축합니다.
    - 부분 피보팅(Partial Pivoting) 가우스-요르단 소거법을 적용하여 수치적 안정성을 확보하면서 연속 가동 배율 벡터 $\mathbf{x}^*$를 $O(N^3)$ 시간 내에 결정론적으로 도출합니다.
 2. **2단계: 정수 양자화 (Integer Quantization)**:
    - 정수 기계 대수 연산 요구 시, 각 미지수 해에 천장 함수를 적용($\lceil x_i^* \rceil$)하고 공정 병목 비율을 보존하는 스케일링을 거쳐 정수 대수 벡터를 확정합니다.

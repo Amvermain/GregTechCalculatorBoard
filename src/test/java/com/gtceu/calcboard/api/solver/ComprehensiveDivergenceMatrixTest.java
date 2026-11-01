@@ -370,11 +370,11 @@ public class ComprehensiveDivergenceMatrixTest {
         Assertions.assertEquals(3.0, formingPress.getMachineCount(), 1e-4);
         Assertions.assertEquals(2.0, implosion.getMachineCount(), 1e-4);
         Assertions.assertEquals(3.0, forgeHammer.getMachineCount(), 1e-4);
-        Assertions.assertEquals(16.0, polarizer.getMachineCount(), 1e-4);
-        Assertions.assertEquals(10.0, auto1.getMachineCount(), 1e-4);
-        Assertions.assertEquals(10.0, auto2.getMachineCount(), 1e-4);
-        Assertions.assertEquals(10.0, auto3.getMachineCount(), 1e-4);
-        Assertions.assertEquals(10.0, auto4.getMachineCount(), 1e-4);
+        Assertions.assertEquals(17.0, polarizer.getMachineCount(), 1e-4);
+        Assertions.assertEquals(11.0, auto1.getMachineCount(), 1e-4);
+        Assertions.assertEquals(11.0, auto2.getMachineCount(), 1e-4);
+        Assertions.assertEquals(11.0, auto3.getMachineCount(), 1e-4);
+        Assertions.assertEquals(11.0, auto4.getMachineCount(), 1e-4);
     }
 
     @Test

@@ -89,7 +89,7 @@ public class StarTModAdapter extends GTCEuModAdapter {
             return true;
         }
 
-        if (StarTTurbineHelper.isStarTTurbine(node)) {
+        if (StarTTurbineHelper.isStarTTurbine(node) || StarTHellForgeHelper.isHellForge(node)) {
             return true;
         }
 
@@ -105,6 +105,7 @@ public class StarTModAdapter extends GTCEuModAdapter {
     public boolean isAddonCompatible(RecipeNode node, MachineAddon addon) {
         if (node == null || addon == null) return false;
         if (addon.getCategory().equals(AddonCategory.CUSTOM)) return true;
+        if (StarTHellForgeHelper.isHellForge(node) && addon.getCategory().equals(AddonCategory.COIL)) return false;
 
         if (StarTTurbineHelper.isStarTTrait(addon)) {
             return StarTTurbineHelper.isCompatibleStarTTrait(node, addon);
@@ -116,6 +117,9 @@ public class StarTModAdapter extends GTCEuModAdapter {
     @Override
     public List<AddonCategory> getApplicableAddonCategories(RecipeNode node) {
         List<AddonCategory> mutable = new ArrayList<>(super.getApplicableAddonCategories(node));
+        if (StarTHellForgeHelper.isHellForge(node)) {
+            mutable.remove(AddonCategory.COIL);
+        }
         if (com.gtceu.calcboard.compat.start.projection.StarTPortProjector.isBacterialHarvester(node)) {
             if (!mutable.contains(AddonCategory.BACTERIA_STATS)) {
                 mutable.add(0, AddonCategory.BACTERIA_STATS);
@@ -323,6 +327,9 @@ public class StarTModAdapter extends GTCEuModAdapter {
     @Override
     public void onMachineIconChanged(RecipeNode node, ResourceLocation oldIcon, ResourceLocation newIcon) {
         super.onMachineIconChanged(node, oldIcon, newIcon);
+        if (StarTHellForgeHelper.isHellForge(node)) {
+            StarTHellForgeHelper.ensureDefaultHeat(node);
+        }
         boolean wasPlasmaTurbine = StarTTurbineHelper.isPlasmaTurbineIcon(oldIcon);
         boolean isPlasmaTurbine = StarTTurbineHelper.supportsBoost(node);
         if (wasPlasmaTurbine || isPlasmaTurbine) {
@@ -369,6 +376,22 @@ public class StarTModAdapter extends GTCEuModAdapter {
             return StarTTurbineHelper.getBoosterRatePerSec(node, stack.getId());
         }
         return super.computeSingleMachineIngredientRate(node, stack, isInput, defaultRate);
+    }
+
+    @Override
+    public boolean canUseCoils(RecipeNode node) {
+        if (StarTHellForgeHelper.isHellForge(node)) {
+            return false;
+        }
+        return super.canUseCoils(node);
+    }
+
+    @Override
+    public boolean isCoilMultiblock(ResourceLocation machineId) {
+        if (StarTHellForgeHelper.isHellForgeMachine(machineId)) {
+            return false;
+        }
+        return super.isCoilMultiblock(machineId);
     }
 }
 

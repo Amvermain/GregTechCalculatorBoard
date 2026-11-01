@@ -13,6 +13,18 @@
 
 ## [Unreleased]
 
+## [2.4.4] - 2026-11-01
+
+### Fixed
+- Fixed an issue where Star Technology Hellforge and Fornax's Infernal Rotary Engine nodes displayed heating coils instead of crucible heat, and added heating fluid selection (900 MK to 4,050 MK) that applies 2x bonus parallels for every 450 MK above the recipe's required heat.
+- Fixed an issue where Star Technology nuclear fission reactors were treated as power-consuming machines requiring input energy hatches and heating coils, and updated them to operate as generators using dynamo, substation dynamo, and laser source hatches based on total output power capacity rather than hatch voltage tier.
+- Fixed an issue where normal large turbines allowed selecting 64A substation dynamo hatches instead of capping at 16A, and added 256A, 1024A, and 4096A laser hatch amperage options for turbines that support laser hatches.
+- Fixed an issue where recipes outputting the same item or fluid across multiple slots with different probabilities (such as Dirty Ion Exchange Resin in the Dual-Chambered Vacuum) used the first slot's probability for all slots during Auto-Ratio, causing incorrect machine counts on regeneration and makeup lines in recirculation loops.
+- Fixed an issue on multi-step (Layered) recipe cards such as Ordered Chemistry where the base Advanced Synthesis Plant was missing from the machine selector, the True Synthesis Array did not equip Throughput Boosting by default, and the step badge shifted the click areas of the Overclock and Machine Config buttons.
+- Fixed an issue where multi-step (Layered) recipes did not synchronize machine selection and installed hatches/addons across steps, counted steps as separate machines after editing, calculated each step's consumption and production rates using only that single step's duration instead of the total sequential cycle time across all steps, and only scaled the last step during Auto-Ratio instead of scaling all steps and their upstream suppliers together.
+- Fixed an issue where renaming an FTB Teams party did not update the team workspace header name, keeping the original name even after relogging or restarting the server.
+- Fixed an issue where the Configurable Maintenance Hatch duration modifier was applied after overclocking instead of before overclocking, causing machines that do not support sub-tick processing (such as Industrial Barrels and Kube centrifuges or electrolyzers overclocked down to a few ticks) to show a shorter recipe duration and faster production speed on the board than in-game.
+
 ## [2.4.3] - 2026-10-18
 
 ### Added

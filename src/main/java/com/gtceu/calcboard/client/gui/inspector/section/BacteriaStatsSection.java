@@ -155,18 +155,25 @@ public class BacteriaStatsSection implements IInspectorSection {
         int m = StarTBacterialProperties.getMetabolism(node) + metaDelta;
         StarTBacterialProperties.setProduction(node, p);
         StarTBacterialProperties.setMetabolism(node, m);
-        node.syncProjectedPorts();
-        if (widget != null) widget.invalidateCache();
-        if (screen != null) screen.markSummaryDirty();
+        notifyStatChanged();
     }
 
     private void applyPreset(int prod, int meta) {
         playClickSound();
         StarTBacterialProperties.setProduction(node, prod);
         StarTBacterialProperties.setMetabolism(node, meta);
+        notifyStatChanged();
+    }
+
+    private void notifyStatChanged() {
         node.syncProjectedPorts();
         if (widget != null) widget.invalidateCache();
-        if (screen != null) screen.markSummaryDirty();
+        if (screen == null) return;
+        if (node.isCompoundNode() && screen.getGraph() != null) {
+            screen.getGraph().syncCompoundParameters(node);
+            screen.rebuildBoardWidgets();
+        }
+        screen.markSummaryDirty();
     }
 
     private static void playClickSound() {

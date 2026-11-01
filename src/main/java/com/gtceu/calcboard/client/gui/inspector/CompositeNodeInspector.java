@@ -122,10 +122,18 @@ public class CompositeNodeInspector implements INodeSubInspector {
             int w = section.isFullWidth() ? NodeInspectorPanel.PANEL_WIDTH : NodeInspectorPanel.PANEL_WIDTH - 16;
 
             if (section.mouseClicked(x, curY, w, mouseX, mouseY, button)) {
+                syncCompoundNodeIfNeeded(node);
                 return true;
             }
             curY += sectionH;
         }
         return true;
+    }
+
+    private void syncCompoundNodeIfNeeded(RecipeNode node) {
+        if (node == null || !node.isCompoundNode() || screen == null || screen.getGraph() == null) return;
+        screen.getGraph().syncCompoundParameters(node);
+        screen.rebuildBoardWidgets();
+        screen.markSummaryDirty();
     }
 }

@@ -75,6 +75,9 @@ public final class AutoRatioEngine {
             targetAnchorCount = quantizeMachineCount(graph, anchor, currentAnchorCount, FlowBalanceMatrixSolver.CountRoundingMode.CEIL, true);
         }
         anchor.setMachineCount(targetAnchorCount);
+        if (anchor.isCompoundNode()) {
+            graph.syncCompoundParameters(anchor);
+        }
 
         ProcessStabilityAnalyzer.DivergenceContext divergenceContext = new ProcessStabilityAnalyzer.DivergenceContext();
         ProcessStabilityAnalyzer.detectConflictingAnchors(graph, initialBaseNodeCounts, divergenceContext);
@@ -89,6 +92,9 @@ public final class AutoRatioEngine {
         if (linearResult.successful() && !linearResult.underDetermined() && !linearResult.machineCounts().isEmpty()) {
             boolean hasClamp = applyLinearCountsAndCheckClamping(graph, linearResult.machineCounts(), divergenceContext);
             anchor.setMachineCount(targetAnchorCount);
+            if (anchor.isCompoundNode()) {
+                graph.syncCompoundParameters(anchor);
+            }
             optimizeDampedLoopsToSteadyState(graph, integerCounts);
             if (hasClamp) {
                 ProcessStabilityAnalyzer.applyDivergenceWarnings(graph, divergenceContext);
@@ -125,6 +131,9 @@ public final class AutoRatioEngine {
         resolveBottlenecksPass(graph, anchor, upstreamNodes, downstreamNodes, false, divergenceContext);
         ProcessStabilityAnalyzer.detectConflictingAnchors(graph, initialBaseNodeCounts, divergenceContext);
         anchor.setMachineCount(targetAnchorCount);
+        if (anchor.isCompoundNode()) {
+            graph.syncCompoundParameters(anchor);
+        }
         AutoRatioRelaxationSolver.normalizeNodeCounts(graph, anchor, targetAnchorCount, downstreamNodes, cyclicNodes, integerCounts);
 
         ProcessStabilityAnalyzer.reconcileLoopDivergences(graph, anchor, divergenceContext, integerCounts);
@@ -185,7 +194,7 @@ public final class AutoRatioEngine {
             ProcessStabilityAnalyzer.DivergenceContext divergenceContext
     ) {
         Queue<RecipeNode> upQueue = new ArrayDeque<>();
-        upQueue.add(anchor);
+        seedQueueWithNodeAndCompoundSiblings(graph, anchor, upQueue);
         if (downstreamNodes != null) {
             for (String downId : downstreamNodes) {
                 RecipeNode dn = graph.findNodeById(downId);
@@ -216,6 +225,17 @@ public final class AutoRatioEngine {
         }
     }
 
+    private static void seedQueueWithNodeAndCompoundSiblings(FlowGraph graph, RecipeNode node, Queue<RecipeNode> queue) {
+        if (node == null) return;
+        queue.add(node);
+        if (!node.isCompoundNode() || graph == null) return;
+        for (RecipeNode sibling : graph.findCompoundSiblingNodes(node.getCompoundGroupId())) {
+            if (!sibling.getId().equals(node.getId())) {
+                queue.add(sibling);
+            }
+        }
+    }
+
     private static void processUpstreamEdge(
             FlowGraph graph,
             FlowGraph.ConnectionEdge edge,
@@ -235,12 +255,18 @@ public final class AutoRatioEngine {
             return;
         }
 
-        if (producer.getId().equals(anchor.getId())) return;
+        if (isSameNodeOrCompoundGroup(anchor, producer)) return;
         if (allowedUpstreamNodes != null && !allowedUpstreamNodes.contains(producer.getId())) return;
 
         if (edge.outputIndex() >= 0 && edge.outputIndex() < producer.getOutputs().size()) {
             scaleUpstreamProducerNode(graph, producer, edge.outputIndex(), countsMap, integerCounts, upVisitCounts, upQueue, divergenceContext);
         }
+    }
+
+    private static boolean isSameNodeOrCompoundGroup(RecipeNode a, RecipeNode b) {
+        if (a == null || b == null) return false;
+        if (a.getId().equals(b.getId())) return true;
+        return a.isCompoundNode() && b.isCompoundNode() && a.getCompoundGroupId().equals(b.getCompoundGroupId());
     }
 
     private static void scaleUpstreamProducerNode(
@@ -273,10 +299,30 @@ public final class AutoRatioEngine {
         int visits = upVisitCounts.getOrDefault(producer.getId(), 0);
 
         if (neededCount > prevCount + 0.0001 && visits < 3) {
-            countsMap.put(producer.getId(), neededCount);
-            producer.setMachineCount(neededCount);
-            upVisitCounts.put(producer.getId(), visits + 1);
-            upQueue.add(producer);
+            applyCountAndEnqueueWithSiblings(graph, producer, neededCount, visits + 1, countsMap, upVisitCounts, upQueue);
+        }
+    }
+
+    private static void applyCountAndEnqueueWithSiblings(
+            FlowGraph graph,
+            RecipeNode node,
+            double count,
+            int nextVisitCount,
+            Map<String, Double> countsMap,
+            Map<String, Integer> visitCounts,
+            Queue<RecipeNode> queue
+    ) {
+        countsMap.put(node.getId(), count);
+        node.setMachineCount(count);
+        visitCounts.put(node.getId(), nextVisitCount);
+        queue.add(node);
+        if (!node.isCompoundNode() || graph == null) return;
+        for (RecipeNode sibling : graph.findCompoundSiblingNodes(node.getCompoundGroupId())) {
+            if (sibling.getId().equals(node.getId())) continue;
+            countsMap.put(sibling.getId(), count);
+            sibling.setMachineCount(count);
+            visitCounts.put(sibling.getId(), nextVisitCount);
+            queue.add(sibling);
         }
     }
 
@@ -306,7 +352,7 @@ public final class AutoRatioEngine {
 
     public static void solveDownstreamPassRestricted(FlowGraph graph, RecipeNode anchor, Map<String, Double> countsMap, Set<String> allowedDownstreamNodes, boolean integerCounts) {
         Queue<RecipeNode> downQueue = new ArrayDeque<>();
-        downQueue.add(anchor);
+        seedQueueWithNodeAndCompoundSiblings(graph, anchor, downQueue);
 
         int maxDownstreamIterations = Math.max(50, graph.getNodes().size() * 5);
         int downIterations = 0;
@@ -329,7 +375,7 @@ public final class AutoRatioEngine {
         for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
             if (!edge.fromNodeId().equals(producer.getId())) continue;
             RecipeNode consumer = graph.findNodeById(edge.toNodeId());
-            if (consumer == null || consumer.getId().equals(anchor.getId())) continue;
+            if (consumer == null || isSameNodeOrCompoundGroup(anchor, consumer)) continue;
             if (consumer.isReroute() || allowedDownstreamNodes.contains(consumer.getId())) {
                 nextConsumers.add(consumer);
             }
@@ -355,13 +401,12 @@ public final class AutoRatioEngine {
         if (requiredConsumerCount <= 0.0001) return;
 
         double finalConsumerCount = quantizeMachineCount(graph, consumer, requiredConsumerCount, FlowBalanceMatrixSolver.CountRoundingMode.CEIL, integerCounts);
-        countsMap.put(consumer.getId(), finalConsumerCount);
-        consumer.setMachineCount(finalConsumerCount);
-
         int v = downVisitCounts.getOrDefault(consumer.getId(), 0);
         if (v < 3) {
-            downVisitCounts.put(consumer.getId(), v + 1);
-            downQueue.add(consumer);
+            applyCountAndEnqueueWithSiblings(graph, consumer, finalConsumerCount, v + 1, countsMap, downVisitCounts, downQueue);
+        } else {
+            countsMap.put(consumer.getId(), finalConsumerCount);
+            consumer.setMachineCount(finalConsumerCount);
         }
     }
 

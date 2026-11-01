@@ -166,7 +166,7 @@ public final class GTCEuWorkstationResolver {
     }
 
     private static void appendCapabilityMultiblocks(ResourceLocation catId, List<ResourceLocation> result) {
-        if (!result.isEmpty() || catId == null) return;
+        if (catId == null) return;
         CategoryCapability cap = CategoryCapabilityMatrix.getInstance().getCapability(catId);
         if (cap == null || cap.availableWorkstations() == null) return;
         for (ResourceLocation ws : cap.availableWorkstations()) {

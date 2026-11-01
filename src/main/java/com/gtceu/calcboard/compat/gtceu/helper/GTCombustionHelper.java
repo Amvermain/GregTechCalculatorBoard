@@ -164,6 +164,9 @@ public final class GTCombustionHelper {
         if (LARGE_COMBUSTION_ENGINE.equals(node.getMachineIcon())) {
             return true;
         }
+        if (node.getMachineIcon() != null && isCombustionEngine(node.getMachineIcon())) {
+            return false;
+        }
         if (!node.isMultiblock() || isStarTModule(node) || isModularCombustionFrame(node)) {
             return false;
         }
@@ -180,6 +183,9 @@ public final class GTCombustionHelper {
         }
         if (EXTREME_COMBUSTION_ENGINE.equals(node.getMachineIcon())) {
             return true;
+        }
+        if (node.getMachineIcon() != null && isCombustionEngine(node.getMachineIcon())) {
+            return false;
         }
         if (!node.isMultiblock() || isStarTModule(node) || isModularCombustionFrame(node)) {
             return false;

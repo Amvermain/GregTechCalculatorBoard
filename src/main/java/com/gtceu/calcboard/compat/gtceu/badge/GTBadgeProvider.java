@@ -4,13 +4,11 @@ import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.property.NodeBadge;
 import com.gtceu.calcboard.api.property.NodeBadgeRegistry;
-import com.gtceu.calcboard.api.property.NodeProperties;
-import com.gtceu.calcboard.api.property.NodePropertyStore;
 import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.util.NumberFormatUtil;
-import com.gtceu.calcboard.compat.gtceu.GTCEuProperties;
 import com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter;
+import com.gtceu.calcboard.compat.gtceu.GTCEuProperties;
 import com.gtceu.calcboard.compat.gtceu.GTTurbineHelper;
 import com.gtceu.calcboard.compat.gtceu.handler.GTAddonCompatibilityHandler;
 import net.minecraft.network.chat.Component;
@@ -71,7 +69,6 @@ public final class GTBadgeProvider {
             return List.of(tierBadge);
         });
 
-        // 2. Cleanroom Badge Provider
         NodeBadgeRegistry.register((node, store) -> {
             if (node == null || store == null) return List.of();
             String cleanroom = store.get(GTCEuProperties.CLEANROOM_TYPE);
@@ -85,7 +82,6 @@ public final class GTBadgeProvider {
             return List.of(new NodeBadge(label, 0xFF55FFFF, 0xEE1E2D3D, 0xFF55FFFF, tooltip));
         });
 
-        // 3. Fusion Reflector Badge Provider
         NodeBadgeRegistry.register((node, store) -> {
             if (node == null || store == null) return List.of();
             int reqTier = store.get(GTCEuProperties.REQUIRED_REFLECTOR_TIER);
@@ -127,7 +123,6 @@ public final class GTBadgeProvider {
             return List.of();
         });
 
-        // 4. Turbine Deficit Badge Provider
         NodeBadgeRegistry.register((node, store) -> {
             if (node == null || !GTTurbineHelper.isTurbine(node)) return List.of();
             FlowGraph graph = BoardManager.getInstance().getActiveGraph();
@@ -143,7 +138,6 @@ public final class GTBadgeProvider {
             return List.of();
         });
 
-        // 4b. Missing Energy Hatch Badge Provider
         NodeBadgeRegistry.register((node, store) -> {
             if (node == null) return List.of();
             if (GTAddonCompatibilityHandler.requiresEnergyHatch(node) && !GTAddonCompatibilityHandler.hasEnergyHatch(node)) {
@@ -157,9 +151,9 @@ public final class GTBadgeProvider {
             return List.of();
         });
 
-        // 5. Heating Coil Badge Provider
         NodeBadgeRegistry.register((node, store) -> {
             if (node == null || store == null) return List.of();
+            if (com.gtceu.calcboard.compat.start.StarTHellForgeHelper.isHellForge(node)) return List.of();
             int reqTemp = store.get(GTCEuProperties.EBF_TEMPERATURE);
             if (reqTemp <= 0) reqTemp = node.getRecipeTemperature();
 
@@ -208,7 +202,6 @@ public final class GTBadgeProvider {
             return List.of();
         });
 
-        // 6. Combustion Engine Boost Badge Provider
         NodeBadgeRegistry.register((node, store) -> {
             if (node == null || store == null) return List.of();
             if (!com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isCombustionEngine(node)) return List.of();
@@ -253,5 +246,61 @@ public final class GTBadgeProvider {
 
             return badges;
         });
+
+        NodeBadgeRegistry.register((node, store) -> buildHellForgeBadges(node));
+    }
+
+    private static List<NodeBadge> buildHellForgeBadges(RecipeNode node) {
+        if (node == null || !com.gtceu.calcboard.compat.start.StarTHellForgeHelper.isHellForge(node)) {
+            return List.of();
+        }
+        com.gtceu.calcboard.compat.start.StarTHellForgeHelper.purgeLegacyCoilAddons(node);
+        int reqTemp = com.gtceu.calcboard.compat.start.StarTHellForgeHelper.getRequiredTemperature(node);
+        int curTemp = com.gtceu.calcboard.compat.start.StarTHellForgeHelper.getOperatingTemperature(node);
+        var fluid = com.gtceu.calcboard.compat.start.StarTHellForgeHelper.getSelectedFluid(node);
+        Runnable cycleAction = () -> com.gtceu.calcboard.compat.start.StarTHellForgeHelper.cycleTemperature(node, 1);
+
+        if (reqTemp > 0 && curTemp < reqTemp) {
+            return List.of(createHellForgeDeficitBadge(fluid, curTemp, reqTemp, cycleAction));
+        }
+        return List.of(createHellForgeValidBadge(node, fluid, curTemp, reqTemp, cycleAction));
+    }
+
+    private static NodeBadge createHellForgeValidBadge(
+            RecipeNode node,
+            com.gtceu.calcboard.compat.start.StarTHellForgeHelper.HeatingFluid fluid,
+            int curTemp,
+            int reqTemp,
+            Runnable cycleAction
+    ) {
+        String badgeText = String.format(Locale.ROOT, "🔥 %,dMK", curTemp);
+        List<Component> tooltip = new ArrayList<>();
+        tooltip.add(Component.literal("§6🔥 ").append(Component.translatable("gui.gtcalcboard.hellforge.crucible_heat")));
+        tooltip.add(Component.literal("§7").append(Component.translatable("gui.gtcalcboard.badge.hellforge_fluid", "§e" + fluid.getDisplayName(), String.format(Locale.ROOT, "%,d", curTemp))));
+        if (reqTemp > 0) {
+            int infPar = com.gtceu.calcboard.compat.start.StarTHellForgeHelper.computeInfernalParallel(node);
+            int tiersAbove = com.gtceu.calcboard.compat.start.StarTHellForgeHelper.computeExcessTiers(reqTemp, curTemp);
+            tooltip.add(Component.literal("§7").append(Component.translatable("gui.gtcalcboard.badge.hellforge_required_temp", String.format(Locale.ROOT, "§f%,d", reqTemp))));
+            tooltip.add(Component.literal("§a⚡ ").append(Component.translatable("gui.gtcalcboard.hellforge.infernal_parallel_tooltip", infPar, tiersAbove)));
+        }
+        tooltip.add(Component.literal("§8").append(Component.translatable("gui.gtcalcboard.hellforge.click_to_cycle_fluid")));
+        return new NodeBadge(badgeText, 0xFFFF8833, 0xEE3D2418, 0xFFFF8833, tooltip, false, cycleAction);
+    }
+
+    private static NodeBadge createHellForgeDeficitBadge(
+            com.gtceu.calcboard.compat.start.StarTHellForgeHelper.HeatingFluid fluid,
+            int curTemp,
+            int reqTemp,
+            Runnable cycleAction
+    ) {
+        String badgeText = String.format(Locale.ROOT, "🔥 ⚠ %,dMK", curTemp);
+        List<Component> tooltip = List.of(
+                Component.literal("§c⚠ ").append(Component.translatable("gui.gtcalcboard.hellforge.temp_deficit_title")),
+                Component.literal("§7").append(Component.translatable("gui.gtcalcboard.badge.hellforge_required_temp", String.format(Locale.ROOT, "§c%,d", reqTemp))),
+                Component.literal("§7").append(Component.translatable("gui.gtcalcboard.badge.hellforge_fluid", "§e" + fluid.getDisplayName(), String.format(Locale.ROOT, "%,d", curTemp))),
+                Component.literal("§c❌ ").append(Component.translatable("gui.gtcalcboard.node_warning.hellforge_temp_deficit", curTemp, reqTemp)),
+                Component.literal("§8").append(Component.translatable("gui.gtcalcboard.hellforge.click_to_cycle_fluid"))
+        );
+        return new NodeBadge(badgeText, 0xFFFF5555, 0xEE3D1E1E, 0xFFFF5555, tooltip, true, cycleAction);
     }
 }

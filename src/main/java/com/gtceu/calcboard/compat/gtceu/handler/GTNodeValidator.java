@@ -43,37 +43,13 @@ public final class GTNodeValidator {
         }
 
         // 2. Heating Coil Temperature Check
-        int reqTemp = node.getProperties().get(GTCEuProperties.EBF_TEMPERATURE);
-        if (reqTemp <= 0) {
-            reqTemp = node.getRecipeTemperature();
-        }
-        if (reqTemp > 0) {
-            int instTemp = com.gtceu.calcboard.compat.gtceu.helper.CoilHelper.getInstalledCoilTemperature(node);
-            if (instTemp < reqTemp) {
-                if (warnings != null) {
-                    warnings.add(Component.translatable("gui.gtcalcboard.node_warning.coil_temp_deficit", instTemp, reqTemp));
-                }
-                valid = false;
-            }
+        if (!validateRequiredTemperature(node, warnings)) {
+            valid = false;
         }
 
-        // 3. Electric Voltage & Energy Hatch Tier Requirement Check
         if (GTAddonCompatibilityHandler.requiresEnergyHatch(node)) {
-            if (!GTAddonCompatibilityHandler.hasEnergyHatch(node)) {
-                if (warnings != null) {
-                    warnings.add(Component.translatable("gui.gtcalcboard.node_warning.energy_hatch_missing"));
-                }
+            if (!validateRequiredEnergyOrDynamoHatch(node, warnings)) {
                 valid = false;
-            } else {
-                com.gtceu.calcboard.api.type.GTVoltageTier hatchTier = GTAddonCompatibilityHandler.getPrimaryEnergyHatchTier(node);
-                com.gtceu.calcboard.api.type.GTVoltageTier reqTier = getRequiredRecipeTier(node);
-                if (hatchTier != null && reqTier != null && hatchTier.ordinal() < reqTier.ordinal()) {
-                    if (warnings != null) {
-                        warnings.add(Component.translatable("gui.gtcalcboard.node_warning.energy_hatch_tier_deficit",
-                                reqTier.getName(), hatchTier.getName()));
-                    }
-                    valid = false;
-                }
             }
         } else if (!node.isMultiblock() && !node.isGenerator() && !node.isModule()
                 && node.getEnergyType() == com.gtceu.calcboard.api.type.EnergyType.ELECTRIC_EU
@@ -285,6 +261,47 @@ public final class GTNodeValidator {
         }
     }
 
+    private static boolean validateRequiredEnergyOrDynamoHatch(RecipeNode node, List<Component> warnings) {
+        if (!GTAddonCompatibilityHandler.hasEnergyHatch(node)) {
+            if (warnings != null) {
+                warnings.add(Component.translatable("gui.gtcalcboard.node_warning.energy_hatch_missing"));
+            }
+            return false;
+        }
+        if (node.isGenerator()) {
+            if (isGeneratorDynamoCapacitySufficient(node)) {
+                return true;
+            }
+            com.gtceu.calcboard.api.type.GTVoltageTier hatchTier = GTAddonCompatibilityHandler.getPrimaryEnergyHatchTier(node);
+            com.gtceu.calcboard.api.type.GTVoltageTier reqTier = getRequiredRecipeTier(node);
+            if (warnings != null) {
+                warnings.add(Component.translatable("gui.gtcalcboard.node_warning.energy_hatch_tier_deficit",
+                        reqTier != null ? reqTier.getName() : "?",
+                        hatchTier != null ? hatchTier.getName() : "?"));
+            }
+            return false;
+        }
+        com.gtceu.calcboard.api.type.GTVoltageTier hatchTier = GTAddonCompatibilityHandler.getPrimaryEnergyHatchTier(node);
+        com.gtceu.calcboard.api.type.GTVoltageTier reqTier = getRequiredRecipeTier(node);
+        if (hatchTier != null && reqTier != null && hatchTier.ordinal() < reqTier.ordinal()) {
+            if (warnings != null) {
+                warnings.add(Component.translatable("gui.gtcalcboard.node_warning.energy_hatch_tier_deficit",
+                        reqTier.getName(), hatchTier.getName()));
+            }
+            return false;
+        }
+        return true;
+    }
+
+    public static boolean isGeneratorDynamoCapacitySufficient(RecipeNode node) {
+        if (node == null || !node.isGenerator() || !node.isMultiblock()) return true;
+        if (!GTAddonCompatibilityHandler.requiresEnergyHatch(node)) return true;
+        if (!GTAddonCompatibilityHandler.hasEnergyHatch(node)) return false;
+        long dynamoCap = GTEnergyHatchCalculator.getMaxEUtCapacity(node);
+        long reqOutEUt = (long) Math.ceil(node.getBaseEUt() * node.getCombinedEutMultiplier());
+        return dynamoCap >= reqOutEUt;
+    }
+
     public static com.gtceu.calcboard.api.type.GTVoltageTier getRequiredRecipeTier(RecipeNode node) {
         if (node == null) return null;
         com.gtceu.calcboard.api.type.GTVoltageTier req = node.getRecipeTier();
@@ -292,5 +309,35 @@ public final class GTNodeValidator {
             req = com.gtceu.calcboard.api.type.GTVoltageTier.getTierForVoltage((long) Math.ceil(node.getBaseEUt()));
         }
         return req;
+    }
+
+    private static boolean validateRequiredTemperature(RecipeNode node, List<Component> warnings) {
+        int reqTemp = node.getProperties().get(GTCEuProperties.EBF_TEMPERATURE);
+        if (reqTemp <= 0) {
+            reqTemp = node.getRecipeTemperature();
+        }
+        if (reqTemp <= 0) return true;
+        if (com.gtceu.calcboard.compat.start.StarTHellForgeHelper.isHellForge(node)) {
+            return validateHellForgeTemperature(node, reqTemp, warnings);
+        }
+        return validateCoilTemperature(node, reqTemp, warnings);
+    }
+
+    private static boolean validateHellForgeTemperature(RecipeNode node, int reqTemp, List<Component> warnings) {
+        int curTemp = com.gtceu.calcboard.compat.start.StarTHellForgeHelper.getOperatingTemperature(node);
+        if (curTemp >= reqTemp) return true;
+        if (warnings != null) {
+            warnings.add(Component.translatable("gui.gtcalcboard.node_warning.hellforge_temp_deficit", curTemp, reqTemp));
+        }
+        return false;
+    }
+
+    private static boolean validateCoilTemperature(RecipeNode node, int reqTemp, List<Component> warnings) {
+        int instTemp = com.gtceu.calcboard.compat.gtceu.helper.CoilHelper.getInstalledCoilTemperature(node);
+        if (instTemp >= reqTemp) return true;
+        if (warnings != null) {
+            warnings.add(Component.translatable("gui.gtcalcboard.node_warning.coil_temp_deficit", instTemp, reqTemp));
+        }
+        return false;
     }
 }

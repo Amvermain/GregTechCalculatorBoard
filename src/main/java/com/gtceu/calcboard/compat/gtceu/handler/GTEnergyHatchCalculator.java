@@ -26,7 +26,9 @@ public final class GTEnergyHatchCalculator {
 
     public static int getMaxAllowedEnergyHatches(RecipeNode node) {
         if (node == null || !node.isMultiblock()) return 1;
-        if (node.isGenerator()) return 1;
+        if (node.isGenerator() && (node.isTurbine() || GTCombustionHelper.isCombustionFamily(node))) {
+            return 1;
+        }
 
         ResourceLocation mbId = node.getMachineIcon();
         MultiblockStructureDef def = mbId != null ? MultiblockStructureCatalog.getStructure(mbId) : null;
@@ -73,7 +75,10 @@ public final class GTEnergyHatchCalculator {
     }
 
     public static boolean requiresEnergyHatch(RecipeNode node) {
-        if (node == null || !node.isMultiblock() || node.isModule() || node.isGenerator()) {
+        if (node == null || !node.isMultiblock() || node.isModule()) {
+            return false;
+        }
+        if (node.isTurbine() || com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.isTurbine(node)) {
             return false;
         }
         if (node.isFusion() || GTFusionHelper.isFusion(node)) {

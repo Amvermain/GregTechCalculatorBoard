@@ -24,6 +24,7 @@ public final class NodeAddonHelper {
         } else {
             addons.add(addon);
         }
+        syncCompoundGroupIfApplicable(node);
     }
 
     public static void removeSingleAddon(RecipeNode node, List<MachineAddon> addons, String addonId) {
@@ -35,8 +36,15 @@ public final class NodeAddonHelper {
                 if (adapter != null) {
                     adapter.onAddonRemoved(node, removed);
                 }
+                syncCompoundGroupIfApplicable(node);
                 break;
             }
+        }
+    }
+
+    private static void syncCompoundGroupIfApplicable(RecipeNode node) {
+        if (node != null && node.isCompoundNode() && node.getParentGraph() != null) {
+            node.getParentGraph().syncCompoundParameters(node);
         }
     }
 
@@ -53,7 +61,9 @@ public final class NodeAddonHelper {
 
     public static double getCombinedDurationMultiplier(List<MachineAddon> addons) {
         double mult = 1.0;
-        for (MachineAddon a : addons) {
+        for (int i = 0; i < addons.size(); i++) {
+            MachineAddon a = addons.get(i);
+            if (isDuplicateTrait(addons, i, a)) continue;
             mult *= a.getDurationMultiplier();
         }
         return mult;
@@ -61,7 +71,9 @@ public final class NodeAddonHelper {
 
     public static double getCombinedEutMultiplier(List<MachineAddon> addons) {
         double mult = 1.0;
-        for (MachineAddon a : addons) {
+        for (int i = 0; i < addons.size(); i++) {
+            MachineAddon a = addons.get(i);
+            if (isDuplicateTrait(addons, i, a)) continue;
             mult *= a.getEutMultiplier();
         }
         return mult;
@@ -69,7 +81,9 @@ public final class NodeAddonHelper {
 
     public static int getCombinedParallelMultiplier(List<MachineAddon> addons) {
         int mult = 1;
-        for (MachineAddon a : addons) {
+        for (int i = 0; i < addons.size(); i++) {
+            MachineAddon a = addons.get(i);
+            if (isDuplicateTrait(addons, i, a)) continue;
             mult *= a.getParallelMultiplier();
         }
         return mult;
@@ -77,7 +91,9 @@ public final class NodeAddonHelper {
 
     public static int getPowerConsumingParallelMultiplier(List<MachineAddon> addons) {
         int mult = 1;
-        for (MachineAddon a : addons) {
+        for (int i = 0; i < addons.size(); i++) {
+            MachineAddon a = addons.get(i);
+            if (isDuplicateTrait(addons, i, a)) continue;
             if (!a.isPowerConstant()) {
                 mult *= a.getParallelMultiplier();
             }
@@ -88,12 +104,29 @@ public final class NodeAddonHelper {
     public static int getPowerConstantParallelMultiplier(List<MachineAddon> addons) {
         if (addons == null || addons.isEmpty()) return 1;
         int mult = 1;
-        for (MachineAddon a : addons) {
+        for (int i = 0; i < addons.size(); i++) {
+            MachineAddon a = addons.get(i);
+            if (isDuplicateTrait(addons, i, a)) continue;
             if (a.isPowerConstant() && a.getParallelMultiplier() > 1) {
                 mult *= a.getParallelMultiplier();
             }
         }
         return mult;
+    }
+
+    private static boolean isDuplicateTrait(List<MachineAddon> addons, int index, MachineAddon addon) {
+        if (addon == null || addon.getCategory() != MachineAddon.Category.MULTIBLOCK_TRAIT) {
+            return false;
+        }
+        String id = addon.getId();
+        if (id == null) return false;
+        for (int j = 0; j < index; j++) {
+            MachineAddon prev = addons.get(j);
+            if (prev != null && id.equals(prev.getId())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static boolean hasPowerConstantAddon(List<MachineAddon> addons) {

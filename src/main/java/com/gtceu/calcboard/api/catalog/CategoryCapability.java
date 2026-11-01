@@ -103,21 +103,20 @@ public record CategoryCapability(
             var def = mbId != null ? com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.getStructure(mbId) : null;
             boolean isSteamMb = (node.getSteamMode() != null && node.getSteamMode().isSteam()) || (mbId != null && MultiblockDetector.isSteamMultiblock(mbId));
 
-            if (!isSteamMb && !node.isGenerator() && node.getEnergyType() != EnergyType.NONE && node.getEnergyType() != EnergyType.KINETIC_SU
-                    && (def == null || def.supportsAbility("INPUT_ENERGY") || def.supportsAbility("SUBSTATION_INPUT_ENERGY") || def.supportsAbility("INPUT_LASER") || def.energyHatchSlotCount() > 0 || def.allowedAbilities().isEmpty() || node.getEnergyType() != EnergyType.NONE)) {
+            if (!isSteamMb && !node.isTurbine() && node.getEnergyType() != EnergyType.NONE && node.getEnergyType() != EnergyType.KINETIC_SU
+                    && (def == null || def.supportsAbility("INPUT_ENERGY") || def.supportsAbility("SUBSTATION_INPUT_ENERGY") || def.supportsAbility("INPUT_LASER")
+                    || def.supportsAbility("OUTPUT_ENERGY") || def.supportsAbility("SUBSTATION_OUTPUT_ENERGY") || def.supportsAbility("OUTPUT_LASER")
+                    || def.energyHatchSlotCount() > 0 || def.allowedAbilities().isEmpty() || node.getEnergyType() != EnergyType.NONE)) {
                 cats.add(AddonCategory.ENERGY_HATCH);
             }
             if (def == null || !def.allowedAbilities().isEmpty() || def.inputBusSlotCount() > 0 || def.outputBusSlotCount() > 0 || def.inputHatchSlotCount() > 0 || def.outputHatchSlotCount() > 0 || !node.getInputs().isEmpty() || !node.getOutputs().isEmpty() || isMb) {
                 cats.add(AddonCategory.HATCH_BUS);
             }
-            boolean supportsCoil = false;
-            if (def != null) {
-                supportsCoil = def.supportsAbility("HEATING_COILS")
-                        || def.coilSlotCount() > 0
-                        || MultiblockDetector.isCoilMultiblock(mbId);
-            } else {
-                supportsCoil = MultiblockDetector.isCoilMultiblock(mbId);
-            }
+            IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
+            boolean adapterAllowsCoil = adapter == null || adapter.canUseCoils(node);
+            boolean supportsCoil = adapterAllowsCoil && !node.isGenerator() && (MultiblockDetector.isCoilMultiblock(mbId)
+                    || (mbId == null && this.canUseCoils)
+                    || node.getRecipeTemperature() > 0);
             if (supportsCoil) {
                 cats.add(AddonCategory.COIL);
             }

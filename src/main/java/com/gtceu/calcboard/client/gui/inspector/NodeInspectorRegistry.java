@@ -29,6 +29,7 @@ public final class NodeInspectorRegistry {
         registerSection(SteamModeSection::new);
         registerSection(BoilerThrottleSection::new);
         registerSection(com.gtceu.calcboard.client.gui.inspector.section.BacteriaStatsSection::new);
+        registerSection(com.gtceu.calcboard.client.gui.inspector.section.HellForgeHeatSection::new);
         registerSection(SubPageModuleSection::new);
         registerSection(HardwareConfigSection::new);
         registerSection(StatsSummarySection::new);

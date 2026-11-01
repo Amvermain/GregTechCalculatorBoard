@@ -15,9 +15,11 @@ public class GTEnergyHatchAddon extends MachineAddon {
     private boolean isLaser = false;
     private boolean isSubstation = false;
     private boolean isDualLowerTier = false;
+    private boolean isDynamo = false;
 
     public GTEnergyHatchAddon(String id, String name, String description, ResourceLocation itemIcon,
-                              GTVoltageTier tier, int amperage, boolean isLaser, boolean isSubstation, boolean isDualLowerTier) {
+                              GTVoltageTier tier, int amperage, boolean isLaser, boolean isSubstation,
+                              boolean isDualLowerTier, boolean isDynamo) {
         super(id, name, Category.ENERGY_HATCH, description, itemIcon);
         setModId("gtceu");
         this.tier = tier != null ? tier : GTVoltageTier.LV;
@@ -25,6 +27,12 @@ public class GTEnergyHatchAddon extends MachineAddon {
         this.isLaser = isLaser;
         this.isSubstation = isSubstation;
         this.isDualLowerTier = isDualLowerTier;
+        this.isDynamo = isDynamo;
+    }
+
+    public GTEnergyHatchAddon(String id, String name, String description, ResourceLocation itemIcon,
+                              GTVoltageTier tier, int amperage, boolean isLaser, boolean isSubstation, boolean isDualLowerTier) {
+        this(id, name, description, itemIcon, tier, amperage, isLaser, isSubstation, isDualLowerTier, false);
     }
 
     public GTEnergyHatchAddon(String id, String name, String description, ResourceLocation itemIcon,
@@ -77,10 +85,18 @@ public class GTEnergyHatchAddon extends MachineAddon {
         isDualLowerTier = dualLowerTier;
     }
 
+    public boolean isDynamo() {
+        return isDynamo;
+    }
+
+    public void setDynamo(boolean dynamo) {
+        isDynamo = dynamo;
+    }
+
     @Override
     public MachineAddon copy() {
         GTEnergyHatchAddon cp = new GTEnergyHatchAddon(getId(), getName(), getDescription(), getItemIcon(),
-                tier, amperage, isLaser, isSubstation, isDualLowerTier);
+                tier, amperage, isLaser, isSubstation, isDualLowerTier, isDynamo);
         cp.setModId(getModId());
         cp.setDiscoverySource(getDiscoverySource());
         cp.setItemStackSample(getItemStackSample());
@@ -95,6 +111,7 @@ public class GTEnergyHatchAddon extends MachineAddon {
         tag.putBoolean("IsLaser", isLaser);
         tag.putBoolean("IsSubstation", isSubstation);
         tag.putBoolean("IsDualLowerTier", isDualLowerTier);
+        tag.putBoolean("IsDynamo", isDynamo);
         return tag;
     }
 
@@ -112,6 +129,7 @@ public class GTEnergyHatchAddon extends MachineAddon {
         if (tag.contains("IsLaser")) this.isLaser = tag.getBoolean("IsLaser");
         if (tag.contains("IsSubstation")) this.isSubstation = tag.getBoolean("IsSubstation");
         if (tag.contains("IsDualLowerTier")) this.isDualLowerTier = tag.getBoolean("IsDualLowerTier");
+        if (tag.contains("IsDynamo")) this.isDynamo = tag.getBoolean("IsDynamo");
     }
 }
 

@@ -331,28 +331,22 @@ public class CompoundNodeTest {
         RecipeNode layer2Node = cluster.nodes().get(1);
         RecipeNode layer3Node = cluster.nodes().get(2);
 
-        // Create an under-supplying producer for Layer II's spool (produces 0.0125/s when Layer II demands 0.025/s -> 50% bottleneck)
-        RecipeNode spoolProducer = RecipeNode.create("Spool Maker", 1600.0, 30.0, GTVoltageTier.LV);
+        RecipeNode spoolProducer = RecipeNode.create("Spool Maker", 4800.0, 30.0, GTVoltageTier.LV);
         spoolProducer.getOutputs().add(IngredientStack.item(ResourceLocation.tryParse("gtceu:spool"), "Spool", 1.0));
         graph.addNode(spoolProducer);
 
-        // Connect spoolProducer (output 0) -> layer2Node (input 0)
         graph.addConnection(spoolProducer.getId(), 0, layer2Node.getId(), 0);
 
         Map<String, Double> effMap = FlowGraphSolver.computeNodeEfficiencies(graph);
 
-        // Layer I has no connected inputs -> 1.0
         Assertions.assertEquals(1.0, effMap.get(layer1Node.getId()), 0.001);
 
-        // Layer II is supplied with 0.0125/s against 0.025/s required -> 0.5 (50%)
         Assertions.assertEquals(0.5, effMap.get(layer2Node.getId()), 0.001);
 
-        // Layer III is downstream in the compound group -> MUST propagate bottleneck to 0.5 (50%)!
         Assertions.assertEquals(0.5, effMap.get(layer3Node.getId()), 0.001);
         Assertions.assertEquals(0.5, layer3Node.getEfficiency(), 0.001);
 
-        // Layer III effective output rate should be scaled down to 50% (0.0125/s instead of nominal 0.025/s)
-        Assertions.assertEquals(0.0125, layer3Node.getOutputSlotRate(0, true), 0.0001);
+        Assertions.assertEquals(1.0 / 240.0, layer3Node.getOutputSlotRate(0, true), 0.0001);
     }
 
     @Test

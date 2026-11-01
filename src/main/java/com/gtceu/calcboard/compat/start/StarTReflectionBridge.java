@@ -23,11 +23,24 @@ public final class StarTReflectionBridge {
     public static final ResourceLocation BACTERIAL_HARVESTER_START_MACHINE_ID = ResourceLocation.tryParse("start_core:bacterial_hydrocarbon_harvester");
     public static final ResourceLocation BACTERIAL_HARVESTER_GT_MACHINE_ID = ResourceLocation.tryParse("gtceu:bacterial_hydrocarbon_harvester");
 
+    public static final ResourceLocation HELLFORGE_RECIPE_ID = ResourceLocation.tryParse("gtceu:hellforge");
+    public static final ResourceLocation HELLFORGE_HEATING_RECIPE_ID = ResourceLocation.tryParse("gtceu:hellforge_heating");
+    public static final ResourceLocation HELLFORGE_START_RECIPE_ID = ResourceLocation.tryParse("start_core:hellforge");
+    public static final ResourceLocation HELLFORGE_START_HEATING_RECIPE_ID = ResourceLocation.tryParse("start_core:hellforge_heating");
+    public static final ResourceLocation HELLFORGE_START_MACHINE_ID = ResourceLocation.tryParse("start_core:hellforge");
+    public static final ResourceLocation HELLFORGE_GT_MACHINE_ID = ResourceLocation.tryParse("gtceu:hellforge");
+    public static final ResourceLocation BOOSTED_HELLFORGE_START_MACHINE_ID = ResourceLocation.tryParse("start_core:fornaxs_infernal_rotary_engine");
+    public static final ResourceLocation BOOSTED_HELLFORGE_GT_MACHINE_ID = ResourceLocation.tryParse("gtceu:fornaxs_infernal_rotary_engine");
+
     private static final Set<String> START_NAMESPACES = Set.of(
             "start_core", "gtceu_start", "start", "star_technology"
     );
 
     private static final Set<ResourceLocation> KNOWN_START_RECIPE_TYPES = Set.of(
+            ResourceLocation.tryParse("gtceu:hellforge"),
+            ResourceLocation.tryParse("gtceu:hellforge_heating"),
+            ResourceLocation.tryParse("start_core:hellforge"),
+            ResourceLocation.tryParse("start_core:hellforge_heating"),
             ResourceLocation.tryParse("gtceu:bacterial_hydrocarbon_harvester"),
             ResourceLocation.tryParse("gtceu:large_rotor_machine"),
             ResourceLocation.tryParse("gtceu:gate_construction"),

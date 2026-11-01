@@ -45,6 +45,8 @@ public class GTCEuMachineDialogHeaderRenderer {
             GTCEuHardwareStatusRenderer.renderSteamModeDialogHeader(dialog, graphics, font, node, x, y, mouseX, mouseY);
         } else if (GTCEuNodeCardGuiHandler.isFusionMachine(node)) {
             GTCEuCoilFusionHeaderRenderer.renderFusionReflectorHeader(dialog, graphics, font, node, x, y, dialogW, mouseX, mouseY, state);
+        } else if (com.gtceu.calcboard.compat.start.StarTHellForgeHelper.isHellForge(node)) {
+            StarTHellForgeHeaderRenderer.renderHellForgeHeader(dialog, graphics, font, node, x, y, dialogW, mouseX, mouseY, state);
         } else if (GTCEuNodeCardGuiHandler.isCoilMultiblock(node)) {
             GTCEuCoilFusionHeaderRenderer.renderCoilDialogHeader(dialog, graphics, font, node, x, y, dialogW, mouseX, mouseY, state);
         } else {

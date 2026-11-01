@@ -440,6 +440,7 @@ public class CoilHelper {
 
     public static int getInstalledCoilTemperature(RecipeNode node) {
         if (node == null) return 0;
+        if (com.gtceu.calcboard.compat.start.StarTHellForgeHelper.isHellForge(node)) return 0;
         MachineAddon installed = getInstalledCoil(node);
         if (installed instanceof GTCoilAddon c) {
             return c.getCoilTemperature();
@@ -465,6 +466,7 @@ public class CoilHelper {
 
     public static int getInstalledCoilSmelterParallel(RecipeNode node) {
         if (node == null) return 16;
+        if (com.gtceu.calcboard.compat.start.StarTHellForgeHelper.isHellForge(node)) return 0;
         MachineAddon installed = getInstalledCoil(node);
         if (installed != null) {
             CoilStats stats = getCoilStats(installed.getId());
@@ -488,6 +490,10 @@ public class CoilHelper {
 
     public static void installCoil(RecipeNode node, MachineAddon coilAddon) {
         if (node == null) return;
+        if (com.gtceu.calcboard.compat.start.StarTHellForgeHelper.isHellForge(node)) {
+            com.gtceu.calcboard.compat.start.StarTHellForgeHelper.ensureDefaultHeat(node);
+            return;
+        }
         node.getAddons().removeIf(a -> a.getCategory() == MachineAddon.Category.COIL);
         if (coilAddon != null) {
             MachineAddon tailored = tailorCoilAddon(coilAddon, node);

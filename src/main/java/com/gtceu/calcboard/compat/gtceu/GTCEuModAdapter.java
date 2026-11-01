@@ -418,7 +418,7 @@ public class GTCEuModAdapter implements IModAdapter {
     ) {
         if (backingRecipe == null && recipeObj == null) return null;
 
-        String machineName = preferredWorkstation != null ? RecipeConversionHelper.formatName(preferredWorkstation.getPath()) : resolveMachineName(recipeObj);
+        String machineName = preferredWorkstation != null ? RecipeConversionHelper.formatName(preferredWorkstation.getPath()) : resolveMachineName(recipeObj, backingRecipe);
         ResourceLocation icon = preferredWorkstation != null ? preferredWorkstation : resolveMachineIcon(recipeObj);
 
         if (GTCEuLayeredRecipeExtractor.isLayeredRecipe(backingRecipe, recipeObj)) {
@@ -426,14 +426,18 @@ public class GTCEuModAdapter implements IModAdapter {
             Object detailSource = backingRecipe != null ? backingRecipe : recipeObj;
             GTCEuRecipeHandler.extractGTRecipeDetails(detailSource, details);
             return GTCEuLayeredRecipeExtractor.buildCompoundCluster(
-                    backingRecipe, recipeObj, machineName, icon, details.tier, startX, startY
+                    backingRecipe, recipeObj, machineName, icon, preferredWorkstation, details.tier, startX, startY
             );
         }
 
         return null;
     }
 
-    private static String resolveMachineName(Object recipeObj) {
+    private static String resolveMachineName(Object recipeObj, Object backingRecipe) {
+        ResourceLocation catId = GTCEuRecipeHandler.extractRecipeCategoryId(recipeObj, backingRecipe);
+        if (catId != null) {
+            return RecipeConversionHelper.formatName(catId.getPath());
+        }
         if (recipeObj instanceof dev.emi.emi.api.recipe.EmiRecipe emi && emi.getCategory() != null && emi.getCategory().getId() != null) {
             return RecipeConversionHelper.formatName(emi.getCategory().getId().getPath());
         }

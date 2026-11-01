@@ -95,12 +95,12 @@ public final class GTCEuPatternScanner {
         scanPatternFactory(multiDef, ctx);
         enrichFromMachineDefinition(multiDef, ctx.abilities);
 
-        if (ctx.coilBlocks.size() > 1) {
+        if (ctx.coilBlocks.size() > 1 && isFunctionalCoilMultiblock(multiDef)) {
             ctx.abilities.add("HEATING_COILS");
         }
 
         int finalMaxEnergy = ctx.maxEnergyHatches;
-        if (finalMaxEnergy == 0 && ctx.abilities.contains("INPUT_ENERGY")) {
+        if (finalMaxEnergy == 0 && (ctx.abilities.contains("INPUT_ENERGY") || ctx.abilities.contains("OUTPUT_ENERGY"))) {
             finalMaxEnergy = 2;
         }
 
@@ -180,9 +180,28 @@ public final class GTCEuPatternScanner {
         checkBlocksLimit(blocks, sp.maxCount, ctx);
     }
 
+    private static boolean isFunctionalCoilMultiblock(MultiblockMachineDefinition multiDef) {
+        if (GTCEuReflectionBridge.isGenerator(multiDef)) {
+            return false;
+        }
+        Class<?> mCls = GTCEuReflectionBridge.getMachineClass(multiDef);
+        if (mCls != null && GTCEuReflectionBridge.isCoilWorkableClass(mCls)) {
+            return true;
+        }
+        return GTCEuCoilModifierHelper.getCoilMachineSpec(multiDef.getId()).kind()
+                != GTCEuCoilModifierHelper.CoilMachineKind.GENERIC;
+    }
+
+    private static boolean isEnergyHatchAbility(String typeUpper) {
+        return typeUpper.contains("INPUT_ENERGY")
+                || typeUpper.equals("INPUT_LASER")
+                || typeUpper.contains("OUTPUT_ENERGY")
+                || typeUpper.equals("OUTPUT_LASER");
+    }
+
     private static void checkTypeLimit(String typeUpper, int maxCount, ScanContext ctx) {
         if (maxCount <= 0) return;
-        if (typeUpper.contains("INPUT_ENERGY") || typeUpper.equals("INPUT_LASER")) {
+        if (isEnergyHatchAbility(typeUpper)) {
             ctx.maxEnergyHatches = ctx.maxEnergyHatches == 0 ? maxCount : Math.min(ctx.maxEnergyHatches, maxCount);
         } else if (typeUpper.equals("MAINTENANCE")) {
             ctx.maxMaintenanceHatches = ctx.maxMaintenanceHatches == 0 ? maxCount : Math.min(ctx.maxMaintenanceHatches, maxCount);
@@ -218,7 +237,7 @@ public final class GTCEuPatternScanner {
         if (PART_ABILITY_IS_APPLICABLE == null || KNOWN_PART_ABILITIES.isEmpty() || b == null) return false;
         for (Map.Entry<Object, String> entry : KNOWN_PART_ABILITIES.entrySet()) {
             String name = entry.getValue();
-            if (name.contains("INPUT_ENERGY") || name.equals("INPUT_LASER")) {
+            if (isEnergyHatchAbility(name)) {
                 try {
                     Object res = PART_ABILITY_IS_APPLICABLE.invoke(entry.getKey(), b);
                     if (res instanceof Boolean bool && bool) {

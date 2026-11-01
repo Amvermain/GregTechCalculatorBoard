@@ -176,6 +176,7 @@ public final class TestMultiblockFixtures {
         MultiblockDetector.registerBatchModeMultiblock(megaAbs);
         MultiblockDetector.registerBatchModeMultiblock(ultimateAbs);
 
+
         MultiblockDetector.registerThroughputBoostingMultiblock(pyrolyse);
         MultiblockDetector.registerThroughputBoostingMultiblock(superAbs);
         MultiblockDetector.registerThroughputBoostingMultiblock(ultimateAbs);
@@ -186,6 +187,12 @@ public final class TestMultiblockFixtures {
         ResourceLocation largeAutoclave = ResourceLocation.tryParse("gtceu:large_autoclave");
         MultiblockDetector.registerMultiblock(largeAutoclave);
         MultiblockDetector.registerOverpressureMultiblock(largeAutoclave);
+
+        ResourceLocation hellforge = ResourceLocation.tryParse("start_core:hellforge");
+        ResourceLocation fornax = ResourceLocation.tryParse("start_core:fornaxs_infernal_rotary_engine");
+        MultiblockDetector.registerMultiblock(hellforge);
+        MultiblockDetector.registerMultiblock(fornax);
+        MultiblockDetector.registerThroughputBoostingMultiblock(fornax);
     }
 
     private static void initSteamMultiblockDefaults() {

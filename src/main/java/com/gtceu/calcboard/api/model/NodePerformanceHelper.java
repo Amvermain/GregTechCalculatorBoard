@@ -37,7 +37,44 @@ public final class NodePerformanceHelper {
         return node.getSingleMachineEUt() * node.getMachineCount();
     }
 
+    public static double computeCompoundCycleDurationTicks(RecipeNode node) {
+        if (node == null) return 0.0;
+        double stepTicks = node.getOverclockResult().durationTicks();
+        if (!node.isCompoundNode()) {
+            return stepTicks;
+        }
+        FlowGraph graph = node.getParentGraph();
+        if (graph != null) {
+            java.util.List<RecipeNode> siblings = graph.findCompoundSiblingNodes(node.getCompoundGroupId());
+            if (siblings.size() > 1) {
+                double totalTicks = sumSiblingDurationTicks(siblings);
+                if (totalTicks > 0.0) {
+                    return totalTicks;
+                }
+            }
+        }
+        int totalLayers = Math.max(1, node.getCompoundTotalLayers());
+        return stepTicks * totalLayers;
+    }
+
+    private static double sumSiblingDurationTicks(java.util.List<RecipeNode> siblings) {
+        double totalTicks = 0.0;
+        for (RecipeNode sibling : siblings) {
+            totalTicks += sibling.getOverclockResult().durationTicks();
+        }
+        return totalTicks;
+    }
+
+    public static double computeSingleMachineCyclesPerSecond(RecipeNode node) {
+        if (node == null) return 0.0;
+        if (!node.isCompoundNode()) {
+            return node.getOverclockResult().getCyclesPerSecond();
+        }
+        double cycleTicks = computeCompoundCycleDurationTicks(node);
+        return cycleTicks > 0.0 ? (20.0 / cycleTicks) * node.getOverclockResult().batchesPerTick() : 0.0;
+    }
+
     public static double computeNominalCps(RecipeNode node) {
-        return node.getOverclockResult().getCyclesPerSecond() * node.getMachineCount() * node.getTotalParallel();
+        return computeSingleMachineCyclesPerSecond(node) * node.getMachineCount() * node.getTotalParallel();
     }
 }

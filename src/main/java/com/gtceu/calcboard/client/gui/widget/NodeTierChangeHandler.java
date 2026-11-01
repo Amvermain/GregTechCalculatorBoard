@@ -298,12 +298,15 @@ public final class NodeTierChangeHandler {
     }
 
     public static void syncSharedFrameHardware(IBoardScreenContext parent, RecipeNode node) {
-        if (parent != null && parent.getGraph() != null) {
-            var frame = parent.getGraph().findFrameEnclosingNode(node);
-            if (frame != null && frame.isSharedMachineFrame()) {
-                frame.syncHardwareConfig(node, parent.getGraph());
-                parent.rebuildBoardWidgets();
-            }
+        if (parent == null || parent.getGraph() == null) return;
+        if (node != null && node.isCompoundNode()) {
+            parent.getGraph().syncCompoundParameters(node);
+            parent.rebuildBoardWidgets();
+        }
+        var frame = parent.getGraph().findFrameEnclosingNode(node);
+        if (frame != null && frame.isSharedMachineFrame()) {
+            frame.syncHardwareConfig(node, parent.getGraph());
+            parent.rebuildBoardWidgets();
         }
     }
 

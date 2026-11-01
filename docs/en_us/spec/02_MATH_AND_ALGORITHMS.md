@@ -70,10 +70,11 @@ $$\text{Cycles Per Second (CPS)} = 20.0 \times \text{BatchesPerTick} \times \tex
 
 ### 1.4 Hardware Addon Compounding
 
-For all installed addons $a \in \text{InstalledAddons}$, duration and power multipliers compound multiplicatively. Heating coil (`MachineAddon.Category.COIL`) speed multipliers are applied before overclocking with floor rounding ($\lfloor \text{BaseDurationTicks} \times \text{CoilDurationMult} \rfloor$), whereas non-coil duration multipliers compound after overclocking:
+For all installed addons $a \in \text{InstalledAddons}$, duration and power multipliers compound multiplicatively. Maintenance hatch (`MachineAddon.Category.MAINTENANCE`) duration multipliers are applied to the base recipe duration first with nearest-integer rounding ($\text{round}(\text{BaseDurationTicks} \times \text{MaintDurationMult})$), followed by heating coil (`MachineAddon.Category.COIL`) speed multipliers with floor rounding ($\lfloor \text{MaintDuration} \times \text{CoilDurationMult} \rfloor$) before overclocking, whereas remaining post-overclock duration multipliers compound after overclocking:
 
-$$\text{Pre-OC Base Duration} = \max\left(1.0, \, \left\lfloor \text{BaseDurationTicks} \times \prod_{c \in \text{Coils}} c.\text{getDurationMultiplier}() \right\rfloor\right)$$
-$$\text{Total Duration} = \text{Effective Duration} \times \prod_{a \in \text{Addons} \setminus \text{Coils}} a.\text{getDurationMultiplier}()$$
+$$\text{MaintDuration} = \max\left(1.0, \, \text{round}\left(\text{BaseDurationTicks} \times \prod_{m \in \text{Maintenance}} m.\text{getDurationMultiplier}()\right)\right)$$
+$$\text{Pre-OC Base Duration} = \max\left(1.0, \, \left\lfloor \text{MaintDuration} \times \prod_{c \in \text{Coils}} c.\text{getDurationMultiplier}() \right\rfloor\right)$$
+$$\text{Total Duration} = \text{Effective Duration} \times \prod_{a \in \text{Addons} \setminus (\text{Maintenance} \cup \text{Coils})} a.\text{getDurationMultiplier}()$$
 $$\text{Total EU/t} = \text{Effective EU/t} \times \prod_{a \in \text{Addons}} a.\text{getEutMultiplier}()$$
 
 #### Heating Coil Machine-Specific Bonus Deduction
@@ -101,11 +102,13 @@ $$\text{Parallel} = \text{SmelterParallel} \quad (32\text{x}, 64\text{x}, 128\te
 #### Large Steam/Gas/Plasma Turbine Rotor, Decoupled Tiers & Durability Formulas (ADR-006)
 
 ##### 1. Decoupled Rotor Holder & Dynamo Hatch Tiers
-Given Rotor Holder tier voltage $V_{\text{holder}}$, Dynamo Hatch tier voltage $V_{\text{dynamo}}$, and amperage $A_{\text{dynamo}}$:
+Given Rotor Holder tier voltage $V_{\text{holder}}$, Dynamo Hatch tier voltage $V_{\text{dynamo}}$, and amperage $A_{\text{dynamo}}$ ($A_{\text{dynamo}} \in \{1, 2, 4, 16\}\text{A}$ for standard large turbines, or $A_{\text{dynamo}} \in \{1, 2, 4, 16, 256, 1024, 4096\}\text{A}$ for laser-capable turbines):
 
 $$\text{Cap}_{\text{holder}} = V_{\text{holder}} \times 2.0 \quad (\text{EU/t, Flow Rate Limit})$$
 $$\text{Cap}_{\text{dynamo}} = V_{\text{dynamo}} \times A_{\text{dynamo}} \quad (\text{EU/t, Power Generation Ceiling})$$
 $$P_{\text{max, turbine}} = \min(\text{Cap}_{\text{holder}}, \, \text{Cap}_{\text{dynamo}})$$
+
+For non-turbine generator multiblocks (e.g., Nuclear Fission Reactors), operational validity requires total installed dynamo/substation/laser source hatch capacity $\text{Cap}_{\text{dynamo}} = \sum (V_k \times A_k) \ge E_{\text{single}}$, and the maximum parallel cap when a parallel hatch is installed is bounded by $P_{\text{max, gen}} = \lfloor \text{Cap}_{\text{dynamo}} / E_{\text{single}} \rfloor$.
 
 ##### 2. Turbine Rotor Efficiency & Generation Calculation
 Given rotor efficiency $E_{\text{rotor}}$, rotor power $P_{\text{rotor}}$, rotor holder tier bonus $B_{\text{holder}} = \max(0, (\text{HolderTier} - \text{BaseTier}) \times 10\%)$, and lubricant boost multiplier $M_{\text{boost}} \in \{1.0, 1.25, 1.50\}$:
@@ -138,6 +141,11 @@ Given colony Production $P \in [1, 5]$ and Metabolism $M \in [1, 5]$ (JEI/EMI re
 - **Biomass Consumption (`gtceu:biomass`)**: $Q_{\text{biomass}} = 100 \times 2^M \text{ mB}$ (`100 << M`)
 - **Fluid Output Yields (5 fluids)**: $Q_{\text{out}} = \left(\frac{Q_{\text{rep}}}{5.0}\right) \times P \text{ mB}$
 - **Constant Inputs**: Distilled Water ($1,000\text{ mB}$) and the bacteria colony item ($1\text{x}$) remain constant across all stat tiers.
+
+##### 6. Star Technology Hellforge & Fornax's Infernal Rotary Engine (FIRE) Infernal Parallel Bonus Formulas
+For infernal machines driven by crucible heat (`GTCEuProperties.EBF_TEMPERATURE`, $T_{\text{recipe}} \in [0, 4050]\text{ MK}$) and supplied with a heating fluid (`StarTProperties.HELLFORGE_TEMP`, $T_{\text{fluid}} \in \{900, 1350, 1800, 2250, 2700, 3150, 3600, 4050\}\text{ MK}$), an insufficient heat warning is raised when $T_{\text{fluid}} < T_{\text{recipe}}$, and when $T_{\text{fluid}} \ge T_{\text{recipe}}$, an infernal parallel multiplier $P_{\text{infernal}}$ doubling for every $450\text{ MK}$ above $T_{\text{recipe}}$ compounds with the machine's base/hatch parallel:
+$$P_{\text{infernal}} = 2^{\lfloor \max(0, \, T_{\text{fluid}} - T_{\text{recipe}}) / 450 \rfloor}$$
+$$P_{\text{total}} = \max(1, \, P_{\text{base}} \times P_{\text{infernal}})$$
 
 #### Power Supply Based Maximum Available Machine Parallel ($P_{\max}$) & Overclocking Capacity
 Given equipped Energy Hatch voltage $V_{\text{hatch}}$, amperage $A_{\text{hatch}}$, and single recipe power $E_{\text{recipe}}$:
@@ -455,7 +463,7 @@ Supports contextual wire-drag buffer instantiation and rate-anchored inverse sca
 Guarantees single-click deterministic mass balance convergence across coupled recirculation loops, anchors, and shared pools:
 
 1. **Stage 1: Continuous Flow Balance Linear System ($A\mathbf{x} = \mathbf{b}$)**:
-   - Constructs an augmented matrix $[A | \mathbf{b}]$ mapping unknown machine scale vector $\mathbf{x}$ against mass conservation equations $\sum_i C_{ji} x_i = 0$ and anchor constraints $x_{\text{anchor}} = S_{\text{fixed}}$.
+   - Constructs an augmented matrix $[A | \mathbf{b}]$ mapping unknown machine scale vector $\mathbf{x}$ against mass conservation equations $\sum_i C_{ji} x_i = 0$, anchor constraints $x_{\text{anchor}} = S_{\text{fixed}}$, and compound group sibling equality constraints $x_{\text{rep}} - x_{\text{sibling}} = 0$ for multi-step layered recipes.
    - Applies partial pivoting Gauss-Jordan elimination for robust numerical stability, resolving continuous scale vector $\mathbf{x}^*$ in $O(N^3)$ time.
 2. **Stage 2: Integer Quantization**:
    - Applies ceiling quantization ($\lceil x_i^* \rceil$) with bottleneck-preserving scaling when integer machine counts are required.

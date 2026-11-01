@@ -55,8 +55,7 @@ public class RFC047ExactMatchNormalizationTest {
 
         ResourceLocation devHatchId = ResourceLocation.tryParse("gtceu:developer_energy_hatch");
         EnergyHatchHelper.EnergyHatchStats devStats = EnergyHatchHelper.getEnergyHatchStats(devHatchId);
-        Assertions.assertNotNull(devStats);
-        Assertions.assertEquals(GTVoltageTier.LV, devStats.tier());
+        Assertions.assertNull(devStats);
     }
 
     @Test

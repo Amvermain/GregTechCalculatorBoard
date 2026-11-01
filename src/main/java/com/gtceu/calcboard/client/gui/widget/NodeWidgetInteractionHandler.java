@@ -371,10 +371,20 @@ public final class NodeWidgetInteractionHandler {
         if (bounds.hasRow2Controls()) {
             var handler = ModGuiHandlerRegistry.getHandlerForNode(node);
             if (handler.handleControlScroll(widget, node, mouseX, mouseY, delta)) {
+                syncCompoundScrollIfNeeded(widget, node);
                 return true;
             }
         }
         return false;
+    }
+
+    private static void syncCompoundScrollIfNeeded(NodeWidget widget, RecipeNode node) {
+        IBoardScreenContext parent = widget.getParent();
+        if (node.isCompoundNode() && parent != null && parent.getGraph() != null) {
+            parent.getGraph().syncCompoundParameters(node);
+            parent.rebuildBoardWidgets();
+            parent.markSummaryDirty();
+        }
     }
 
     public static boolean handleInputPortScroll(NodeWidget widget, int inIdx, double delta) {

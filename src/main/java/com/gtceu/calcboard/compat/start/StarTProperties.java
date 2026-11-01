@@ -12,6 +12,10 @@ import com.gtceu.calcboard.compat.start.model.NodeThreadingConfig;
 public final class StarTProperties {
     private StarTProperties() {}
 
+    public static final NodePropertyKey<Integer> HELLFORGE_TEMP = NodeProperties.register(
+            NodePropertyKey.ofInt("start_hellforge_temp", 0)
+    );
+
     public static final NodePropertyKey<NodeThreadingConfig> THREADING_CONFIG = NodeProperties.register(
             new NodePropertyKey<>(
                     "threading_config",

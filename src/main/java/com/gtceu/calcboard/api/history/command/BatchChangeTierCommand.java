@@ -62,21 +62,21 @@ public class BatchChangeTierCommand implements BoardCommand {
 
     @Override
     public void undo(FlowGraph graph) {
-        for (NodeTierSnapshot snap : previousSnapshots) {
-            RecipeNode node = graph.findNodeById(snap.nodeId());
-            if (node != null) {
-                snap.applyTo(node);
-            }
-        }
-        graph.invalidatePortStatsCache();
+        applySnapshots(graph, previousSnapshots);
     }
 
     @Override
     public void redo(FlowGraph graph) {
-        for (NodeTierSnapshot snap : newSnapshots) {
+        applySnapshots(graph, newSnapshots);
+    }
+
+    private void applySnapshots(FlowGraph graph, List<NodeTierSnapshot> snapshots) {
+        for (NodeTierSnapshot snap : snapshots) {
             RecipeNode node = graph.findNodeById(snap.nodeId());
-            if (node != null) {
-                snap.applyTo(node);
+            if (node == null) continue;
+            snap.applyTo(node);
+            if (node.isCompoundNode()) {
+                graph.syncCompoundParameters(node);
             }
         }
         graph.invalidatePortStatsCache();

@@ -67,42 +67,47 @@ public class SetMachineIconCommand implements BoardCommand {
     @Override
     public void undo(FlowGraph graph) {
         RecipeNode node = graph.findNodeById(nodeId);
-        if (node != null) {
-            node.setMachineIcon(oldIcon);
-            node.setMultiblock(oldMultiblock);
-            node.setParallel(oldParallel);
-            node.setSteamMode(oldSteamMode);
-            node.setTargetTier(oldTier);
-            if (oldName != null) {
-                node.setName(oldName);
-            }
-            node.getAddons().clear();
-            for (com.gtceu.calcboard.api.catalog.MachineAddon a : oldAddons) {
-                node.getAddons().add(a.copy());
-            }
-            node.markOverclockDirty();
-            node.markOperationalDirty();
+        if (node == null) return;
+        node.setMachineIcon(oldIcon);
+        node.setMultiblock(oldMultiblock);
+        restoreAddons(node, oldAddons);
+        node.setParallel(oldParallel);
+        node.setSteamMode(oldSteamMode);
+        node.setTargetTier(oldTier);
+        if (oldName != null) {
+            node.setName(oldName);
+        }
+        node.markOverclockDirty();
+        node.markOperationalDirty();
+        if (node.isCompoundNode()) {
+            graph.syncCompoundParameters(node);
         }
     }
 
     @Override
     public void redo(FlowGraph graph) {
         RecipeNode node = graph.findNodeById(nodeId);
-        if (node != null) {
-            node.setMachineIcon(newIcon);
-            node.setMultiblock(newMultiblock);
-            node.setParallel(newParallel);
-            node.setSteamMode(newSteamMode);
-            node.setTargetTier(newTier);
-            if (newName != null) {
-                node.setName(newName);
-            }
-            node.getAddons().clear();
-            for (com.gtceu.calcboard.api.catalog.MachineAddon a : newAddons) {
-                node.getAddons().add(a.copy());
-            }
-            node.markOverclockDirty();
-            node.markOperationalDirty();
+        if (node == null) return;
+        node.setMachineIcon(newIcon);
+        node.setMultiblock(newMultiblock);
+        restoreAddons(node, newAddons);
+        node.setParallel(newParallel);
+        node.setSteamMode(newSteamMode);
+        node.setTargetTier(newTier);
+        if (newName != null) {
+            node.setName(newName);
+        }
+        node.markOverclockDirty();
+        node.markOperationalDirty();
+        if (node.isCompoundNode()) {
+            graph.syncCompoundParameters(node);
+        }
+    }
+
+    private void restoreAddons(RecipeNode node, List<com.gtceu.calcboard.api.catalog.MachineAddon> addons) {
+        node.getAddons().clear();
+        for (com.gtceu.calcboard.api.catalog.MachineAddon addon : addons) {
+            node.getAddons().add(addon.copy());
         }
     }
 

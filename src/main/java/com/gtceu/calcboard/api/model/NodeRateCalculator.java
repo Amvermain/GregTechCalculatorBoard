@@ -222,8 +222,8 @@ public final class NodeRateCalculator {
                     ? node.getSingleMachineEUt()
                     : (out.getAmount() * node.getTotalParallel());
         } else {
-            double singleCps = node.getOverclockResult().getCyclesPerSecond() * node.getTotalParallel();
-            int idx = node.getOutputs().indexOf(out);
+            double singleCps = NodePerformanceHelper.computeSingleMachineCyclesPerSecond(node) * node.getTotalParallel();
+            int idx = findSlotIndexByReferenceOrEquals(node.getOutputs(), out);
             double effChance = idx >= 0 ? getEffectiveOutputChance(node, idx) : out.getEffectiveChance(node.getTierDelta());
             baseRate = out.getAmount() * effChance * singleCps;
         }
@@ -238,12 +238,20 @@ public final class NodeRateCalculator {
                     ? node.getSingleMachineEUt()
                     : (in.getAmount() * node.getTotalParallel());
         } else {
-            int idx = node.getInputs().indexOf(in);
+            int idx = findSlotIndexByReferenceOrEquals(node.getInputs(), in);
             double effChance = idx >= 0 ? getEffectiveInputChance(node, idx) : in.getEffectiveChance(node.getTierDelta());
-            double singleCps = node.getOverclockResult().getCyclesPerSecond() * node.getTotalParallel();
+            double singleCps = NodePerformanceHelper.computeSingleMachineCyclesPerSecond(node) * node.getTotalParallel();
             baseRate = in.getAmount() * effChance * singleCps;
         }
         return ModAdapterRegistry.getAdapterForNode(node).computeSingleMachineIngredientRate(node, in, true, baseRate);
+    }
+
+    private static int findSlotIndexByReferenceOrEquals(java.util.List<IngredientStack> slots, IngredientStack target) {
+        if (slots == null || target == null) return -1;
+        for (int i = 0; i < slots.size(); i++) {
+            if (slots.get(i) == target) return i;
+        }
+        return slots.indexOf(target);
     }
 
     private static double computeStressRate(RecipeNode node, IngredientStack stack, boolean effective, boolean nominal) {

@@ -328,5 +328,68 @@ public class MultiblockEnergyParallelOverclockTest {
         double rate = node.calculateSingleMachineOutputRate(node.getOutputs().get(0));
         Assertions.assertEquals(6.4, rate, 1e-4, "Output rate must be 6.4/s (matching 16x 1A LV centrifuges), not 12.8/s");
     }
+
+    @Test
+    public void testConfigHatchPreOverclockDurationOnNonSubtickKubesAndIndustrialBarrel() {
+        ResourceLocation kubeCentrifugeId = ResourceLocation.tryParse("gtceu:t_large_centrifuge");
+        RecipeNode kubeNode = RecipeNode.create(kubeCentrifugeId, "Debrominated Brine Decomposition", 60.0, 30.0, GTVoltageTier.LV);
+        kubeNode.setMultiblock(false);
+        kubeNode.setOverclockMode(com.gtceu.calcboard.api.type.OverclockMode.PERFECT);
+        kubeNode.setTargetTier(GTVoltageTier.HV);
+
+        MachineAddon configHatchFast = new MachineAddon(
+                "gtceu:configurable_maintenance_hatch_fast",
+                "Configurable Maintenance Hatch (0.9x)",
+                MachineAddon.Category.MAINTENANCE,
+                "-10% Duration",
+                ResourceLocation.tryParse("gtceu:configurable_maintenance_hatch")
+        );
+        configHatchFast.setDurationMultiplier(0.9);
+        kubeNode.getAddons().add(configHatchFast);
+        kubeNode.markOverclockDirty();
+
+        Assertions.assertEquals(3.0, kubeNode.getOverclockResult().durationTicks(), 1e-6,
+                "60t recipe with 0.9x config hatch (54t pre-OC) after 2 perfect OCs must remain 3t, not floor(3 * 0.9) = 2t");
+        Assertions.assertEquals(0.15, kubeNode.getEffectiveDurationSeconds(), 1e-6);
+
+        MachineAddon batch = new MachineAddon("gtceu:batch_processing", "Batch Mode", MachineAddon.Category.MULTIBLOCK_TRAIT, "", null);
+        kubeNode.getAddons().add(batch);
+        kubeNode.markOverclockDirty();
+
+        Assertions.assertEquals(33, GTPowerCalculator.computeBatchMultiplier(kubeNode),
+                "Batch multiplier at 3t must remain 33 (99t total), not 50 (from erroneous 2t)");
+        Assertions.assertEquals(99.0, kubeNode.getOverclockResult().durationTicks(), 1e-6);
+
+        ResourceLocation barrelId = ResourceLocation.tryParse("gtceu:industrial_barrel");
+        RecipeNode clayBarrel = RecipeNode.create(barrelId, "Clay From Dust", 5.0, 7.0, GTVoltageTier.LV);
+        clayBarrel.setMultiblock(false);
+        clayBarrel.setTargetTier(GTVoltageTier.LV);
+        clayBarrel.getAddons().add(configHatchFast);
+        clayBarrel.markOverclockDirty();
+
+        Assertions.assertEquals(5.0, clayBarrel.getOverclockResult().durationTicks(), 1e-6,
+                "5t recipe with 0.9x config hatch must round(5 * 0.9) = 5t at LV, not floor to 4t");
+
+        clayBarrel.setTargetTier(GTVoltageTier.MV);
+        clayBarrel.markOverclockDirty();
+        Assertions.assertEquals(2.0, clayBarrel.getOverclockResult().durationTicks(), 1e-6,
+                "5t recipe with 0.9x config hatch at 1 OC must remain 2t, not floor(2 * 0.9) = 1t");
+
+        RecipeNode seaWaterBarrel = RecipeNode.create(barrelId, "Sea Water", 80.0, 15.0, GTVoltageTier.LV);
+        seaWaterBarrel.setMultiblock(false);
+        seaWaterBarrel.setTargetTier(GTVoltageTier.LuV);
+        seaWaterBarrel.getAddons().add(configHatchFast);
+
+        MachineAddon tpb = new MachineAddon("gtceu:throughput_boosting", "Throughput Boosting", MachineAddon.Category.MULTIBLOCK_TRAIT, "", null);
+        tpb.setParallelMultiplier(4);
+        tpb.setDurationMultiplier(1.6);
+        tpb.setEutMultiplier(0.95);
+        tpb.setPowerConstant(true);
+        seaWaterBarrel.getAddons().add(tpb);
+        seaWaterBarrel.markOverclockDirty();
+
+        Assertions.assertEquals(3.0, seaWaterBarrel.getOverclockResult().durationTicks(), 1e-6,
+                "80t recipe with 0.9x config hatch (72t pre-OC -> 2t after 5 OCs) + 1.6x throughput boosting must be 3t, not 1t");
+    }
 }
 

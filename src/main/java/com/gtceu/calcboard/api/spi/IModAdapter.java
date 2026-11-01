@@ -69,6 +69,10 @@ public interface IModAdapter extends
         return false;
     }
 
+    default boolean canUseCoils(RecipeNode node) {
+        return true;
+    }
+
     default boolean isCombustionEngine(ResourceLocation machineId) {
         return false;
     }

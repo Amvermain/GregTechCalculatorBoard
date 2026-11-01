@@ -120,22 +120,41 @@ public class GenericModGuiHandler implements IModGuiHandler {
             int cardW = node.getCardWidth();
             return mouseX >= x + 6 && mouseX <= x + cardW - 6 && mouseY >= row2Y && mouseY <= row2Y + 14;
         }
-        int btnW = 32;
+        int btnW = computeTierButtonWidth(node);
+        return mouseX >= x + 6 && mouseX <= x + 6 + btnW && mouseY >= row2Y && mouseY <= row2Y + 14;
+    }
+
+    private static int computeTierButtonWidth(RecipeNode node) {
         var adapter = ModAdapterRegistry.getAdapterForNode(node);
         if (node.isLiquidBoilerRecipe() || (adapter != null && adapter.isBoilerRecipe(node))) {
             GTBoilerTier bTier = GTBoilerTier.getBoilerTier(node);
-            btnW = Math.max(54, safeFontWidth(bTier.getDisplayName(), 46) + 8);
-        } else if (node.getSteamMode() != null && node.getSteamMode().isSteam()) {
+            return Math.max(54, safeFontWidth(bTier.getDisplayName(), 46) + 8);
+        }
+        if (node.getSteamMode() != null && node.getSteamMode().isSteam()) {
             String prefix = node.isMultiblock() ? "▦ " : "";
             String steamText = prefix + node.getSteamMode().getDisplayName();
-            btnW = Math.max(48, safeFontWidth(steamText, 40) + 8);
-        } else {
-            GTVoltageTier tier = node.getTargetTier();
-            String tierText = (tier != null ? tier.getName() : "LV");
-            if (node.isMultiblock()) tierText = "▦ " + tierText;
-            btnW = Math.max(32, safeFontWidth(tierText, 24) + 8);
+            return Math.max(48, safeFontWidth(steamText, 40) + 8);
         }
-        return mouseX >= x + 6 && mouseX <= x + 6 + btnW && mouseY >= row2Y && mouseY <= row2Y + 14;
+        GTVoltageTier tier = node.getTargetTier();
+        String tierText = (tier != null ? tier.getName() : "LV");
+        if (node.isMultiblock()) tierText = "▦ " + tierText;
+        return Math.max(32, safeFontWidth(tierText, 24) + 8);
+    }
+
+    private static int computePostTierStartX(RecipeNode node, int x) {
+        return x + 6 + computeTierButtonWidth(node) + 4;
+    }
+
+    private static int computePostBadgeStartX(RecipeNode node, FlowGraph graph, int x) {
+        int nextCtrlX = computePostTierStartX(node, x);
+        FlowGraph effectiveGraph = graph != null ? graph : (node != null ? node.getParentGraph() : null);
+        List<com.gtceu.calcboard.api.property.NodeBadge> badges = com.gtceu.calcboard.api.property.NodeBadgeRegistry.getBadgesForNode(node, effectiveGraph);
+        for (com.gtceu.calcboard.api.property.NodeBadge badge : badges) {
+            int badgeW = safeFontWidth(badge.text(), 30) + 8;
+            if (nextCtrlX + badgeW > x + node.getCardWidth() - 46) break;
+            nextCtrlX += badgeW + 3;
+        }
+        return nextCtrlX;
     }
 
     @Override
@@ -156,8 +175,11 @@ public class GenericModGuiHandler implements IModGuiHandler {
         int y = (int) node.getPosY();
         int ctrlY = y + 20 + 6;
         int row2Y = ctrlY + 18;
-        int ocX = x + 42;
-        int ocW = Math.max(50, safeFontWidth("STD OC", 44) + 6);
+        int ocX = computePostBadgeStartX(node, null, x);
+        String ocKey = node.getOverclockMode() == OverclockMode.PERFECT ? "gui.gtcalcboard.oc_perf" : "gui.gtcalcboard.oc_std";
+        String ocText = Component.translatable(ocKey).getString();
+        int ocW = Math.max(50, safeFontWidth(ocText, 44) + 6);
+        if (ocX + ocW > x + node.getCardWidth() - 46) return false;
         return mouseX >= ocX && mouseX <= ocX + ocW && mouseY >= row2Y && mouseY <= row2Y + 14;
     }
 
@@ -178,18 +200,27 @@ public class GenericModGuiHandler implements IModGuiHandler {
         int y = (int) node.getPosY();
         int ctrlY = y + 20 + 6;
         int row2Y = ctrlY + 18;
-        int configStartX;
+        int postBadgeX = computePostBadgeStartX(node, null, x);
+        int configStartX = computeConfigStartX(node, x, postBadgeX);
+        return mouseX >= configStartX && mouseX <= x + node.getCardWidth() - 6 && mouseY >= row2Y && mouseY <= row2Y + 14;
+    }
+
+    private static int computeConfigStartX(RecipeNode node, int x, int postBadgeX) {
+        int maxMidEndX = x + node.getCardWidth() - 46;
         if (node.isGenerator()) {
+            if (node.isFusion()) return postBadgeX;
             String genBadge = Component.translatable("gui.gtcalcboard.gen_badge").getString();
             int genW = Math.max(28, safeFontWidth(genBadge, 24) + 4);
-            configStartX = x + 42 + genW + 3;
-        } else {
-            String ocKey = node.getOverclockMode() == OverclockMode.PERFECT ? "gui.gtcalcboard.oc_perf" : "gui.gtcalcboard.oc_std";
-            String ocText = Component.translatable(ocKey).getString();
-            int ocW = Math.max(50, safeFontWidth(ocText, 44) + 6);
-            configStartX = x + 42 + ocW + 3;
+            return (postBadgeX + genW <= maxMidEndX) ? postBadgeX + genW + 3 : postBadgeX;
         }
-        return mouseX >= configStartX && mouseX <= x + node.getCardWidth() - 6 && mouseY >= row2Y && mouseY <= row2Y + 14;
+        boolean isSteam = node.getSteamMode() != null && node.getSteamMode().isSteam();
+        if (node.isFusion() || node.getEnergyType() == EnergyType.HEAT_OR_SELF || isSteam) {
+            return postBadgeX;
+        }
+        String ocKey = node.getOverclockMode() == OverclockMode.PERFECT ? "gui.gtcalcboard.oc_perf" : "gui.gtcalcboard.oc_std";
+        String ocText = Component.translatable(ocKey).getString();
+        int ocW = Math.max(50, safeFontWidth(ocText, 44) + 6);
+        return (postBadgeX + ocW <= maxMidEndX) ? postBadgeX + ocW + 3 : postBadgeX;
     }
 
     @Override
@@ -222,22 +253,12 @@ public class GenericModGuiHandler implements IModGuiHandler {
 
     @Override
     public boolean handleControlClick(NodeWidget widget, RecipeNode node, double mouseX, double mouseY, int button) {
-        int x = (int) node.getPosX();
-        int y = (int) node.getPosY();
-        int row2Y = y + 20 + 6 + 18;
-        int nextCtrlX = x + 42;
-        FlowGraph graph = (widget != null && widget.getParent() != null) ? widget.getParent().getGraph() : (node != null ? node.getParentGraph() : null);
-        List<com.gtceu.calcboard.api.property.NodeBadge> badges = com.gtceu.calcboard.api.property.NodeBadgeRegistry.getBadgesForNode(node, graph);
-        for (com.gtceu.calcboard.api.property.NodeBadge badge : badges) {
-            int badgeW = safeFontWidth(badge.text(), 30) + 8;
-            if (nextCtrlX + badgeW > x + node.getCardWidth() - 46) break;
-            if (mouseX >= nextCtrlX && mouseX <= nextCtrlX + badgeW && mouseY >= row2Y && mouseY <= row2Y + 14) {
-                if (triggerBadgeClick(widget, badge)) return true;
-            }
-            nextCtrlX += badgeW + 3;
+        if (node == null) return false;
+        if (isBadgeHovered(widget, node, mouseX, mouseY)) {
+            return handleHoveredBadgeClick(widget, node, mouseX, mouseY);
         }
 
-        if (isTierOrSpeedControlHovered(node, mouseX, mouseY)) {
+        if (isTierOrSpeedControlHovered(widget, node, mouseX, mouseY)) {
             widget.commitCountEdit();
             var adapter = ModAdapterRegistry.getAdapterForNode(node);
             if (node.isMultiblock() && !node.isGenerator() && !node.isTurbine() && adapter != null && adapter.supportsAddons(node)) {
@@ -250,7 +271,7 @@ public class GenericModGuiHandler implements IModGuiHandler {
             return widget.changeTier(direction);
         }
 
-        if (isSecondaryControlHovered(node, mouseX, mouseY)) {
+        if (isSecondaryControlHovered(widget, node, mouseX, mouseY)) {
             widget.commitCountEdit();
             OverclockMode oldOc = node.getOverclockMode();
             OverclockMode newOc = (oldOc == OverclockMode.STANDARD) ? OverclockMode.PERFECT : OverclockMode.STANDARD;
@@ -268,7 +289,7 @@ public class GenericModGuiHandler implements IModGuiHandler {
             return true;
         }
 
-        if (isMachineConfigHovered(node, mouseX, mouseY)) {
+        if (isMachineConfigHovered(widget, node, mouseX, mouseY)) {
             widget.commitCountEdit();
             if (widget.getParent() != null) {
                 widget.getParent().openMachineConfigDialog(node);
@@ -277,6 +298,49 @@ public class GenericModGuiHandler implements IModGuiHandler {
         }
 
         return false;
+    }
+
+    private boolean isBadgeHovered(NodeWidget widget, RecipeNode node, double mouseX, double mouseY) {
+        if (hasCachedButtons(widget)) {
+            return isCachedButtonHovered(widget, node, mouseX, mouseY,
+                    btn -> btn.role() == com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button.ButtonRole.BADGE);
+        }
+        return findHoveredUncachedBadge(widget, node, mouseX, mouseY) != null;
+    }
+
+    private boolean handleHoveredBadgeClick(NodeWidget widget, RecipeNode node, double mouseX, double mouseY) {
+        if (hasCachedButtons(widget)) {
+            int x = (int) node.getPosX();
+            int row2Y = (int) node.getPosY() + 20 + 6 + 18;
+            for (var btn : widget.getTextCache().getRow2Buttons()) {
+                if (btn.role() != com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button.ButtonRole.BADGE || btn.badge() == null) continue;
+                int bx = x + btn.relX();
+                if (mouseX >= bx && mouseX <= bx + btn.width() && mouseY >= row2Y && mouseY <= row2Y + 14) {
+                    return triggerBadgeClick(widget, btn.badge());
+                }
+            }
+            return false;
+        }
+        com.gtceu.calcboard.api.property.NodeBadge badge = findHoveredUncachedBadge(widget, node, mouseX, mouseY);
+        return badge != null && triggerBadgeClick(widget, badge);
+    }
+
+    private com.gtceu.calcboard.api.property.NodeBadge findHoveredUncachedBadge(NodeWidget widget, RecipeNode node, double mouseX, double mouseY) {
+        int x = (int) node.getPosX();
+        int row2Y = (int) node.getPosY() + 20 + 6 + 18;
+        if (mouseY < row2Y || mouseY > row2Y + 14) return null;
+        int nextCtrlX = computePostTierStartX(node, x);
+        FlowGraph graph = (widget != null && widget.getParent() != null) ? widget.getParent().getGraph() : node.getParentGraph();
+        List<com.gtceu.calcboard.api.property.NodeBadge> badges = com.gtceu.calcboard.api.property.NodeBadgeRegistry.getBadgesForNode(node, graph);
+        for (com.gtceu.calcboard.api.property.NodeBadge badge : badges) {
+            int badgeW = safeFontWidth(badge.text(), 30) + 8;
+            if (nextCtrlX + badgeW > x + node.getCardWidth() - 46) break;
+            if (mouseX >= nextCtrlX && mouseX <= nextCtrlX + badgeW) {
+                return badge;
+            }
+            nextCtrlX += badgeW + 3;
+        }
+        return null;
     }
 
     private boolean triggerBadgeClick(NodeWidget widget, com.gtceu.calcboard.api.property.NodeBadge badge) {
@@ -302,7 +366,7 @@ public class GenericModGuiHandler implements IModGuiHandler {
 
     @Override
     public boolean handleControlScroll(NodeWidget widget, RecipeNode node, double mouseX, double mouseY, double delta) {
-        if (isTierOrSpeedControlHovered(node, mouseX, mouseY)) {
+        if (isTierOrSpeedControlHovered(widget, node, mouseX, mouseY)) {
             widget.commitCountEdit();
             return widget.changeTier(delta > 0 ? 1 : -1);
         }

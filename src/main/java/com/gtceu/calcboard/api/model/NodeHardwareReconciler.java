@@ -42,6 +42,9 @@ public final class NodeHardwareReconciler {
 
         node.markOverclockDirty();
         node.markOperationalDirty();
+        if (node.isCompoundNode() && node.getParentGraph() != null) {
+            node.getParentGraph().syncCompoundParameters(node);
+        }
     }
 
     public static void reconcileForMachine(RecipeNode node, ResourceLocation newWs) {
@@ -60,6 +63,9 @@ public final class NodeHardwareReconciler {
 
         node.markOverclockDirty();
         node.markOperationalDirty();
+        if (node.isCompoundNode() && node.getParentGraph() != null) {
+            node.getParentGraph().syncCompoundParameters(node);
+        }
     }
 
     public static boolean isWorkstationCompatible(RecipeNode node, RecipeNode template) {

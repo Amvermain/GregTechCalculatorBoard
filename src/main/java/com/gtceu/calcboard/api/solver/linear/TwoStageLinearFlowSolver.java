@@ -52,6 +52,7 @@ public final class TwoStageLinearFlowSolver {
         buildConservationEquations(graph, system);
         buildAnchorEquation(graph, anchor, system);
         buildSharedPoolEquations(graph, system);
+        buildCompoundGroupEquations(graph, system);
 
         GaussJordanEliminator.Solution solution = GaussJordanEliminator.solve(
                 system.buildMatrixA(),
@@ -137,6 +138,19 @@ public final class TwoStageLinearFlowSolver {
             }
             if (!poolNodeIds.isEmpty()) {
                 system.addSharedPoolCapacityEquation(poolNodeIds, frame.getTargetPoolCapacity());
+            }
+        }
+    }
+
+    private static void buildCompoundGroupEquations(FlowGraph graph, LinearEquationSystem system) {
+        Map<String, String> groupRepresentativeMap = new HashMap<>();
+        for (String nodeId : system.getVariableNodeIds()) {
+            RecipeNode node = graph.findNodeById(nodeId);
+            if (node == null || !node.isCompoundNode()) continue;
+            String groupId = node.getCompoundGroupId();
+            String repId = groupRepresentativeMap.putIfAbsent(groupId, nodeId);
+            if (repId != null && !repId.equals(nodeId)) {
+                system.addCompoundSiblingEquation(repId, nodeId);
             }
         }
     }

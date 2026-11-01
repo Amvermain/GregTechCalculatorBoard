@@ -301,6 +301,7 @@ public class EmiRecipeConverter {
         }
 
         node.autoCalculateTurbineParallel();
+        com.gtceu.calcboard.compat.gtceu.helper.GTCEuMachineLifecycleHandler.ensureDefaultMachineTraits(node, node.getMachineIcon());
         if (preferredWorkstation == null) {
             com.gtceu.calcboard.api.preset.CategoryMachinePresetManager.getInstance().applyPresetIfPresent(node);
         }

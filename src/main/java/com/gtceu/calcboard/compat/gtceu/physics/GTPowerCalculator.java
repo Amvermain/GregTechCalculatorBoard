@@ -167,8 +167,7 @@ public final class GTPowerCalculator {
         double threadingPowerMult = node.hasThreading() ? RecipeNodeThreadingHelper.getThreadingConfig(node).getFinalPowerMultiplier() : 1.0;
         long maxVoltage = GTAddonCompatibilityHandler.getOverclockVoltage(node);
 
-        double coilDurationMult = getCoilDurationMultiplier(node);
-        double baseDuration = Math.max(1.0, Math.floor(node.getBaseDurationTicks() * coilDurationMult + 1e-9));
+        double baseDuration = resolvePreOverclockBaseDuration(node);
         double currentEUt = node.getBaseEUt();
         double durationMultiplier = 1.0;
         int performedOcs = 0;
@@ -279,6 +278,26 @@ public final class GTPowerCalculator {
         return false;
     }
 
+    public static double resolvePreOverclockBaseDuration(RecipeNode node) {
+        double maintDurationMult = getMaintenanceDurationMultiplier(node);
+        double maintDuration = maintDurationMult != 1.0
+                ? Math.max(1.0, Math.round(node.getBaseDurationTicks() * maintDurationMult))
+                : node.getBaseDurationTicks();
+        double coilDurationMult = getCoilDurationMultiplier(node);
+        return Math.max(1.0, Math.floor(maintDuration * coilDurationMult + 1e-9));
+    }
+
+    public static double getMaintenanceDurationMultiplier(RecipeNode node) {
+        if (node == null) return 1.0;
+        double mult = 1.0;
+        for (MachineAddon a : node.getAddons()) {
+            if (a != null && a.getCategory() == MachineAddon.Category.MAINTENANCE) {
+                mult *= a.getDurationMultiplier();
+            }
+        }
+        return mult;
+    }
+
     public static double getCoilDurationMultiplier(RecipeNode node) {
         if (node == null) return 1.0;
         double mult = 1.0;
@@ -294,7 +313,10 @@ public final class GTPowerCalculator {
         if (node == null) return 1.0;
         double mult = 1.0;
         for (MachineAddon a : node.getAddons()) {
-            if (a != null && a.getCategory() != MachineAddon.Category.COIL && !isSequentialPostOcAddon(a)) {
+            if (a != null
+                    && a.getCategory() != MachineAddon.Category.COIL
+                    && a.getCategory() != MachineAddon.Category.MAINTENANCE
+                    && !isSequentialPostOcAddon(a)) {
                 mult *= a.getDurationMultiplier();
             }
         }
@@ -393,13 +415,16 @@ public final class GTPowerCalculator {
                 int boostMult = GTCombustionHelper.getCombustionParallelMultiplier(node);
                 int addonMult = node.getCombinedParallelMultiplier();
                 par = getEffectiveCombustionParallel(node) * Math.max(boostMult, addonMult);
-            } else if (isGTGenerator(node)) {
+            } else if (isGTGenerator(node) && !node.isMultiblock()) {
                 par = getEffectiveSingleblockParallel(node) * node.getCombinedParallelMultiplier();
             } else {
-                par = Math.max(1, node.getParallel() * node.getCombinedParallelMultiplier());
+                par = computeGeneratorMultiblockParallel(node);
             }
         } else {
             int powerConstantMult = NodeAddonHelper.getPowerConstantParallelMultiplier(node.getAddons());
+            if (com.gtceu.calcboard.compat.start.StarTHellForgeHelper.isHellForge(node)) {
+                powerConstantMult *= com.gtceu.calcboard.compat.start.StarTHellForgeHelper.computeInfernalParallel(node);
+            }
             int powerConsumingPar = computePowerConsumingParallel(node);
             par = Math.max(1, powerConsumingPar * powerConstantMult);
             if (hasBatchModeAddon(node)) {
@@ -555,8 +580,25 @@ public final class GTPowerCalculator {
         return (int) Math.max(1, Math.floor((double) baseVoltage / recipeEUt));
     }
 
+    private static int computeGeneratorMultiblockParallel(RecipeNode node) {
+        int rawPar = Math.max(1, node.getParallel() * node.getCombinedParallelMultiplier());
+        if (!com.gtceu.calcboard.compat.gtceu.handler.GTEnergyHatchCalculator.hasEnergyHatch(node)) {
+            return rawPar;
+        }
+        double singleRecipeEUt = Math.abs(node.getBaseEUt()) * node.getCombinedEutMultiplier();
+        if (singleRecipeEUt <= 0.0) {
+            return rawPar;
+        }
+        long dynamoCap = com.gtceu.calcboard.compat.gtceu.handler.GTEnergyHatchCalculator.getMaxEUtCapacity(node);
+        if (dynamoCap <= 0 || dynamoCap >= Long.MAX_VALUE) {
+            return rawPar;
+        }
+        int maxDynamoPar = (int) Math.max(1, Math.floor((double) dynamoCap / singleRecipeEUt));
+        return Math.min(rawPar, maxDynamoPar);
+    }
+
     public static int getEffectiveSingleblockParallel(RecipeNode node) {
-        if (!isGTGenerator(node) || GTTurbineHelper.isLargeTurbine(node)) return Math.max(1, node.getParallel());
+        if (!isGTGenerator(node) || node.isMultiblock() || GTTurbineHelper.isLargeTurbine(node)) return Math.max(1, node.getParallel());
         if (node.getParallel() > 1) return node.getParallel();
         double recipeEUt = Math.abs(node.getBaseEUt());
         if (recipeEUt > 0 && node.getTargetTier() != null && recipeEUt < node.getTargetTier().getVoltage()) {
@@ -571,6 +613,10 @@ public final class GTPowerCalculator {
             return 1;
         }
         if (node.isGenerator() || GTTurbineHelper.isTurbine(node)) {
+            if (node.isMultiblock() && !GTTurbineHelper.isTurbine(node)
+                    && com.gtceu.calcboard.compat.gtceu.handler.GTEnergyHatchCalculator.hasEnergyHatch(node)) {
+                return getGeneratorMultiblockMaxParallel(node);
+            }
             double cap = GTTurbineHelper.getGeneratorMaxEUt(node);
             double recipeEUt = Math.abs(node.getBaseEUt());
             if (recipeEUt <= 0.0 || cap >= Double.MAX_VALUE) return Math.max(1, node.getParallel());
@@ -592,7 +638,21 @@ public final class GTPowerCalculator {
         int maxPar = Math.min(hatchAndHardware, energyLimit);
         int baseLimit = Math.max(1, maxPar == Integer.MAX_VALUE ? node.getParallel() : maxPar);
         int powerConstantMult = NodeAddonHelper.getPowerConstantParallelMultiplier(node.getAddons());
+        if (com.gtceu.calcboard.compat.start.StarTHellForgeHelper.isHellForge(node)) {
+            powerConstantMult *= com.gtceu.calcboard.compat.start.StarTHellForgeHelper.computeInfernalParallel(node);
+        }
         return baseLimit * powerConstantMult * computeBatchMultiplier(node);
+    }
+
+    private static int getGeneratorMultiblockMaxParallel(RecipeNode node) {
+        int hatchAndHardware = getHatchAndHardwareParallelLimit(node);
+        double singleRecipeEUt = Math.abs(node.getBaseEUt()) * node.getCombinedEutMultiplier();
+        long dynamoCap = com.gtceu.calcboard.compat.gtceu.handler.GTEnergyHatchCalculator.getMaxEUtCapacity(node);
+        int dynamoLimit = (singleRecipeEUt > 0.0 && dynamoCap < Long.MAX_VALUE)
+                ? (int) Math.max(1, Math.floor((double) dynamoCap / singleRecipeEUt))
+                : Integer.MAX_VALUE;
+        int maxPar = Math.min(hatchAndHardware, dynamoLimit);
+        return Math.max(1, maxPar == Integer.MAX_VALUE ? node.getParallel() : maxPar);
     }
 
     public static int getHatchAndHardwareParallelLimit(RecipeNode node) {
@@ -859,9 +919,24 @@ public final class GTPowerCalculator {
             tooltipLines.add(Component.literal("§e⚡ " + Component.translatable("gui.gtcalcboard.total_power").getString()));
             tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Total Consumption: §e%,.2f EU/t", totEUt)));
             tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Current: §e%,.4fA %s", amps, tier.getName())));
-            tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Duration: §f%.4fs §7(§f%,.4f cycles/s§7)", node.getEffectiveDurationSeconds(), node.getEffectiveCyclesPerSecond())));
+            if (node.isCompoundNode()) {
+                double totalCycleSec = com.gtceu.calcboard.api.model.NodePerformanceHelper.computeCompoundCycleDurationTicks(node) / 20.0;
+                tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Duration: §f%.4fs §7/ §f%.4fs §7(§f%,.4f cycles/s§7)", node.getEffectiveDurationSeconds(), totalCycleSec, node.getEffectiveCyclesPerSecond())));
+            } else {
+                tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Duration: §f%.4fs §7(§f%,.4f cycles/s§7)", node.getEffectiveDurationSeconds(), node.getEffectiveCyclesPerSecond())));
+            }
+            if (com.gtceu.calcboard.compat.start.StarTHellForgeHelper.isHellForge(node)) {
+                appendHellForgeTooltip(node, tooltipLines);
+            }
         }
         return tooltipLines;
+    }
+
+    private static void appendHellForgeTooltip(RecipeNode node, List<Component> tooltipLines) {
+        var fluid = com.gtceu.calcboard.compat.start.StarTHellForgeHelper.getSelectedFluid(node);
+        int curTemp = com.gtceu.calcboard.compat.start.StarTHellForgeHelper.getOperatingTemperature(node);
+        int infPar = com.gtceu.calcboard.compat.start.StarTHellForgeHelper.computeInfernalParallel(node);
+        tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§6🔥 " + Component.translatable("gui.gtcalcboard.hellforge.crucible_heat").getString() + ": §f%,d MK §7(%s) §a[%dx]", curTemp, fluid.getDisplayName(), infPar)));
     }
 
     private static void appendTurbineRotorWearTooltip(RecipeNode node, List<Component> tooltipLines) {

@@ -201,11 +201,11 @@ public final class GTTurbineHelper {
     public static int getDynamoAmperage(RecipeNode node) {
         if (node == null) return 16;
         if (node.getProperties().has(GTCEuProperties.DYNAMO_AMPERAGE)) {
-            return Math.max(1, node.getProperties().get(GTCEuProperties.DYNAMO_AMPERAGE));
+            return clampDynamoAmperage(node, node.getProperties().get(GTCEuProperties.DYNAMO_AMPERAGE));
         }
         for (MachineAddon addon : node.getAddons()) {
             if (addon instanceof GTEnergyHatchAddon eh) {
-                return Math.max(1, eh.getAmperage());
+                return clampDynamoAmperage(node, eh.getAmperage());
             }
         }
         return 16;
@@ -213,8 +213,36 @@ public final class GTTurbineHelper {
 
     public static void setDynamoAmperage(RecipeNode node, int amperage) {
         if (node == null) return;
-        node.getProperties().set(GTCEuProperties.DYNAMO_AMPERAGE, Math.max(1, amperage));
+        node.getProperties().set(GTCEuProperties.DYNAMO_AMPERAGE, clampDynamoAmperage(node, amperage));
         node.markOverclockDirty();
+    }
+
+    public static boolean supportsLaserDynamo(RecipeNode node) {
+        if (node == null) return false;
+        ResourceLocation icon = node.getMachineIcon();
+        if (icon != null && MultiblockDetector.supportsLaserHatch(icon, null)) {
+            return true;
+        }
+        GTPlasmaTurbineModel model = GTPlasmaTurbineModel.getModel(node);
+        if (model == GTPlasmaTurbineModel.SPT || model == GTPlasmaTurbineModel.NPT) {
+            return true;
+        }
+        if (icon != null) {
+            var def = com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.getStructure(icon);
+            if (def != null && def.supportsAbility("OUTPUT_LASER")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static int clampDynamoAmperage(RecipeNode node, int amperage) {
+        int clampedMin = Math.max(1, amperage);
+        if (supportsLaserDynamo(node)) {
+            if (clampedMin == 64) return 16;
+            return Math.min(4096, clampedMin);
+        }
+        return Math.min(16, clampedMin);
     }
 
     public static boolean supportsTurbineBoost(RecipeNode node) {
@@ -319,7 +347,8 @@ public final class GTTurbineHelper {
         }
     }
 
-    public static final int[] STANDARD_AMPERAGES = {1, 2, 4, 16, 64};
+    public static final int[] STANDARD_AMPERAGES = {1, 2, 4, 16};
+    public static final int[] LASER_TURBINE_AMPERAGES = {1, 2, 4, 16, 256, 1024, 4096};
 
     public static void cycleRotorHolderTier(RecipeNode node, int direction) {
         if (node == null) return;
@@ -353,16 +382,17 @@ public final class GTTurbineHelper {
 
     public static void cycleDynamoAmperage(RecipeNode node, int direction) {
         if (node == null) return;
+        int[] allowedAmps = supportsLaserDynamo(node) ? LASER_TURBINE_AMPERAGES : STANDARD_AMPERAGES;
         int curAmps = getDynamoAmperage(node);
         int curIdx = 0;
-        for (int i = 0; i < STANDARD_AMPERAGES.length; i++) {
-            if (STANDARD_AMPERAGES[i] == curAmps) {
+        for (int i = 0; i < allowedAmps.length; i++) {
+            if (allowedAmps[i] == curAmps) {
                 curIdx = i;
                 break;
             }
         }
-        int nextIdx = (curIdx + direction + STANDARD_AMPERAGES.length) % STANDARD_AMPERAGES.length;
-        setDynamoAmperage(node, STANDARD_AMPERAGES[nextIdx]);
+        int nextIdx = (curIdx + direction + allowedAmps.length) % allowedAmps.length;
+        setDynamoAmperage(node, allowedAmps[nextIdx]);
     }
 
     /**

@@ -275,6 +275,7 @@ public class MachineConfigDialog implements IBoardModal {
                 if (p >= 1 && p <= 100000) {
                     this.node.setParallel(p);
                     this.node.setCustomParallel(p);
+                    syncCompoundIfApplicable();
                     if (parent != null) parent.markSummaryDirty();
                 }
             } catch (NumberFormatException ignored) {}
@@ -294,6 +295,7 @@ public class MachineConfigDialog implements IBoardModal {
     }
 
     public void close() {
+        syncCompoundIfApplicable();
         this.visible = false;
         if (onCloseCallback != null) {
             try {
@@ -677,7 +679,19 @@ public class MachineConfigDialog implements IBoardModal {
         return mouseClicked(mouseX, mouseY, button, getScreenWidth(), getScreenHeight());
     }
 
+    private void syncCompoundIfApplicable() {
+        if (node != null && node.isCompoundNode() && parent != null && parent.getGraph() != null) {
+            parent.getGraph().syncCompoundParameters(node);
+        }
+    }
+
     public boolean mouseClicked(double mouseX, double mouseY, int button, int screenWidth, int screenHeight) {
+        boolean handled = mouseClickedInternal(mouseX, mouseY, button, screenWidth, screenHeight);
+        syncCompoundIfApplicable();
+        return handled;
+    }
+
+    private boolean mouseClickedInternal(double mouseX, double mouseY, int button, int screenWidth, int screenHeight) {
         if (!visible || node == null) return false;
 
         Minecraft mc = Minecraft.getInstance();
@@ -846,6 +860,12 @@ public class MachineConfigDialog implements IBoardModal {
     }
 
     public boolean mouseScrolled(double mouseX, double mouseY, double delta, int screenWidth, int screenHeight) {
+        boolean handled = mouseScrolledInternal(mouseX, mouseY, delta, screenWidth, screenHeight);
+        syncCompoundIfApplicable();
+        return handled;
+    }
+
+    private boolean mouseScrolledInternal(double mouseX, double mouseY, double delta, int screenWidth, int screenHeight) {
         if (!visible || node == null) return false;
 
         float scale = currentFontScale.getScale();
@@ -980,6 +1000,12 @@ public class MachineConfigDialog implements IBoardModal {
     }
 
     public boolean mouseReleased(double mouseX, double mouseY, int button, int screenWidth, int screenHeight) {
+        boolean handled = mouseReleasedInternal(mouseX, mouseY, button, screenWidth, screenHeight);
+        syncCompoundIfApplicable();
+        return handled;
+    }
+
+    private boolean mouseReleasedInternal(double mouseX, double mouseY, int button, int screenWidth, int screenHeight) {
         if (!visible || node == null) return false;
 
         float scale = currentFontScale.getScale();

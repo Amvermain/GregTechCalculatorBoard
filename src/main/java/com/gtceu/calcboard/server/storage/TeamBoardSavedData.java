@@ -54,12 +54,17 @@ public class TeamBoardSavedData extends SavedData {
         );
     }
 
-    public TeamWorkspaceData getOrCreateWorkspace(UUID teamId, String defaultName) {
+    public TeamWorkspaceData getOrCreateWorkspace(UUID teamId, String currentName) {
         if (teamId == null) return null;
-        return workspaces.computeIfAbsent(teamId, id -> {
+        TeamWorkspaceData ws = workspaces.computeIfAbsent(teamId, id -> {
             setDirty();
-            return new TeamWorkspaceData(id, defaultName);
+            return new TeamWorkspaceData(id, currentName);
         });
+        if (currentName != null && !currentName.isEmpty() && !currentName.equals(ws.getTeamName())) {
+            ws.setTeamName(currentName);
+            setDirty();
+        }
+        return ws;
     }
 
     public TeamWorkspaceData getWorkspace(UUID teamId) {

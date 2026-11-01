@@ -119,13 +119,14 @@ public final class NodeWorkstationResolver {
     public static ResourceLocation getMultiblockWorkstation(RecipeNode node) {
         if (node == null) return null;
         List<ResourceLocation> mbList = getMultiblockWorkstations(node);
-        if (!mbList.isEmpty()) {
-            return mbList.get(0);
-        }
         IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
         if (adapter != null) {
-            ResourceLocation preferred = adapter.getPreferredMultiblockWorkstation(node, node.getAvailableWorkstations());
+            List<ResourceLocation> candidates = mbList.isEmpty() ? node.getAvailableWorkstations() : mbList;
+            ResourceLocation preferred = adapter.getPreferredMultiblockWorkstation(node, candidates);
             if (preferred != null) return preferred;
+        }
+        if (!mbList.isEmpty()) {
+            return mbList.get(0);
         }
         return null;
     }
@@ -157,6 +158,8 @@ public final class NodeWorkstationResolver {
 
     public static boolean canUseCoils(RecipeNode node) {
         if (node == null) return false;
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
+        if (adapter != null && !adapter.canUseCoils(node)) return false;
         if (node.getRecipeTemperature() > 0) return true;
         ResourceLocation catId = node.getRecipeCategoryId();
         if (catId != null && CategoryCapabilityMatrix.getInstance().getCapability(catId).canUseCoils()) return true;

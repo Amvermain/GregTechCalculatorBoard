@@ -41,11 +41,24 @@ public final class GTWorkstationSelector {
         }
 
         for (ResourceLocation ws : availableWorkstations) {
+            if (isBaseMultiblockWithoutUpgradeTraits(ws)) {
+                String path = ws.getPath().toLowerCase(Locale.ROOT);
+                if (!isUpgradeVariantPrefix(path)) {
+                    return ws;
+                }
+            }
+        }
+
+        for (ResourceLocation ws : availableWorkstations) {
+            if (isBaseMultiblockWithoutUpgradeTraits(ws)) {
+                return ws;
+            }
+        }
+
+        for (ResourceLocation ws : availableWorkstations) {
             if (MultiblockDetector.isMultiblock(ws)) {
                 String path = ws.getPath().toLowerCase(Locale.ROOT);
-                if (!path.startsWith("mega_") && !path.startsWith("extreme_") && !path.startsWith("incomprehensible_")
-                        && !path.startsWith("advanced_") && !path.startsWith("yielding_") && !path.startsWith("super_")
-                        && !path.startsWith("supreme_") && !path.startsWith("nyinsane_")) {
+                if (!isUpgradeVariantPrefix(path) && !path.startsWith("advanced_")) {
                     return ws;
                 }
             }
@@ -55,6 +68,20 @@ public final class GTWorkstationSelector {
             if (MultiblockDetector.isMultiblock(ws)) return ws;
         }
         return null;
+    }
+
+    private static boolean isBaseMultiblockWithoutUpgradeTraits(ResourceLocation ws) {
+        if (!MultiblockDetector.isMultiblock(ws)) return false;
+        return !MultiblockDetector.supportsThroughputBoosting(ws)
+                && !MultiblockDetector.supportsBulkProcessing(ws)
+                && !MultiblockDetector.isThreadingMultiblock(ws);
+    }
+
+    private static boolean isUpgradeVariantPrefix(String path) {
+        return path.startsWith("mega_") || path.startsWith("extreme_") || path.startsWith("incomprehensible_")
+                || path.startsWith("yielding_") || path.startsWith("super_")
+                || path.startsWith("supreme_") || path.startsWith("nyinsane_")
+                || path.startsWith("true_") || path.startsWith("ultimate_");
     }
 
     private static ResourceLocation selectFusionWorkstation(RecipeNode node, List<ResourceLocation> availableWorkstations) {

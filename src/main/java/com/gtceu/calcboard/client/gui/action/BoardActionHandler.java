@@ -104,6 +104,9 @@ public class BoardActionHandler {
         var prev = BatchChangeTierCommand.NodeTierSnapshot.of(node);
         EnergyHatchHelper.installDefaultEnergyHatch(node, effectiveTier);
         var next = BatchChangeTierCommand.NodeTierSnapshot.of(node);
+        if (node.isCompoundNode() && node.getParentGraph() != null) {
+            node.getParentGraph().syncCompoundParameters(node);
+        }
         prevSnapshots.add(prev);
         newSnapshots.add(next);
     }
@@ -125,6 +128,9 @@ public class BoardActionHandler {
         }
         node.markOverclockDirty();
         var next = BatchChangeTierCommand.NodeTierSnapshot.of(node);
+        if (node.isCompoundNode() && node.getParentGraph() != null) {
+            node.getParentGraph().syncCompoundParameters(node);
+        }
         prevSnapshots.add(prev);
         newSnapshots.add(next);
     }
@@ -343,6 +349,7 @@ public class BoardActionHandler {
         if (!node.hasCustomName()) {
             newName = computeSwitchedNodeName(oldName, machineDisplayName);
             node.setName(newName);
+            syncCompoundWorkstationSwitch(node, machineDisplayName);
         }
 
         screen.recordCommand(new BoardCommand.SetMachineIconCommand(
@@ -356,6 +363,16 @@ public class BoardActionHandler {
         }
 
         BoardToast.show(Component.literal("§b▦ ").append(Component.translatable("message.gtcalcboard.machine_switched", machineDisplayName)));
+    }
+
+    private void syncCompoundWorkstationSwitch(RecipeNode node, String machineDisplayName) {
+        if (!node.isCompoundNode() || screen.getGraph() == null) return;
+        screen.getGraph().syncCompoundParameters(node);
+        for (RecipeNode sibling : screen.getGraph().findCompoundSiblingNodes(node.getCompoundGroupId())) {
+            if (!sibling.getId().equals(node.getId()) && !sibling.hasCustomName()) {
+                sibling.setName(computeSwitchedNodeName(sibling.getName(), machineDisplayName));
+            }
+        }
     }
 
     public static String computeSwitchedNodeName(String oldName, String newMachineName) {

@@ -1655,5 +1655,14 @@
   "gui.gtcalcboard.bacteria_stats.preset_initial": "野生菌落 (产1/代5)",
   "gui.gtcalcboard.bacteria_stats.preview_title": "周期流体概览",
   "gui.gtcalcboard.bacteria_stats.inputs_header": "每周期消耗输入",
-  "gui.gtcalcboard.bacteria_stats.outputs_header": "每周期产物流体"
+  "gui.gtcalcboard.bacteria_stats.outputs_header": "每周期产物流体",
+  "gui.gtcalcboard.hellforge.crucible_heat": "坩埚热量 (加热流体)",
+  "gui.gtcalcboard.badge.hellforge_fluid": "加热流体: %s (%s MK)",
+  "gui.gtcalcboard.badge.hellforge_required_temp": "所需热量: %s MK",
+  "gui.gtcalcboard.hellforge.infernal_parallel_tooltip": "炼狱并行: %dx (高出最低热量 +%d 阶)",
+  "gui.gtcalcboard.hellforge.click_to_cycle_fluid": "[点击] 切换加热流体",
+  "gui.gtcalcboard.hellforge.temp_deficit_title": "坩埚热量不足",
+  "gui.gtcalcboard.node_warning.hellforge_temp_deficit": "当前坩埚热量 (%d MK) 低于配方所需热量 (%d MK)",
+  "gui.gtcalcboard.hellforge.fluid_max_temp": "最高温度: %s MK (+%d MK/B)",
+  "gui.gtcalcboard.hellforge.active_fluid": "当前选中的加热流体"
 }

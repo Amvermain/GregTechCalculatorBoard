@@ -19,8 +19,11 @@ public final class FlowGraphTopologyAnalyzer {
         Set<String> directSuppliers = new HashSet<>();
         Queue<String> queue = new ArrayDeque<>();
         Set<String> visited = new HashSet<>();
-        queue.add(targetNodeId);
-        visited.add(targetNodeId);
+        for (String id : collectCompoundGroupIds(graph, targetNodeId)) {
+            if (visited.add(id)) {
+                queue.add(id);
+            }
+        }
 
         while (!queue.isEmpty()) {
             String currId = queue.poll();
@@ -44,19 +47,34 @@ public final class FlowGraphTopologyAnalyzer {
             if (src.isReroute()) {
                 queue.add(src.getId());
             } else {
-                directSuppliers.add(src.getId());
+                addDirectSupplierAndSiblings(graph, src, visited, directSuppliers);
             }
+        }
+    }
+
+    private static void addDirectSupplierAndSiblings(
+            FlowGraph graph,
+            RecipeNode src,
+            Set<String> visited,
+            Set<String> directSuppliers
+    ) {
+        directSuppliers.add(src.getId());
+        if (!src.isCompoundNode()) return;
+        for (RecipeNode sibling : graph.findCompoundSiblingNodes(src.getCompoundGroupId())) {
+            visited.add(sibling.getId());
+            directSuppliers.add(sibling.getId());
         }
     }
 
     public static Set<String> findDownstreamNodes(FlowGraph graph, String anchorId, Set<String> directAnchorSuppliers) {
         Set<String> downstream = new LinkedHashSet<>();
         Queue<String> queue = new ArrayDeque<>();
-        queue.add(anchorId);
+        Set<String> anchorGroupIds = collectCompoundGroupIds(graph, anchorId);
+        queue.addAll(anchorGroupIds);
 
         while (!queue.isEmpty()) {
             String currId = queue.poll();
-            collectDownstreamForNode(graph, currId, anchorId, directAnchorSuppliers, downstream, queue);
+            collectDownstreamForNode(graph, currId, anchorGroupIds, directAnchorSuppliers, downstream, queue);
         }
         return downstream;
     }
@@ -64,7 +82,7 @@ public final class FlowGraphTopologyAnalyzer {
     private static void collectDownstreamForNode(
             FlowGraph graph,
             String currId,
-            String anchorId,
+            Set<String> anchorGroupIds,
             Set<String> directAnchorSuppliers,
             Set<String> downstream,
             Queue<String> queue
@@ -72,9 +90,22 @@ public final class FlowGraphTopologyAnalyzer {
         for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
             if (!edge.fromNodeId().equals(currId)) continue;
             String nextId = edge.toNodeId();
-            if (nextId.equals(anchorId) || directAnchorSuppliers.contains(nextId)) continue;
-            if (downstream.add(nextId)) {
-                queue.add(nextId);
+            offerDownstreamNodeAndSiblings(graph, nextId, anchorGroupIds, directAnchorSuppliers, downstream, queue);
+        }
+    }
+
+    private static void offerDownstreamNodeAndSiblings(
+            FlowGraph graph,
+            String nodeId,
+            Set<String> anchorGroupIds,
+            Set<String> directAnchorSuppliers,
+            Set<String> downstream,
+            Queue<String> queue
+    ) {
+        for (String groupMemberId : collectCompoundGroupIds(graph, nodeId)) {
+            if (anchorGroupIds.contains(groupMemberId) || directAnchorSuppliers.contains(groupMemberId)) continue;
+            if (downstream.add(groupMemberId)) {
+                queue.add(groupMemberId);
             }
         }
     }
@@ -82,14 +113,15 @@ public final class FlowGraphTopologyAnalyzer {
     public static Set<String> findUpstreamNodes(FlowGraph graph, String anchorId, Set<String> downstreamNodes) {
         Set<String> upstream = new LinkedHashSet<>();
         Queue<String> queue = new ArrayDeque<>();
-        queue.add(anchorId);
+        Set<String> anchorGroupIds = collectCompoundGroupIds(graph, anchorId);
+        queue.addAll(anchorGroupIds);
         if (downstreamNodes != null) {
             queue.addAll(downstreamNodes);
         }
 
         while (!queue.isEmpty()) {
             String currId = queue.poll();
-            collectUpstreamForNode(graph, currId, anchorId, downstreamNodes, upstream, queue);
+            collectUpstreamForNode(graph, currId, anchorGroupIds, downstreamNodes, upstream, queue);
         }
         return upstream;
     }
@@ -97,7 +129,7 @@ public final class FlowGraphTopologyAnalyzer {
     private static void collectUpstreamForNode(
             FlowGraph graph,
             String currId,
-            String anchorId,
+            Set<String> anchorGroupIds,
             Set<String> downstreamNodes,
             Set<String> upstream,
             Queue<String> queue
@@ -105,11 +137,40 @@ public final class FlowGraphTopologyAnalyzer {
         for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
             if (!edge.toNodeId().equals(currId)) continue;
             String prevId = edge.fromNodeId();
-            if (prevId.equals(anchorId) || (downstreamNodes != null && downstreamNodes.contains(prevId))) continue;
-            if (upstream.add(prevId)) {
-                queue.add(prevId);
+            offerUpstreamNodeAndSiblings(graph, prevId, anchorGroupIds, downstreamNodes, upstream, queue);
+        }
+    }
+
+    private static void offerUpstreamNodeAndSiblings(
+            FlowGraph graph,
+            String nodeId,
+            Set<String> anchorGroupIds,
+            Set<String> downstreamNodes,
+            Set<String> upstream,
+            Queue<String> queue
+    ) {
+        for (String groupMemberId : collectCompoundGroupIds(graph, nodeId)) {
+            if (anchorGroupIds.contains(groupMemberId)) continue;
+            if (downstreamNodes != null && downstreamNodes.contains(groupMemberId)) continue;
+            if (upstream.add(groupMemberId)) {
+                queue.add(groupMemberId);
             }
         }
+    }
+
+    public static Set<String> collectCompoundGroupIds(FlowGraph graph, String nodeId) {
+        if (nodeId == null) return Collections.emptySet();
+        if (graph == null) return Set.of(nodeId);
+        RecipeNode node = graph.findNodeById(nodeId);
+        if (node == null || !node.isCompoundNode()) {
+            return Set.of(nodeId);
+        }
+        Set<String> ids = new LinkedHashSet<>();
+        ids.add(nodeId);
+        for (RecipeNode sibling : graph.findCompoundSiblingNodes(node.getCompoundGroupId())) {
+            ids.add(sibling.getId());
+        }
+        return ids;
     }
 
     public static void collectFeedingProducers(FlowGraph graph, String targetNodeId, int inIdx, Set<RecipeNode> result) {
@@ -185,6 +246,9 @@ public final class FlowGraphTopologyAnalyzer {
             } else if (edge.toNodeId().equals(currId)) {
                 offerConnectedNode(edge.fromNodeId(), connected, queue);
             }
+        }
+        for (String siblingId : collectCompoundGroupIds(graph, currId)) {
+            offerConnectedNode(siblingId, connected, queue);
         }
     }
 
@@ -374,4 +438,3 @@ public final class FlowGraphTopologyAnalyzer {
         }
     }
 }
-

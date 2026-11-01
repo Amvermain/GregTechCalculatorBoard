@@ -36,6 +36,7 @@ public final class LinearEquationSystem {
             if (down != null) orderedNodeIds.addAll(down);
             Set<String> up = com.gtceu.calcboard.api.solver.FlowGraphTopologyAnalyzer.findUpstreamNodes(graph, anchor.getId(), down);
             if (up != null) orderedNodeIds.addAll(up);
+            includeCompoundSiblings(graph, orderedNodeIds);
             includeIntersectingSharedPools(graph, orderedNodeIds);
         } else {
             for (RecipeNode node : graph.getNodes()) {
@@ -50,6 +51,13 @@ public final class LinearEquationSystem {
                 nodeIndexMap.put(id, variableNodeIds.size());
                 variableNodeIds.add(id);
             }
+        }
+    }
+
+    private void includeCompoundSiblings(FlowGraph graph, Set<String> orderedNodeIds) {
+        List<String> snapshot = new ArrayList<>(orderedNodeIds);
+        for (String id : snapshot) {
+            orderedNodeIds.addAll(com.gtceu.calcboard.api.solver.FlowGraphTopologyAnalyzer.collectCompoundGroupIds(graph, id));
         }
     }
 
@@ -135,6 +143,18 @@ public final class LinearEquationSystem {
             equationsB.add(totalCapacity);
             equationLabels.add("shared_pool");
         }
+    }
+
+    public void addCompoundSiblingEquation(String masterId, String siblingId) {
+        Integer masterIdx = nodeIndexMap.get(masterId);
+        Integer siblingIdx = nodeIndexMap.get(siblingId);
+        if (masterIdx == null || siblingIdx == null || masterIdx.equals(siblingIdx)) return;
+        double[] row = new double[variableNodeIds.size()];
+        row[masterIdx] = 1.0;
+        row[siblingIdx] = -1.0;
+        equationsA.add(row);
+        equationsB.add(0.0);
+        equationLabels.add("compound:" + masterId + "=" + siblingId);
     }
 
     public double[][] buildMatrixA() {

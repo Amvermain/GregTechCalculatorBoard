@@ -101,6 +101,23 @@ public class GTCEuRecipeHandler {
         return matchesGTRecipeShape(unwrapRecipe(backing));
     }
 
+    public static ResourceLocation extractRecipeCategoryId(Object emiRecipeObj, Object backing) {
+        if (ModCompatHelper.isEmiLoaded() && emiRecipeObj != null) {
+            ResourceLocation emiCatId = EmiGTCEuHelper.getCategoryId(emiRecipeObj);
+            if (emiCatId != null) return emiCatId;
+        }
+        Object unwrapped = unwrapRecipe(backing != null ? backing : emiRecipeObj);
+        if (unwrapped == null) return null;
+        Field recipeTypeField = RECIPE_TYPE_FIELD_CACHE.get(unwrapped.getClass());
+        if (recipeTypeField == null) return null;
+        try {
+            Object rt = recipeTypeField.get(unwrapped);
+            return rt != null ? MultiblockDetector.extractRecipeTypeId(rt) : null;
+        } catch (ReflectiveOperationException ignored) {
+            return null;
+        }
+    }
+
     public static boolean adaptRecipeDetails(Object emiRecipeObj, Object backing, RecipeDetails details) {
         if (backing == null && emiRecipeObj == null) return false;
 

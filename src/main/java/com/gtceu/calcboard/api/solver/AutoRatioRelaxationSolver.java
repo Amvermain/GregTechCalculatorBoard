@@ -126,7 +126,9 @@ public final class AutoRatioRelaxationSolver {
             ProcessStabilityAnalyzer.DivergenceContext divergenceContext
     ) {
         Map<String, Double> countsMap = new HashMap<>();
-        countsMap.put(anchor.getId(), targetAnchorCount);
+        for (String anchorGroupId : FlowGraphTopologyAnalyzer.collectCompoundGroupIds(graph, anchor.getId())) {
+            countsMap.put(anchorGroupId, targetAnchorCount);
+        }
 
         AutoRatioEngine.solveDownstreamPassRestricted(graph, anchor, countsMap, downstreamNodes, integerCounts);
         applyCalculatedCounts(graph, countsMap, downstreamNodes);
@@ -135,6 +137,9 @@ public final class AutoRatioRelaxationSolver {
         applyCalculatedCounts(graph, countsMap, upstreamNodes);
 
         anchor.setMachineCount(targetAnchorCount);
+        if (anchor.isCompoundNode()) {
+            graph.syncCompoundParameters(anchor);
+        }
     }
 
     private static void applyCalculatedCounts(FlowGraph graph, Map<String, Double> countsMap, Set<String> targetNodeIds) {
@@ -216,5 +221,8 @@ public final class AutoRatioRelaxationSolver {
             ));
         }
         anchor.setMachineCount(targetAnchorCount);
+        if (anchor.isCompoundNode()) {
+            graph.syncCompoundParameters(anchor);
+        }
     }
 }

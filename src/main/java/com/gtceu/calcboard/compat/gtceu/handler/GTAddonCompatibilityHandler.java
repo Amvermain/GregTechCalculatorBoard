@@ -171,23 +171,17 @@ public final class GTAddonCompatibilityHandler {
         boolean isSteamMb = false;
 
         List<AddonCategory> cats = new ArrayList<>();
-        if (!isSteamMb && !node.isGenerator() && node.getEnergyType() != EnergyType.NONE && node.getEnergyType() != EnergyType.KINETIC_SU
-                && (def == null || def.supportsAbility("INPUT_ENERGY") || def.supportsAbility("SUBSTATION_INPUT_ENERGY") || def.supportsAbility("INPUT_LASER") || def.energyHatchSlotCount() > 0 || def.allowedAbilities().isEmpty() || node.getEnergyType() != EnergyType.NONE)) {
+        if (supportsMultiblockEnergyOrDynamoHatch(node, def, isSteamMb)) {
             cats.add(AddonCategory.ENERGY_HATCH);
         }
         if (def == null || !def.allowedAbilities().isEmpty() || def.inputBusSlotCount() > 0 || def.outputBusSlotCount() > 0 || def.inputHatchSlotCount() > 0 || def.outputHatchSlotCount() > 0 || !node.getInputs().isEmpty() || !node.getOutputs().isEmpty() || node.isMultiblock()) {
             cats.add(AddonCategory.HATCH_BUS);
         }
-        boolean supportsCoil = false;
-        if (def != null) {
-            supportsCoil = def.supportsAbility("HEATING_COILS")
-                    || def.coilSlotCount() > 0
-                    || MultiblockDetector.isCoilMultiblock(mbId)
-                    || (GTCEuCoilModifierHelper.getCoilMachineSpec(mbId).kind() != GTCEuCoilModifierHelper.CoilMachineKind.GENERIC);
-        } else {
-            supportsCoil = MultiblockDetector.isCoilMultiblock(mbId)
-                    || (GTCEuCoilModifierHelper.getCoilMachineSpec(mbId).kind() != GTCEuCoilModifierHelper.CoilMachineKind.GENERIC);
-        }
+        boolean supportsCoil = !node.isGenerator()
+                && !com.gtceu.calcboard.compat.start.StarTHellForgeHelper.isHellForge(node)
+                && (MultiblockDetector.isCoilMultiblock(mbId)
+                || GTCEuCoilModifierHelper.getCoilMachineSpec(mbId).kind() != GTCEuCoilModifierHelper.CoilMachineKind.GENERIC
+                || node.getRecipeTemperature() > 0);
         if (supportsCoil) {
             cats.add(AddonCategory.COIL);
         }
@@ -287,8 +281,34 @@ public final class GTAddonCompatibilityHandler {
         return true;
     }
 
+    private static boolean supportsMultiblockEnergyOrDynamoHatch(RecipeNode node, MultiblockStructureDef def, boolean isSteamMb) {
+        if (isSteamMb || node.getEnergyType() == EnergyType.NONE || node.getEnergyType() == EnergyType.KINETIC_SU) {
+            return false;
+        }
+        if (node.isTurbine() || GTCombustionHelper.isCombustionFamily(node)) {
+            return false;
+        }
+        if (def == null || def.energyHatchSlotCount() > 0 || def.allowedAbilities().isEmpty()) {
+            return true;
+        }
+        if (node.isGenerator()) {
+            return def.supportsAbility("OUTPUT_ENERGY")
+                    || def.supportsAbility("SUBSTATION_OUTPUT_ENERGY")
+                    || def.supportsAbility("OUTPUT_LASER")
+                    || def.supportsAbility("LASER_SOURCE_HATCH");
+        }
+        return def.supportsAbility("INPUT_ENERGY")
+                || def.supportsAbility("SUBSTATION_INPUT_ENERGY")
+                || def.supportsAbility("INPUT_LASER")
+                || node.getEnergyType() != EnergyType.NONE;
+    }
+
     private static boolean isEnergyHatchCompatible(RecipeNode node, MachineAddon addon, boolean isGen, boolean isFusion) {
-        if ((!node.isMultiblock() && !isFusion) || isGen) return false;
+        if (!node.isMultiblock() && !isFusion) return false;
+        if (isGen && (node.isTurbine() || GTCombustionHelper.isCombustionFamily(node))) return false;
+        if (addon instanceof GTEnergyHatchAddon eh && eh.isDynamo() != isGen) {
+            return false;
+        }
         if (isFusion && addon instanceof GTEnergyHatchAddon eh && eh.getTier() != node.getTargetTier()) {
             return false;
         }
@@ -297,12 +317,15 @@ public final class GTAddonCompatibilityHandler {
         MultiblockStructureDef def = MultiblockStructureCatalog.getStructure(mbId);
         if (def == null) return true;
         if (!matchesEnergyHatchAbilities(def, addon, node, mbId, isGen)) return false;
-        if (def.energyHatchSlotCount() == 0 && (MultiblockDetector.isSteamMultiblock(mbId) || isGen)) return false;
+        if (def.energyHatchSlotCount() == 0 && MultiblockDetector.isSteamMultiblock(mbId)) return false;
         return true;
     }
 
     private static boolean matchesEnergyHatchAbilities(MultiblockStructureDef def, MachineAddon addon, RecipeNode node, ResourceLocation mbId, boolean isGen) {
         if (addon instanceof GTEnergyHatchAddon eh) {
+            if (isGen) {
+                return matchesGeneratorDynamoAbilities(def, eh);
+            }
             if (eh.isLaser()) {
                 return def.supportsAbility("INPUT_LASER") || def.allowedAbilities().isEmpty();
             }
@@ -313,10 +336,28 @@ public final class GTAddonCompatibilityHandler {
                 return true;
             }
             boolean isSteam = (node.getSteamMode() != null && node.getSteamMode().isSteam()) || MultiblockDetector.isSteamMultiblock(mbId);
-            return !isSteam && !isGen && node.getEnergyType() != EnergyType.NONE && node.getEnergyType() != EnergyType.KINETIC_SU;
+            return !isSteam && node.getEnergyType() != EnergyType.NONE && node.getEnergyType() != EnergyType.KINETIC_SU;
         }
         if (def.allowedAbilities().isEmpty()) return true;
+        if (isGen) {
+            return def.supportsAbility("OUTPUT_ENERGY") || def.supportsAbility("OUTPUT_LASER") || def.supportsAbility("SUBSTATION_OUTPUT_ENERGY");
+        }
         return def.supportsAbility("INPUT_ENERGY") || def.supportsAbility("INPUT_LASER") || def.supportsAbility("SUBSTATION_INPUT_ENERGY");
+    }
+
+    private static boolean matchesGeneratorDynamoAbilities(MultiblockStructureDef def, GTEnergyHatchAddon eh) {
+        if (eh.isLaser()) {
+            return def.supportsAbility("OUTPUT_LASER")
+                    || def.supportsAbility("LASER_SOURCE_HATCH")
+                    || def.allowedAbilities().isEmpty();
+        }
+        if (eh.isSubstation()) {
+            return def.supportsAbility("SUBSTATION_OUTPUT_ENERGY")
+                    || def.allowedAbilities().isEmpty();
+        }
+        return def.supportsAbility("OUTPUT_ENERGY")
+                || def.energyHatchSlotCount() > 0
+                || def.allowedAbilities().isEmpty();
     }
 
     private static boolean isHatchBusCompatible(RecipeNode node, MachineAddon addon) {
@@ -452,7 +493,10 @@ public final class GTAddonCompatibilityHandler {
         if (def == null) return true;
         if (addon.getCategory() == MachineAddon.Category.COIL && def.coilSlotCount() == 0 && !MultiblockDetector.isCoilMultiblock(mbWs)) return false;
         if (addon.getCategory() == MachineAddon.Category.MAINTENANCE && def.maintenanceSlotCount() == 0 && !def.supportsAbility("MAINTENANCE") && def.allowedAbilities() != null && !def.allowedAbilities().isEmpty()) return false;
-        if (addon.getCategory() == MachineAddon.Category.ENERGY_HATCH && def.energyHatchSlotCount() == 0 && !def.supportsAbility("INPUT_ENERGY") && !def.supportsAbility("SUBSTATION_INPUT_ENERGY") && (MultiblockDetector.isSteamMultiblock(mbWs) || node.isGenerator())) return false;
+        if (addon.getCategory() == MachineAddon.Category.ENERGY_HATCH && def.energyHatchSlotCount() == 0
+                && !def.supportsAbility("INPUT_ENERGY") && !def.supportsAbility("SUBSTATION_INPUT_ENERGY")
+                && !def.supportsAbility("OUTPUT_ENERGY") && !def.supportsAbility("SUBSTATION_OUTPUT_ENERGY")
+                && !def.supportsAbility("OUTPUT_LASER") && MultiblockDetector.isSteamMultiblock(mbWs)) return false;
         if (addon.getCategory() == MachineAddon.Category.HATCH_BUS && !isHatchBusCompatible(node, addon)) return false;
         return true;
     }

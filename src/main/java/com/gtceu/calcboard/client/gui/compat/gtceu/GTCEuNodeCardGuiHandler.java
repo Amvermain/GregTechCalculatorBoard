@@ -62,7 +62,7 @@ public class GTCEuNodeCardGuiHandler {
 
     public static boolean isCoilMultiblock(RecipeNode node) {
         if (node == null || !node.isMultiblock()) return false;
-        if (isFusionMachine(node)) return false;
+        if (isFusionMachine(node) || com.gtceu.calcboard.compat.start.StarTHellForgeHelper.isHellForge(node)) return false;
         if (node.getMachineIcon() != null) {
             return MultiblockDetector.isCoilMultiblock(node.getMachineIcon())
                     || GTCEuCoilModifierHelper.getCoilMachineSpec(node.getMachineIcon()).kind() != GTCEuCoilModifierHelper.CoilMachineKind.GENERIC;
@@ -142,7 +142,9 @@ public class GTCEuNodeCardGuiHandler {
                 }
             }
             GTVoltageTier reqTier = GTNodeValidator.getRequiredRecipeTier(node);
-            boolean isTierDeficit = reqTier != null && tier != null && tier.ordinal() < reqTier.ordinal();
+            boolean isTierDeficit = (node.isGenerator() && node.isMultiblock() && GTAddonCompatibilityHandler.requiresEnergyHatch(node))
+                    ? !GTNodeValidator.isGeneratorDynamoCapacitySufficient(node)
+                    : (reqTier != null && tier != null && tier.ordinal() < reqTier.ordinal());
             int tierColor = (!isOperational || isTierDeficit) ? 0xFFFF8888 : (tier != null ? tier.getColor() : 0xFFFFFFFF);
             String prefix = node.isMultiblock() ? "▦ " : "";
             if (isTierDeficit) {
@@ -318,7 +320,11 @@ public class GTCEuNodeCardGuiHandler {
 
     public boolean handleControlClick(NodeWidget widget, RecipeNode node, double mouseX, double mouseY, int button) {
         if (node == null) return false;
-        if (handleClickCachedButtons(widget, node, mouseX, mouseY)) {
+        if (hasCachedButtons(widget)) {
+            if (handleClickCachedButtons(widget, node, mouseX, mouseY)) {
+                return true;
+            }
+        } else if (handleClickUncachedBadges(widget, node, mouseX, mouseY)) {
             return true;
         }
         return fallbackHandler.handleControlClick(widget, node, mouseX, mouseY, button);
@@ -332,6 +338,24 @@ public class GTCEuNodeCardGuiHandler {
             if (tryClickRow2Button(widget, node, btn, x, row2Y, mouseX, mouseY)) {
                 return true;
             }
+        }
+        return false;
+    }
+
+    private boolean handleClickUncachedBadges(NodeWidget widget, RecipeNode node, double mouseX, double mouseY) {
+        int x = (int) node.getPosX();
+        int row2Y = (int) node.getPosY() + 20 + 6 + 18;
+        if (mouseY < row2Y || mouseY > row2Y + 14) return false;
+        int nextCtrlX = calculateTierButtonEndX(node, x);
+        FlowGraph graph = (widget != null && widget.getParent() != null) ? widget.getParent().getGraph() : node.getParentGraph();
+        List<NodeBadge> badges = NodeBadgeRegistry.getBadgesForNode(node, graph);
+        for (NodeBadge badge : badges) {
+            int badgeW = safeFontWidth(badge.text(), 30) + 8;
+            if (nextCtrlX + badgeW > x + node.getCardWidth() - 46) break;
+            if (mouseX >= nextCtrlX && mouseX <= nextCtrlX + badgeW) {
+                return triggerBadgeClick(widget, badge) || handleSpecialBadgeClick(widget, node, badge);
+            }
+            nextCtrlX += badgeW + 3;
         }
         return false;
     }
@@ -394,14 +418,17 @@ public class GTCEuNodeCardGuiHandler {
 
     private void refreshWidgetAndFrame(NodeWidget widget, RecipeNode node) {
         widget.invalidateCache();
-        if (widget.getParent() != null) {
-            var frame = widget.getParent().getGraph().findFrameEnclosingNode(node);
-            if (frame != null && frame.isSharedMachineFrame()) {
-                frame.syncHardwareConfig(node, widget.getParent().getGraph());
-                widget.getParent().rebuildBoardWidgets();
-            }
-            widget.getParent().markSummaryDirty();
+        if (widget.getParent() == null) return;
+        if (node != null && node.isCompoundNode() && widget.getParent().getGraph() != null) {
+            widget.getParent().getGraph().syncCompoundParameters(node);
+            widget.getParent().rebuildBoardWidgets();
         }
+        var frame = widget.getParent().getGraph().findFrameEnclosingNode(node);
+        if (frame != null && frame.isSharedMachineFrame()) {
+            frame.syncHardwareConfig(node, widget.getParent().getGraph());
+            widget.getParent().rebuildBoardWidgets();
+        }
+        widget.getParent().markSummaryDirty();
     }
 
     private boolean triggerBadgeClick(NodeWidget widget, NodeBadge badge) {
@@ -409,7 +436,7 @@ public class GTCEuNodeCardGuiHandler {
         widget.commitCountEdit();
         badge.onClick().run();
         playButtonClickSound();
-        widget.invalidateCache();
+        refreshWidgetAndFrame(widget, widget.getNode());
         notifyWidgetParentUpdated(widget);
         return true;
     }

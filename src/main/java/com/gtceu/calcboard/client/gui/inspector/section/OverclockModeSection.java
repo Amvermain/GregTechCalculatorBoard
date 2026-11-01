@@ -91,12 +91,15 @@ public class OverclockModeSection implements IInspectorSection {
     }
 
     private void syncSharedFrame() {
-        if (screen != null && screen.getGraph() != null) {
-            var frame = screen.getGraph().findFrameEnclosingNode(node);
-            if (frame != null && frame.isSharedMachineFrame()) {
-                frame.syncHardwareConfig(node, screen.getGraph());
-                screen.rebuildBoardWidgets();
-            }
+        if (screen == null || screen.getGraph() == null) return;
+        if (node != null && node.isCompoundNode()) {
+            screen.getGraph().syncCompoundParameters(node);
+            screen.rebuildBoardWidgets();
+        }
+        var frame = screen.getGraph().findFrameEnclosingNode(node);
+        if (frame != null && frame.isSharedMachineFrame()) {
+            frame.syncHardwareConfig(node, screen.getGraph());
+            screen.rebuildBoardWidgets();
         }
     }
 }

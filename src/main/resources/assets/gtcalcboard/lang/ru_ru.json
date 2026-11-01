@@ -1655,5 +1655,14 @@
   "gui.gtcalcboard.bacteria_stats.preset_initial": "Дикая колония (Э1 / М5)",
   "gui.gtcalcboard.bacteria_stats.preview_title": "Обзор потоков за цикл",
   "gui.gtcalcboard.bacteria_stats.inputs_header": "Затраты за цикл",
-  "gui.gtcalcboard.bacteria_stats.outputs_header": "Выход за цикл"
+  "gui.gtcalcboard.bacteria_stats.outputs_header": "Выход за цикл",
+  "gui.gtcalcboard.hellforge.crucible_heat": "Нагрев тигля (жидкость)",
+  "gui.gtcalcboard.badge.hellforge_fluid": "Нагревающая жидкость: %s (%s MK)",
+  "gui.gtcalcboard.badge.hellforge_required_temp": "Требуемый нагрев: %s MK",
+  "gui.gtcalcboard.hellforge.infernal_parallel_tooltip": "Инфернальная параллель: %dx (+%d ур. сверх мин.)",
+  "gui.gtcalcboard.hellforge.click_to_cycle_fluid": "[Клик] Сменить нагревающую жидкость",
+  "gui.gtcalcboard.hellforge.temp_deficit_title": "Недостаточный нагрев тигля",
+  "gui.gtcalcboard.node_warning.hellforge_temp_deficit": "Нагрев тигля (%d MK) ниже требуемого по рецепту (%d MK)",
+  "gui.gtcalcboard.hellforge.fluid_max_temp": "Макс. температура: %s MK (+%d MK/B)",
+  "gui.gtcalcboard.hellforge.active_fluid": "Активная нагревающая жидкость"
 }

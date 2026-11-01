@@ -1,15 +1,31 @@
 package com.gtceu.calcboard.compat.gtceu;
 
+import com.gtceu.calcboard.api.catalog.CategoryCapability;
+import com.gtceu.calcboard.api.catalog.CategoryCapabilityMatrix;
+import com.gtceu.calcboard.api.catalog.MultiblockDetector;
 import com.gtceu.calcboard.api.model.CompoundRecipeBuilder;
 import com.gtceu.calcboard.api.model.IngredientStack;
-import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.model.RecipeDetails;
+import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.model.RecipeSpec;
+import com.gtceu.calcboard.api.preset.CategoryMachinePresetManager;
+import com.gtceu.calcboard.api.property.RecipePropertyExtractorPipeline;
+import com.gtceu.calcboard.api.spi.viewer.IRecipeViewerBridge;
+import com.gtceu.calcboard.api.spi.viewer.RecipeViewerBridgeRegistry;
+import com.gtceu.calcboard.api.type.GTVoltageTier;
+import com.gtceu.calcboard.api.util.RecipeConversionHelper;
+import com.gtceu.calcboard.compat.gtceu.handler.GTWorkstationSelector;
+import com.gtceu.calcboard.compat.gtceu.helper.CoilHelper;
+import com.gtceu.calcboard.compat.gtceu.helper.GTCEuWorkstationResolver;
+import com.gtceu.calcboard.compat.gtceu.helper.ReflectorHelper;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * Decomposes multi-step progressive (layered) recipes into sequential compound clusters.
@@ -25,6 +41,45 @@ public final class GTCEuLayeredRecipeExtractor {
     private static final Method IS_LAYERED_TYPE;
     private static final Field RECIPE_FIELD_IN_EMI;
 
+    private static final ClassValue<Method> DIRECT_STEPS_METHOD_CACHE = new ClassValue<>() {
+        @Override
+        protected Method computeValue(Class<?> type) {
+            try {
+                Method m = type.getMethod("getLayeredSteps");
+                m.setAccessible(true);
+                return m;
+            } catch (ReflectiveOperationException ignored) {
+                return null;
+            }
+        }
+    };
+
+    private static final ClassValue<Method> IS_LAYERED_METHOD_CACHE = new ClassValue<>() {
+        @Override
+        protected Method computeValue(Class<?> type) {
+            try {
+                Method m = type.getMethod("isLayered");
+                m.setAccessible(true);
+                return m;
+            } catch (ReflectiveOperationException ignored) {
+                return null;
+            }
+        }
+    };
+
+    private static final ClassValue<Field> RECIPE_TYPE_FIELD_CACHE = new ClassValue<>() {
+        @Override
+        protected Field computeValue(Class<?> type) {
+            try {
+                Field f = type.getField("recipeType");
+                f.setAccessible(true);
+                return f;
+            } catch (ReflectiveOperationException ignored) {
+                return null;
+            }
+        }
+    };
+
     static {
         Method hasSteps = null;
         Method getStepsRecipe = null;
@@ -35,10 +90,8 @@ public final class GTCEuLayeredRecipeExtractor {
             for (Method m : helperClass.getMethods()) {
                 if (m.getParameterCount() != 1) continue;
                 Class<?> pType = m.getParameterTypes()[0];
-                if ("hasLayeredSteps".equals(m.getName())) {
-                    if (!CompoundTag.class.isAssignableFrom(pType)) {
-                        hasSteps = m;
-                    }
+                if ("hasLayeredSteps".equals(m.getName()) && !CompoundTag.class.isAssignableFrom(pType)) {
+                    hasSteps = m;
                 } else if ("getLayeredSteps".equals(m.getName())) {
                     if (CompoundTag.class.isAssignableFrom(pType)) {
                         getStepsTag = m;
@@ -95,7 +148,6 @@ public final class GTCEuLayeredRecipeExtractor {
         return extractLayeredSteps(backingRecipe, null);
     }
 
-    @SuppressWarnings("unchecked")
     public static List<Object> extractLayeredSteps(Object backingRecipe, Object recipeObj) {
         Object candidate = resolveBackingRecipe(backingRecipe, recipeObj);
         if (candidate == null) return Collections.emptyList();
@@ -114,7 +166,7 @@ public final class GTCEuLayeredRecipeExtractor {
             }
         }
 
-        return Collections.emptyList();
+        return invokeDirectGetLayeredSteps(candidate);
     }
 
     public static CompoundRecipeBuilder.CompoundCluster buildCompoundCluster(
@@ -125,7 +177,7 @@ public final class GTCEuLayeredRecipeExtractor {
             double startX,
             double startY
     ) {
-        return buildCompoundCluster(backingRecipe, null, machineName, machineIcon, tier, startX, startY);
+        return buildCompoundCluster(backingRecipe, null, machineName, machineIcon, null, tier, startX, startY);
     }
 
     public static CompoundRecipeBuilder.CompoundCluster buildCompoundCluster(
@@ -133,6 +185,19 @@ public final class GTCEuLayeredRecipeExtractor {
             Object recipeObj,
             String machineName,
             ResourceLocation machineIcon,
+            GTVoltageTier tier,
+            double startX,
+            double startY
+    ) {
+        return buildCompoundCluster(backingRecipe, recipeObj, machineName, machineIcon, null, tier, startX, startY);
+    }
+
+    public static CompoundRecipeBuilder.CompoundCluster buildCompoundCluster(
+            Object backingRecipe,
+            Object recipeObj,
+            String machineName,
+            ResourceLocation machineIcon,
+            ResourceLocation preferredWorkstation,
             GTVoltageTier tier,
             double startX,
             double startY
@@ -152,6 +217,7 @@ public final class GTCEuLayeredRecipeExtractor {
         double fallbackDurationPerStep = totalDurationTicks > 0.0 ? totalDurationTicks / stepRecipes.size() : 20.0;
 
         List<CompoundRecipeBuilder.LayerSpec> layers = new ArrayList<>();
+        List<Object> validSteps = new ArrayList<>();
         double accumulatedDuration = 0.0;
         int stepIndex = 1;
 
@@ -170,13 +236,170 @@ public final class GTCEuLayeredRecipeExtractor {
 
             String roman = CompoundRecipeBuilder.formatRoman(stepIndex);
             layers.add(new CompoundRecipeBuilder.LayerSpec("Layer " + roman, stepDuration, stepEUt, stepInputs, stepOutputs));
+            validSteps.add(stepObj);
             stepIndex++;
         }
 
         if (layers.size() < 2) return null;
 
         double finalDuration = accumulatedDuration > 0.0 ? accumulatedDuration : totalDurationTicks;
-        return CompoundRecipeBuilder.build(machineName, machineIcon, finalDuration, baseEUt, effectiveTier, layers, startX, startY);
+        CompoundRecipeBuilder.CompoundCluster cluster = CompoundRecipeBuilder.build(
+                machineName, machineIcon, finalDuration, baseEUt, effectiveTier, layers, startX, startY
+        );
+        configureLayerNodes(cluster, validSteps, resolvedRecipe, recipeObj, machineIcon, preferredWorkstation);
+        return cluster;
+    }
+
+    private static void configureLayerNodes(
+            CompoundRecipeBuilder.CompoundCluster cluster,
+            List<Object> stepRecipes,
+            Object resolvedRecipe,
+            Object recipeObj,
+            ResourceLocation initialIcon,
+            ResourceLocation preferredWorkstation
+    ) {
+        if (cluster == null || cluster.nodes().isEmpty()) return;
+
+        ResourceLocation categoryId = GTCEuRecipeHandler.extractRecipeCategoryId(recipeObj, resolvedRecipe);
+        List<ResourceLocation> workstations = resolveLayeredWorkstations(categoryId, recipeObj, initialIcon);
+        boolean multiblockOnly = isMultiblockOnly(categoryId, workstations);
+
+        List<RecipeNode> nodes = cluster.nodes();
+        for (int i = 0; i < nodes.size(); i++) {
+            Object stepObj = i < stepRecipes.size() ? stepRecipes.get(i) : resolvedRecipe;
+            configureSingleLayerNode(nodes.get(i), stepObj, categoryId, workstations, multiblockOnly, preferredWorkstation);
+        }
+    }
+
+    private static void configureSingleLayerNode(
+            RecipeNode node,
+            Object stepObj,
+            ResourceLocation categoryId,
+            List<ResourceLocation> workstations,
+            boolean multiblockOnly,
+            ResourceLocation preferredWorkstation
+    ) {
+        if (categoryId != null) {
+            node.setRecipeCategoryId(categoryId);
+        }
+        if (!workstations.isEmpty()) {
+            node.setAvailableWorkstations(new ArrayList<>(workstations));
+        }
+
+        if (multiblockOnly) {
+            node.setMultiblock(true);
+            ResourceLocation targetWs = preferredWorkstation != null
+                    ? preferredWorkstation
+                    : GTWorkstationSelector.getPreferredMultiblockWorkstation(node, node.getAvailableWorkstations());
+            if (targetWs != null) {
+                node.setMachineIcon(targetWs);
+            }
+        }
+
+        CompoundTag stepDataTag = GTCEuRecipeHandler.extractRecipeDataTag(stepObj);
+        RecipePropertyExtractorPipeline.extractAll(stepObj, stepDataTag, categoryId, node.getProperties());
+        autoProvisionLayerHardware(node, preferredWorkstation);
+        refreshLayerBaseSpec(node);
+    }
+
+    private static void autoProvisionLayerHardware(RecipeNode node, ResourceLocation preferredWorkstation) {
+        int reqTemp = node.getProperties().get(GTCEuProperties.EBF_TEMPERATURE);
+        if (reqTemp <= 0) reqTemp = node.getRecipeTemperature();
+        if (reqTemp > 0) {
+            var coil = CoilHelper.getCoilForTemperature(reqTemp);
+            if (coil != null) {
+                CoilHelper.installCoil(node, coil);
+            }
+        }
+
+        int reqReflector = node.getProperties().get(GTCEuProperties.REQUIRED_REFLECTOR_TIER);
+        if (reqReflector > 0) {
+            ReflectorHelper.installReflector(node, reqReflector);
+        }
+
+        com.gtceu.calcboard.compat.gtceu.helper.GTCEuMachineLifecycleHandler.ensureDefaultMachineTraits(node, node.getMachineIcon());
+
+        if (preferredWorkstation == null) {
+            CategoryMachinePresetManager.getInstance().applyPresetIfPresent(node);
+        }
+
+        GTVoltageTier currentTier = node.getTargetTier() != null ? node.getTargetTier() : node.getRecipeTier();
+        if (currentTier != null) {
+            node.setTargetTier(GTCEuWorkstationResolver.sanitizeTargetTier(node, currentTier));
+        }
+    }
+
+    private static void refreshLayerBaseSpec(RecipeNode node) {
+        node.setBaseSpec(RecipeSpec.of(
+                node.getId(),
+                node.getRecipeCategoryId(),
+                node.getBaseDurationTicks(),
+                node.getBaseEUt(),
+                node.getInputs(),
+                node.getOutputs()
+        ));
+    }
+
+    private static List<ResourceLocation> resolveLayeredWorkstations(
+            ResourceLocation categoryId,
+            Object recipeObj,
+            ResourceLocation initialIcon
+    ) {
+        List<ResourceLocation> workstations = new ArrayList<>();
+        CategoryCapability cap = categoryId != null ? CategoryCapabilityMatrix.getInstance().getCapability(categoryId) : null;
+        if (cap != null && cap.availableWorkstations() != null) {
+            for (ResourceLocation ws : cap.availableWorkstations()) {
+                addUniqueWorkstation(workstations, ws);
+            }
+        }
+
+        IRecipeViewerBridge bridge = RecipeViewerBridgeRegistry.getActiveBridge();
+        if (bridge != null && recipeObj != null) {
+            for (ResourceLocation ws : bridge.findAllWorkstations(recipeObj)) {
+                addUniqueWorkstation(workstations, ws);
+            }
+        }
+
+        if (categoryId != null) {
+            for (ResourceLocation ws : GTCEuWorkstationResolver.deductMultiblocksFromGTRegistries(categoryId)) {
+                addUniqueWorkstation(workstations, ws);
+            }
+        }
+
+        if (cap != null && cap.hasMultiblockOption() && !cap.hasSingleblockOption()) {
+            workstations.removeIf(ws -> !MultiblockDetector.isMultiblock(ws));
+        }
+
+        if (workstations.isEmpty() && initialIcon != null) {
+            addUniqueWorkstation(workstations, initialIcon);
+        }
+        return workstations;
+    }
+
+    private static void addUniqueWorkstation(List<ResourceLocation> workstations, ResourceLocation ws) {
+        if (ws == null || RecipeConversionHelper.isIgnoredWorkstation(ws)) return;
+        if (!workstations.contains(ws)) {
+            workstations.add(ws);
+        }
+    }
+
+    private static boolean isMultiblockOnly(ResourceLocation categoryId, List<ResourceLocation> workstations) {
+        if (categoryId != null) {
+            CategoryCapability cap = CategoryCapabilityMatrix.getInstance().getCapability(categoryId);
+            if (cap != null && cap.hasMultiblockOption() && !cap.hasSingleblockOption()) {
+                return true;
+            }
+        }
+        boolean hasMulti = false;
+        boolean hasSingle = false;
+        for (ResourceLocation ws : workstations) {
+            if (MultiblockDetector.isMultiblock(ws) || RecipeNode.isMultiblockWorkstation(ws)) {
+                hasMulti = true;
+            } else {
+                hasSingle = true;
+            }
+        }
+        return hasMulti && !hasSingle;
     }
 
     private static Object resolveBackingRecipe(Object backingRecipe, Object recipeObj) {
@@ -208,16 +431,19 @@ public final class GTCEuLayeredRecipeExtractor {
     }
 
     private static boolean checkRecipeTypeIsLayered(Object recipe) {
-        if (IS_LAYERED_TYPE == null || recipe == null) return false;
+        if (recipe == null) return false;
+        Field typeField = RECIPE_TYPE_FIELD_CACHE.get(recipe.getClass());
+        if (typeField == null) return false;
         try {
-            Field typeField = recipe.getClass().getField("recipeType");
             Object recipeType = typeField.get(recipe);
-            if (recipeType != null) {
-                Object res = IS_LAYERED_TYPE.invoke(recipeType);
-                return res instanceof Boolean b && b;
-            }
-        } catch (Throwable ignored) {}
-        return false;
+            if (recipeType == null) return false;
+            Method method = IS_LAYERED_TYPE != null ? IS_LAYERED_TYPE : IS_LAYERED_METHOD_CACHE.get(recipeType.getClass());
+            if (method == null) return false;
+            Object res = method.invoke(recipeType);
+            return res instanceof Boolean b && b;
+        } catch (Throwable ignored) {
+            return false;
+        }
     }
 
     @SuppressWarnings("unchecked")
@@ -249,6 +475,20 @@ public final class GTCEuLayeredRecipeExtractor {
         if (CALCULATE_RECIPE_STEPS == null || recipe == null) return Collections.emptyList();
         try {
             Object res = CALCULATE_RECIPE_STEPS.invoke(null, recipe);
+            if (res instanceof List<?> list && !list.isEmpty()) {
+                return (List<Object>) list;
+            }
+        } catch (Throwable ignored) {}
+        return Collections.emptyList();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<Object> invokeDirectGetLayeredSteps(Object recipe) {
+        if (recipe == null) return Collections.emptyList();
+        Method directMethod = DIRECT_STEPS_METHOD_CACHE.get(recipe.getClass());
+        if (directMethod == null) return Collections.emptyList();
+        try {
+            Object res = directMethod.invoke(recipe);
             if (res instanceof List<?> list && !list.isEmpty()) {
                 return (List<Object>) list;
             }

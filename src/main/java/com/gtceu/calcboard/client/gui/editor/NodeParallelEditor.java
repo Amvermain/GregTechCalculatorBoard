@@ -40,17 +40,7 @@ public class NodeParallelEditor {
         try {
             int parsed = Integer.parseInt(text);
             if (parsed >= 1) {
-                int newVal = Math.min(65536, parsed);
-                if (oldVal != newVal) {
-                    widget.getNode().setParallel(newVal);
-                    if (widget.getParent() != null) {
-                        widget.getParent().recordCommand(BoardCommand.ModifyPropertyCommand.parallel(
-                            widget.getNode().getId(),
-                            oldVal,
-                            newVal
-                        ));
-                    }
-                }
+                applyParallelChange(oldVal, Math.min(65536, parsed), true);
             }
         } catch (NumberFormatException ignored) {}
 
@@ -106,13 +96,9 @@ public class NodeParallelEditor {
         if (fineStep) {
             next = Math.max(1, Math.min(65536, cur + direction));
         } else {
-            if (direction > 0) {
-                next = Math.min(65536, cur * 2);
-            } else {
-                next = Math.max(1, cur / 2);
-            }
+            next = direction > 0 ? Math.min(65536, cur * 2) : Math.max(1, cur / 2);
         }
-        widget.getNode().setParallel(next);
+        applyParallelChange(cur, next, false);
         widget.invalidateCache();
     }
 
@@ -122,19 +108,23 @@ public class NodeParallelEditor {
         var adapter = ModAdapterRegistry.getAdapterForNode(node);
         int maxPar = adapter != null ? adapter.getMaxParallelCapacity(node) : 1;
         if (maxPar >= 1) {
-            int oldVal = node.getParallel();
-            if (oldVal != maxPar) {
-                node.setParallel(maxPar);
-                if (widget.getParent() != null) {
-                    widget.getParent().recordCommand(BoardCommand.ModifyPropertyCommand.parallel(
-                        node.getId(),
-                        oldVal,
-                        maxPar
-                    ));
-                    widget.getParent().markSummaryDirty();
-                }
-                widget.invalidateCache();
-            }
+            applyParallelChange(node.getParallel(), maxPar, true);
         }
+    }
+
+    private void applyParallelChange(int oldVal, int newVal, boolean recordHistory) {
+        if (oldVal == newVal || widget.getNode() == null) return;
+        var node = widget.getNode();
+        node.setParallel(newVal);
+        widget.invalidateCache();
+        if (widget.getParent() == null) return;
+        if (recordHistory) {
+            widget.getParent().recordCommand(BoardCommand.ModifyPropertyCommand.parallel(node.getId(), oldVal, newVal));
+        }
+        if (node.isCompoundNode() && widget.getParent().getGraph() != null) {
+            widget.getParent().getGraph().syncCompoundParameters(node);
+            widget.getParent().rebuildBoardWidgets();
+        }
+        widget.getParent().markSummaryDirty();
     }
 }

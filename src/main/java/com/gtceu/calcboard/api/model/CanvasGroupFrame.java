@@ -619,32 +619,32 @@ public class CanvasGroupFrame {
         }
         for (RecipeNode target : getEnclosedNodes(graph)) {
             if (target == null || target.isReroute() || target == sourceNode) continue;
-            if (sourceNode.getMachineIcon() != null) {
-                target.setMachineIcon(sourceNode.getMachineIcon());
-            }
-            target.setMultiblock(sourceNode.isMultiblock());
-            target.setTargetTier(sourceNode.getTargetTier());
-            target.setSteamMode(sourceNode.getSteamMode());
-            target.setOverclockMode(sourceNode.getOverclockMode());
-            target.setParallel(sourceNode.getParallel());
-
-            // Addons
-            target.getAddons().clear();
-            for (com.gtceu.calcboard.api.catalog.MachineAddon addon : sourceNode.getAddons()) {
-                if (addon != null) {
-                    target.getAddons().add(addon.copy());
-                }
-            }
-
-            // Node Property Store
-            target.getProperties().copyFrom(sourceNode.getProperties());
-
-            // Turbine & Boiler Specifics
-            target.setRotorName(sourceNode.getRotorName());
-            target.setRotorEfficiency(sourceNode.getRotorEfficiency());
-            target.setRotorPower(sourceNode.getRotorPower());
-            target.setBoilerThrottle(sourceNode.getBoilerThrottle());
+            copyHardwareTargetState(sourceNode, target);
         }
+    }
+
+    private void copyHardwareTargetState(RecipeNode sourceNode, RecipeNode target) {
+        if (sourceNode.getMachineIcon() != null) {
+            target.setMachineIcon(sourceNode.getMachineIcon());
+        }
+        target.setMultiblock(sourceNode.isMultiblock());
+        target.getAddons().clear();
+        for (com.gtceu.calcboard.api.catalog.MachineAddon addon : sourceNode.getAddons()) {
+            if (addon != null) {
+                target.getAddons().add(addon.copy());
+            }
+        }
+        target.getProperties().copyFrom(sourceNode.getProperties());
+        target.setTargetTier(sourceNode.getTargetTier());
+        target.setSteamMode(sourceNode.getSteamMode());
+        target.setOverclockMode(sourceNode.getOverclockMode());
+        target.setParallel(sourceNode.getParallel());
+        target.setRotorName(sourceNode.getRotorName());
+        target.setRotorEfficiency(sourceNode.getRotorEfficiency());
+        target.setRotorPower(sourceNode.getRotorPower());
+        target.setBoilerThrottle(sourceNode.getBoilerThrottle());
+        target.markOverclockDirty();
+        target.markOperationalDirty();
     }
 
     public ResourceLocation getSharedMachineIcon(FlowGraph graph) {

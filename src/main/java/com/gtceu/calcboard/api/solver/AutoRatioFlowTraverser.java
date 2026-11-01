@@ -262,8 +262,9 @@ public final class AutoRatioFlowTraverser {
     public static boolean isPortDrivenByDownstreamChain(FlowGraph graph, String consumerId, int inIdx, String anchorId, Map<String, Double> countsMap) {
         Set<RecipeNode> feeders = new HashSet<>();
         FlowGraphTopologyAnalyzer.collectFeedingProducers(graph, consumerId, inIdx, feeders);
+        Set<String> anchorGroupIds = FlowGraphTopologyAnalyzer.collectCompoundGroupIds(graph, anchorId);
         for (RecipeNode feeder : feeders) {
-            if (feeder.getId().equals(anchorId) || countsMap.containsKey(feeder.getId())) {
+            if (anchorGroupIds.contains(feeder.getId()) || countsMap.containsKey(feeder.getId())) {
                 return true;
             }
         }

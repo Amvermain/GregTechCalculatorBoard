@@ -135,6 +135,12 @@ public class BoilerThrottleSection implements IInspectorSection {
             mc.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
         }
         if (widget != null) widget.invalidateCache();
-        if (screen != null) screen.markSummaryDirty();
+        if (screen != null) {
+            if (node.isCompoundNode() && screen.getGraph() != null) {
+                screen.getGraph().syncCompoundParameters(node);
+                screen.rebuildBoardWidgets();
+            }
+            screen.markSummaryDirty();
+        }
     }
 }

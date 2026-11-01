@@ -1655,5 +1655,14 @@
   "gui.gtcalcboard.bacteria_stats.preset_initial": "초기 배양체 (생산 1 / 대사 5)",
   "gui.gtcalcboard.bacteria_stats.preview_title": "실시간 사이클 요약",
   "gui.gtcalcboard.bacteria_stats.inputs_header": "사이클당 입력 자원",
-  "gui.gtcalcboard.bacteria_stats.outputs_header": "사이클당 출력 유체"
+  "gui.gtcalcboard.bacteria_stats.outputs_header": "사이클당 출력 유체",
+  "gui.gtcalcboard.hellforge.crucible_heat": "도가니 열기 (가열 유체)",
+  "gui.gtcalcboard.badge.hellforge_fluid": "가열 유체: %s (%s MK)",
+  "gui.gtcalcboard.badge.hellforge_required_temp": "필요 열기: %s MK",
+  "gui.gtcalcboard.hellforge.infernal_parallel_tooltip": "인퍼널 병렬: %dx (최소 열기 대비 +%d단계)",
+  "gui.gtcalcboard.hellforge.click_to_cycle_fluid": "[클릭] 가열 유체 단계 변경",
+  "gui.gtcalcboard.hellforge.temp_deficit_title": "도가니 열기 부족",
+  "gui.gtcalcboard.node_warning.hellforge_temp_deficit": "설정된 도가니 열기(%d MK)가 레시피 요구 열기(%d MK)보다 낮습니다",
+  "gui.gtcalcboard.hellforge.fluid_max_temp": "최대 온도: %s MK (+%d MK/B)",
+  "gui.gtcalcboard.hellforge.active_fluid": "현재 선택된 가열 유체"
 }

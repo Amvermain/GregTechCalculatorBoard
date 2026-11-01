@@ -112,4 +112,31 @@ public class TeamBoardStorageTest {
         assertEquals("Team 1", loaded.getWorkspace(team1).getTeamName());
         assertEquals("Team 2", loaded.getWorkspace(team2).getTeamName());
     }
+
+    @Test
+    public void testTeamWorkspaceNameUpdatesOnRenameAndPersists() {
+        TeamBoardSavedData savedData = new TeamBoardSavedData();
+        UUID teamId = UUID.randomUUID();
+
+        TeamWorkspaceData initialWs = savedData.getOrCreateWorkspace(teamId, "Original FTB Party");
+        initialWs.addOrUpdatePage(new TeamWorkspacePage("page_chem", "Chemical Line"));
+        savedData.setDirty(false);
+
+        TeamWorkspaceData updatedWs = savedData.getOrCreateWorkspace(teamId, "Renamed FTB Party");
+        assertSame(initialWs, updatedWs);
+        assertEquals("Renamed FTB Party", updatedWs.getTeamName());
+        assertEquals("Renamed FTB Party", updatedWs.buildMetaPacket().getTeamName());
+        assertTrue(savedData.isDirty());
+
+        savedData.setDirty(false);
+        savedData.getOrCreateWorkspace(teamId, "");
+        savedData.getOrCreateWorkspace(teamId, null);
+        assertEquals("Renamed FTB Party", updatedWs.getTeamName());
+        assertFalse(savedData.isDirty());
+
+        CompoundTag nbt = savedData.save(new CompoundTag());
+        TeamBoardSavedData reloaded = TeamBoardSavedData.load(nbt);
+        assertEquals("Renamed FTB Party", reloaded.getWorkspace(teamId).getTeamName());
+        assertNotNull(reloaded.getWorkspace(teamId).getPage("page_chem"));
+    }
 }

@@ -316,8 +316,8 @@ public final class ProductionETACalculator {
             IngredientStack inStack = node.getInputs().get(i);
             if (inStack == null || hasIncomingEdge(graph, node.getId(), i)) continue;
 
-            double inputRatePerSec = inStack.getAmount() * node.getOverclockResult().getCyclesPerSecond()
-                    * node.getTotalParallel() * node.getMachineCount();
+            double inputRatePerSec = inStack.getAmount() * node.getNominalCyclesPerSecond();
+
             accumulateRawMaterialDemand(result, inStack, inputRatePerSec * etaSec);
         }
     }

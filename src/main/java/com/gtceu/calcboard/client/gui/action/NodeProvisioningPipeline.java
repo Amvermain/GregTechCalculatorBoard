@@ -21,12 +21,15 @@ public final class NodeProvisioningPipeline {
     private NodeProvisioningPipeline() {}
 
     public static void provision(RecipeNode node, BoardPage page) {
-        if (node == null || page == null) return;
-        GTVoltageTier targetTier = page.getDefaultVoltageTier();
+        if (node == null) return;
+        GTVoltageTier targetTier = page != null ? page.getDefaultVoltageTier() : GTVoltageTier.LV;
         if (targetTier == null) return;
         if (node.getEnergyType() != EnergyType.ELECTRIC_EU) return;
 
         GTVoltageTier recipeTier = node.getRecipeTier();
+        if (node.isGenerator() && node.isMultiblock() && node.getBaseEUt() > 0) {
+            recipeTier = GTVoltageTier.getTierForVoltage((long) Math.ceil(node.getBaseEUt() / 2.0));
+        }
         GTVoltageTier effectiveTier = targetTier;
         if (recipeTier != null && recipeTier.ordinal() > targetTier.ordinal()) {
             effectiveTier = recipeTier;
@@ -44,7 +47,7 @@ public final class NodeProvisioningPipeline {
     }
 
     private static void provisionMultiblock(RecipeNode node, BoardPage page, GTVoltageTier effectiveTier) {
-        if (!page.isAutoEquipEnergyHatches()) return;
+        if (page != null && !page.isAutoEquipEnergyHatches()) return;
 
         boolean hasCustomHatch = node.getAddons().stream().anyMatch(a -> a.getCategory() == MachineAddon.Category.ENERGY_HATCH);
         if (hasCustomHatch) return;

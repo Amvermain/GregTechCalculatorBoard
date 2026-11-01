@@ -236,7 +236,9 @@ public class GTCEuMachineDialogHeaderHandler {
         if (!node.isMultiblock()) {
             return handleSingleBlockHeaderClick(node, x, y, mouseX, mouseY, parent);
         }
-        if (GTCEuNodeCardGuiHandler.isFusionMachine(node) || GTCEuNodeCardGuiHandler.isCoilMultiblock(node)) {
+        if (GTCEuNodeCardGuiHandler.isFusionMachine(node)
+                || GTCEuNodeCardGuiHandler.isCoilMultiblock(node)
+                || com.gtceu.calcboard.compat.start.StarTHellForgeHelper.isHellForge(node)) {
             return handleFusionOrCoilHeaderClick(dialog, node, x, y, dialogW, mouseX, mouseY, parent);
         }
         return handleGenericMultiblockHeaderClick(dialog, node, x, y, dialogW, mouseX, mouseY, parent);
@@ -391,7 +393,7 @@ public class GTCEuMachineDialogHeaderHandler {
 
     private boolean handleFusionOrCoilHeaderClick(MachineConfigDialog dialog, RecipeNode node, int x, int y, int dialogW,
                                                   double mouseX, double mouseY, BoardScreen parent) {
-        if (GTCEuNodeCardGuiHandler.isCoilMultiblock(node)) {
+        if (GTCEuNodeCardGuiHandler.isCoilMultiblock(node) || com.gtceu.calcboard.compat.start.StarTHellForgeHelper.isHellForge(node)) {
             boolean supportsParHatch = MultiblockDetector.supportsParallelHatch(node.getMachineIcon(), node.getAvailableWorkstations());
             int parBtnW = supportsParHatch ? 120 : 0;
             int parBtnX = x + dialogW - 10 - parBtnW;
@@ -529,7 +531,9 @@ public class GTCEuMachineDialogHeaderHandler {
                 return true;
             }
         }
-        if (GTCEuNodeCardGuiHandler.isFusionMachine(node) || GTCEuNodeCardGuiHandler.isCoilMultiblock(node)) {
+        if (GTCEuNodeCardGuiHandler.isFusionMachine(node)
+                || GTCEuNodeCardGuiHandler.isCoilMultiblock(node)
+                || com.gtceu.calcboard.compat.start.StarTHellForgeHelper.isHellForge(node)) {
             if (mouseY >= y + 36 && mouseY <= y + 50 && mouseX >= x + 10 && mouseX <= x + dialogW - 10) {
                 state.setHeaderRow1ScrollX(Math.max(0, Math.min(state.getMaxHeaderRow1ScrollX(), state.getHeaderRow1ScrollX() - delta * 24.0)));
                 return true;
@@ -547,7 +551,7 @@ public class GTCEuMachineDialogHeaderHandler {
         if (GTCEuNodeCardGuiHandler.isFusionMachine(node)) {
             return executeFusionSelection(dialog, node, x, y, dialogW, mouseX, mouseY, parent, row);
         }
-        if (GTCEuNodeCardGuiHandler.isCoilMultiblock(node)) {
+        if (GTCEuNodeCardGuiHandler.isCoilMultiblock(node) || com.gtceu.calcboard.compat.start.StarTHellForgeHelper.isHellForge(node)) {
             return executeCoilSelection(dialog, node, x, y, dialogW, mouseX, mouseY, parent, row);
         }
         return false;
@@ -619,6 +623,9 @@ public class GTCEuMachineDialogHeaderHandler {
             return selectCoilController(dialog, node, x, mouseX, parent);
         }
         if (row == 2 && mouseY >= y + 51 && mouseY <= y + 66 && mouseX >= x + 10 && mouseX <= x + dialogW - 10) {
+            if (com.gtceu.calcboard.compat.start.StarTHellForgeHelper.isHellForge(node)) {
+                return StarTHellForgeHeaderRenderer.selectHellForgeFluid(dialog, node, x, mouseX, parent, state);
+            }
             return selectCoil(dialog, node, x, mouseX, parent);
         }
         return false;

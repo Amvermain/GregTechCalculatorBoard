@@ -156,6 +156,9 @@ public final class AutoRatioBottleneckResolver {
             if (newCount <= currentCount + 1e-4) continue;
 
             p.setMachineCount(newCount);
+            if (p.isCompoundNode()) {
+                graph.syncCompoundParameters(p);
+            }
             changed = true;
 
             propagateBottleneckUpstream(graph, p, newCount, anchor, upstreamNodes, downstreamNodes, cyclicNodes, integerCounts, divergenceContext);
@@ -190,6 +193,9 @@ public final class AutoRatioBottleneckResolver {
                 }
             }
             un.setMachineCount(Math.min(MAX_AUTO_RATIO_MACHINE_COUNT, e.getValue()));
+            if (un.isCompoundNode()) {
+                graph.syncCompoundParameters(un);
+            }
         }
     }
 

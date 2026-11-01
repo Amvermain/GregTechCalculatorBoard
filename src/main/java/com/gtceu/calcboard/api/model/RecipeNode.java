@@ -1430,6 +1430,7 @@ public class RecipeNode {
 
     public void setParentGraph(FlowGraph parentGraph) {
         this.parentGraph = parentGraph;
+        markOverclockDirty();
         markOperationalDirty();
     }
 
@@ -1488,6 +1489,9 @@ public class RecipeNode {
     public void markOverclockDirty() {
         if (role != null) {
             role.markDirty();
+            if (parentGraph != null && isCompoundNode()) {
+                parentGraph.markCompoundGroupRolesDirty(getCompoundGroupId());
+            }
         }
     }
 

@@ -303,6 +303,11 @@ public class FlowGraph {
             node.setParentGraph(this);
             nodes.add(node);
             nodeMap.put(node.getId(), node);
+            if (node.isCompoundNode()) {
+                for (RecipeNode sib : findCompoundSiblingNodes(node.getCompoundGroupId())) {
+                    sib.markOverclockDirty();
+                }
+            }
             invalidatePortStatsCache();
         }
     }
@@ -346,6 +351,7 @@ public class FlowGraph {
                 siblings.add(n);
             }
         }
+        repairCompoundGroupIndices(siblings, compoundGroupId);
         return siblings;
     }
 
@@ -381,24 +387,106 @@ public class FlowGraph {
         invalidatePortStatsCache();
     }
 
+    private transient boolean syncingCompound = false;
+
+    public void markCompoundGroupRolesDirty(String compoundGroupId) {
+        if (compoundGroupId == null || compoundGroupId.isEmpty()) return;
+        for (RecipeNode n : nodes) {
+            if (compoundGroupId.equals(n.getCompoundGroupId()) && n.getRole() != null) {
+                n.getRole().markDirty();
+            }
+        }
+    }
+
     public void syncCompoundParameters(RecipeNode sourceNode) {
-        if (sourceNode == null || !sourceNode.isCompoundNode()) return;
+        if (syncingCompound || sourceNode == null || !sourceNode.isCompoundNode()) return;
         String groupId = sourceNode.getCompoundGroupId();
         List<RecipeNode> siblings = findCompoundSiblingNodes(groupId);
-        for (RecipeNode sibling : siblings) {
-            if (sibling.getId().equals(sourceNode.getId())) continue;
-            sibling.setMachineCount(sourceNode.getMachineCount());
-            sibling.setTargetTier(sourceNode.getTargetTier());
-            sibling.setOverclockMode(sourceNode.getOverclockMode());
-            sibling.setParallel(sourceNode.getParallel());
-            sibling.setSteamMode(sourceNode.getSteamMode());
-            sibling.setMultiblock(sourceNode.isMultiblock());
-            sibling.setGenerator(sourceNode.isGenerator());
-
-            sibling.getProperties().copyFrom(sourceNode.getProperties());
+        syncingCompound = true;
+        try {
+            for (RecipeNode sibling : siblings) {
+                if (!sibling.getId().equals(sourceNode.getId())) {
+                    syncSingleCompoundSibling(sourceNode, sibling, groupId);
+                }
+            }
+            refreshCompoundSiblingProjections(siblings);
+        } finally {
+            syncingCompound = false;
         }
         invalidatePortStatsCache();
     }
+
+    private void syncSingleCompoundSibling(RecipeNode sourceNode, RecipeNode sibling, String groupId) {
+        int sibLayerIndex = sibling.getCompoundLayerIndex();
+        int sibTotalLayers = sibling.getCompoundTotalLayers();
+        String sibMasterId = sibling.getCompoundMasterNodeId();
+
+        sibling.setMachineIcon(sourceNode.getMachineIcon());
+        sibling.setMultiblock(sourceNode.isMultiblock());
+        sibling.setGenerator(sourceNode.isGenerator());
+
+        copyCompoundAddons(sourceNode, sibling);
+        sibling.getProperties().copyFrom(sourceNode.getProperties());
+        sibling.setCompoundMetadata(groupId, sibLayerIndex, sibTotalLayers, sibMasterId);
+
+        sibling.setMachineCount(sourceNode.getMachineCount());
+        sibling.setTargetTier(sourceNode.getTargetTier());
+        sibling.setOverclockMode(sourceNode.getOverclockMode());
+        sibling.setParallel(sourceNode.getParallel());
+        sibling.setCustomParallel(sourceNode.getCustomParallel());
+        sibling.setSteamMode(sourceNode.getSteamMode());
+    }
+
+    private void refreshCompoundSiblingProjections(List<RecipeNode> siblings) {
+        for (RecipeNode sibling : siblings) {
+            sibling.markOverclockDirty();
+            sibling.markOperationalDirty();
+            sibling.syncProjectedPorts();
+        }
+    }
+
+    private void copyCompoundAddons(RecipeNode sourceNode, RecipeNode sibling) {
+        sibling.getAddons().clear();
+        for (com.gtceu.calcboard.api.catalog.MachineAddon addon : sourceNode.getAddons()) {
+            if (addon != null) {
+                sibling.getAddons().add(addon.copy());
+            }
+        }
+    }
+
+    private void repairCompoundGroupIndices(List<RecipeNode> siblings, String groupId) {
+        if (siblings.size() <= 1 || !hasCorruptedCompoundIndices(siblings)) return;
+        String masterId = resolveCompoundMasterId(siblings);
+        int totalLayers = Math.max(siblings.size(), siblings.get(0).getCompoundTotalLayers());
+        int nextIdx = 1;
+        for (RecipeNode sibling : siblings) {
+            int assignedIdx = sibling.getId().equals(masterId) ? 0 : nextIdx++;
+            sibling.setCompoundMetadata(groupId, assignedIdx, totalLayers, masterId);
+        }
+    }
+
+    private boolean hasCorruptedCompoundIndices(List<RecipeNode> siblings) {
+        Set<Integer> seenIndices = new HashSet<>();
+        boolean hasZeroIndex = false;
+        for (RecipeNode sibling : siblings) {
+            int idx = sibling.getCompoundLayerIndex();
+            if (!seenIndices.add(idx)) return true;
+            if (idx == 0) hasZeroIndex = true;
+        }
+        return !hasZeroIndex;
+    }
+
+    private String resolveCompoundMasterId(List<RecipeNode> siblings) {
+        for (RecipeNode sibling : siblings) {
+            String masterId = sibling.getCompoundMasterNodeId();
+            if (!masterId.isEmpty() && sibling.getId().equals(masterId)) {
+                return masterId;
+            }
+        }
+        return siblings.get(0).getId();
+    }
+
+
 
     public RecipeNode findNodeById(String id) {
         if (id == null) return null;

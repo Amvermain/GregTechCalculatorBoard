@@ -238,6 +238,9 @@ public final class GTCEuMachineLifecycleHandler {
     }
 
     private static void configureTurbineParallel(RecipeNode node, ResourceLocation oldIcon, int defPar) {
+        if (node.getProperties().has(GTCEuProperties.DYNAMO_AMPERAGE)) {
+            GTTurbineHelper.setDynamoAmperage(node, GTTurbineHelper.getDynamoAmperage(node));
+        }
         if (oldIcon != null && MultiblockDetector.isTurbineMachine(oldIcon)) {
             if (GTTurbineHelper.hasRotorAddon(node)) {
                 GTTurbineHelper.autoCalculateTurbineParallel(node);
@@ -249,6 +252,12 @@ public final class GTCEuMachineLifecycleHandler {
         if (defPar > 1) {
             node.setParallel(defPar);
         }
+    }
+
+    public static void ensureDefaultMachineTraits(RecipeNode node, ResourceLocation icon) {
+        if (node == null || icon == null || !node.isMultiblock()) return;
+        ensureAddonIfSupported(node, "gtceu:throughput_boosting", MultiblockDetector.supportsThroughputBoosting(icon));
+        ensureAddonIfSupported(node, "gtceu:overpressure_autoclave", MultiblockDetector.supportsOverpressure(icon));
     }
 
     private static void ensureAddonIfSupported(RecipeNode node, String addonId, boolean isSupported) {

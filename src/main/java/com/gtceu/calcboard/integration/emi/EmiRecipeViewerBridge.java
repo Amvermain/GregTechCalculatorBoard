@@ -442,4 +442,12 @@ public final class EmiRecipeViewerBridge implements IRecipeViewerBridge {
         }
         return null;
     }
+
+    @Override
+    public List<ResourceLocation> findAllWorkstations(Object recipe) {
+        if (recipe instanceof dev.emi.emi.api.recipe.EmiRecipe emi) {
+            return EmiRecipeConverter.findAllWorkstations(emi);
+        }
+        return List.of();
+    }
 }
